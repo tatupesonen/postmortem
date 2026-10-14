@@ -27,7 +27,11 @@
   **artifact events** (web history, downloads, cookies, bookmarks,
   searches, autofill, EXIF) loaded from the case DB
   (`pm-ui/src/timeline_artifacts.rs`); the timeline rebuilds when an
-  analysis finishes.
+  analysis finishes. **Details view** (`pm-ui/src/timeline_details.rs`):
+  events grouped by type + description (Short/Medium/Full detail),
+  clustered in time (gap = span/80), packed into labelled stripes on a
+  time axis; click selects (viewer + event table), double-click zooms,
+  Ctrl/⌘+wheel zooms.
 
 ### How to try it
 1. `cargo build --release -p postmortem && ./target/release/postmortem`
@@ -47,9 +51,11 @@
   image), Picture Analyzer end-to-end, timeline chart widget (kittest
   screenshot + interactions), timeline artifact events (mapping, source
   file location), overview range slider.
-- Timeline: only Counts and List views; Autopsy's **Details** view
-  (clustered event stripes), toolbar/filter-panel restyle to match
-  Autopsy, Description-detail zoom, tag/hash-hit filters not done.
+- Timeline: Details view lacks Autopsy's cluster expand/collapse into
+  sub-clusters, pinning and the bundled "same description" grouping;
+  toolbar/filter-panel restyle to match Autopsy and tag/hash-hit filters
+  not done. Tests owed for the Details view (clustering, description
+  levels beyond the unit test, packing, interactions).
   Artifact events lose their own description column (shown in path).
 - Recent Activity gaps: Firefox (helper `prtime` already in place),
   Safari, legacy Edge (ESE WebCacheV01.dat), Chrome cache/favicons/
@@ -64,7 +70,7 @@
 1. Run the gate, fix, add the owed tests above.
 2. Tantivy file-name search (`pm-search`, design below in this file).
 3. Firefox + remaining Recent Activity; File Type Identification.
-4. Timeline Details view and Autopsy-style toolbar/filters.
+4. Timeline Details polish (expand/pin) and Autopsy-style toolbar/filters.
 
 ## Blockers
 

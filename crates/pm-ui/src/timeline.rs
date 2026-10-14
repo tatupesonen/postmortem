@@ -42,6 +42,7 @@ const MAX_BINS: usize = 400;
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
     Counts,
+    Details,
     List,
 }
 
@@ -93,6 +94,10 @@ pub(crate) struct TimelineWindow {
     prefs: DisplayPrefs,
     /// "View in Timeline" requested before events were ready.
     pending_focus: Option<((i64, i64), Filter)>,
+    /// Details view: description detail, clusters cache, selected cluster.
+    desc_level: crate::timeline_details::DescLevel,
+    details: Option<(String, Vec<crate::timeline_details::Cluster>)>,
+    detail_sel: Option<usize>,
     /// Whole-span histogram for the range slider.
     overview: Option<((i64, i64), Vec<u64>)>,
     /// Case whose artifacts (web history, …) become events too.
@@ -136,6 +141,9 @@ impl TimelineWindow {
             pending_focus: None,
             overview: None,
             case,
+            desc_level: crate::timeline_details::DescLevel::default(),
+            details: None,
+            detail_sel: None,
         }
     }
 
@@ -144,6 +152,7 @@ impl TimelineWindow {
         self.timeline = None;
         self.building = None;
         self.overview = None;
+        self.details = None;
         self.cache = Cache::default();
     }
 
@@ -340,6 +349,13 @@ impl TimelineWindow {
                 let range = self.selection.unwrap_or(self.range);
                 self.event_table(ui, &timeline, range);
             }
+            Mode::Details => {
+                let h = (ui.available_height() * 0.6).max(160.0);
+                self.details_view(ui, &timeline, h);
+                ui.separator();
+                let range = self.selection.unwrap_or(self.range);
+                self.event_table(ui, &timeline, range);
+            }
             Mode::List => {
                 let range = self.range;
                 self.event_table(ui, &timeline, range);
@@ -384,7 +400,15 @@ impl TimelineWindow {
         ui.horizontal_wrapped(|ui| {
             ui.label("View:");
             ui.selectable_value(&mut self.mode, Mode::Counts, "Counts");
+            ui.selectable_value(&mut self.mode, Mode::Details, "Details");
             ui.selectable_value(&mut self.mode, Mode::List, "List");
+            if self.mode == Mode::Details {
+                ui.separator();
+                ui.label("Description detail:");
+                for l in crate::timeline_details::DescLevel::ALL {
+                    ui.selectable_value(&mut self.desc_level, l, l.name());
+                }
+            }
             ui.separator();
             if ui
                 .add_enabled(!self.back.is_empty(), egui::Button::new("⏴"))
@@ -602,6 +626,44 @@ impl TimelineWindow {
         {
             self.range = r;
             self.selection = None;
+        }
+    }
+
+    fn details_view(&mut self, ui: &mut egui::Ui, timeline: &Timeline, height: f32) {
+        use crate::timeline_details::{DetailsEvent, clusters, view};
+        let range = self.range;
+        let key = format!("{range:?}{}{:?}", filter_key(&self.filter), self.desc_level);
+        if self.details.as_ref().is_none_or(|d| d.0 != key) {
+            let rows = timeline.list(range.0, range.1, &self.filter);
+            let gap = ((range.1 - range.0) / 80).max(1);
+            self.details = Some((key, clusters(&rows, timeline, self.desc_level, gap)));
+            self.detail_sel = None;
+        }
+        let tz = self.tz().clone();
+        let cl = self.details.as_ref().map(|d| d.1.clone()).unwrap_or_default();
+        for e in view(ui, height, &cl, range, &tz, self.detail_sel) {
+            match e {
+                DetailsEvent::Select(sel) => {
+                    self.detail_sel = sel;
+                    match sel.and_then(|i| cl.get(i)) {
+                        Some(c) => {
+                            self.selection = Some((c.start, c.end + 1));
+                            let row = ListRow {
+                                time: c.start,
+                                subject: c.subject,
+                                kinds: vec![c.kind],
+                            };
+                            let content = self.content_for(&row);
+                            self.viewer.set_content(content);
+                        }
+                        None => self.selection = None,
+                    }
+                }
+                DetailsEvent::ZoomTo(r) => self.push(r, self.filter.clone()),
+                DetailsEvent::Wheel { zoom_in, anchor } => {
+                    self.zoom_by(if zoom_in { 0.8 } else { 1.25 }, Some(anchor));
+                }
+            }
         }
     }
 
