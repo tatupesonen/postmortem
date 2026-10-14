@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>postmortem — tombstone</title>
+  <rect width="512" height="512" rx="112" fill="#14161B"/>
+  <path d="M148 390V230A108 108 0 0 1 364 230V390Z" fill="#E8EAEE"/>
+  <rect x="232" y="214" width="48" height="84" fill="#F0435A"/>
+</svg>

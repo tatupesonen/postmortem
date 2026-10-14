@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>postmortem — p monogram</title>
+  <rect width="512" height="512" rx="112" fill="#14161B"/>
+  <mask id="hub">
+    <rect width="512" height="512" fill="#fff"/>
+    <circle cx="276" cy="224" r="36"/>
+  </mask>
+  <circle cx="276" cy="224" r="112" fill="#E8EAEE" mask="url(#hub)"/>
+  <rect x="164" y="112" width="48" height="300" fill="#E8EAEE"/>
+  <circle cx="276" cy="224" r="16" fill="#F0435A"/>
+</svg>

@@ -30,9 +30,11 @@ fn main() {
             size,
         );
     }
-    render(
-        &dir.join("postmortem-wordmark.svg"),
-        &dir.join("postmortem-wordmark.png"),
-        1720,
-    );
+    for bg in ["on-dark", "on-light"] {
+        render(
+            &dir.join(format!("postmortem-wordmark-{bg}.svg")),
+            &dir.join(format!("postmortem-wordmark-{bg}.png")),
+            1600,
+        );
+    }
 }

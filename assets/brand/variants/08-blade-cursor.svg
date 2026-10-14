@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <title>postmortem — blade cursor</title>
+  <rect width="512" height="512" rx="112" fill="#14161B"/>
+  <path d="M200 120H312M200 392H312" stroke="#E8EAEE" stroke-width="28" stroke-linecap="butt"/>
+  <path d="M236 134H280V268C280 316 262 352 236 378Z" fill="#F0435A"/>
+</svg>

@@ -25,9 +25,11 @@ pub use model::{Content, DataSource, FileRow, NodeId};
 /// Starts the GUI, optionally opening the given images immediately.
 /// App icon (512 px PNG rendered from `assets/brand/postmortem-icon.svg`).
 pub(crate) const ICON_PNG: &[u8] = include_bytes!("../../../assets/brand/postmortem-icon-512.png");
-/// Wordmark for About / welcome screens.
-pub(crate) const WORDMARK_PNG: &[u8] =
-    include_bytes!("../../../assets/brand/postmortem-wordmark.png");
+/// Wordmark for About / welcome screens, one per theme (transparent background).
+pub(crate) const WORDMARK_ON_DARK_PNG: &[u8] =
+    include_bytes!("../../../assets/brand/postmortem-wordmark-on-dark.png");
+pub(crate) const WORDMARK_ON_LIGHT_PNG: &[u8] =
+    include_bytes!("../../../assets/brand/postmortem-wordmark-on-light.png");
 
 pub fn run(open: Vec<PathBuf>) -> eframe::Result {
     let mut viewport = egui::ViewportBuilder::default();

@@ -1,0 +1,28 @@
+[package]
+name = "pm-modules"
+description = "postmortem's built-in ingest modules (Autopsy core analysers)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+pm-casedb.workspace = true
+pm-ingest.workspace = true
+pm-hashdb.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+parking_lot.workspace = true
+md-5.workspace = true
+sha2.workspace = true
+
+[dev-dependencies]
+pm-case.workspace = true
+pm-testkit.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

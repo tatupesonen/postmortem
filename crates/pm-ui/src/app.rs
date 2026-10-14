@@ -69,7 +69,8 @@ pub struct PostmortemApp {
     errors: Vec<String>,
     about_open: bool,
     exports: Vec<Task<Result<String, String>>>,
-    wordmark: Option<egui::TextureHandle>,
+    /// Decoded wordmark texture and whether it is the dark-theme variant.
+    wordmark: Option<(bool, egui::TextureHandle)>,
     timeline: Option<Arc<Mutex<TimelineWindow>>>,
     timeline_closed: Arc<AtomicBool>,
     gallery: Option<Arc<Mutex<GalleryWindow>>>,
@@ -473,17 +474,23 @@ impl PostmortemApp {
         );
     }
 
-    /// The decoded wordmark texture (created on first use).
+    /// The wordmark texture for the current theme (decoded on first use and
+    /// again when the theme flips).
     fn wordmark(&mut self, ctx: &egui::Context) -> Option<egui::TextureHandle> {
-        if self.wordmark.is_none() {
-            let img = image::load_from_memory(crate::WORDMARK_PNG)
-                .ok()?
-                .to_rgba8();
+        let dark = ctx.theme() == egui::Theme::Dark;
+        if self.wordmark.as_ref().is_none_or(|(d, _)| *d != dark) {
+            let png = if dark {
+                crate::WORDMARK_ON_DARK_PNG
+            } else {
+                crate::WORDMARK_ON_LIGHT_PNG
+            };
+            let img = image::load_from_memory(png).ok()?.to_rgba8();
             let size = [img.width() as usize, img.height() as usize];
             let color = egui::ColorImage::from_rgba_unmultiplied(size, img.as_raw());
-            self.wordmark = Some(ctx.load_texture("wordmark", color, egui::TextureOptions::LINEAR));
+            let tex = ctx.load_texture("wordmark", color, egui::TextureOptions::LINEAR);
+            self.wordmark = Some((dark, tex));
         }
-        self.wordmark.clone()
+        self.wordmark.as_ref().map(|(_, t)| t.clone())
     }
 
     // ------------------------------------------------------------ panels
@@ -875,7 +882,7 @@ impl PostmortemApp {
             ui.vertical_centered(|ui| {
                 ui.add_space((ui.available_height() / 2.0 - 150.0).max(0.0));
                 if let Some(tex) = self.wordmark(ui.ctx()) {
-                    ui.add(egui::Image::new(&tex).max_width(560.0));
+                    ui.add(egui::Image::new(&tex).max_width(420.0));
                 }
                 ui.add_space(18.0);
                 ui.weak("Add a data source to begin (Case › Add Data Source…), or drop a disk image here.");
@@ -1077,7 +1084,8 @@ impl PostmortemApp {
             let wordmark = self.wordmark(ctx);
             let r = egui::Modal::new(egui::Id::new("about")).show(ctx, |ui| {
                 if let Some(tex) = &wordmark {
-                    ui.add(egui::Image::new(tex).max_width(430.0));
+                    ui.add(egui::Image::new(tex).max_width(320.0));
+                    ui.add_space(8.0);
                 }
                 ui.label(format!("Version {}", env!("CARGO_PKG_VERSION")));
                 ui.label("A digital forensics platform written in Rust,");
