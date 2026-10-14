@@ -166,6 +166,28 @@ impl CaseDb {
         Ok(())
     }
 
+    /// First unused file id (for pre-assigning ids before a bulk load).
+    pub fn next_file_id(&self) -> Result<i64> {
+        self.read(|c| {
+            Ok(
+                c.query_row("SELECT COALESCE(MAX(id), 0) + 1 FROM files", [], |r| {
+                    r.get(0)
+                })?,
+            )
+        })
+    }
+
+    /// Layout JSON of an unallocated-space or carved file.
+    pub fn file_layout(&self, id: i64) -> Result<Option<String>> {
+        self.read(|c| {
+            Ok(
+                c.query_row("SELECT layout FROM files WHERE id = ?1", [id], |r| r.get(0))
+                    .optional()?
+                    .flatten(),
+            )
+        })
+    }
+
     pub fn schema_version(&self) -> Result<i64> {
         self.read(schema_version)
     }
@@ -709,6 +731,8 @@ impl Bulk<'_> {
             extension_of(&f.name),
             f.derived_from,
             f.local_path,
+            f.layout,
+            f.id,
         ])?;
         let id = self.conn.last_insert_rowid();
         self.tick()?;
@@ -757,8 +781,8 @@ const FILE_INDEXES: &[(&str, &str)] = &[
 ];
 
 const INSERT_FILE: &str = "INSERT INTO files (ds_id, fs_id, parent_id, origin, inode, stream, name, parent_path, kind, name_alloc, meta_alloc, meta_flags, size, \
-    mtime, mtime_ns, atime, atime_ns, ctime, ctime_ns, crtime, crtime_ns, mode, uid, gid, seq, attributes, extension, derived_from, local_path) \
-    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29)";
+    mtime, mtime_ns, atime, atime_ns, ctime, ctime_ns, crtime, crtime_ns, mode, uid, gid, seq, attributes, extension, derived_from, local_path, layout, id) \
+    VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12, ?13, ?14, ?15, ?16, ?17, ?18, ?19, ?20, ?21, ?22, ?23, ?24, ?25, ?26, ?27, ?28, ?29, ?30, ?31)";
 
 pub(crate) const FILE_COLS: &str = "id, ds_id, fs_id, parent_id, origin, inode, stream, name, parent_path, kind, name_alloc, meta_alloc, meta_flags, size, \
     mtime, mtime_ns, atime, atime_ns, ctime, ctime_ns, crtime, crtime_ns, mode, uid, gid, seq, attributes, extension, mime, md5, sha1, sha256, known, derived_from, local_path";

@@ -243,6 +243,9 @@ impl Known {
 /// A file to insert.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewFile {
+    /// Pre-assigned id (lets parallel producers know parent ids before the
+    /// single writer inserts); `None` lets SQLite assign one.
+    pub id: Option<i64>,
     pub ds_id: i64,
     pub fs_id: Option<i64>,
     pub parent_id: Option<i64>,
@@ -266,6 +269,8 @@ pub struct NewFile {
     pub attributes: Option<u32>,
     pub derived_from: Option<i64>,
     pub local_path: Option<String>,
+    /// JSON byte ranges for unallocated-space and carved files.
+    pub layout: Option<String>,
 }
 
 /// A file row.

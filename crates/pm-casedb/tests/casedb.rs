@@ -44,6 +44,7 @@ fn file(
     alloc: bool,
 ) -> NewFile {
     NewFile {
+        id: None,
         ds_id,
         fs_id: Some(fs_id),
         parent_id: parent,
@@ -70,6 +71,7 @@ fn file(
         attributes: None,
         derived_from: None,
         local_path: None,
+        layout: None,
     }
 }
 
@@ -527,6 +529,30 @@ fn readers_see_committed_data_while_writing() {
             db.set_meta("k", &i.to_string()).unwrap();
         }
     });
+}
+
+#[test]
+fn preassigned_ids_and_layout() {
+    let (_d, db) = new_db();
+    let (ds_id, fs_id, root, _) = populate(&db);
+    let next = db.next_file_id().unwrap();
+    let mut f = file(
+        ds_id,
+        fs_id,
+        Some(root),
+        "/",
+        "Unalloc_1_0_4096",
+        FileKindCode::Regular,
+        4096,
+        false,
+    );
+    f.id = Some(next + 100);
+    f.origin = Origin::UnallocBlocks;
+    f.layout = Some("[[0,4096]]".into());
+    let id = db.bulk(|b| b.add_file(&f)).unwrap();
+    assert_eq!(id, next + 100);
+    assert_eq!(db.file_layout(id).unwrap().as_deref(), Some("[[0,4096]]"));
+    assert_eq!(db.file(id).unwrap().unwrap().origin, Origin::UnallocBlocks);
 }
 
 #[test]
