@@ -46,7 +46,8 @@ Never modify it.
 
 Run `scripts/gate.sh` from `/Users/tatu/slop/postmortem` (fmt check, clippy
 with `-D warnings`, all tests). **Commit only as `scripts/gate.sh && git commit …`**
-so that a red gate can never be committed.
+so that a red gate can never be committed. **Never pipe the gate** (`gate.sh | tail` returns tail's exit
+status and lets a red gate through).
 
 UI snapshot tests (egui_kittest) and slow tests (large fixtures, fuzz corpora)
 may be gated behind `--features slow-tests`/`#[ignore]` and run at milestone

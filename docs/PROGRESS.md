@@ -2,18 +2,36 @@
 
 ## Now
 
-- M1 next: `pm-fs-ext` (ext2/3/4). Fixture options: the `fstool` crate
-  (pure-Rust ext2/3/4 image *writer*, dev-dependency) for in-test images,
-  plus TSK `fls`/`istat` differential. Then HFS+/APFS (hdiutil can create
-  both on macOS), ISO9660/UDF (hdiutil `makehybrid`), then VMDK/VHD/QCOW2
-  (qemu-img is installed), then M2 (case DB).
-- Keep the UI working: register each new FS in `pm-evidence::probe_fs`.
+- User asked (2026-10-14) for the analysis tools, starting with the Timeline
+  (first cut done). Next, analysis tools that the file index supports
+  without ingest: **Data Source Summary** (Types tab: counts by
+  category/extension/deleted/size), **Image Gallery** (pictures grouped by
+  folder, with thumbnails), **File Discovery** (filters by
+  type/size/time/path). Then the remaining Timeline items, then M2 (case DB)
+  so analysis results persist.
+- M1 leftovers: HFS+/APFS, ISO, XFS (fstool can write fixtures for most),
+  VMDK/VHD/QCOW2 (qemu-img).
 
 ## Blockers
 
 _None._
 
 ## Log
+
+### 2026-10-14 — ext + Timeline
+- `pm-fs-ext` (ext2/3/4) using `fstool` (pinned exact) as the fixture
+  writer. Exact `fls` parity on ext2/3/4; wired into `pm-evidence`.
+- `pm-timeline`: Autopsy event-type hierarchy (sub-type colours tuned for
+  contrast), calendar binning (RangeDivision rule, DST-correct), AND
+  filters (types, data sources, file categories, deleted, text), counts
+  and MACB list rows. Parallel FS event collection with progress.
+- Timeline window (native pop-out): counts chart (hover, click to select a
+  bin, double-click or drag to zoom, wheel zoom), list view, history,
+  presets, filters, content viewer, and "View File in Timeline" from the
+  table. Demo disk now has realistic varied timestamps (a deletion burst
+  on 2021-05-31).
+- Process slip: one commit went in red because `gate.sh` was piped. Fixed
+  by amending; LOOP.md now says never pipe the gate. Workspace: 208 tests.
 
 ### 2026-10-14 — logo + exFAT
 - Brand: `assets/brand` SVG icon (disk platter with a stitched Y-incision)

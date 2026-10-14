@@ -235,7 +235,8 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Registry viewer, SQLite viewer, plist viewer, HTML viewer, PDF viewer, media viewer, message/contact/call-log artifact viewers
 
 ### M7 — Analysis views
-- [ ] Timeline: event generation, filters, counts/details/list views, zoom, histogram, snapshot report
+- [x] Timeline (first cut): `pm-timeline` (event-type tree, calendar bins with Autopsy's RangeDivision rule, filters, counts, MACB list) + FS event collection + native-window UI (counts chart with drag/double-click/wheel zoom, list view, filters, history, presets, content viewer, View File in Timeline)
+- [ ] Timeline remaining: Details view (clustered stripes), artifact events (after M4/M6), tags/hash-hit filters, Add Event, Snapshot report, bottom range-slider histogram
 - [ ] Communications: accounts browser, relationship graph, message/contacts/call-log views, filters
 - [ ] Geolocation: map tiles (online plus offline MBTiles), waypoints/tracks/routes/areas, filters, KML export
 - [ ] Image Gallery: grouping, categories (Project VIC), hash-hit marking, slideshow, thumbnail cache

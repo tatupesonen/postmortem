@@ -95,6 +95,7 @@ pub struct TableEvents {
     pub activated: Option<usize>,
     pub popout: Option<usize>,
     pub export: Option<usize>,
+    pub timeline: Option<usize>,
 }
 
 /// Persistent table state.
@@ -312,6 +313,19 @@ impl TableState {
                                     .clicked()
                                 {
                                     ev.export = Some(i);
+                                    ui.close();
+                                }
+                                let has_time = r.meta.as_ref().is_some_and(|m| {
+                                    m.times.modified.or(m.times.created).is_some()
+                                });
+                                if ui
+                                    .add_enabled(
+                                        has_time && !r.is_dir(),
+                                        egui::Button::new("View File in Timeline…"),
+                                    )
+                                    .clicked()
+                                {
+                                    ev.timeline = Some(i);
                                     ui.close();
                                 }
                                 if ui.button("Copy Path").clicked() {

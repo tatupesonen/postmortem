@@ -9,6 +9,7 @@ mod format;
 mod model;
 mod table;
 mod task;
+mod timeline;
 mod viewers;
 
 use std::path::PathBuf;

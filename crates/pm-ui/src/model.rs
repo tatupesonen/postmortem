@@ -78,6 +78,28 @@ pub struct FileRow {
 }
 
 impl FileRow {
+    /// Builds a row for a known inode (used when navigating from results
+    /// such as the timeline rather than a directory listing).
+    pub(crate) fn from_fs(
+        fs: &dyn FileSystem,
+        inode: InodeId,
+        path: &str,
+        name_allocated: bool,
+    ) -> Self {
+        let meta = fs.metadata(inode).ok();
+        let name = path.rsplit('/').next().unwrap_or(path).to_owned();
+        Self {
+            name,
+            inode,
+            stream: None,
+            kind: meta.as_ref().map_or(FileKind::Unknown, |m| m.kind),
+            name_allocated,
+            size: meta.as_ref().map_or(0, |m| m.size),
+            meta,
+            path: path.to_owned(),
+        }
+    }
+
     pub fn is_dir(&self) -> bool {
         self.kind == FileKind::Directory && self.stream.is_none()
     }

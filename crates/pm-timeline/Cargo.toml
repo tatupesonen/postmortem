@@ -1,0 +1,23 @@
+[package]
+name = "pm-timeline"
+description = "Timeline event model, filters, calendar binning and aggregation for postmortem"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+pm-fs.workspace = true
+jiff.workspace = true
+rayon.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+pm-testkit.workspace = true
+proptest.workspace = true
+rstest.workspace = true
+pm-fs-ntfs.workspace = true
+
+[lints]
+workspace = true

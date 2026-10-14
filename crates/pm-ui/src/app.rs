@@ -13,6 +13,7 @@ use crate::format::{DisplayPrefs, size_long};
 use crate::model::{Content, DataSource, FileRow, NodeId, list_dir, list_orphans};
 use crate::table::TableState;
 use crate::task::{self, Task};
+use crate::timeline::TimelineWindow;
 use crate::viewers::ViewerPanel;
 
 type Listing = Result<Arc<Vec<FileRow>>, String>;
@@ -65,6 +66,8 @@ pub struct PostmortemApp {
     about_open: bool,
     exports: Vec<Task<Result<String, String>>>,
     wordmark: Option<egui::TextureHandle>,
+    timeline: Option<Arc<Mutex<TimelineWindow>>>,
+    timeline_closed: Arc<AtomicBool>,
 }
 
 impl PostmortemApp {
@@ -96,6 +99,8 @@ impl PostmortemApp {
             about_open: false,
             exports: Vec::new(),
             wordmark: None,
+            timeline: None,
+            timeline_closed: Arc::new(AtomicBool::new(false)),
         };
         app.apply_time_pref();
         for p in open {
@@ -300,6 +305,51 @@ impl PostmortemApp {
         }));
     }
 
+    /// Opens (or focuses) the Timeline window, building events if needed.
+    fn open_timeline(&mut self, ctx: &egui::Context) -> Option<Arc<Mutex<TimelineWindow>>> {
+        if self.sources.is_empty() {
+            self.errors
+                .push("Add a data source before opening the Timeline.".into());
+            return None;
+        }
+        if self.timeline.is_none() || self.timeline_closed.swap(false, Ordering::Relaxed) {
+            self.timeline = Some(Arc::new(Mutex::new(TimelineWindow::new(
+                ctx,
+                self.sources.clone(),
+                self.prefs.clone(),
+            ))));
+        }
+        ctx.send_viewport_cmd_to(Self::timeline_viewport_id(), egui::ViewportCommand::Focus);
+        self.timeline.clone()
+    }
+
+    fn timeline_viewport_id() -> egui::ViewportId {
+        egui::ViewportId::from_hash_of("timeline")
+    }
+
+    fn show_timeline(&mut self, ctx: &egui::Context) {
+        if self.timeline_closed.load(Ordering::Relaxed) {
+            self.timeline = None;
+            self.timeline_closed.store(false, Ordering::Relaxed);
+        }
+        let Some(tl) = self.timeline.clone() else {
+            return;
+        };
+        let closed = Arc::clone(&self.timeline_closed);
+        ctx.show_viewport_deferred(
+            Self::timeline_viewport_id(),
+            egui::ViewportBuilder::default()
+                .with_title("Timeline — postmortem")
+                .with_inner_size([1300.0, 850.0]),
+            move |ui, _| {
+                tl.lock().ui(ui);
+                if ui.ctx().input(|i| i.viewport().close_requested()) {
+                    closed.store(true, Ordering::Relaxed);
+                }
+            },
+        );
+    }
+
     /// The decoded wordmark texture (created on first use).
     fn wordmark(&mut self, ctx: &egui::Context) -> Option<egui::TextureHandle> {
         if self.wordmark.is_none() {
@@ -385,6 +435,15 @@ impl PostmortemApp {
                     self.apply_time_pref();
                 }
             });
+            ui.menu_button("Tools", |ui| {
+                if ui
+                    .add_enabled(!self.sources.is_empty(), egui::Button::new("⏱ Timeline"))
+                    .clicked()
+                {
+                    self.open_timeline(ui.ctx());
+                    ui.close();
+                }
+            });
             ui.menu_button("Window", |ui| {
                 let content = self.viewer.content().cloned();
                 if ui
@@ -442,6 +501,14 @@ impl PostmortemApp {
                 .clicked()
             {
                 self.go_forward();
+            }
+            ui.separator();
+            if ui
+                .add_enabled(!self.sources.is_empty(), egui::Button::new("⏱ Timeline"))
+                .on_hover_text("Open the Timeline (Tools › Timeline)")
+                .clicked()
+            {
+                self.open_timeline(ui.ctx());
             }
             ui.separator();
             let has = self.viewer.content().is_some();
@@ -723,6 +790,16 @@ impl PostmortemApp {
                 row: r.clone(),
             });
         }
+        if let Some(r) = ev.timeline.and_then(|i| rows.get(i)) {
+            let t = r
+                .meta
+                .as_ref()
+                .and_then(|m| m.times.modified.or(m.times.created))
+                .map(jiff::Timestamp::as_second);
+            if let (Some(t), Some(tl)) = (t, self.open_timeline(&ctx)) {
+                tl.lock().focus(t, 60);
+            }
+        }
         if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
             self.export(&ctx, Content { fs, row: r.clone() });
         }
@@ -940,6 +1017,7 @@ impl PostmortemApp {
             });
         egui::CentralPanel::default().show(ui, |ui| self.results(ui));
         self.popouts(&ctx);
+        self.show_timeline(&ctx);
         self.dialogs(&ctx);
         self.persisted.table = self.table.clone();
     }

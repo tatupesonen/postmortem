@@ -3296,6 +3296,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-timeline"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "pm-core",
+ "pm-fs",
+ "pm-fs-ntfs",
+ "pm-testkit",
+ "proptest",
+ "rayon",
+ "rstest",
+ "tracing",
+]
+
+[[package]]
 name = "pm-ui"
 version = "0.1.0"
 dependencies = [
@@ -3311,6 +3326,7 @@ dependencies = [
  "pm-fs",
  "pm-image",
  "pm-testkit",
+ "pm-timeline",
  "pm-volume",
  "rayon",
  "resvg",
