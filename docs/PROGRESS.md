@@ -2,24 +2,29 @@
 
 ## Now
 
-- **M2 case database** (user agreed ADR-013 on 2026-10-14; the analysis
-  tools now need persistent results). Steps:
-  1. `pm-casedb`: schema v1 (SQLite, WAL), migration runner, typed models,
-     batched writer, query API (children, files, artifacts, attributes,
-     tags), with tests.
-  2. Standard artifact/attribute type catalogue (inventory 01 §artifacts)
-     as Rust enums + seed.
-  3. `pm-case`: case folder (`case.pmcase` TOML + `case.db`),
-     create/open/close, add data source → bulk loader (walk → channel →
-     batched writer).
-  4. UI: New/Open Case, tree and table backed by the DB, tags.
-  5. Then M4 ingest (hash, file type, EXIF, …) feeding artifacts.
+- **M2/M4 in progress** (2026-10-14):
+  - Done: pm-casedb v1, pm-case (case folders, parallel loader, evidence
+    re-open), pm-ingest framework (ADR-015), pm-hashdb + Hash Lookup,
+    case-first UI (welcome, New Case wizard, Open/Close Case), live
+    analysis progress in the status bar + Ingest Progress window, Data
+    Artifacts / Analysis Results tree and result viewer.
+  - Verified on a real disk: NIST "Hacking Case" (`PM_REAL_DISK`) matches
+    TSK `fls` exactly (12 544 names).
+  - Running in parallel (worktree agent): File Type ID (pm-filetype),
+    Extension Mismatch, Picture Analyzer, Encryption Detection, Interesting
+    Files (FilesSet rules), Data Source Integrity — merge when it reports.
+  - Next: hash-set management UI (Options › Hash Sets) and ingest module
+    selection page in Add Data Source; DB-backed tree/table replacing
+    pm-index (ADR-014); Tantivy name search; Embedded File Extractor
+    (needs derived files + ID reservation in pm-casedb).
 
 ## Blockers
 
 _None._
 
 ## Log
+
+- 2026-10-14: pm-case loader (205 k rows/s synthetic), ingest framework, Hash Lookup, case-first UI with status-bar progress, results tree; NTFS TSK-exact on the NIST Hacking Case image.
 
 ### 2026-10-14 — File Discovery
 - `pm-discovery` crate (14 tests, Autopsy's size-bucket boundaries) and the
