@@ -1,76 +1,70 @@
 # Progress
 
-## Now
+## Now — state at end of 2026-10-14 (resume here)
 
-- **M2/M4 in progress** (2026-10-14):
-  - Done: pm-casedb v1, pm-case (case folders, parallel loader, evidence
-    re-open), pm-ingest framework (ADR-015), pm-hashdb + Hash Lookup,
-    case-first UI (welcome, New Case wizard, Open/Close Case), live
-    analysis progress in the status bar + Ingest Progress window, Data
-    Artifacts / Analysis Results tree and result viewer, Add Data Source
-    wizard with ingest module configuration (hash sets), Views tree
-    (file types by extension/MIME, deleted files, sizes) from the case DB.
-  - Verified on a real disk: NIST "Hacking Case" (`PM_REAL_DISK`) matches
-    TSK `fls` exactly (12 544 names).
-  - Running in parallel (worktree agent): File Type ID (pm-filetype),
-    Extension Mismatch, Picture Analyzer, Encryption Detection, Interesting
-    Files (FilesSet rules), Data Source Integrity — merge when it reports.
+### What works (all on `master`)
+- **Evidence & file systems:** raw/split/EWF images, MBR/GPT, NTFS (TSK-exact,
+  verified against `fls` on the NIST "Hacking Case" image), FAT, exFAT, ext.
+- **Cases (`pm-case`, `pm-casedb`):** case folders (`case.pmcase` +
+  `case.db`), parallel loader into SQLite (205 k rows/s synthetic),
+  `$OrphanFiles`, `$Unalloc`, ADS rows, re-open, relocate, delete.
+- **Ingest (`pm-ingest`, ADR-015):** priority scheduling, N workers, staged
+  data-source modules, single writer, inbox, progress snapshots.
+- **Modules (`pm-modules`):** Hash Lookup (+ `pm-hashdb`: kdb, NSRL v2/v3,
+  md5sum, HashKeeper, EnCase, idx); Picture Analyzer (EXIF); **Recent
+  Activity**: Internet Explorer (native `index.dat` history, Favorites,
+  cookies), Chromium family (history, downloads, cookies, bookmarks,
+  logins, autofill), web search queries (Autopsy SEUQA mappings).
+- **UI (`pm-ui`):** case-first workflow (Welcome, New Case wizard,
+  Open/Close Case), Add Data Source wizard with module + hash-set
+  configuration, status-bar progress + Ingest Progress window, Data
+  Artifacts / Analysis Results tree + result table, Views tree (by
+  extension/MIME, deleted, size) from the case DB, file browsing,
+  viewers, Gallery, Discovery, Data Source Summary.
+- **Timeline:** Autopsy-style custom chart component
+  (`pm-ui/src/timeline_chart.rs`: JavaFX-like stacked bar chart with
+  axes/grid/ticks/legend/hover, plus the overview range slider), and
+  **artifact events** (web history, downloads, cookies, bookmarks,
+  searches, autofill, EXIF) loaded from the case DB
+  (`pm-ui/src/timeline_artifacts.rs`); the timeline rebuilds when an
+  analysis finishes.
 
-- **NEXT: file-name search with Tantivy** (`pm-search`, ADR-014; user
-  asked for Tantivy explicitly). Design:
-  - New crate `crates/pm-search` on `tantivy = "0.26.2"`; one index per
-    case at `<case>/Index/names/` (add `Index` to the case sub-folders).
-  - Schema: `file_id` (u64, fast + stored), `ds_id` (u64, fast),
-    `name` and `path` indexed with an n-gram tokenizer (lower-cased,
-    grams 3..=3, plus a raw lower-cased `name_exact` field) so substring
-    queries ("evil", "IMG_00") are term lookups, not scans; extension,
-    size and deleted flag as fast fields for filtering.
-  - Built by a background task after a data source is loaded (stream
-    `files` by id with keyset paging; bounded writer heap, e.g. 256 MB;
-    commit every ~1 M docs) and updated for derived files during ingest;
-    progress shown in the status bar like other jobs.
-  - Query API: `search(text, filters, limit) -> Vec<file_id>`; 1–2 char
-    queries fall back to prefix matching on `name_exact`; results resolve
-    to `FileRecord`s via the case DB and show in the standard file table.
-  - UI: search box in the toolbar (Ctrl/⌘+F) → "Search Results" node in
-    the tree; Autopsy's File Search by Attributes dialog can reuse it.
-  - Tests: substring/prefix/case-insensitivity, deleted/ADS names,
-    multiple data sources, rebuild after reopen, and a scale benchmark
-    (synthetic 10 M names: index rate and < 100 ms query latency), with
-    numbers recorded in docs/PERF.md. Later, M5 content search shares the
-    crate.
+### How to try it
+1. `cargo build --release -p postmortem && ./target/release/postmortem`
+2. Case › New Case…; Case › Add Data Source… → e.g.
+   `~/Downloads/4Dell Latitude CPi.E01` (E02 found automatically); keep
+   Recent Activity / Hash Lookup / Picture Analyzer enabled → Finish.
+3. Status bar shows progress (click for details); results under Data
+   Artifacts; Tools › Timeline shows file and web events.
 
-- After that: hash-set management (Options › Hash Sets: create .kdb,
-  import/index, add file to hash set from the context menu); move Data
-  Source Summary/Timeline/Gallery/Discovery from `pm-index` to the case
-  DB (ADR-014); Embedded File Extractor (needs derived files + id
-  reservation in pm-casedb).
+### Not verified / debt (usage was limited today)
+- **The full gate (`scripts/gate.sh`) was NOT run** for the last commits
+  (Recent Activity, Picture Analyzer merge, timeline chart/artifact
+  events). Run it first tomorrow and fix any fmt/clippy/test failures.
+- **Tests owed:** Recent Activity (IE index.dat incl. multiple hash tables
+  and MSHist daily files, Favorites, cookies; Chromium databases; search
+  queries; idempotent re-runs; diff IE history vs `pasco` on the Dell
+  image), Picture Analyzer end-to-end, timeline chart widget (kittest
+  screenshot + interactions), timeline artifact events (mapping, source
+  file location), overview range slider.
+- Timeline: only Counts and List views; Autopsy's **Details** view
+  (clustered event stripes), toolbar/filter-panel restyle to match
+  Autopsy, Description-detail zoom, tag/hash-hit filters not done.
+  Artifact events lose their own description column (shown in path).
+- Recent Activity gaps: Firefox (helper `prtime` already in place),
+  Safari, legacy Edge (ESE WebCacheV01.dat), Chrome cache/favicons/
+  extensions/web-form addresses, full public-suffix list, download
+  TSK_PATH_ID / associated objects, other Recent Activity parts
+  (registry, recent docs, programs, USB, …).
+- Module agent's remaining plan: File Type Identification (`pm-filetype`,
+  Tika parity), Extension Mismatch, Encryption Detection, Interesting
+  Files, Data Source Integrity, Embedded File Extractor.
 
-- **TESTS OWED (written without tests to save usage, 2026-10-14):**
-  - Recent Activity (`pm-modules/src/recent_activity/`): integration tests
-    for IE (index.dat history incl. multiple hash tables and daily
-    MSHist files, Favorites .url, Cookies .txt), Chromium (History,
-    Cookies, Downloads v30 and older, Bookmarks JSON, Login Data, Web Data
-    autofill), search-query analysis over history, idempotent re-runs;
-    diff IE history against `pasco` output on the NIST Hacking Case image.
-  - Picture Analyzer: end-to-end ingest test on a disk image.
-  - Not yet ported: Firefox, Safari, legacy Edge (ESE WebCacheV01.dat),
-    Chrome cache/favicons/extensions/web form addresses, public-suffix
-    list for domains (a built-in subset is used), TSK_PATH_ID/associated
-    objects for downloads.
-  - The full workspace gate was not run for this commit.
-
-- **How to try it yourself** (2026-10-14):
-  1. Build: `cargo build --release -p postmortem`
-  2. Run: `./target/release/postmortem` (or `./target/release/postmortem <case folder>` to reopen a case)
-  3. Case › New Case… (name + base folder), then Case › Add Data Source…:
-     pick the image (e.g. `~/Downloads/4Dell Latitude CPi.E01`, the E02
-     segment is found automatically), choose time zone, then on step 2
-     keep **Recent Activity**, **Hash Lookup** and **Picture Analyzer**
-     enabled (optionally add hash sets) → Finish.
-  4. Watch progress in the status bar (click it for the Ingest Progress
-     window); results appear under **Data Artifacts** (Web History, Web
-     Cookies, Web Bookmarks, Web Search, …) and **Analysis Results**.
+### Next, in order
+1. Run the gate, fix, add the owed tests above.
+2. Tantivy file-name search (`pm-search`, design below in this file).
+3. Firefox + remaining Recent Activity; File Type Identification.
+4. Timeline Details view and Autopsy-style toolbar/filters.
 
 ## Blockers
 

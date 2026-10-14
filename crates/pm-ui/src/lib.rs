@@ -19,6 +19,8 @@ mod table;
 mod task;
 mod thumbs;
 mod timeline;
+mod timeline_artifacts;
+mod timeline_chart;
 mod viewers;
 mod views;
 

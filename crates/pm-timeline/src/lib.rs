@@ -209,6 +209,21 @@ impl Timeline {
         self.events.len()
     }
 
+    /// Adds events about further subjects (e.g. artifacts from the case
+    /// database); `events[].subject` index into `subjects`.
+    #[must_use]
+    pub fn with(self, events: Vec<Event>, subjects: Vec<Subject>) -> Self {
+        let base = self.subjects.len() as u32;
+        let mut all_subjects = self.subjects;
+        all_subjects.extend(subjects);
+        let mut all_events = self.events;
+        all_events.extend(events.into_iter().map(|e| Event {
+            subject: e.subject + base,
+            ..e
+        }));
+        Self::new(all_events, all_subjects, self.data_sources)
+    }
+
     pub fn is_empty(&self) -> bool {
         self.events.is_empty()
     }

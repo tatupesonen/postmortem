@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Stroke, StrokeKind, Vec2};
+use egui::{Color32, Sense, Vec2};
 use egui_extras::{Column, TableBuilder};
 use jiff::tz::TimeZone;
 use pm_timeline::{
@@ -87,13 +87,16 @@ pub(crate) struct TimelineWindow {
     unit_override: Option<TimeUnit>,
     /// Selected bin (start, end) in the counts view.
     selection: Option<(i64, i64)>,
-    drag_from: Option<f32>,
     selected_row: Option<usize>,
     cache: Cache,
     viewer: ViewerPanel,
     prefs: DisplayPrefs,
     /// "View in Timeline" requested before events were ready.
     pending_focus: Option<((i64, i64), Filter)>,
+    /// Whole-span histogram for the range slider.
+    overview: Option<((i64, i64), Vec<u64>)>,
+    /// Case whose artifacts (web history, …) become events too.
+    case: Option<Arc<pm_case::Case>>,
 }
 
 impl std::fmt::Debug for TimelineWindow {
@@ -106,7 +109,12 @@ impl std::fmt::Debug for TimelineWindow {
 
 impl TimelineWindow {
     /// Creates the window; events are built once the shared index is ready.
-    pub(crate) fn new(index: SharedIndex, sources: Vec<DataSource>, prefs: DisplayPrefs) -> Self {
+    pub(crate) fn new(
+        index: SharedIndex,
+        sources: Vec<DataSource>,
+        prefs: DisplayPrefs,
+        case: Option<Arc<pm_case::Case>>,
+    ) -> Self {
         Self {
             index,
             sources,
@@ -121,13 +129,22 @@ impl TimelineWindow {
             log_scale: true,
             unit_override: None,
             selection: None,
-            drag_from: None,
             selected_row: None,
             cache: Cache::default(),
             viewer: ViewerPanel::default(),
             prefs,
             pending_focus: None,
+            overview: None,
+            case,
         }
+    }
+
+    /// Rebuilds the events (e.g. after analysis added artifacts).
+    pub(crate) fn invalidate(&mut self) {
+        self.timeline = None;
+        self.building = None;
+        self.overview = None;
+        self.cache = Cache::default();
     }
 
     /// Focuses the window on `[t - pad, t + pad]` in list mode ("View in Timeline").
@@ -262,8 +279,19 @@ impl TimelineWindow {
             let Some(idx) = self.index.ready_or_progress(ui) else {
                 return;
             };
+            let (case, sources) = (self.case.clone(), self.sources.clone());
             let task = self.building.get_or_insert_with(|| {
-                Task::spawn(ui.ctx(), move || Arc::new(Timeline::from_index(&idx)))
+                Task::spawn(ui.ctx(), move || {
+                    let t = Timeline::from_index(&idx);
+                    let t = match &case {
+                        Some(c) => {
+                            let (events, subjects) = crate::timeline_artifacts::load(c, &sources);
+                            t.with(events, subjects)
+                        }
+                        None => t,
+                    };
+                    Arc::new(t)
+                })
             });
             let Some(t) = task.poll() else {
                 ui.centered_and_justified(egui::Ui::spinner);
@@ -528,199 +556,51 @@ impl TimelineWindow {
     fn chart(&mut self, ui: &mut egui::Ui, height: f32) {
         let tz = self.tz().clone();
         let unit = self.unit();
-        let log = self.log_scale;
         let series = Timeline::series(self.zoom);
         let bins = self.bins().to_vec();
-        let (rect, resp) = ui.allocate_exact_size(
-            Vec2::new(ui.available_width(), height),
-            Sense::click_and_drag(),
+        let events = crate::timeline_chart::stacked_bars(
+            ui,
+            height,
+            &crate::timeline_chart::Chart {
+                bins: &bins,
+                series: &series,
+                log: self.log_scale,
+                unit,
+                tz: &tz,
+                selection: self.selection,
+                range: self.range,
+            },
         );
-        let painter = ui.painter_at(rect);
-        let visuals = ui.visuals().clone();
-        painter.rect_filled(rect, 4.0, visuals.extreme_bg_color);
-        let plot = Rect::from_min_max(
-            rect.min + Vec2::new(48.0, 8.0),
-            rect.max - Vec2::new(8.0, 36.0),
-        );
-        if bins.is_empty() || plot.width() < 10.0 {
-            return;
-        }
-        let seg = |c: u32| {
-            if c == 0 {
-                0.0
-            } else if log {
-                f64::from(c).log10() + 1.0
-            } else {
-                f64::from(c)
-            }
-        };
-        let max = bins
-            .iter()
-            .map(|b| b.counts.iter().map(|&c| seg(c)).sum::<f64>())
-            .fold(1.0_f64, f64::max);
-        let n = bins.len() as f32;
-        let slot = plot.width() / n;
-        let gap = (slot * 0.15).min(2.0);
-        // Y axis.
-        let text_color = visuals.text_color();
-        let weak = visuals.weak_text_color();
-        painter.line_segment(
-            [plot.left_bottom(), plot.left_top()],
-            Stroke::new(1.0, weak),
-        );
-        painter.line_segment(
-            [plot.left_bottom(), plot.right_bottom()],
-            Stroke::new(1.0, weak),
-        );
-        let max_total = bins.iter().map(Bin::total).max().unwrap_or(0);
-        let top_label = if log {
-            format!("{max_total}\n(log)")
-        } else {
-            max_total.to_string()
-        };
-        painter.text(
-            plot.left_top() - Vec2::new(4.0, 0.0),
-            Align2::RIGHT_TOP,
-            top_label,
-            FontId::proportional(11.0),
-            weak,
-        );
-        painter.text(
-            plot.left_bottom() - Vec2::new(4.0, 0.0),
-            Align2::RIGHT_BOTTOM,
-            "0",
-            FontId::proportional(11.0),
-            weak,
-        );
-        // Bars.
-        for (i, b) in bins.iter().enumerate() {
-            let x0 = plot.left() + i as f32 * slot + gap / 2.0;
-            let x1 = x0 + slot - gap;
-            let mut y = plot.bottom();
-            for (s, &c) in b.counts.iter().enumerate() {
-                if c == 0 {
-                    continue;
-                }
-                let h = (seg(c) / max) as f32 * plot.height();
-                let r = Rect::from_min_max(Pos2::new(x0, y - h), Pos2::new(x1, y));
-                let col = series.get(s).map_or(Color32::GRAY, |(_, rgb)| color(*rgb));
-                painter.rect_filled(r, 1.0, col);
-                y -= h;
-            }
-            if self.selection == Some((b.start, b.end)) {
-                painter.rect_stroke(
-                    Rect::from_min_max(
-                        Pos2::new(x0 - 1.0, plot.top()),
-                        Pos2::new(x1 + 1.0, plot.bottom()),
-                    ),
-                    2.0,
-                    Stroke::new(2.0, visuals.selection.stroke.color),
-                    StrokeKind::Outside,
-                );
-            }
-        }
-        // X labels: as many as fit.
-        let label_w = match unit {
-            TimeUnit::Years => 40.0,
-            TimeUnit::Months => 110.0,
-            TimeUnit::Days => 140.0,
-            _ => 150.0,
-        };
-        let every = ((label_w / slot).ceil() as usize).max(1);
-        for (i, b) in bins.iter().enumerate().step_by(every) {
-            let x = plot.left() + (i as f32 + 0.5) * slot;
-            let col = if b.total() > 0 { text_color } else { weak };
-            painter.text(
-                Pos2::new(x, plot.bottom() + 4.0),
-                Align2::CENTER_TOP,
-                unit.label(b.start, &tz),
-                FontId::proportional(11.0),
-                col,
-            );
-        }
-        painter.text(
-            rect.right_bottom() - Vec2::new(6.0, 4.0),
-            Align2::RIGHT_BOTTOM,
-            format!("bins: {}", unit.name()),
-            FontId::proportional(10.0),
-            weak,
-        );
-
-        let bin_at = |x: f32| -> Option<usize> {
-            let i = ((x - plot.left()) / slot).floor();
-            (i >= 0.0 && (i as usize) < bins.len()).then_some(i as usize)
-        };
-        // Interval selection by dragging.
-        if resp.drag_started() {
-            self.drag_from = resp.interact_pointer_pos().map(|p| p.x);
-        }
-        if let (Some(x0), Some(p)) = (self.drag_from, resp.interact_pointer_pos()) {
-            if resp.dragged() {
-                let band = Rect::from_min_max(
-                    Pos2::new(x0.min(p.x), plot.top()),
-                    Pos2::new(x0.max(p.x), plot.bottom()),
-                );
-                painter.rect_filled(band, 0.0, visuals.selection.bg_fill.gamma_multiply(0.35));
-            }
-            if resp.drag_stopped() {
-                self.drag_from = None;
-                if let (Some(a), Some(b)) = (
-                    bin_at(x0.min(p.x).max(plot.left())),
-                    bin_at(x0.max(p.x).min(plot.right() - 0.5)),
-                ) && let (Some(first), Some(last)) = (bins.get(a), bins.get(b))
-                {
-                    let r = (first.start, last.end);
-                    self.push(r, self.filter.clone());
+        for e in events {
+            match e {
+                crate::timeline_chart::ChartEvent::Select(s) => self.selection = s,
+                crate::timeline_chart::ChartEvent::ZoomTo(r) => self.push(r, self.filter.clone()),
+                crate::timeline_chart::ChartEvent::Wheel { factor, anchor } => {
+                    self.zoom_by(factor, Some(anchor));
                 }
             }
         }
-        // Hover tooltip, click to select, double-click to zoom, wheel to zoom.
-        if let Some(i) = resp.hover_pos().and_then(|p| bin_at(p.x)) {
-            if let Some(b) = bins.get(i) {
-                let b = b.clone();
-                let label = unit.label(b.start, &tz);
-                let end_label = TimeUnit::Seconds.label(b.end - 1, &tz);
-                let resp2 = resp.clone().on_hover_ui_at_pointer(|ui| {
-                    ui.strong(label.as_str());
-                    ui.weak(format!("until {end_label}"));
-                    for (s, &c) in b.counts.iter().enumerate() {
-                        if c > 0 {
-                            ui.horizontal(|ui| {
-                                swatch(
-                                    ui,
-                                    series.get(s).map_or(Color32::GRAY, |(_, rgb)| color(*rgb)),
-                                );
-                                ui.label(format!(
-                                    "{c} {}",
-                                    series.get(s).map_or("", |(n, _)| n.as_str())
-                                ));
-                            });
-                        }
-                    }
-                    if b.total() == 0 {
-                        ui.weak("no events");
-                    }
-                });
-                if resp2.double_clicked() {
-                    self.push((b.start, b.end), self.filter.clone());
-                } else if resp2.clicked() {
-                    self.selection = if self.selection == Some((b.start, b.end)) {
-                        None
-                    } else {
-                        Some((b.start, b.end))
-                    };
-                }
-            }
-            let scroll = ui.input(|i| i.smooth_scroll_delta.y);
-            if scroll.abs() > 0.5 {
-                let anchor = resp.hover_pos().map(|p| {
-                    let frac = f64::from(((p.x - plot.left()) / plot.width()).clamp(0.0, 1.0));
-                    self.range.0 + ((self.range.1 - self.range.0) as f64 * frac) as i64
-                });
-                self.zoom_by(if scroll > 0.0 { 0.8 } else { 1.25 }, anchor);
-            }
+        // Autopsy's range slider over the whole span.
+        let span = self.span();
+        if self.overview.as_ref().is_none_or(|o| o.0 != span)
+            && let Some(t) = &self.timeline
+        {
+            let all = Filter::default();
+            let bins = t.counts(&CountsQuery {
+                start: span.0,
+                end: span.1,
+                unit: TimeUnit::for_range(span.0, span.1).finer(),
+                tz: &tz,
+                filter: &all,
+                zoom: TypeZoom::Category,
+                max_bins: 240,
+            });
+            self.overview = Some((span, bins.iter().map(Bin::total).collect()));
         }
-        if resp.clicked() && resp.hover_pos().and_then(|p| bin_at(p.x)).is_none() {
+        if let Some((_, totals)) = &self.overview
+            && let Some(r) = crate::timeline_chart::overview(ui, totals, span, self.range, &tz)
+        {
+            self.range = r;
             self.selection = None;
         }
     }
@@ -888,7 +768,7 @@ mod tests {
         let (_dir, sources) = demo_sources();
         let ctx = egui::Context::default();
         let index = SharedIndex::build(&ctx, &sources);
-        let win = TimelineWindow::new(index, sources, DisplayPrefs::default());
+        let win = TimelineWindow::new(index, sources, DisplayPrefs::default(), None);
         let mut h = Harness::builder()
             .with_size(egui::vec2(1300.0, 850.0))
             .build_ui_state(|ui, w: &mut TimelineWindow| w.ui(ui), win);

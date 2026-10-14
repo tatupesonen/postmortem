@@ -238,6 +238,7 @@ pub(crate) fn webkit_time(us: Option<i64>) -> Option<i64> {
 }
 
 /// Microseconds since 1970 (Mozilla PRTime) → Unix seconds; 0 = absent.
+#[allow(dead_code, reason = "for the Firefox extractor (pending)")]
 pub(crate) fn prtime(us: Option<i64>) -> Option<i64> {
     us.filter(|&t| t > 0).map(|t| t / 1_000_000)
 }

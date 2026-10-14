@@ -643,6 +643,7 @@ impl PostmortemApp {
                 self.shared_index(ctx),
                 self.sources.clone(),
                 self.prefs.clone(),
+                self.analysis.lock().case().cloned(),
             ))));
         }
         ctx.send_viewport_cmd_to(Self::timeline_viewport_id(), egui::ViewportCommand::Focus);
@@ -1247,6 +1248,10 @@ impl PostmortemApp {
             // Final counts and rows once analysis has finished.
             self.result_counts.invalidate();
             self.result_rows.clear();
+            // New artifacts (web history, …) become timeline events.
+            if let Some(t) = &self.timeline {
+                t.lock().invalidate();
+            }
         }
         self.was_analysing = live;
         let counts = self.result_counts.get(ui.ctx(), case.as_ref(), live);
