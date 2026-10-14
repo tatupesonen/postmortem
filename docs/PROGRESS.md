@@ -7,16 +7,44 @@
     re-open), pm-ingest framework (ADR-015), pm-hashdb + Hash Lookup,
     case-first UI (welcome, New Case wizard, Open/Close Case), live
     analysis progress in the status bar + Ingest Progress window, Data
-    Artifacts / Analysis Results tree and result viewer.
+    Artifacts / Analysis Results tree and result viewer, Add Data Source
+    wizard with ingest module configuration (hash sets), Views tree
+    (file types by extension/MIME, deleted files, sizes) from the case DB.
   - Verified on a real disk: NIST "Hacking Case" (`PM_REAL_DISK`) matches
     TSK `fls` exactly (12 544 names).
   - Running in parallel (worktree agent): File Type ID (pm-filetype),
     Extension Mismatch, Picture Analyzer, Encryption Detection, Interesting
     Files (FilesSet rules), Data Source Integrity — merge when it reports.
-  - Next: hash-set management UI (Options › Hash Sets) and ingest module
-    selection page in Add Data Source; DB-backed tree/table replacing
-    pm-index (ADR-014); Tantivy name search; Embedded File Extractor
-    (needs derived files + ID reservation in pm-casedb).
+
+- **NEXT: file-name search with Tantivy** (`pm-search`, ADR-014; user
+  asked for Tantivy explicitly). Design:
+  - New crate `crates/pm-search` on `tantivy = "0.26.2"`; one index per
+    case at `<case>/Index/names/` (add `Index` to the case sub-folders).
+  - Schema: `file_id` (u64, fast + stored), `ds_id` (u64, fast),
+    `name` and `path` indexed with an n-gram tokenizer (lower-cased,
+    grams 3..=3, plus a raw lower-cased `name_exact` field) so substring
+    queries ("evil", "IMG_00") are term lookups, not scans; extension,
+    size and deleted flag as fast fields for filtering.
+  - Built by a background task after a data source is loaded (stream
+    `files` by id with keyset paging; bounded writer heap, e.g. 256 MB;
+    commit every ~1 M docs) and updated for derived files during ingest;
+    progress shown in the status bar like other jobs.
+  - Query API: `search(text, filters, limit) -> Vec<file_id>`; 1–2 char
+    queries fall back to prefix matching on `name_exact`; results resolve
+    to `FileRecord`s via the case DB and show in the standard file table.
+  - UI: search box in the toolbar (Ctrl/⌘+F) → "Search Results" node in
+    the tree; Autopsy's File Search by Attributes dialog can reuse it.
+  - Tests: substring/prefix/case-insensitivity, deleted/ADS names,
+    multiple data sources, rebuild after reopen, and a scale benchmark
+    (synthetic 10 M names: index rate and < 100 ms query latency), with
+    numbers recorded in docs/PERF.md. Later, M5 content search shares the
+    crate.
+
+- After that: hash-set management (Options › Hash Sets: create .kdb,
+  import/index, add file to hash set from the context menu); move Data
+  Source Summary/Timeline/Gallery/Discovery from `pm-index` to the case
+  DB (ADR-014); Embedded File Extractor (needs derived files + id
+  reservation in pm-casedb).
 
 ## Blockers
 
