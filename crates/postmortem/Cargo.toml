@@ -1,0 +1,12 @@
+[package]
+name = "postmortem"
+description = "Digital forensics platform (desktop GUI)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+
+[lints]
+workspace = true
