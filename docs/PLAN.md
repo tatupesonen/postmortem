@@ -177,6 +177,10 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] slack-space content for FAT/NTFS (Autopsy "-slack" files)
 - [ ] XFS, Btrfs, YAFFS2 (lower priority; may move to M13)
 
+### Cross-cutting — test parity (inventory 08)
+- [ ] Work through the 126-item parity checklist in `docs/inventory/08-autopsy-tests.md`, ticking items there as each area lands (credit-card vectors → M5, correlation normalisers → M8, ingest filters → M4, …)
+- [ ] `cargo-deny` licence/ban checks in the gate (ADR-010)
+
 ### M2 — Case database & data sources
 - [ ] `pm-casedb` schema v1 (SQLite) + migrations + typed API (objects, files, VS/FS, data sources, artifacts/attributes with all standard types, tags, hosts/persons/OS accounts, accounts/relationships, events, ingest jobs, reports, scores)
 - [ ] Standard artifact & attribute type catalogue (from inventory 01) as Rust enums + DB seed

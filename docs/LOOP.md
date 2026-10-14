@@ -36,7 +36,7 @@ Never modify it.
 7. **Record**: tick boxes in `PLAN.md`, update `## Now` with the precise next
    step, prepend a dated entry to `## Log` (what was done, what was learned,
    test counts), add an ADR for any non-obvious decision.
-8. **Commit**: `git add -A && git commit` in `postmortem/` with a conventional
+8. **Commit**: `scripts/gate.sh && git add -A && git commit` in `postmortem/` with a conventional
    message (`feat(fs-ntfs): …`) ending with the Co-Authored-By trailer. Local
    commits only — never push, never add remotes.
 9. **Continue**: if there is remaining work and context budget, go back to 3.
@@ -44,13 +44,9 @@ Never modify it.
 
 ## Quality gate
 
-Run from `/Users/tatu/slop/postmortem`:
-
-```sh
-cargo fmt --all --check
-cargo clippy --workspace --all-targets --all-features -- -D warnings
-cargo test --workspace --all-features
-```
+Run `scripts/gate.sh` from `/Users/tatu/slop/postmortem` (fmt check, clippy
+with `-D warnings`, all tests). **Commit only as `scripts/gate.sh && git commit …`**
+so that a red gate can never be committed.
 
 UI snapshot tests (egui_kittest) and slow tests (large fixtures, fuzz corpora)
 may be gated behind `--features slow-tests`/`#[ignore]` and run at milestone
@@ -84,6 +80,9 @@ ends.
 - Integration-test crates (`tests/*.rs`) start with
   `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::print_stderr, reason = "test code")]`
   because helper functions there are not covered by clippy.toml's test allowances.
+- **Differential tests against TSK** (`pm_testkit::tsk`, needs
+  `brew install sleuthkit`): volume and filesystem output must match
+  `mmls`/`fls` on generated images, except for documented improvements.
 - Every public behaviour gets a test. Unit tests sit next to code; cross-crate
   behaviour goes in `tests/`.
 - Parsers: hand-built minimal fixtures generated **in Rust test code** where
