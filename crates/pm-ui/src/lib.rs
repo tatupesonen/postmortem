@@ -4,6 +4,7 @@
 //! result table (centre) and content viewers (bottom). Any viewer can be
 //! popped out into its own native window (egui deferred viewports).
 
+mod add_source;
 mod analysis;
 mod app;
 mod case_ui;
@@ -22,6 +23,7 @@ mod viewers;
 
 use std::path::PathBuf;
 
+pub use add_source::IngestPrefs;
 pub use app::{Persisted, PostmortemApp};
 pub use model::{Content, DataSource, FileRow, NodeId};
 

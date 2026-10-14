@@ -3483,6 +3483,7 @@ dependencies = [
  "egui_kittest",
  "image",
  "jiff",
+ "md-5",
  "parking_lot",
  "pm-case",
  "pm-casedb",
@@ -3501,6 +3502,7 @@ dependencies = [
  "resvg",
  "rfd",
  "serde",
+ "serde_json",
  "tempfile",
  "tracing",
 ]

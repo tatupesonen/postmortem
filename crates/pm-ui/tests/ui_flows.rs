@@ -4,6 +4,7 @@
     clippy::expect_used,
     clippy::indexing_slicing,
     clippy::print_stderr,
+    clippy::format_collect,
     reason = "test code"
 )]
 
@@ -26,6 +27,14 @@ static DEMO: LazyLock<(tempfile::TempDir, PathBuf)> = LazyLock::new(|| {
 static CASES: LazyLock<tempfile::TempDir> = LazyLock::new(|| tempfile::tempdir().unwrap());
 
 fn harness_with(open: Vec<PathBuf>, case: bool) -> Harness<'static, PostmortemApp> {
+    harness_full(open, case, pm_ui::IngestPrefs::default())
+}
+
+fn harness_full(
+    open: Vec<PathBuf>,
+    case: bool,
+    ingest: pm_ui::IngestPrefs,
+) -> Harness<'static, PostmortemApp> {
     static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let ctx = egui::Context::default();
     let mut app = PostmortemApp::with_state(
@@ -34,6 +43,7 @@ fn harness_with(open: Vec<PathBuf>, case: bool) -> Harness<'static, PostmortemAp
             theme: egui::ThemePreference::Light,
             // Never create cases in the user's home folder from tests.
             case_root: Some(CASES.path().to_path_buf()),
+            ingest,
             ..Default::default()
         },
         Vec::new(),
@@ -390,4 +400,77 @@ fn analysis_results_are_listed_and_open_the_source_file() {
         h.query_by_label_contains("4d 5a").is_some() || h.query_by_label_contains("4D 5A").is_some()
     });
     shot(&mut h, "results-hashset-viewer");
+}
+
+/// MD5 of the demo disk's `setup.exe` (read through a throwaway case).
+fn setup_exe_md5() -> String {
+    use md5::Digest;
+    let tmp = tempfile::tempdir().unwrap();
+    let case =
+        pm_case::Case::create(tmp.path().join("c"), pm_case::CaseDetails::default()).unwrap();
+    pm_case::add_image(
+        &case,
+        &DEMO.1,
+        &pm_case::LoadOptions::default(),
+        &pm_case::LoadProgress::default(),
+    )
+    .unwrap();
+    let f = case
+        .db()
+        .query_files(&pm_casedb::FileQuery::default(), 0, 100_000)
+        .unwrap()
+        .into_iter()
+        .find(|f| f.name == "setup.exe")
+        .unwrap();
+    let src = case.content(&f).unwrap();
+    let data = src
+        .read_vec_at(0, usize::try_from(src.size()).unwrap())
+        .unwrap();
+    md5::Md5::digest(&data)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
+}
+
+#[test]
+fn add_data_source_wizard_runs_configured_hash_lookup() {
+    let sets = tempfile::tempdir().unwrap();
+    let set = sets.path().join("bad.md5");
+    std::fs::write(&set, format!("{}  setup.exe\n", setup_exe_md5())).unwrap();
+    let mut ingest = pm_ui::IngestPrefs::default();
+    ingest
+        .hash_lookup
+        .sets
+        .push(pm_modules::hash_lookup::HashSetConfig {
+            path: set,
+            name: Some("Bad stuff".into()),
+            kind: pm_modules::hash_lookup::SetKind::Notable,
+            search_during_ingest: true,
+            send_ingest_messages: None,
+        });
+    let mut h = harness_full(Vec::new(), true, ingest);
+    h.run_steps(2);
+    click_exact(&mut h, "➕ Add Data Source");
+    h.get_by_label_contains("Step 1 of 2");
+    h.get_all_by_role(egui::accesskit::Role::TextInput)
+        .next()
+        .unwrap()
+        .click();
+    h.run_steps(1);
+    h.get_all_by_role(egui::accesskit::Role::TextInput)
+        .next()
+        .unwrap()
+        .type_text(&DEMO.1.display().to_string());
+    h.run_steps(2);
+    click_exact(&mut h, "Next ›");
+    h.get_by_label_contains("Step 2 of 2");
+    h.get_by_label("Hash Lookup");
+    h.get_by_label("Bad stuff");
+    shot(&mut h, "add-source-ingest");
+    click_exact(&mut h, "Finish");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Analysed demo.dd").is_some()
+    });
+    settle(&mut h, |h| h.query_by_label("Hashset Hits (1)").is_some());
+    shot(&mut h, "add-source-done");
 }

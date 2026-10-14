@@ -89,7 +89,8 @@ impl Analysis {
         &mut self,
         ctx: &egui::Context,
         image: PathBuf,
-        timezone: String,
+        load: LoadOptions,
+        settings: JobSettings,
     ) -> Result<(), String> {
         let case = self
             .case
@@ -111,7 +112,7 @@ impl Analysis {
         let spawned = std::thread::Builder::new()
             .name("pm-analysis".into())
             .spawn(move || {
-                let stage = run(&case, &image, &timezone, &job, &inbox);
+                let stage = run(&case, &image, &load, &settings, &job, &inbox);
                 *job.stage.lock() = stage;
                 ctx.request_repaint();
             });
@@ -124,15 +125,12 @@ impl Analysis {
 fn run(
     case: &Arc<Case>,
     image: &Path,
-    timezone: &str,
+    load: &LoadOptions,
+    settings: &JobSettings,
     job: &AnalysisJob,
     inbox: &Arc<Inbox>,
 ) -> Stage {
-    let opts = LoadOptions {
-        timezone: timezone.to_owned(),
-        ..LoadOptions::default()
-    };
-    let loaded = match pm_case::add_image(case, image, &opts, &job.load) {
+    let loaded = match pm_case::add_image(case, image, load, &job.load) {
         Ok(s) => s,
         Err(pm_case::CaseError::Cancelled) => {
             return Stage::Done {
@@ -146,14 +144,7 @@ fn run(
     };
     *job.stage.lock() = Stage::Analysing;
     let modules = pm_modules::core_modules();
-    match pm_ingest::run_job(
-        case,
-        loaded.ds_id,
-        &JobSettings::default(),
-        &modules,
-        &job.ingest,
-        inbox,
-    ) {
+    match pm_ingest::run_job(case, loaded.ds_id, settings, &modules, &job.ingest, inbox) {
         Ok(s) => Stage::Done {
             files: s.files,
             artifacts: s.artifacts,

@@ -36,6 +36,8 @@ pub struct Persisted {
     pub case_root: Option<PathBuf>,
     /// Recently opened case folders, newest first.
     pub recent_cases: Vec<PathBuf>,
+    /// Ingest module choices and hash sets (Add Data Source wizard).
+    pub ingest: crate::add_source::IngestPrefs,
 }
 
 impl Default for Persisted {
@@ -47,6 +49,7 @@ impl Default for Persisted {
             table: TableState::default(),
             case_root: None,
             recent_cases: Vec::new(),
+            ingest: crate::add_source::IngestPrefs::default(),
         }
     }
 }
@@ -98,6 +101,7 @@ pub struct PostmortemApp {
     result_selected: Option<usize>,
     /// Analysis was running last frame (refresh results when it stops).
     was_analysing: bool,
+    add_wizard: Option<crate::add_source::AddSourceWizard>,
 }
 
 impl PostmortemApp {
@@ -145,6 +149,7 @@ impl PostmortemApp {
             result_rows: HashMap::new(),
             result_selected: None,
             was_analysing: false,
+            add_wizard: None,
         };
         app.apply_time_pref();
         // Command line: a case (folder or case.pmcase) is opened; images are
@@ -200,9 +205,38 @@ impl PostmortemApp {
 
     /// Adds a disk image to the open case: it is loaded into the case
     /// database and analysed in the background, and opened for browsing.
+    /// Uses the remembered ingest settings (see the Add Data Source wizard).
     pub fn add_data_source(&mut self, ctx: &egui::Context, path: PathBuf) {
-        let tz = self.prefs.timezone.iana_name().unwrap_or("UTC").to_owned();
-        if let Err(e) = self.analysis.lock().start(ctx, path.clone(), tz) {
+        let ingest = &self.persisted.ingest;
+        let load = pm_case::LoadOptions {
+            timezone: Self::default_timezone(),
+            fat_orphans: !ingest.ignore_fat_orphans,
+            process_unallocated: !ingest.ignore_unallocated,
+            ..pm_case::LoadOptions::default()
+        };
+        let settings = ingest.job_settings();
+        self.add_data_source_with(ctx, path, load, settings);
+    }
+
+    fn default_timezone() -> String {
+        jiff::tz::TimeZone::system()
+            .iana_name()
+            .unwrap_or("UTC")
+            .to_owned()
+    }
+
+    fn add_data_source_with(
+        &mut self,
+        ctx: &egui::Context,
+        path: PathBuf,
+        load: pm_case::LoadOptions,
+        settings: pm_ingest::JobSettings,
+    ) {
+        if let Err(e) = self
+            .analysis
+            .lock()
+            .start(ctx, path.clone(), load, settings)
+        {
             self.errors.push(e);
             return;
         }
@@ -430,20 +464,17 @@ impl PostmortemApp {
         }
     }
 
-    fn pick_image(&mut self, ctx: &egui::Context) {
-        let picked = rfd::FileDialog::new()
-            .set_title("Add Data Source — Disk Image")
-            .add_filter(
-                "Disk images",
-                &[
-                    "dd", "raw", "img", "bin", "001", "000", "aa", "e01", "E01", "s01",
-                ],
-            )
-            .add_filter("All files", &["*"])
-            .pick_file();
-        if let Some(p) = picked {
-            self.add_data_source(ctx, p);
+    /// Opens the Add Data Source wizard (requires an open case).
+    fn pick_image(&mut self, _ctx: &egui::Context) {
+        if !self.has_case() {
+            self.errors
+                .push("Create or open a case before adding a data source.".into());
+            return;
         }
+        self.add_wizard = Some(crate::add_source::AddSourceWizard::new(
+            self.persisted.ingest.clone(),
+            Self::default_timezone(),
+        ));
     }
 
     fn open_popout(&mut self, content: Content) {
@@ -1525,6 +1556,22 @@ impl PostmortemApp {
     }
 
     fn dialogs(&mut self, ctx: &egui::Context) {
+        if let Some(w) = self.add_wizard.as_mut() {
+            match w.ui(ctx) {
+                crate::add_source::AddAction::None => {}
+                crate::add_source::AddAction::Cancel => self.add_wizard = None,
+                crate::add_source::AddAction::Start {
+                    image,
+                    load,
+                    settings,
+                    prefs,
+                } => {
+                    self.add_wizard = None;
+                    self.persisted.ingest = prefs;
+                    self.add_data_source_with(ctx, image, load, settings);
+                }
+            }
+        }
         if let Some(w) = self.case_wizard.as_mut() {
             match w.ui(ctx) {
                 WizardAction::None => {}
