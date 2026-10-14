@@ -32,6 +32,7 @@ rayon = "1.12.0"
 crossbeam-channel = "0.5.17"
 parking_lot = "0.12.5"
 crc32fast = "1.5.2"
+flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
 uuid = "1.28.0"
 
 # Testing
@@ -39,6 +40,9 @@ proptest = "1.12.0"
 rstest = "0.27.0"
 insta = "1.49.0"
 tempfile = "3.27.0"
+md-5 = "0.11.0"
+sha1 = "0.11.0"
+sha2 = "0.11.1"
 fatfs = { version = "0.3.6", default-features = false, features = ["std", "alloc"] }
 
 [workspace.lints.rust]

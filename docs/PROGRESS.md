@@ -2,18 +2,34 @@
 
 ## Now
 
-- M1: set up `fuzz/` (cargo-fuzz, nightly) with targets for pm-volume and
-  pm-fs-fat, plus `scripts/fuzz-smoke.sh`. Then EWF in `pm-image`, then
-  `pm-fs-ntfs`, then `pm-evidence`.
-- PLAN.md is a first draft. When inventories 01 (case/data model), 07 (Rust
-  ecosystem) and 08 (Autopsy tests) land, refine the M2 schema tasks, pin
-  crate choices (ADR) and add test-parity tasks.
+- M1: `pm-fs-ntfs` is next. NTFS fixtures: there is no mkntfs; options are
+  (a) `brew install ntfs-3g` for mkntfs plus a FUSE-free population route,
+  (b) a Docker image, (c) an in-house NTFS writer in pm-testkit for unit
+  tests and the `ntfs`/`mft` crates as dev-only oracles (ADR-009). Prefer (c)
+  plus TSK `fls`/`istat`/`icat` differential tests on any generated image.
+- Then `pm-evidence` (probe chain image → VS → FS) so M2 can start.
 
 ## Blockers
 
 _None._
 
 ## Log
+
+### 2026-10-14 — TSK differential harness, EWF
+- All 8 inventories landed (01–08). ADRs 007–012 record the crate and
+  licence decisions.
+- Dev tools installed: cargo-fuzz, libewf (ewfacquire/ewfinfo), sleuthkit
+  4.15 (mmls/fls/istat/icat).
+- `pm_testkit::tsk` differential harness: volume layouts match mmls
+  (unallocated semantics, GPT names, a 256-entry MBR name table generated
+  from TSK). FAT trees match fls on FAT12/16/32, including `$OrphanFiles`
+  (new orphan scan of free clusters). Recovering full deleted LFN names
+  goes beyond TSK.
+- EWF v1 reader verified against ewfacquire output across 9 format,
+  compression and chunk-size variants. Fuzzing found a section-chain
+  overflow on day one (fixed). `scripts/gate.sh` added; commits are now
+  chained behind it.
+- Workspace: 126 tests; 3 fuzz targets clean at 60 s each.
 
 ### 2026-10-14 — pm-fs-fat + PLAN draft
 - `pm-fs-fat`: BPB/geometry with MS cluster-count typing, FAT12/16/32 tables,

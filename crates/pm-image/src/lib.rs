@@ -5,6 +5,7 @@
 //! *logical* (decompressed, de-sparsed) disk bytes plus container metadata.
 
 pub mod concat;
+pub mod ewf;
 pub mod segments;
 
 use std::path::{Path, PathBuf};
@@ -154,8 +155,33 @@ pub fn open(first: impl AsRef<Path>) -> Result<Image, ImageError> {
     let head = open_file(first)?;
     match sniff(&head) {
         ImageFormat::Raw => open_paths(&segments::discover(first)),
+        ImageFormat::Ewf => open_ewf(&ewf::discover(first)),
         format => Err(ImageError::Unsupported { format }),
     }
+}
+
+/// Opens an EWF (E01/s01) image from an explicit list of segments.
+pub fn open_ewf(paths: &[PathBuf]) -> Result<Image, ImageError> {
+    if paths.is_empty() {
+        return Err(ImageError::NoPaths);
+    }
+    let (src, meta) = ewf::EwfSource::open(paths)?;
+    let source: SharedSource = Arc::new(src);
+    Ok(Image {
+        info: ImageInfo {
+            format: ImageFormat::Ewf,
+            paths: paths.to_vec(),
+            size: source.size(),
+            sector_size: if meta.bytes_per_sector == 0 {
+                512
+            } else {
+                meta.bytes_per_sector
+            },
+            stored_hashes: meta.hashes,
+            metadata: meta.fields,
+        },
+        source,
+    })
 }
 
 /// Opens an explicit, ordered list of raw segments.

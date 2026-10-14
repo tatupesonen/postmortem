@@ -111,7 +111,7 @@ content viewer, data source processor). On top of it sit two hosts:
 |-------|---------|--------|
 | `pm-core` | ReadAt sources, bounded decoding, time, units | done (M0) |
 | `pm-testkit` | fixture builders (disks, FS images, artefacts) | started |
-| `pm-image` | raw/split, EWF/EWF2, VMDK, VHD/VHDX, QCOW2, DMG, AFF4 | raw done |
+| `pm-image` | raw/split, EWF/EWF2, VMDK, VHD/VHDX, QCOW2, DMG, AFF4 | raw + EWF v1 done |
 | `pm-volume` | MBR/EBR, GPT, APM, BSD disklabel, LVM, BitLocker/LUKS detection | MBR+GPT done |
 | `pm-fs` | FileSystem trait, ExtentSource, walker | done |
 | `pm-fs-fat` | FAT12/16/32 | done |
@@ -165,7 +165,8 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 
 ### M1 — Evidence layer (vertical-slice subset first)
 - [x] `fuzz/` crate with targets for volume, FAT; smoke script `scripts/fuzz-smoke.sh` (seeds in `fuzz/seeds/`)
-- [ ] `pm-image` EWF (E01/Ex01 v1): segments, zlib chunks, table/table2, stored hashes, metadata; generate fixtures (in-house EWF writer in testkit)
+- [x] `pm-image` EWF v1 (E01/s01): segments (E01…ZZZ), zlib/stored chunks, >2 GiB offset overflow, stored MD5/SHA-1, header2/header metadata, error2; verified against ewfacquire (9 format variants, multi-segment) + fuzz target
+- [ ] `pm-image` EWF2 (Ex01/Lx01) and L01 logical evidence (file tree in `ltree`)
 - [ ] `pm-fs-ntfs`: boot, MFT, attribute lists, runlists, resident/non-resident, compressed (LZNT1), sparse, ADS, $FILE_NAME times, deleted entries, orphans, $I30 index + slack entries, $Secure/owner later, unallocated clusters; fixtures (testkit NTFS builder or hdiutil-free generation; document provenance)
 - [ ] `pm-evidence`: probe chain (image → VS → FS registry), unallocated-space virtual files, partitions with unknown FS, "no VS" fallback, logical files & folders DSP, local disk DSP (read-only)
 - [ ] `pm-fs-exfat`

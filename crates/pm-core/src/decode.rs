@@ -113,6 +113,17 @@ pub fn utf16be_lossy(bytes: &[u8]) -> String {
         .collect()
 }
 
+/// Lower-case hexadecimal encoding (hash values, GUIDs, hex dumps).
+pub fn to_hex(bytes: &[u8]) -> String {
+    let digit = |n: u8| char::from_digit(u32::from(n), 16).unwrap_or('0');
+    let mut out = String::with_capacity(bytes.len() * 2);
+    for &b in bytes {
+        out.push(digit(b >> 4));
+        out.push(digit(b & 0x0F));
+    }
+    out
+}
+
 /// Decodes a NUL-terminated (or full-length) byte string as UTF-8, lossily.
 pub fn cstr_lossy(bytes: &[u8]) -> String {
     let s = bytes.split(|&b| b == 0).next().unwrap_or_default();
@@ -163,6 +174,12 @@ mod tests {
         assert_eq!(utf16le_lossy(&[b'a', 0, 0, 0, b'b', 0]), "a");
         assert_eq!(utf16be_lossy(&[0, b'O', 0, b'K']), "OK");
         assert_eq!(utf16le_lossy(&[0x00, 0xd8, b'x', 0]), "\u{fffd}x");
+    }
+
+    #[test]
+    fn hex() {
+        assert_eq!(to_hex(&[0x00, 0xAB, 0x7F]), "00ab7f");
+        assert_eq!(to_hex(&[]), "");
     }
 
     #[test]
