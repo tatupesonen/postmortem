@@ -18,11 +18,14 @@ serde_json.workspace = true
 parking_lot.workspace = true
 md-5.workspace = true
 sha2.workspace = true
+jiff.workspace = true
+rusqlite.workspace = true
 
 [dev-dependencies]
 pm-case.workspace = true
 pm-testkit.workspace = true
 tempfile.workspace = true
+proptest.workspace = true
 
 [lints]
 workspace = true

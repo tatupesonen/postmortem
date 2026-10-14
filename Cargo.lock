@@ -3427,6 +3427,7 @@ dependencies = [
 name = "pm-modules"
 version = "0.1.0"
 dependencies = [
+ "jiff",
  "md-5",
  "parking_lot",
  "pm-case",
@@ -3435,6 +3436,8 @@ dependencies = [
  "pm-hashdb",
  "pm-ingest",
  "pm-testkit",
+ "proptest",
+ "rusqlite",
  "serde",
  "serde_json",
  "sha2",

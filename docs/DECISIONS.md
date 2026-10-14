@@ -75,6 +75,10 @@ Evaluations:
   deleted-entry or orphan recovery.
 - **EWF: in-house.** The candidates were young (2026) single-author crates.
   Verified against libewf's `ewfacquire`.
+- **EXIF: in-house (`pm-modules::exif`).** `kamadak-exif` 0.6 needs the
+  whole TIFF in memory (fails criterion 3: a TIFF's IFDs may sit at the end
+  of a multi-GB file); the Picture Analyzer only needs six tags, read with
+  random access over `ReadAt`.
 - **To evaluate when reached**: `notatin` (registry), `evtx`, `lnk`, `cfb`,
   `plist`, `mail-parser`, `outlook-pst`, `zip`, `sevenz-rust2`, `rars`,
   `tantivy`, `yara-x`, `nom-exif`/`kamadak-exif`, `file-format`/`infer`,

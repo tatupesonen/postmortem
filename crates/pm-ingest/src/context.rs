@@ -16,8 +16,9 @@ pub const HEAD_LEN: usize = 8192;
 #[derive(Debug)]
 pub(crate) enum WriteOp {
     Analysis(i64, FileAnalysis),
-    /// Artifact plus the attribute types that identify a duplicate.
-    Artifact(NewArtifact, Vec<i64>),
+    /// Artifact plus the attribute types that identify a duplicate
+    /// (`None`: insert without a duplicate check).
+    Artifact(NewArtifact, Option<Vec<i64>>),
     /// End of the job: the writer commits and exits.
     Stop,
 }
@@ -54,7 +55,14 @@ impl JobContext {
     pub fn post_artifact(&self, artifact: NewArtifact, key: &[i64]) {
         // The writer only disappears when the job is failing; the error
         // is reported there.
-        let _ = self.sink.send(WriteOp::Artifact(artifact, key.to_vec()));
+        let _ = self.sink.send(WriteOp::Artifact(artifact, Some(key.to_vec())));
+    }
+
+    /// Posts an artifact without the duplicate check (for bulk extractors
+    /// that make re-runs idempotent themselves, e.g. by skipping files
+    /// they have already processed).
+    pub fn post_artifact_unchecked(&self, artifact: NewArtifact) {
+        let _ = self.sink.send(WriteOp::Artifact(artifact, None));
     }
 
     /// Posts an ingest inbox message.
