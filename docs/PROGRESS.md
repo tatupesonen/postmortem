@@ -16,6 +16,19 @@ _None._
 
 ## Log
 
+### 2026-10-14 — UI first slice
+- `pm-evidence` (image → VS → FS probe chain) and `pm-ui` (eframe 0.36):
+  tree/table/viewers, background tasks, pop-out windows (deferred
+  viewports), extract file, back/forward, persisted prefs. `postmortem`
+  binary takes image paths. Demo disk at `pm-testkit::demo`
+  (`cargo run -p pm-testkit --example make_demo -- out.dd`).
+- egui 0.36 lessons: labels are selectable by default and swallow row
+  clicks (disable `selectable_labels` in tables). Resizable panels persist
+  their *content* size, so fill the panel with `set_min_size`. Tasks must
+  `request_repaint_of` their own viewport.
+- `egui_kittest` UI flow tests (3) with optional screenshots
+  (`PM_UI_SCREENSHOT_DIR`). Workspace: 169 tests.
+
 ### 2026-10-14 — NTFS
 - `pm-fs-ntfs` in-house (ADR-009 evaluation: the `ntfs` crate lacks MFT
   attribute lists, torn-record tolerance, LZNT1 and slack recovery, so it is

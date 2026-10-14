@@ -506,11 +506,21 @@ impl PostmortemApp {
                 id,
                 false,
             );
-            let (_, header, body) = state
+            let (_, header, _) = state
                 .show_header(ui, |ui| ui.selectable_label(selected, label))
                 .body(|ui| children(self, ui));
-            let _ = body;
-            if header.inner.clicked() {
+            // Click selects and expands; double-click toggles.
+            let (clicked, double) = (header.inner.clicked(), header.inner.double_clicked());
+            if clicked || double {
+                let mut st = egui::collapsing_header::CollapsingState::load_with_default_open(
+                    ui.ctx(),
+                    id,
+                    false,
+                );
+                st.set_open(if double { !st.is_open() } else { true });
+                st.store(ui.ctx());
+            }
+            if clicked {
                 self.navigate(node.clone());
             }
         } else {
@@ -891,12 +901,18 @@ impl PostmortemApp {
             .resizable(true)
             .default_size(300.0)
             .min_size(160.0)
-            .show(ui, |ui| self.tree(ui));
+            .show(ui, |ui| {
+                ui.set_min_size(ui.available_size());
+                self.tree(ui);
+            });
         egui::Panel::bottom("viewer")
             .resizable(true)
             .default_size(330.0)
             .min_size(120.0)
             .show(ui, |ui| {
+                // egui 0.36 panels persist the size of their content; claim the
+                // whole panel so loading states (a spinner) do not shrink it.
+                ui.set_min_size(ui.available_size());
                 self.viewer.ui(ui, &self.prefs);
             });
         egui::CentralPanel::default().show(ui, |ui| self.results(ui));

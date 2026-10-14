@@ -173,143 +173,154 @@ impl TableState {
         }
 
         let text_h = egui::TextStyle::Body.resolve(ui.style()).size + 6.0;
-        let mut table = TableBuilder::new(ui)
-            .striped(true)
-            .resizable(true)
-            .sense(egui::Sense::click())
-            .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-            .column(Column::initial(280.0).at_least(80.0).clip(true))
-            .columns(Column::initial(170.0).clip(true), 4)
-            .column(Column::initial(90.0))
-            .columns(Column::initial(95.0), 2)
-            .column(Column::initial(70.0))
-            .column(Column::remainder().at_least(70.0));
-        if let Some(p) = scroll_to {
-            table = table.scroll_to_row(p, None);
-        }
-        table
-            .header(text_h + 2.0, |mut header| {
-                for col in Col::ALL {
-                    header.col(|ui| {
-                        let arrow = if self.sort == col {
-                            if self.ascending { " ⏶" } else { " ⏷" }
-                        } else {
-                            ""
-                        };
-                        if ui
-                            .add(
-                                egui::Button::selectable(
-                                    self.sort == col,
-                                    format!("{}{arrow}", col.title()),
-                                )
-                                .frame(false),
-                            )
-                            .clicked()
-                        {
-                            if self.sort == col {
-                                self.ascending = !self.ascending;
-                            } else {
-                                self.sort = col;
-                                self.ascending = true;
-                            }
-                        }
-                    });
+        // Wide tables scroll horizontally instead of clipping columns.
+        egui::ScrollArea::horizontal()
+            .auto_shrink(false)
+            .show(ui, |ui| {
+                // Cell text must not swallow clicks meant for the row.
+                ui.style_mut().interaction.selectable_labels = false;
+                let mut table = TableBuilder::new(ui)
+                    .striped(true)
+                    .resizable(true)
+                    .sense(egui::Sense::click())
+                    .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                    .column(Column::initial(250.0).at_least(80.0).clip(true))
+                    .columns(Column::initial(150.0).clip(true), 4)
+                    .column(Column::initial(100.0))
+                    .columns(Column::initial(95.0), 2)
+                    .column(Column::initial(70.0))
+                    .column(Column::remainder().at_least(70.0));
+                if let Some(p) = scroll_to {
+                    table = table.scroll_to_row(p, None);
                 }
-            })
-            .body(|body| {
-                body.rows(text_h, order.len(), |mut row| {
-                    let Some((i, r)) = order
-                        .get(row.index())
-                        .and_then(|&i| rows.get(i).map(|r| (i, r)))
-                    else {
-                        return;
-                    };
-                    let is_sel = self.selected == Some((r.inode, r.stream));
-                    row.set_selected(is_sel);
-                    let deleted = r.deleted();
-                    let color = |ui: &egui::Ui| {
-                        if deleted {
-                            ui.visuals().error_fg_color
-                        } else {
-                            ui.visuals().text_color()
+                table
+                    .header(text_h + 2.0, |mut header| {
+                        for col in Col::ALL {
+                            header.col(|ui| {
+                                let arrow = if self.sort == col {
+                                    if self.ascending { " ⏶" } else { " ⏷" }
+                                } else {
+                                    ""
+                                };
+                                if ui
+                                    .add(
+                                        egui::Button::selectable(
+                                            self.sort == col,
+                                            format!("{}{arrow}", col.title()),
+                                        )
+                                        .frame(false),
+                                    )
+                                    .clicked()
+                                {
+                                    if self.sort == col {
+                                        self.ascending = !self.ascending;
+                                    } else {
+                                        self.sort = col;
+                                        self.ascending = true;
+                                    }
+                                }
+                            });
                         }
-                    };
-                    row.col(|ui| {
-                        let icon = if r.is_dir() {
-                            "🗀"
-                        } else if r.stream.is_some() {
-                            "⧉"
-                        } else {
-                            "🗋"
-                        };
-                        let mark = if deleted { " ✖" } else { "" };
-                        ui.label(
-                            egui::RichText::new(format!("{icon} {}{mark}", r.name))
-                                .color(color(ui)),
-                        );
-                    });
-                    let times = r.meta.as_ref().map(|m| m.times).unwrap_or_default();
-                    for t in [times.modified, times.changed, times.accessed, times.created] {
-                        row.col(|ui| {
-                            ui.label(prefs.time(t));
+                    })
+                    .body(|body| {
+                        body.rows(text_h, order.len(), |mut row| {
+                            let Some((i, r)) = order
+                                .get(row.index())
+                                .and_then(|&i| rows.get(i).map(|r| (i, r)))
+                            else {
+                                return;
+                            };
+                            let is_sel = self.selected == Some((r.inode, r.stream));
+                            row.set_selected(is_sel);
+                            let deleted = r.deleted();
+                            let color = |ui: &egui::Ui| {
+                                if deleted {
+                                    ui.visuals().error_fg_color
+                                } else {
+                                    ui.visuals().text_color()
+                                }
+                            };
+                            row.col(|ui| {
+                                let icon = if r.is_dir() {
+                                    "🗀"
+                                } else if r.stream.is_some() {
+                                    "⧉"
+                                } else {
+                                    "🗋"
+                                };
+                                let mark = if deleted { " ✖" } else { "" };
+                                ui.label(
+                                    egui::RichText::new(format!("{icon} {}{mark}", r.name))
+                                        .color(color(ui)),
+                                );
+                            });
+                            let times = r.meta.as_ref().map(|m| m.times).unwrap_or_default();
+                            for t in [times.modified, times.changed, times.accessed, times.created]
+                            {
+                                row.col(|ui| {
+                                    ui.label(prefs.time(t));
+                                });
+                            }
+                            row.col(|ui| {
+                                ui.with_layout(
+                                    egui::Layout::right_to_left(egui::Align::Center),
+                                    |ui| {
+                                        ui.label(crate::format::grouped(r.size));
+                                    },
+                                );
+                            });
+                            row.col(|ui| {
+                                ui.label(if r.name_allocated {
+                                    "Allocated"
+                                } else {
+                                    "Unallocated"
+                                });
+                            });
+                            row.col(|ui| {
+                                ui.label(if r.meta_allocated() {
+                                    "Allocated"
+                                } else {
+                                    "Unallocated"
+                                });
+                            });
+                            row.col(|ui| {
+                                ui.label(r.extension());
+                            });
+                            row.col(|ui| {
+                                ui.label(match r.stream {
+                                    Some(s) => format!("{}:{s}", r.inode),
+                                    None => r.inode.to_string(),
+                                });
+                            });
+                            let resp = row.response();
+                            if resp.clicked() {
+                                self.selected = Some((r.inode, r.stream));
+                                ev.selected = Some(i);
+                            }
+                            if resp.double_clicked() {
+                                ev.activated = Some(i);
+                            }
+                            resp.context_menu(|ui| {
+                                self.selected = Some((r.inode, r.stream));
+                                ev.selected = Some(i);
+                                if ui.button("Open in New Window").clicked() {
+                                    ev.popout = Some(i);
+                                    ui.close();
+                                }
+                                if ui
+                                    .add_enabled(!r.is_dir(), egui::Button::new("Extract File…"))
+                                    .clicked()
+                                {
+                                    ev.export = Some(i);
+                                    ui.close();
+                                }
+                                if ui.button("Copy Path").clicked() {
+                                    ui.ctx().copy_text(r.path.clone());
+                                    ui.close();
+                                }
+                            });
                         });
-                    }
-                    row.col(|ui| {
-                        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                            ui.label(crate::format::grouped(r.size));
-                        });
                     });
-                    row.col(|ui| {
-                        ui.label(if r.name_allocated {
-                            "Allocated"
-                        } else {
-                            "Unallocated"
-                        });
-                    });
-                    row.col(|ui| {
-                        ui.label(if r.meta_allocated() {
-                            "Allocated"
-                        } else {
-                            "Unallocated"
-                        });
-                    });
-                    row.col(|ui| {
-                        ui.label(r.extension());
-                    });
-                    row.col(|ui| {
-                        ui.label(match r.stream {
-                            Some(s) => format!("{}:{s}", r.inode),
-                            None => r.inode.to_string(),
-                        });
-                    });
-                    let resp = row.response();
-                    if resp.clicked() {
-                        self.selected = Some((r.inode, r.stream));
-                        ev.selected = Some(i);
-                    }
-                    if resp.double_clicked() {
-                        ev.activated = Some(i);
-                    }
-                    resp.context_menu(|ui| {
-                        self.selected = Some((r.inode, r.stream));
-                        ev.selected = Some(i);
-                        if ui.button("Open in New Window").clicked() {
-                            ev.popout = Some(i);
-                            ui.close();
-                        }
-                        if ui
-                            .add_enabled(!r.is_dir(), egui::Button::new("Extract File…"))
-                            .clicked()
-                        {
-                            ev.export = Some(i);
-                            ui.close();
-                        }
-                        if ui.button("Copy Path").clicked() {
-                            ui.ctx().copy_text(r.path.clone());
-                            ui.close();
-                        }
-                    });
-                });
             });
         ev
     }
