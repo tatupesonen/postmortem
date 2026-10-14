@@ -9,6 +9,8 @@ publish = false
 
 [dependencies]
 pm-core.workspace = true
+pm-fs.workspace = true
+jiff.workspace = true
 crc32fast.workspace = true
 uuid.workspace = true
 tempfile.workspace = true

@@ -597,3 +597,85 @@ proptest! {
         }
     }
 }
+
+// ------------------------------------------------------------- benchmark
+
+/// Loader throughput on a synthetic tree (no parser cost): measures the
+/// walker + single writer + index rebuild path. Run in release:
+/// `cargo test -p pm-case --release --test case -- --ignored load_rate --nocapture`
+#[test]
+#[ignore = "benchmark"]
+fn load_rate() {
+    use std::sync::Arc;
+    use std::time::Instant;
+
+    let n: u64 = std::env::var("PM_BENCH_DIRS_FANOUT")
+        .ok()
+        .and_then(|v| v.parse().ok())
+        .unwrap_or(10);
+    // fanout 10, depth 3 → 1 111 directories × 900 files ≈ 1 M rows.
+    let fs = pm_testkit::synth::SynthFs::new(n, 3, 900);
+    let names = fs.names();
+    let fs: Arc<dyn pm_fs::FileSystem> = Arc::new(fs);
+    let image = pm_image::Image::new(
+        pm_image::ImageInfo {
+            format: pm_image::ImageFormat::Raw,
+            paths: vec![PathBuf::from("synthetic.dd")],
+            size: 1 << 40,
+            sector_size: 512,
+            stored_hashes: Vec::new(),
+            metadata: Vec::new(),
+        },
+        Arc::new(pm_core::io::ZeroSource::new(1 << 40)),
+    );
+    let ev = pm_evidence::Evidence {
+        image,
+        volume_system: None,
+        filesystems: vec![pm_evidence::FoundFs {
+            partition: None,
+            offset: 0,
+            fs,
+        }],
+    };
+    let tmp = tempfile::tempdir().unwrap();
+    let case = Case::create(tmp.path().join("case"), details()).unwrap();
+    let progress = LoadProgress::default();
+    let t = Instant::now();
+    let s = pm_case::add_evidence(&case, ev, &LoadOptions::default(), &progress).unwrap();
+    let dt = t.elapsed();
+    // root + names + $OrphanFiles
+    assert_eq!(s.files, names + 2);
+    eprintln!(
+        "loaded {} rows in {:.2?} ({:.0} rows/s, incl. index rebuild)",
+        s.files,
+        dt,
+        s.files as f64 / dt.as_secs_f64()
+    );
+
+    let db = case.db();
+    let t = Instant::now();
+    let root = db.fs_root(s.fs_ids[0]).unwrap().unwrap();
+    let kids = db.children(root.id).unwrap();
+    eprintln!(
+        "children(root) = {} rows in {:.2?}",
+        kids.len(),
+        t.elapsed()
+    );
+    let t = Instant::now();
+    let deleted = db
+        .count_files(&pm_casedb::FileQuery {
+            deleted_only: true,
+            ..Default::default()
+        })
+        .unwrap();
+    eprintln!("deleted count = {deleted} in {:.2?}", t.elapsed());
+    let t = Instant::now();
+    let ext = db.extension_counts(None).unwrap();
+    eprintln!(
+        "extension counts ({} kinds) in {:.2?}",
+        ext.len(),
+        t.elapsed()
+    );
+    let size = std::fs::metadata(db.path()).unwrap().len();
+    eprintln!("database size {:.1} MB", size as f64 / 1e6);
+}

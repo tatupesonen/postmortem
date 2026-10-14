@@ -15,6 +15,7 @@ pub mod disk;
 pub mod ext;
 pub mod lznt1;
 pub mod ntfs;
+pub mod synth;
 pub mod tsk;
 
 pub use disk::{DiskBuilder, GptPart, MbrPart};

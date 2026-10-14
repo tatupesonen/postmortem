@@ -3398,7 +3398,9 @@ dependencies = [
  "crc32fast",
  "fatfs",
  "fstool",
+ "jiff",
  "pm-core",
+ "pm-fs",
  "tempfile",
  "uuid",
 ]

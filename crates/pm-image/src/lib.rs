@@ -96,6 +96,11 @@ pub struct Image {
 }
 
 impl Image {
+    /// Wraps an already opened source (in-memory or synthetic evidence).
+    pub fn new(info: ImageInfo, source: SharedSource) -> Self {
+        Self { info, source }
+    }
+
     /// The logical disk content.
     pub fn source(&self) -> SharedSource {
         Arc::clone(&self.source)
