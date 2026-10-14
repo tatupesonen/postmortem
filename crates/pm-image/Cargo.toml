@@ -1,0 +1,20 @@
+[package]
+name = "pm-image"
+description = "Disk image containers for postmortem: raw, split raw, EWF (E01), VMDK, VHD/VHDX"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+rstest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

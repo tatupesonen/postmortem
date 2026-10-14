@@ -375,6 +375,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-image"
+version = "0.1.0"
+dependencies = [
+ "pm-core",
+ "proptest",
+ "rstest",
+ "tempfile",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "pm-testkit"
 version = "0.1.0"
 dependencies = [

@@ -3,3 +3,9 @@ allow-expect-in-tests = true
 allow-indexing-slicing-in-tests = true
 allow-print-in-tests = true
 allow-dbg-in-tests = true
+doc-valid-idents = [
+    "..",
+    "EnCase", "FILETIME", "WebKit", "NTFS", "exFAT", "ExFAT", "MacOS", "macOS", "iOS",
+    "SQLite", "PostgreSQL", "LevelDB", "IndexedDB", "BitLocker", "FileVault", "VirusTotal",
+    "RegRipper", "PhotoRec", "LibreOffice", "OneDrive", "iCloud", "WhatsApp", "ShellBags",
+]

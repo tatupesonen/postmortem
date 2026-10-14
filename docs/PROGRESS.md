@@ -15,6 +15,13 @@ _None._
 
 ## Log
 
+### 2026-10-14 — pm-image (raw)
+- `pm-image`: container sniffing (EWF/EWF2/VMDK/VHD/VHDX/QCOW/DMG magic),
+  split-raw segment discovery (.000/.001 numeric of any width, .aa alpha,
+  case preserved, .000 candidate prompt as in Autopsy), `ConcatSource` with
+  O(log n) segment lookup and truncation-safe short reads. Non-raw formats
+  return `Unsupported` for now. Workspace total: 72 tests.
+
 ### 2026-10-14 — pm-volume
 - `pm-volume`: DOS/MBR (primary + EBR chains, loop guard, FS-boot-sector
   rejection), GPT (CRC-validated header and array, backup fallback, 512/4096

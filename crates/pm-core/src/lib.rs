@@ -3,7 +3,7 @@
 //! * [`io`] — the [`ReadAt`](io::ReadAt) random-access byte-source abstraction
 //!   that layers images, volumes, filesystems and files.
 //! * [`decode`] — bounds-checked binary field decoding for hostile input.
-//! * [`time`] — epoch conversions (`FILETIME`, HFS, Cocoa, `WebKit`, DOS, ...).
+//! * [`time`] — epoch conversions (FILETIME, HFS, Cocoa, WebKit, DOS, ...).
 //! * [`units`] — human-readable (metric by default) size formatting.
 
 pub mod decode;
