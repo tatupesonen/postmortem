@@ -95,3 +95,22 @@ names, orphans), we match TSK 4.15 output (`mmls`/`fls`/`istat`) on
 generated images via `pm_testkit::tsk`. Where we recover *more* (full deleted
 long names, orphan content), the differential test accepts the TSK form as
 an alternative and the improvement is documented in the test.
+
+## ADR-013 — Analyzers: core parsers in Rust, plugins in WebAssembly
+(Decided with the user 2026-10-14.)
+
+* **Built-in analyzers are Rust.** This covers everything Autopsy ships,
+  including the Jython Android/GPX modules and ALEAPP/iLEAPP-style app
+  parsers. Simple "find DB → query → map columns" parsers may be
+  table-driven inside Rust (a shared query/mapping engine), but that is an
+  implementation detail, not a user-facing format.
+* **Third-party extensibility is WebAssembly** (wasmtime component model,
+  versioned WIT world, pinned to yara-x's wasmtime major per ADR-011).
+  Plugins get read-only file content and metadata through host calls, emit
+  artifacts/analysis results through the host (which batches DB writes and
+  schedules work in parallel), are sandboxed (no ambient FS/network), and
+  have fuel/memory limits. Ingest modules, report modules and content
+  viewers are plugin kinds. Ship templates (Rust first) and a scaffold.
+* **No embedded Python.** Autopsy's Jython plugin API is not reproduced.
+  External tools (aLEAPP/iLEAPP, Plaso, Volatility) may still run as
+  subprocesses with their output imported, as Autopsy does.

@@ -99,11 +99,11 @@ folders sit on a network filesystem as in Autopsy.
 
 ### Plugins
 
-`pm-plugin-api` is a stable Rust trait set (ingest module, report module,
-content viewer, data source processor). On top of it sit two hosts:
-- WASM components (wasmtime, WIT interface): the sandboxed, recommended route.
-- Python modules (pyo3, optional cargo feature): parity with Autopsy's
-  Jython modules.
+Per ADR-013, all built-in analyzers (including Autopsy's Jython Android/GPX
+modules) are Rust. Third-party extensions are WebAssembly components
+(wasmtime, versioned WIT world) that are sandboxed, fuel- and memory-limited,
+and access evidence and emit results only through host calls. There is no
+embedded Python.
 
 ## Crate map
 
@@ -146,7 +146,7 @@ content viewer, data source processor). On top of it sit two hosts:
 | `pm-cli` | command-line ingest/report/export binary | — |
 | `pm-server`, `pm-worker` | multi-user server and auto-ingest worker | — |
 | `pm-mcp` | MCP server exposing case queries | — |
-| `pm-plugin-api`, `pm-plugin-wasm`, `pm-plugin-python` | plugin system | — |
+| `pm-plugin-api`, `pm-plugin-wasm` | WebAssembly plugin system (ADR-013) | — |
 | `fuzz/` | cargo-fuzz targets (outside the workspace) | — |
 
 ## Milestones
@@ -253,7 +253,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Report wizard and module API; HTML, XLSX, CSV/TSV, KML, body file, portable case, CASE/UCO, tagged hashes, data source summary; snapshots via insta
 
 ### M10 — Specialised modules
-- [ ] Android analyzer parsers (22 apps; inventory 03 §4), GPX, DJI drones, VM extractor, YARA (yara-x), file carving (pure-Rust, PhotoRec-like signatures), LEAPP-equivalent iOS/Android parsers or external aLEAPP/iLEAPP runner, Plaso runner (optional external), object detection (optional), memory-image DSP (Volatility runner, optional)
+- [ ] Android analyzer parsers (22 apps; inventory 03 §4) ported to Rust (table-driven query/mapping engine where it fits), GPX, DJI drones, VM extractor, YARA (yara-x), file carving (pure-Rust, PhotoRec-like signatures), LEAPP-equivalent iOS/Android parsers or external aLEAPP/iLEAPP runner, Plaso runner (optional external), object detection (optional), memory-image DSP (Volatility runner, optional)
 
 ### M11 — Multi-user and automation
 - [ ] PostgreSQL back end for `pm-casedb` (parity tests run against both back ends)
@@ -263,8 +263,11 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] `pm-cli`: command-line ingest (Autopsy-compatible options plus clap UX), reports, exports
 - [ ] `pm-mcp`: MCP server with Autopsy's 17 tools (cross-platform)
 
-### M12 — Plugins
-- [ ] `pm-plugin-api` stable traits and data types; WIT world for WASM; wasmtime host; pyo3 host (feature); example plugins and docs
+### M12 — Plugins (ADR-013: Rust built-ins, WebAssembly plugins, no Python)
+- [ ] `pm-plugin-api`: WIT world (file access, metadata, artifact/result emission, settings, logging, progress), versioning policy
+- [ ] `pm-plugin-wasm`: wasmtime host (component model, fuel/memory limits, no ambient authority), plugin discovery/manifest, enable/disable UI, per-plugin settings
+- [ ] Plugin kinds: ingest (file + data source), report, content viewer
+- [ ] Rust plugin template + scaffold command, example plugins, author docs; golden tests running plugins end-to-end
 
 ### M13 — Hardening and release
 - [ ] Benchmarks vs Autopsy-reported numbers; profiling passes
