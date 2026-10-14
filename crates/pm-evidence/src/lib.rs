@@ -73,6 +73,12 @@ pub fn probe_fs(src: SharedSource, opts: &OpenOptions) -> Option<Arc<dyn FileSys
             Err(e) => tracing::warn!("NTFS boot sector found but open failed: {e}"),
         }
     }
+    if pm_fs_ext::probe(&*src) {
+        match pm_fs_ext::ExtFs::open(Arc::clone(&src)) {
+            Ok(fs) => return Some(Arc::new(fs)),
+            Err(e) => tracing::warn!("ext superblock found but open failed: {e}"),
+        }
+    }
     if pm_fs_exfat::probe(&*src) {
         let ex_opts = pm_fs_exfat::ExFatOptions {
             timezone: opts.timezone.clone(),

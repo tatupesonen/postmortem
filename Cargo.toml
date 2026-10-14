@@ -22,6 +22,7 @@ pm-fs = { path = "crates/pm-fs" }
 pm-fs-fat = { path = "crates/pm-fs-fat" }
 pm-fs-ntfs = { path = "crates/pm-fs-ntfs" }
 pm-fs-exfat = { path = "crates/pm-fs-exfat" }
+pm-fs-ext = { path = "crates/pm-fs-ext" }
 pm-evidence = { path = "crates/pm-evidence" }
 pm-ui = { path = "crates/pm-ui" }
 
@@ -59,6 +60,8 @@ md-5 = "0.11.0"
 sha1 = "0.11.0"
 sha2 = "0.11.1"
 ntfs = "0.4.0"
+# Fixture writer for ext/XFS/HFS+/ISO tests; API unstable before 0.5 → pin exactly.
+fstool = { version = "=0.4.35", default-features = false, features = ["std", "ext", "hfs-plus", "iso9660", "xfs"] }
 fatfs = { version = "0.3.6", default-features = false, features = ["std", "alloc"] }
 
 [workspace.lints.rust]

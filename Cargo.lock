@@ -1627,6 +1627,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "aa9a19cbb55df58761df49b23516a86d432839add4af60fc256da840f66ed35b"
 
 [[package]]
+name = "fstool"
+version = "0.4.35"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "fe638c071ff338605e48623ebb7025f4d2e3f85683aed6aefd3a0d7c8ff0a7e2"
+dependencies = [
+ "uuid",
+]
+
+[[package]]
 name = "futures-core"
 version = "0.3.34"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3170,6 +3179,7 @@ dependencies = [
  "pm-core",
  "pm-fs",
  "pm-fs-exfat",
+ "pm-fs-ext",
  "pm-fs-fat",
  "pm-fs-ntfs",
  "pm-image",
@@ -3203,6 +3213,21 @@ dependencies = [
  "pm-fs",
  "pm-testkit",
  "proptest",
+ "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
+name = "pm-fs-ext"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "pm-core",
+ "pm-fs",
+ "pm-testkit",
+ "proptest",
+ "rstest",
  "tempfile",
  "thiserror 2.0.21",
  "tracing",
@@ -3264,6 +3289,7 @@ version = "0.1.0"
 dependencies = [
  "crc32fast",
  "fatfs",
+ "fstool",
  "pm-core",
  "tempfile",
  "uuid",
@@ -4681,6 +4707,7 @@ version = "1.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7cc1186384beb7dd8eedea376413fd654937285ea6c9cfbb928dc3043ea4b606"
 dependencies = [
+ "getrandom 0.4.3",
  "js-sys",
  "serde_core",
  "wasm-bindgen",

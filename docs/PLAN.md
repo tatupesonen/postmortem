@@ -117,7 +117,7 @@ content viewer, data source processor). On top of it sit two hosts:
 | `pm-fs-fat` | FAT12/16/32 | done |
 | `pm-fs-exfat` | exFAT | done |
 | `pm-fs-ntfs` | NTFS incl. ADS, compression, $LogFile/$UsnJrnl access, slack | core done |
-| `pm-fs-ext` | ext2/3/4 incl. extents, inline data, journal | — |
+| `pm-fs-ext` | ext2/3/4 incl. extents, inline data, journal | done (journal TBD) |
 | `pm-fs-hfs` | HFS+/HFSX incl. resource forks, compression | — |
 | `pm-fs-apfs` | APFS (unencrypted; snapshots later) | — |
 | `pm-fs-iso` | ISO9660 (+Joliet/Rock Ridge) and UDF | — |
@@ -171,7 +171,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] NTFS extras: $Secure/owner SIDs, reparse points/junctions, $UsnJrnl/$LogFile parsing, EFS flagging, WOF/compact compression, hard-link enumeration, bulk MFT enumeration fast path
 - [ ] `pm-evidence`: probe chain (image → VS → FS registry), unallocated-space virtual files, partitions with unknown FS, "no VS" fallback, logical files & folders DSP, local disk DSP (read-only)
 - [x] `pm-fs-exfat`: entry sets with checksum validation, deleted sets, NoFatChain/valid-length, UTC offsets (TSK gets these wrong), alloc bitmap, orphan scan; macOS-generated fixture + fls differential + fuzz
-- [ ] `pm-fs-ext` (ext2/3/4)
+- [x] `pm-fs-ext` (ext2/3/4): extents (any depth, uninit), indirect blocks, inline data, fast symlinks, dirent-slack deleted names, bitmaps incl. uninit groups, nanosecond/crtime times; fixtures via `fstool` (pinned dev-dep) + fls differential
 - [ ] `pm-fs-hfs` (HFS+), `pm-fs-apfs`
 - [ ] `pm-fs-iso` (ISO9660/Joliet/RR, UDF)
 - [ ] `pm-image` VMDK (sparse + flat + descriptor), VHD (fixed/dynamic/diff), VHDX, QCOW2, DMG (UDIF)
