@@ -64,9 +64,38 @@ impl Art {
         self
     }
 
+    /// An attribute of any value type.
+    pub(crate) fn value(mut self, attr_name: &str, v: Value) -> Self {
+        self.a
+            .attributes
+            .push((attr(attr_name), v, self.module.to_owned()));
+        self
+    }
+
     pub(crate) fn configuration(mut self, c: impl Into<String>) -> Self {
         self.a.configuration = Some(c.into());
         self
+    }
+
+    /// A text attribute, left out when empty (Autopsy skips null values).
+    pub(crate) fn text_opt(self, attr_name: &str, v: Option<String>) -> Self {
+        match v.filter(|s| !s.is_empty()) {
+            Some(v) => self.text(attr_name, v),
+            None => self,
+        }
+    }
+
+    /// A date-time attribute (Unix seconds), left out when absent.
+    pub(crate) fn time(self, attr_name: &str, v: Option<i64>) -> Self {
+        match v {
+            Some(t) => self.value(attr_name, Value::DateTime(t)),
+            None => self,
+        }
+    }
+
+    /// Posts it without a duplicate check (see `JobContext::post_artifact_unchecked`).
+    pub(crate) fn post_unchecked(self, ctx: &JobContext) {
+        ctx.post_artifact_unchecked(self.a);
     }
 
     /// Posts it; `key` names the attributes that identify a duplicate.

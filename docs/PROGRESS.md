@@ -15,11 +15,35 @@
   4. UI: New/Open Case, tree and table backed by the DB, tags.
   5. Then M4 ingest (hash, file type, EXIF, …) feeding artifacts.
 
+- **TESTS OWED (written without tests to save usage, 2026-10-14):**
+  - Recent Activity (`pm-modules/src/recent_activity/`): integration tests
+    for IE (index.dat history incl. multiple hash tables and daily
+    MSHist files, Favorites .url, Cookies .txt), Chromium (History,
+    Cookies, Downloads v30 and older, Bookmarks JSON, Login Data, Web Data
+    autofill), search-query analysis over history, idempotent re-runs;
+    diff IE history against `pasco` output on the NIST Hacking Case image.
+  - Picture Analyzer: end-to-end ingest test on a disk image.
+  - Not yet ported: Firefox, Safari, legacy Edge (ESE WebCacheV01.dat),
+    Chrome cache/favicons/extensions/web form addresses, public-suffix
+    list for domains (a built-in subset is used), TSK_PATH_ID/associated
+    objects for downloads.
+  - The full workspace gate was not run for this commit.
+
 ## Blockers
 
 _None._
 
 ## Log
+
+### 2026-10-14 — Picture Analyzer (EXIF)
+- `pm-modules::picture_analyzer` + `exif` (random-access TIFF/JPEG EXIF
+  reader): `TSK_METADATA_EXIF` (DATETIME_CREATED in the data source's
+  zone, GEO_LATITUDE/LONGITUDE/ALTITUDE, DEVICE_MODEL/MAKE) and
+  `TSK_USER_CONTENT_SUSPECTED`, per Autopsy's `EXIFProcessor`. Unit tests
+  for the reader (both byte orders, multiple APP1, corrupt offsets,
+  proptest) and dates; **no end-to-end ingest test yet**. HEIC conversion
+  not implemented. Falls back to a JPEG/TIFF/WAV signature check until File
+  Type Identification lands.
 
 ### 2026-10-14 — File Discovery
 - `pm-discovery` crate (14 tests, Autopsy's size-bucket boundaries) and the

@@ -413,10 +413,14 @@ fn run_writer(
                         break;
                     }
                     WriteOp::Analysis(id, a) => b.set_file_analysis(id, &a)?,
-                    WriteOp::Artifact(a, key) => {
+                    WriteOp::Artifact(a, Some(key)) => {
                         if b.add_artifact_unless_exists(&a, &key)?.is_some() {
                             artifacts += 1;
                         }
+                    }
+                    WriteOp::Artifact(a, None) => {
+                        b.add_artifact(&a)?;
+                        artifacts += 1;
                     }
                 }
                 n += 1;
