@@ -15,6 +15,7 @@ pm-fs = { path = "../crates/pm-fs" }
 pm-fs-fat = { path = "../crates/pm-fs-fat" }
 pm-image = { path = "../crates/pm-image" }
 pm-fs-ntfs = { path = "../crates/pm-fs-ntfs" }
+pm-fs-exfat = { path = "../crates/pm-fs-exfat" }
 
 [workspace]
 members = ["."]
@@ -43,6 +44,13 @@ bench = false
 [[bin]]
 name = "ntfs_walk"
 path = "fuzz_targets/ntfs_walk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "exfat_walk"
+path = "fuzz_targets/exfat_walk.rs"
 test = false
 doc = false
 bench = false

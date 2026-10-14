@@ -115,7 +115,7 @@ content viewer, data source processor). On top of it sit two hosts:
 | `pm-volume` | MBR/EBR, GPT, APM, BSD disklabel, LVM, BitLocker/LUKS detection | MBR+GPT done |
 | `pm-fs` | FileSystem trait, ExtentSource, walker | done |
 | `pm-fs-fat` | FAT12/16/32 | done |
-| `pm-fs-exfat` | exFAT | — |
+| `pm-fs-exfat` | exFAT | done |
 | `pm-fs-ntfs` | NTFS incl. ADS, compression, $LogFile/$UsnJrnl access, slack | core done |
 | `pm-fs-ext` | ext2/3/4 incl. extents, inline data, journal | — |
 | `pm-fs-hfs` | HFS+/HFSX incl. resource forks, compression | — |
@@ -170,7 +170,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [x] `pm-fs-ntfs`: boot, MFT (incl. fragmented $MFT via attribute list), fixups (torn-tolerant), runlists, resident/non-resident, LZNT1, sparse, init size, ADS, $SI+$FN times, deleted via parent map, $I30 slack, orphans, unallocated clusters. In-house `NtfsBuilder` (pm-testkit) validated by TSK; differential vs `fls` + `ntfs` crate oracle; fuzz target
 - [ ] NTFS extras: $Secure/owner SIDs, reparse points/junctions, $UsnJrnl/$LogFile parsing, EFS flagging, WOF/compact compression, hard-link enumeration, bulk MFT enumeration fast path
 - [ ] `pm-evidence`: probe chain (image → VS → FS registry), unallocated-space virtual files, partitions with unknown FS, "no VS" fallback, logical files & folders DSP, local disk DSP (read-only)
-- [ ] `pm-fs-exfat`
+- [x] `pm-fs-exfat`: entry sets with checksum validation, deleted sets, NoFatChain/valid-length, UTC offsets (TSK gets these wrong), alloc bitmap, orphan scan; macOS-generated fixture + fls differential + fuzz
 - [ ] `pm-fs-ext` (ext2/3/4)
 - [ ] `pm-fs-hfs` (HFS+), `pm-fs-apfs`
 - [ ] `pm-fs-iso` (ISO9660/Joliet/RR, UDF)

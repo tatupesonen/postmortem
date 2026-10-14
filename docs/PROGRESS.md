@@ -2,19 +2,28 @@
 
 ## Now
 
-- **User asked to see the UI next (2026-10-14).** Build `pm-evidence`
-  (image → VS → FS probe chain) and `pm-ui` (eframe) for a first visible
-  slice: open an image, then tree / table / content viewers (hex, strings,
-  text, metadata, image) with pop-out windows. Back it with the evidence
-  layer directly behind a data-provider trait; switch to `pm-casedb` once M2
-  lands.
-- Then resume M1 (`pm-fs-exfat`, ext, HFS+/APFS, ISO; VMDK/VHD/QCOW) and M2.
+- M1 next: `pm-fs-ext` (ext2/3/4). Fixture options: the `fstool` crate
+  (pure-Rust ext2/3/4 image *writer*, dev-dependency) for in-test images,
+  plus TSK `fls`/`istat` differential. Then HFS+/APFS (hdiutil can create
+  both on macOS), ISO9660/UDF (hdiutil `makehybrid`), then VMDK/VHD/QCOW2
+  (qemu-img is installed), then M2 (case DB).
+- Keep the UI working: register each new FS in `pm-evidence::probe_fs`.
 
 ## Blockers
 
 _None._
 
 ## Log
+
+### 2026-10-14 — logo + exFAT
+- Brand: `assets/brand` SVG icon (disk platter with a stitched Y-incision)
+  and wordmark, rendered with resvg (`cargo run -p pm-ui --example
+  render_brand`). Used as the window icon, on the welcome screen and in
+  About.
+- `pm-fs-exfat`: fixture written by macOS's own exFAT driver
+  (`scripts/fixtures/make-exfat.sh`, gzip-committed); matches `fls`
+  exactly. Timestamps honour the UTC offset; TSK 4.15 is off by the offset
+  twice. Fuzzed for 2 min (149k runs, clean). Workspace: 179 tests.
 
 ### 2026-10-14 — UI first slice
 - `pm-evidence` (image → VS → FS probe chain) and `pm-ui` (eframe 0.36):

@@ -295,6 +295,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-fs-exfat"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "parking_lot",
+ "pm-core",
+ "pm-fs",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "pm-fs-fat"
 version = "0.1.0"
 dependencies = [
@@ -323,6 +335,7 @@ dependencies = [
  "libfuzzer-sys",
  "pm-core",
  "pm-fs",
+ "pm-fs-exfat",
  "pm-fs-fat",
  "pm-fs-ntfs",
  "pm-image",

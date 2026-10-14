@@ -13,6 +13,7 @@ pm-volume.workspace = true
 pm-fs.workspace = true
 pm-fs-fat.workspace = true
 pm-fs-ntfs.workspace = true
+pm-fs-exfat.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 jiff.workspace = true

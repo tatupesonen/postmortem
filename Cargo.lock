@@ -3169,6 +3169,7 @@ dependencies = [
  "jiff",
  "pm-core",
  "pm-fs",
+ "pm-fs-exfat",
  "pm-fs-fat",
  "pm-fs-ntfs",
  "pm-image",
