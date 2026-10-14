@@ -48,15 +48,21 @@ pub enum NodeId {
         ds: DsId,
         fs: usize,
     },
+    /// Results of one artifact type in the case database.
+    Results {
+        type_id: i64,
+    },
 }
 
 impl NodeId {
-    pub fn ds(&self) -> DsId {
+    /// The data source this node belongs to (`None` for case-wide nodes).
+    pub fn ds(&self) -> Option<DsId> {
         match self {
             Self::DataSource(ds)
             | Self::Volume { ds, .. }
             | Self::Dir { ds, .. }
-            | Self::Orphans { ds, .. } => *ds,
+            | Self::Orphans { ds, .. } => Some(*ds),
+            Self::Results { .. } => None,
         }
     }
 }

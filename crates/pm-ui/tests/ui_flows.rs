@@ -331,3 +331,63 @@ fn reopening_a_case_restores_its_data_sources_without_reanalysis() {
     assert!(h.query_by_label_contains("Analysed demo.dd").is_none());
     shot(&mut h, "reopened-case");
 }
+
+#[test]
+fn analysis_results_are_listed_and_open_the_source_file() {
+    // A case whose analysis already found a notable hash-set hit.
+    let dir = CASES.path().join("with-results");
+    {
+        let case = pm_case::Case::create(&dir, pm_case::CaseDetails::default()).unwrap();
+        let s = pm_case::add_image(
+            &case,
+            &DEMO.1,
+            &pm_case::LoadOptions::default(),
+            &pm_case::LoadProgress::default(),
+        )
+        .unwrap();
+        let exe = case
+            .db()
+            .query_files(&pm_casedb::FileQuery::default(), 0, 100_000)
+            .unwrap()
+            .into_iter()
+            .find(|f| f.name == "setup.exe")
+            .unwrap();
+        let set = pm_casedb::catalog::attribute_type_id("TSK_SET_NAME").unwrap();
+        case.db()
+            .add_artifact(&pm_casedb::NewArtifact {
+                type_id: pm_casedb::catalog::artifact_type_id("TSK_HASHSET_HIT").unwrap(),
+                ds_id: s.ds_id,
+                file_id: Some(exe.id),
+                source_artifact_id: None,
+                score: Some((
+                    pm_casedb::Significance::Notable,
+                    pm_casedb::Priority::Normal,
+                )),
+                conclusion: None,
+                configuration: Some("Malware".into()),
+                justification: None,
+                created_at: 0,
+                attributes: vec![(
+                    set,
+                    pm_casedb::Value::Text("Malware".into()),
+                    "Hash Lookup".into(),
+                )],
+            })
+            .unwrap();
+    }
+    let mut h = harness_with(vec![dir.join("case.pmcase")], false);
+    settle(&mut h, |h| {
+        !h.state().data_sources().is_empty() && !h.state().is_loading()
+    });
+    click_exact(&mut h, "Hashset Hits (1)");
+    settle(&mut h, |h| h.query_by_label_contains("Notable").is_some());
+    // Configuration and Set Name columns.
+    assert_eq!(h.get_all_by_label("Malware").count(), 2);
+    shot(&mut h, "results-hashset");
+    click_exact(&mut h, "setup.exe");
+    // The viewer shows the selected result's file.
+    settle(&mut h, |h| {
+        h.query_by_label_contains("4d 5a").is_some() || h.query_by_label_contains("4D 5A").is_some()
+    });
+    shot(&mut h, "results-hashset-viewer");
+}

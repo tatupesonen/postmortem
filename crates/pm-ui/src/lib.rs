@@ -12,6 +12,7 @@ mod format;
 mod gallery;
 mod index;
 mod model;
+mod results;
 mod summary;
 mod table;
 mod task;

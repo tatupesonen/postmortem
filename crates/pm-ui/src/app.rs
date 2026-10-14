@@ -93,6 +93,11 @@ pub struct PostmortemApp {
     progress_open: bool,
     progress_closed: Arc<AtomicBool>,
     case_wizard: Option<NewCaseWizard>,
+    result_counts: crate::results::Counts,
+    result_rows: HashMap<i64, Task<Result<Arc<crate::results::ResultRows>, String>>>,
+    result_selected: Option<usize>,
+    /// Analysis was running last frame (refresh results when it stops).
+    was_analysing: bool,
 }
 
 impl PostmortemApp {
@@ -136,6 +141,10 @@ impl PostmortemApp {
             progress_open: false,
             progress_closed: Arc::new(AtomicBool::new(false)),
             case_wizard: None,
+            result_counts: crate::results::Counts::default(),
+            result_rows: HashMap::new(),
+            result_selected: None,
+            was_analysing: false,
         };
         app.apply_time_pref();
         // Command line: a case (folder or case.pmcase) is opened; images are
@@ -286,6 +295,9 @@ impl PostmortemApp {
         self.timeline = None;
         self.gallery = None;
         self.discovery = None;
+        self.result_counts.invalidate();
+        self.result_rows.clear();
+        self.result_selected = None;
         ctx.send_viewport_cmd(egui::ViewportCommand::Title("postmortem".into()));
     }
 
@@ -388,6 +400,7 @@ impl PostmortemApp {
         self.forward.clear();
         self.selected = Some(node);
         self.table.reset();
+        self.result_selected = None;
     }
 
     fn go_back(&mut self) {
@@ -1005,7 +1018,67 @@ impl PostmortemApp {
                     app.data_source_children(ui, &ds);
                 });
             }
+            self.results_tree(ui);
         });
+    }
+
+    /// "Data Artifacts" and "Analysis Results" with per-type counts.
+    fn results_tree(&mut self, ui: &mut egui::Ui) {
+        let (case, live) = {
+            let a = self.analysis.lock();
+            (a.case().cloned(), a.any_active())
+        };
+        if case.is_none() {
+            return;
+        }
+        if self.was_analysing && !live {
+            // Final counts and rows once analysis has finished.
+            self.result_counts.invalidate();
+            self.result_rows.clear();
+        }
+        self.was_analysing = live;
+        let counts = self.result_counts.get(ui.ctx(), case.as_ref(), live);
+        // Cached rows go stale while results are still being added.
+        for t in counts.iter() {
+            let stale = self
+                .result_rows
+                .get_mut(&t.type_id)
+                .and_then(Task::poll)
+                .and_then(|r| r.as_ref().ok())
+                .is_some_and(|rows| {
+                    rows.rows.len() < (t.count as usize).min(crate::results::MAX_ROWS)
+                });
+            if stale {
+                self.result_rows.remove(&t.type_id);
+            }
+        }
+        for (heading, cat) in [
+            ("Data Artifacts", pm_casedb::catalog::Category::DataArtifact),
+            (
+                "Analysis Results",
+                pm_casedb::catalog::Category::AnalysisResult,
+            ),
+        ] {
+            ui.add_space(8.0);
+            ui.heading(heading);
+            let of_cat: Vec<_> = counts
+                .iter()
+                .filter(|t| t.category == cat)
+                .cloned()
+                .collect();
+            if of_cat.is_empty() {
+                ui.weak(if live {
+                    "Analysis is running…"
+                } else {
+                    "None"
+                });
+            }
+            for t in of_cat {
+                let node = NodeId::Results { type_id: t.type_id };
+                let label = format!("{} ({})", t.display, crate::format::grouped(t.count));
+                self.tree_node(ui, &node, &label, false, |_, _| {});
+            }
+        }
     }
 
     /// One collapsible tree node with a selectable label; children render lazily.
@@ -1200,7 +1273,75 @@ impl PostmortemApp {
                 ui.strong("$OrphanFiles — deleted files whose parent directory is gone");
                 self.file_table(ui, &node);
             }
+            NodeId::Results { type_id } => self.results_view(ui, *type_id),
         }
+    }
+
+    fn results_view(&mut self, ui: &mut egui::Ui, type_id: i64) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        let task = self.result_rows.entry(type_id).or_insert_with(|| {
+            let case = Arc::clone(&case);
+            Task::spawn(ui.ctx(), move || {
+                crate::results::load_rows(&case, type_id).map(Arc::new)
+            })
+        });
+        let rows = match task.poll() {
+            None => {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Loading results…");
+                });
+                return;
+            }
+            Some(Err(e)) => {
+                ui.colored_label(ui.visuals().error_fg_color, e);
+                return;
+            }
+            Some(Ok(r)) => Arc::clone(r),
+        };
+        let title = case
+            .db()
+            .artifact_type_names()
+            .ok()
+            .and_then(|n| n.into_iter().find(|t| t.0 == type_id).map(|t| t.2))
+            .unwrap_or_default();
+        if let Some(i) =
+            crate::results::table_ui(ui, &title, &rows, &self.prefs, self.result_selected)
+        {
+            self.result_selected = Some(i);
+            let content = rows
+                .rows
+                .get(i)
+                .and_then(|r| r.file.as_ref())
+                .and_then(|f| self.content_for(&case, f));
+            self.viewer.set_content(content);
+        }
+    }
+
+    /// The evidence-backed content of a case file (for the viewers).
+    fn content_for(&self, case: &pm_case::Case, f: &pm_casedb::FileRecord) -> Option<Content> {
+        let ds = case.db().data_source(f.ds_id).ok()??;
+        let fs_rec = case.db().file_system(f.fs_id?).ok()??;
+        let first = PathBuf::from(ds.paths.first()?);
+        let src = self
+            .sources
+            .iter()
+            .find(|s| s.evidence.image.info.paths.first() == Some(&first))?;
+        let found = src
+            .evidence
+            .filesystems
+            .iter()
+            .find(|x| x.offset == fs_rec.byte_offset)?;
+        let mut row = FileRow::from_fs(&*found.fs, f.inode?, &f.path(), f.name_alloc);
+        row.name.clone_from(&f.name);
+        row.stream = f.stream;
+        row.size = f.size;
+        Some(Content {
+            fs: Arc::clone(&found.fs),
+            row,
+        })
     }
 
     fn file_table(&mut self, ui: &mut egui::Ui, node: &NodeId) {
