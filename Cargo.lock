@@ -3171,6 +3171,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-discovery"
+version = "0.1.0"
+dependencies = [
+ "pm-fs",
+ "pm-index",
+ "rstest",
+]
+
+[[package]]
 name = "pm-evidence"
 version = "0.1.0"
 dependencies = [
@@ -3337,6 +3346,7 @@ dependencies = [
  "jiff",
  "parking_lot",
  "pm-core",
+ "pm-discovery",
  "pm-evidence",
  "pm-fs",
  "pm-image",

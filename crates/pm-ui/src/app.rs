@@ -9,6 +9,7 @@ use parking_lot::Mutex;
 use pm_evidence::OpenOptions;
 use pm_volume::SlotKind;
 
+use crate::discovery::DiscoveryWindow;
 use crate::format::{DisplayPrefs, size_long};
 use crate::gallery::GalleryWindow;
 use crate::index::SharedIndex;
@@ -73,6 +74,8 @@ pub struct PostmortemApp {
     timeline_closed: Arc<AtomicBool>,
     gallery: Option<Arc<Mutex<GalleryWindow>>>,
     gallery_closed: Arc<AtomicBool>,
+    discovery: Option<Arc<Mutex<DiscoveryWindow>>>,
+    discovery_closed: Arc<AtomicBool>,
     /// File catalogue of all data sources (rebuilt when sources change).
     index: Option<SharedIndex>,
     summary: SummaryState,
@@ -111,6 +114,8 @@ impl PostmortemApp {
             timeline_closed: Arc::new(AtomicBool::new(false)),
             gallery: None,
             gallery_closed: Arc::new(AtomicBool::new(false)),
+            discovery: None,
+            discovery_closed: Arc::new(AtomicBool::new(false)),
             index: None,
             summary: SummaryState::default(),
         };
@@ -353,6 +358,51 @@ impl PostmortemApp {
         );
     }
 
+    fn open_discovery(&mut self, ctx: &egui::Context) {
+        if self.sources.is_empty() {
+            self.errors
+                .push("Add a data source before opening Discovery.".into());
+            return;
+        }
+        if self.discovery.is_none() || self.discovery_closed.swap(false, Ordering::Relaxed) {
+            let w = DiscoveryWindow::new(
+                self.shared_index(ctx),
+                self.sources.clone(),
+                self.prefs.clone(),
+            );
+            self.discovery = Some(Arc::new(Mutex::new(w)));
+        }
+        ctx.send_viewport_cmd_to(
+            egui::ViewportId::from_hash_of("discovery"),
+            egui::ViewportCommand::Focus,
+        );
+    }
+
+    fn show_discovery(&mut self, ctx: &egui::Context) {
+        if self.discovery_closed.swap(false, Ordering::Relaxed) {
+            self.discovery = None;
+        }
+        let Some(d) = self.discovery.clone() else {
+            return;
+        };
+        if let Some(c) = d.lock().popout.take() {
+            self.open_popout(c);
+        }
+        let closed = Arc::clone(&self.discovery_closed);
+        ctx.show_viewport_deferred(
+            egui::ViewportId::from_hash_of("discovery"),
+            egui::ViewportBuilder::default()
+                .with_title("Discovery — postmortem")
+                .with_inner_size([1350.0, 880.0]),
+            move |ui, _| {
+                d.lock().ui(ui);
+                if ui.ctx().input(|i| i.viewport().close_requested()) {
+                    closed.store(true, Ordering::Relaxed);
+                }
+            },
+        );
+    }
+
     fn show_gallery(&mut self, ctx: &egui::Context) {
         if self.gallery_closed.swap(false, Ordering::Relaxed) {
             self.gallery = None;
@@ -526,6 +576,13 @@ impl PostmortemApp {
                     self.open_gallery(ui.ctx());
                     ui.close();
                 }
+                if ui
+                    .add_enabled(!self.sources.is_empty(), egui::Button::new("🔍 Discovery"))
+                    .clicked()
+                {
+                    self.open_discovery(ui.ctx());
+                    ui.close();
+                }
             });
             ui.menu_button("Window", |ui| {
                 let content = self.viewer.content().cloned();
@@ -599,6 +656,13 @@ impl PostmortemApp {
                 .clicked()
             {
                 self.open_gallery(ui.ctx());
+            }
+            if ui
+                .add_enabled(!self.sources.is_empty(), egui::Button::new("🔍 Discovery"))
+                .on_hover_text("Find files by type, size and location (Tools › Discovery)")
+                .clicked()
+            {
+                self.open_discovery(ui.ctx());
             }
             ui.separator();
             let has = self.viewer.content().is_some();
@@ -1075,6 +1139,7 @@ impl PostmortemApp {
         self.popouts(&ctx);
         self.show_timeline(&ctx);
         self.show_gallery(&ctx);
+        self.show_discovery(&ctx);
         self.dialogs(&ctx);
         self.persisted.table = self.table.clone();
     }

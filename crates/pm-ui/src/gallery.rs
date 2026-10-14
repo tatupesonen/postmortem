@@ -5,24 +5,14 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use egui::{Color32, Sense, Vec2};
+use egui::{Sense, Vec2};
 use pm_index::{FileCategory, FileIndex};
 
 use crate::format::DisplayPrefs;
 use crate::index::SharedIndex;
 use crate::model::{Content, DataSource, FileRow};
-use crate::task::Task;
+use crate::thumbs::ThumbCache;
 use crate::viewers::ViewerPanel;
-
-/// Pictures larger than this are not thumbnailed.
-const MAX_THUMB_SOURCE: u64 = 64 * 1024 * 1024;
-const THUMB_PX: u32 = 192;
-
-enum Thumb {
-    Loading(Task<Option<egui::ColorImage>>),
-    Ready(egui::TextureHandle),
-    Failed,
-}
 
 /// A folder of pictures.
 #[derive(Debug, Clone)]
@@ -39,7 +29,7 @@ pub(crate) struct GalleryWindow {
     groups: Option<(Arc<FileIndex>, Vec<Group>)>,
     group: usize,
     group_filter: String,
-    thumbs: HashMap<usize, Thumb>,
+    thumbs: ThumbCache<usize>,
     selected: Option<usize>,
     thumb_size: f32,
     viewer: ViewerPanel,
@@ -56,28 +46,15 @@ impl std::fmt::Debug for GalleryWindow {
     }
 }
 
-fn decode_thumb(src: &pm_core::SharedSource) -> Option<egui::ColorImage> {
-    if src.size() > MAX_THUMB_SOURCE {
-        return None;
-    }
-    let bytes = src.read_vec_at(0, src.size() as usize).ok()?;
-    let mut reader = image::ImageReader::new(std::io::Cursor::new(bytes))
-        .with_guessed_format()
-        .ok()?;
-    let mut limits = image::Limits::default();
-    limits.max_image_width = Some(20_000);
-    limits.max_image_height = Some(20_000);
-    reader.limits(limits);
-    let thumb = reader
-        .decode()
-        .ok()?
-        .thumbnail(THUMB_PX, THUMB_PX)
-        .to_rgba8();
-    let size = [thumb.width() as usize, thumb.height() as usize];
-    Some(egui::ColorImage::from_rgba_unmultiplied(
-        size,
-        thumb.as_raw(),
-    ))
+/// Content for index entry `i`.
+pub(crate) fn self_content(sources: &[DataSource], idx: &FileIndex, i: usize) -> Option<Content> {
+    let f = idx.files.get(i)?;
+    let ds = sources.iter().find(|d| d.id as u32 == f.ds)?;
+    let fs = ds.fs(f.fs as usize)?;
+    Some(Content {
+        fs: Arc::clone(fs),
+        row: FileRow::from_fs(&**fs, f.inode, &f.path, f.name_allocated),
+    })
 }
 
 impl GalleryWindow {
@@ -88,7 +65,7 @@ impl GalleryWindow {
             groups: None,
             group: 0,
             group_filter: String::new(),
-            thumbs: HashMap::new(),
+            thumbs: ThumbCache::default(),
             selected: None,
             thumb_size: 160.0,
             viewer: ViewerPanel::default(),
@@ -276,62 +253,9 @@ impl GalleryWindow {
         painter.rect_filled(rect.shrink(2.0), 6.0, bg);
         let img_rect =
             egui::Rect::from_min_size(rect.min + Vec2::new(6.0, 6.0), Vec2::splat(self.thumb_size));
-        // Kick off decoding for visible cells only.
-        if !self.thumbs.contains_key(&fi) {
-            let content = self.content(idx, fi);
-            let task = Task::spawn(ui.ctx(), move || {
-                content
-                    .and_then(|c| c.source().ok())
-                    .and_then(|s| decode_thumb(&s))
-            });
-            self.thumbs.insert(fi, Thumb::Loading(task));
-        }
-        let ctx = ui.ctx().clone();
-        if let Some(t) = self.thumbs.get_mut(&fi) {
-            if let Thumb::Loading(task) = t
-                && let Some(result) = task.poll()
-            {
-                *t = match result {
-                    Some(img) => Thumb::Ready(ctx.load_texture(
-                        format!("thumb-{fi}"),
-                        img.clone(),
-                        egui::TextureOptions::LINEAR,
-                    )),
-                    None => Thumb::Failed,
-                };
-            }
-            match t {
-                Thumb::Ready(tex) => {
-                    let size = tex.size_vec2();
-                    let scale = (self.thumb_size / size.x).min(self.thumb_size / size.y);
-                    let r = egui::Rect::from_center_size(img_rect.center(), size * scale);
-                    painter.image(
-                        tex.id(),
-                        r,
-                        egui::Rect::from_min_max(egui::pos2(0.0, 0.0), egui::pos2(1.0, 1.0)),
-                        Color32::WHITE,
-                    );
-                }
-                Thumb::Loading(_) => {
-                    painter.text(
-                        img_rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "…",
-                        egui::FontId::proportional(20.0),
-                        visuals.weak_text_color(),
-                    );
-                }
-                Thumb::Failed => {
-                    painter.text(
-                        img_rect.center(),
-                        egui::Align2::CENTER_CENTER,
-                        "⚠ cannot decode",
-                        egui::FontId::proportional(12.0),
-                        visuals.warn_fg_color,
-                    );
-                }
-            }
-        }
+        // Decoding starts only for cells that are actually drawn (visible).
+        let content = || self_content(&self.sources, idx, fi);
+        self.thumbs.paint(ui, img_rect, &fi, content);
         let name_color = if f.deleted() {
             visuals.error_fg_color
         } else {
@@ -350,22 +274,6 @@ impl GalleryWindow {
             name_color,
         );
         resp.clone().on_hover_text(&*f.path);
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn thumbnails_are_bounded() {
-        let bmp = pm_testkit::demo::gradient_bmp(640, 320);
-        let src: pm_core::SharedSource = Arc::new(pm_core::io::MemSource::new(bmp));
-        let t = decode_thumb(&src).unwrap();
-        assert_eq!(t.size, [192, 96]);
-        let junk: pm_core::SharedSource =
-            Arc::new(pm_core::io::MemSource::new(b"not a picture".to_vec()));
-        assert!(decode_thumb(&junk).is_none());
     }
 }
 
@@ -395,11 +303,7 @@ mod ui_tests {
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
         loop {
             h.step();
-            let ready = h
-                .state()
-                .thumbs
-                .values()
-                .any(|t| matches!(t, Thumb::Ready(_)));
+            let ready = h.state().thumbs.any_ready();
             if ready {
                 break;
             }

@@ -5,6 +5,7 @@
 //! popped out into its own native window (egui deferred viewports).
 
 mod app;
+mod discovery;
 mod format;
 mod gallery;
 mod index;
@@ -12,6 +13,7 @@ mod model;
 mod summary;
 mod table;
 mod task;
+mod thumbs;
 mod timeline;
 mod viewers;
 

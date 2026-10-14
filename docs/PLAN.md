@@ -243,7 +243,8 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Image Gallery remaining: categories (Project VIC), tags, hash-hit marking, slideshow, persisted thumbnail cache, group sorting/seen state
 - [x] Data Source Summary (first cut): Types (pie + counts), Recent Files, Timeline (30-day activity + View in Timeline), Container
 - [ ] Data Source Summary remaining tabs (User Activity, Analysis, Past Cases, Geolocation, Ingest History) after ingest
-- [ ] Discovery (file and domain)
+- [x] File Discovery (first cut): `pm-discovery` (Autopsy size buckets, data source/parent folder/deleted filters, group by size/folder/data source/extension, group and item ordering) + window with wizard, groups, paging, thumbnails
+- [ ] Discovery remaining: domain discovery, past occurrences (CR), hash set/interesting item/object/keyword/tag filters, MD5 de-duplication
 
 ### M8 — Central repository
 - [ ] `pm-centralrepo`: schema (SQLite and PostgreSQL), correlation types and normalisation, ingest module, notable flagging, Other Occurrences viewer, personas, organisations, Common Properties search, All Cases search, CR hash sets

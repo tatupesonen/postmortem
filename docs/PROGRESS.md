@@ -18,6 +18,12 @@ _None._
 
 ## Log
 
+### 2026-10-14 — File Discovery
+- `pm-discovery` crate (14 tests, Autopsy's size-bucket boundaries) and the
+  Discovery window (wizard → groups → paged thumbnail/list results →
+  viewer/pop-out). Shared `thumbs::ThumbCache` between Gallery and
+  Discovery. Workspace: 234 tests.
+
 ### 2026-10-14 — file index, Data Source Summary, Image Gallery
 - `pm-index`: parallel file catalogue built automatically per data source
   (it stands in for the case DB's file table). Timeline now builds from it.

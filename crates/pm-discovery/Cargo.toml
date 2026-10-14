@@ -1,0 +1,17 @@
+[package]
+name = "pm-discovery"
+description = "File Discovery for postmortem: Autopsy's discovery filters, grouping and ordering over the file index"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-index.workspace = true
+pm-fs.workspace = true
+
+[dev-dependencies]
+rstest.workspace = true
+
+[lints]
+workspace = true
