@@ -21,6 +21,7 @@ use crate::table::TableState;
 use crate::task::{self, Task};
 use crate::timeline::TimelineWindow;
 use crate::viewers::ViewerPanel;
+use crate::views::View;
 
 type Listing = Result<Arc<Vec<FileRow>>, String>;
 
@@ -38,6 +39,8 @@ pub struct Persisted {
     pub recent_cases: Vec<PathBuf>,
     /// Ingest module choices and hash sets (Add Data Source wizard).
     pub ingest: crate::add_source::IngestPrefs,
+    /// Leave known files (e.g. NSRL) out of the Views tree (Autopsy default).
+    pub hide_known_in_views: bool,
 }
 
 impl Default for Persisted {
@@ -50,6 +53,7 @@ impl Default for Persisted {
             case_root: None,
             recent_cases: Vec::new(),
             ingest: crate::add_source::IngestPrefs::default(),
+            hide_known_in_views: true,
         }
     }
 }
@@ -101,7 +105,10 @@ pub struct PostmortemApp {
     result_selected: Option<usize>,
     /// Analysis was running last frame (refresh results when it stops).
     was_analysing: bool,
+    was_analysing_views: bool,
     add_wizard: Option<crate::add_source::AddSourceWizard>,
+    view_counts: crate::views::Counts,
+    view_rows: HashMap<crate::views::View, Task<Result<Arc<crate::views::ViewRows>, String>>>,
 }
 
 impl PostmortemApp {
@@ -149,7 +156,10 @@ impl PostmortemApp {
             result_rows: HashMap::new(),
             result_selected: None,
             was_analysing: false,
+            was_analysing_views: false,
             add_wizard: None,
+            view_counts: crate::views::Counts::default(),
+            view_rows: HashMap::new(),
         };
         app.apply_time_pref();
         // Command line: a case (folder or case.pmcase) is opened; images are
@@ -332,6 +342,8 @@ impl PostmortemApp {
         self.result_counts.invalidate();
         self.result_rows.clear();
         self.result_selected = None;
+        self.view_counts.invalidate();
+        self.view_rows.clear();
         ctx.send_viewport_cmd(egui::ViewportCommand::Title("postmortem".into()));
     }
 
@@ -780,6 +792,16 @@ impl PostmortemApp {
                 {
                     self.apply_time_pref();
                 }
+                if ui
+                    .checkbox(
+                        &mut self.persisted.hide_known_in_views,
+                        "Hide known files in Views",
+                    )
+                    .changed()
+                {
+                    self.view_counts.invalidate();
+                    self.view_rows.clear();
+                }
             });
             ui.menu_button("Tools", |ui| {
                 if ui.button("⚙ Ingest Progress").clicked() {
@@ -1049,8 +1071,167 @@ impl PostmortemApp {
                     app.data_source_children(ui, &ds);
                 });
             }
+            self.views_tree(ui);
             self.results_tree(ui);
         });
+    }
+
+    /// Autopsy's Views: file types, deleted files and file sizes.
+    fn views_tree(&mut self, ui: &mut egui::Ui) {
+        let (case, live) = {
+            let a = self.analysis.lock();
+            (a.case().cloned(), a.any_active())
+        };
+        if case.is_none() || (self.sources.is_empty() && self.loading.is_empty()) {
+            return;
+        }
+        let hide = self.persisted.hide_known_in_views;
+        if self.was_analysing_views && !live {
+            self.view_counts.invalidate();
+            self.view_rows.clear();
+        }
+        self.was_analysing_views = live;
+        let c = self.view_counts.get(ui.ctx(), case.as_ref(), live, hide);
+        let n = |v: Option<&u64>| crate::format::grouped(v.copied().unwrap_or(0));
+        ui.add_space(8.0);
+        ui.heading("Views");
+        let leaf = |app: &mut Self, ui: &mut egui::Ui, view: View, label: String| {
+            app.tree_node(ui, &NodeId::View(view), &label, false, |_, _| {});
+        };
+        egui::CollapsingHeader::new("File Types")
+            .id_salt("views-types")
+            .default_open(true)
+            .show(ui, |ui| {
+                egui::CollapsingHeader::new("By Extension")
+                    .id_salt("views-ext")
+                    .default_open(true)
+                    .show(ui, |ui| {
+                        for (i, (name, _)) in crate::views::EXT_GROUPS.iter().enumerate() {
+                            leaf(
+                                self,
+                                ui,
+                                View::Ext(i),
+                                format!("{name} ({})", n(c.ext.get(i))),
+                            );
+                        }
+                        egui::CollapsingHeader::new(format!(
+                            "Documents ({})",
+                            crate::format::grouped(c.doc.iter().sum())
+                        ))
+                        .id_salt("views-docs")
+                        .show(ui, |ui| {
+                            for (i, (name, _)) in crate::views::DOC_GROUPS.iter().enumerate() {
+                                leaf(
+                                    self,
+                                    ui,
+                                    View::Doc(i),
+                                    format!("{name} ({})", n(c.doc.get(i))),
+                                );
+                            }
+                        });
+                    });
+                egui::CollapsingHeader::new("By MIME Type")
+                    .id_salt("views-mime")
+                    .show(ui, |ui| {
+                        if c.mime.is_empty() {
+                            ui.weak("Run File Type Identification to populate.");
+                        }
+                        let mut media = String::new();
+                        for (mime, count) in &c.mime {
+                            let (top, sub) = mime.split_once('/').unwrap_or((mime.as_str(), ""));
+                            if top != media {
+                                top.clone_into(&mut media);
+                                ui.strong(&media);
+                            }
+                            leaf(
+                                self,
+                                ui,
+                                View::Mime(mime.clone()),
+                                format!("{sub} ({})", crate::format::grouped(*count)),
+                            );
+                        }
+                    });
+            });
+        egui::CollapsingHeader::new(format!("Deleted Files ({})", n(c.deleted.get(1))))
+            .id_salt("views-deleted")
+            .show(ui, |ui| {
+                leaf(
+                    self,
+                    ui,
+                    View::Deleted(true),
+                    format!("File System ({})", n(c.deleted.first())),
+                );
+                leaf(
+                    self,
+                    ui,
+                    View::Deleted(false),
+                    format!("All ({})", n(c.deleted.get(1))),
+                );
+            });
+        egui::CollapsingHeader::new("File Size")
+            .id_salt("views-size")
+            .show(ui, |ui| {
+                for (i, (name, ..)) in crate::views::SIZE_BUCKETS.iter().enumerate() {
+                    leaf(
+                        self,
+                        ui,
+                        View::Size(i),
+                        format!("{name} ({})", n(c.size.get(i))),
+                    );
+                }
+            });
+    }
+
+    fn view_table(&mut self, ui: &mut egui::Ui, view: &View) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        let hide = self.persisted.hide_known_in_views;
+        let task = self.view_rows.entry(view.clone()).or_insert_with(|| {
+            let (case, view) = (Arc::clone(&case), view.clone());
+            Task::spawn(ui.ctx(), move || {
+                crate::views::load_rows(&case, &view, hide).map(Arc::new)
+            })
+        });
+        let data = match task.poll() {
+            None => {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Loading files…");
+                });
+                return;
+            }
+            Some(Err(e)) => {
+                ui.colored_label(ui.visuals().error_fg_color, e);
+                return;
+            }
+            Some(Ok(d)) => Arc::clone(d),
+        };
+        ui.horizontal(|ui| {
+            ui.strong(view.title());
+            ui.weak(format!(
+                "{} files{}",
+                crate::format::grouped(data.rows.len() as u64),
+                if data.truncated {
+                    format!(
+                        " (first {} shown)",
+                        crate::format::grouped(crate::views::MAX_ROWS as u64)
+                    )
+                } else {
+                    String::new()
+                }
+            ));
+        });
+        let ev = self.table.ui(ui, &data.rows, &self.prefs);
+        if let Some(rec) = ev.selected.and_then(|i| data.records.get(i)) {
+            let content = self.content_for(&case, rec);
+            self.viewer.set_content(content);
+        }
+        if let Some(rec) = ev.activated.and_then(|i| data.records.get(i))
+            && let Some(c) = self.content_for(&case, rec)
+        {
+            self.open_popout(c);
+        }
     }
 
     /// "Data Artifacts" and "Analysis Results" with per-type counts.
@@ -1305,6 +1486,7 @@ impl PostmortemApp {
                 self.file_table(ui, &node);
             }
             NodeId::Results { type_id } => self.results_view(ui, *type_id),
+            NodeId::View(v) => self.view_table(ui, v),
         }
     }
 

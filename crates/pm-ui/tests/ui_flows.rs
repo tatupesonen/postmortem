@@ -474,3 +474,33 @@ fn add_data_source_wizard_runs_configured_hash_lookup() {
     settle(&mut h, |h| h.query_by_label("Hashset Hits (1)").is_some());
     shot(&mut h, "add-source-done");
 }
+
+#[test]
+fn views_list_files_by_type_from_the_case_database() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
+    settle(&mut h, |h| h.query_by_label_contains("Images (").is_some());
+    let label = h
+        .query_all_by_label_contains("Images (")
+        .next()
+        .unwrap()
+        .accesskit_node()
+        .label()
+        .unwrap_or_default();
+    assert_ne!(label, "Images (0)", "{label}");
+    click_exact(&mut h, &label);
+    settle(&mut h, |h| {
+        h.query_by_label_contains("sunset.bmp").is_some()
+    });
+    click(&mut h, "sunset.bmp");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("320 × 200 px").is_some()
+    });
+    shot(&mut h, "views-images");
+    // Deleted files view.
+    click(&mut h, "Deleted Files (");
+    click(&mut h, "File System (");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("deleted_photo.bmp").is_some()
+    });
+}

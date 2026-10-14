@@ -20,6 +20,7 @@ mod task;
 mod thumbs;
 mod timeline;
 mod viewers;
+mod views;
 
 use std::path::PathBuf;
 

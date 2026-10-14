@@ -278,6 +278,63 @@ fn file_queries_and_keyset_paging() {
 }
 
 #[test]
+fn view_conditions() {
+    let (_d, db) = new_db();
+    let (ds_id, ..) = populate(&db);
+    let all = db.query_files(&FileQuery::default(), 0, 100).unwrap();
+    let id = |n: &str| all.iter().find(|f| f.name == n).unwrap().id;
+    db.set_file_analysis(
+        id("B.JPG"),
+        &FileAnalysis {
+            mime: Some("image/jpeg".into()),
+            known: Some(Known::Known),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    db.set_file_analysis(
+        id("a.txt"),
+        &FileAnalysis {
+            mime: Some("text/plain".into()),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let count = |q: FileQuery| db.count_files(&q).unwrap();
+    assert_eq!(
+        count(FileQuery {
+            mime: Some("image/jpeg".into()),
+            ..Default::default()
+        }),
+        1
+    );
+    assert_eq!(
+        count(FileQuery {
+            mime: Some("image/jpeg".into()),
+            hide_known: true,
+            ..Default::default()
+        }),
+        0
+    );
+    let regular = count(FileQuery {
+        regular_only: true,
+        ..Default::default()
+    });
+    assert_eq!(
+        count(FileQuery {
+            regular_only: true,
+            fs_only: true,
+            ..Default::default()
+        }),
+        regular
+    );
+    assert_eq!(
+        db.mime_counts(Some(ds_id)).unwrap(),
+        vec![("image/jpeg".to_owned(), 1), ("text/plain".to_owned(), 1)]
+    );
+}
+
+#[test]
 fn analysis_updates() {
     let (_d, db) = new_db();
     let (ds_id, ..) = populate(&db);

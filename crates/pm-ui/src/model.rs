@@ -52,6 +52,8 @@ pub enum NodeId {
     Results {
         type_id: i64,
     },
+    /// A node of the Views tree (file types, deleted files, sizes).
+    View(crate::views::View),
 }
 
 impl NodeId {
@@ -62,7 +64,7 @@ impl NodeId {
             | Self::Volume { ds, .. }
             | Self::Dir { ds, .. }
             | Self::Orphans { ds, .. } => Some(*ds),
-            Self::Results { .. } => None,
+            Self::Results { .. } | Self::View(_) => None,
         }
     }
 }

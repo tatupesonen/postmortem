@@ -394,6 +394,15 @@ impl CaseDb {
         })
     }
 
+    /// Number of files per detected MIME type.
+    pub fn mime_counts(&self, ds_id: Option<i64>) -> Result<Vec<(String, u64)>> {
+        self.read(|c| {
+            let mut st = c.prepare("SELECT mime, COUNT(*) FROM files WHERE mime IS NOT NULL AND (?1 IS NULL OR ds_id = ?1) GROUP BY mime ORDER BY mime")?;
+            let rows = st.query_map([ds_id], |r| Ok((r.get::<_, String>(0)?, r.get::<_, i64>(1)?.max(0) as u64)))?.collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+    }
+
     /// Records content hashes and/or MIME type (ingest results).
     pub fn set_file_analysis(&self, id: i64, update: &FileAnalysis) -> Result<()> {
         self.write(|tx| update.apply(tx, id))

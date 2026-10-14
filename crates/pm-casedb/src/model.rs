@@ -367,6 +367,12 @@ pub struct FileQuery {
     pub known: Option<Known>,
     pub md5: Option<Vec<u8>>,
     pub name_contains: Option<String>,
+    /// Exact MIME type (uses the MIME index; `mime_prefix` cannot).
+    pub mime: Option<String>,
+    /// Leave out files marked known (Autopsy's "Hide known files").
+    pub hide_known: bool,
+    /// Only files from file systems (not carved, derived or unallocated).
+    pub fs_only: bool,
 }
 
 impl FileQuery {
@@ -421,6 +427,16 @@ impl FileQuery {
         if let Some(n) = &self.name_contains {
             let p = next(format!("%{n}%").into(), &mut args);
             parts.push(format!("name LIKE {p}"));
+        }
+        if let Some(m) = &self.mime {
+            let p = next(m.clone().into(), &mut args);
+            parts.push(format!("mime = {p}"));
+        }
+        if self.hide_known {
+            parts.push("known <> 1".into());
+        }
+        if self.fs_only {
+            parts.push("origin = 0".into());
         }
         (parts.join(" AND "), args)
     }
