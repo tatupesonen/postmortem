@@ -375,6 +375,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-fs"
+version = "0.1.0"
+dependencies = [
+ "bitflags 2.13.2",
+ "jiff",
+ "pm-core",
+ "proptest",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "pm-image"
 version = "0.1.0"
 dependencies = [

@@ -1,0 +1,20 @@
+[package]
+name = "pm-fs"
+description = "Filesystem abstraction for postmortem: the FileSystem trait, common metadata types and a loop-safe tree walker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+bitflags.workspace = true
+jiff.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

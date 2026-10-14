@@ -17,6 +17,7 @@ pm-core = { path = "crates/pm-core" }
 pm-testkit = { path = "crates/pm-testkit" }
 pm-volume = { path = "crates/pm-volume" }
 pm-image = { path = "crates/pm-image" }
+pm-fs = { path = "crates/pm-fs" }
 
 # Foundations
 thiserror = "2.0.21"
