@@ -411,8 +411,10 @@ dependencies = [
  "jiff",
  "pm-core",
  "pm-fs",
+ "pm-testkit",
  "proptest",
  "rstest",
+ "tempfile",
  "thiserror",
  "tracing",
 ]
@@ -435,6 +437,7 @@ version = "0.1.0"
 dependencies = [
  "crc32fast",
  "pm-core",
+ "tempfile",
  "uuid",
 ]
 
@@ -447,6 +450,7 @@ dependencies = [
  "pm-testkit",
  "proptest",
  "rstest",
+ "tempfile",
  "thiserror",
  "tracing",
  "uuid",

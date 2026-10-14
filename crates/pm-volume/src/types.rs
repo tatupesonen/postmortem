@@ -7,72 +7,276 @@ pub(crate) fn is_extended(t: u8) -> bool {
     matches!(t, 0x05 | 0x0F | 0x85)
 }
 
-/// Name of a DOS partition type (as shown by TSK/Autopsy).
+/// Name of a DOS partition type, exactly as TSK's `mmls` prints it (and
+/// therefore as Autopsy shows it). Generated from TSK 4.15 by probing every
+/// type byte; `tests/tsk_differential.rs` keeps it honest.
 pub fn mbr_type_name(t: u8) -> &'static str {
-    match t {
-        0x00 => "Empty",
-        0x01 => "DOS FAT12",
-        0x02 => "XENIX root",
-        0x03 => "XENIX /usr",
-        0x04 | 0x06 => "DOS FAT16",
-        0x05 => "DOS Extended",
-        0x07 => "NTFS / exFAT",
-        0x08 => "AIX Boot",
-        0x09 => "AIX Data",
-        0x0A => "OS/2 Boot Manager",
-        0x0B => "Win95 FAT32",
-        0x0C => "Win95 FAT32 (0x0C)",
-        0x0E => "DOS FAT16 (LBA)",
-        0x0F => "Win95 Extended",
-        0x11 => "DOS FAT12 (hidden)",
-        0x12 => "Hibernation / OEM diagnostics",
-        0x14 | 0x16 => "DOS FAT16 (hidden)",
-        0x17 => "Hidden IFS/HPFS/NTFS",
-        0x1B => "Win95 FAT32 (hidden)",
-        0x1C => "Win95 FAT32 LBA (hidden)",
-        0x1E => "DOS FAT16 LBA (hidden)",
-        0x27 => "Windows Recovery Environment",
-        0x39 => "Plan 9",
-        0x3C => "Partition Magic Recovery",
-        0x42 => "Windows Dynamic (LDM)",
-        0x4D..=0x4F => "QNX",
-        0x63 => "Unix System V",
-        0x64 => "Novell NetWare 286",
-        0x65 => "Novell NetWare 386",
-        0x80 => "Minix (old)",
-        0x81 => "Minix",
-        0x82 => "Linux Swap / Solaris x86",
-        0x83 => "Linux",
-        0x84 => "Hibernation",
-        0x85 => "Linux Extended",
-        0x86 | 0x87 => "NTFS Volume Set",
-        0x8E => "Linux LVM",
-        0x93 => "Amoeba",
-        0x9F => "BSD/OS",
-        0xA0 => "Laptop Hibernation",
-        0xA5 => "FreeBSD",
-        0xA6 => "OpenBSD",
-        0xA8 => "Mac OS X UFS",
-        0xA9 => "NetBSD",
-        0xAB => "Mac OS X Boot",
-        0xAF => "Mac OS X HFS",
-        0xB7 => "BSDI",
-        0xB8 => "BSDI Swap",
-        0xBE => "Solaris 8 Boot",
-        0xBF => "Solaris x86",
-        0xC1 | 0xC4 | 0xC6 => "DR-DOS secured FAT",
-        0xDE => "Dell Utility",
-        0xEB => "BeOS",
-        0xEE => "GPT Safety Partition",
-        0xEF => "EFI File System",
-        0xFB => "VMware File System",
-        0xFC => "VMware Swap",
-        0xFD => "Linux RAID",
-        0xFE => "LANstep",
-        0xFF => "Xenix Bad Block Table",
-        _ => "Unknown Type",
-    }
+    #[expect(
+        clippy::indexing_slicing,
+        reason = "a u8 always indexes a 256-entry table"
+    )]
+    MBR_NAMES[usize::from(t)]
 }
+
+#[rustfmt::skip]
+static MBR_NAMES: [&str; 256] = [
+    "Empty", // 0x00
+    "DOS FAT12", // 0x01
+    "XENIX root", // 0x02
+    "XENIX /usr", // 0x03
+    "DOS FAT16", // 0x04
+    "DOS Extended", // 0x05
+    "DOS FAT16", // 0x06
+    "NTFS / exFAT", // 0x07
+    "AIX Boot", // 0x08
+    "AIX Data", // 0x09
+    "OS/2 Boot Manager", // 0x0A
+    "Win95 FAT32", // 0x0B
+    "Win95 FAT32", // 0x0C
+    "Unknown Type", // 0x0D
+    "Win95 FAT16", // 0x0E
+    "Win95 Extended", // 0x0F
+    "OPUS", // 0x10
+    "DOS FAT12 Hidden", // 0x11
+    "Hibernation", // 0x12
+    "Unknown Type", // 0x13
+    "DOS FAT16 Hidden", // 0x14
+    "Unknown Type", // 0x15
+    "DOS FAT16 Hidden", // 0x16
+    "Hidden IFS/HPFS", // 0x17
+    "AST SmartSleep", // 0x18
+    "Win95 FAT32 Hidden", // 0x19
+    "Unknown Type", // 0x1A
+    "Win95 FAT32 Hidden", // 0x1B
+    "Win95 FAT32 Hidden", // 0x1C
+    "Unknown Type", // 0x1D
+    "Win95 FAT16 Hidden", // 0x1E
+    "Unknown Type", // 0x1F
+    "Unused", // 0x20
+    "Reserved", // 0x21
+    "Unused", // 0x22
+    "Reserved", // 0x23
+    "NEC DOS 3.x", // 0x24
+    "Unknown Type", // 0x25
+    "Reserved", // 0x26
+    "Unknown Type", // 0x27
+    "Unknown Type", // 0x28
+    "Unknown Type", // 0x29
+    "Unknown Type", // 0x2A
+    "Unknown Type", // 0x2B
+    "Unknown Type", // 0x2C
+    "Unknown Type", // 0x2D
+    "Unknown Type", // 0x2E
+    "Unknown Type", // 0x2F
+    "Unknown Type", // 0x30
+    "Reserved", // 0x31
+    "NOS", // 0x32
+    "Reserved", // 0x33
+    "Reserved", // 0x34
+    "JFS on OS/2 or eCS ", // 0x35
+    "Reserved", // 0x36
+    "Unknown Type", // 0x37
+    "THEOS v3.2 2gb", // 0x38
+    "THEOS v4 Spanned", // 0x39
+    "THEOS v4 4gb", // 0x3A
+    "THEOS v4 Extended", // 0x3B
+    "PartitionMagic Recovery", // 0x3C
+    "Hidden NetWare", // 0x3D
+    "Unknown Type", // 0x3E
+    "Unknown Type", // 0x3F
+    "Venix 80286", // 0x40
+    "Linux/MINIX (Sharing Disk with DR-DOS)", // 0x41
+    "Win LVM / Secure FS", // 0x42
+    "Linux Native (Sharing Disk with DR-DOS)", // 0x43
+    "GoBack", // 0x44
+    "Boot-US Boot Manager", // 0x45
+    "EUMEL/Elan ", // 0x46
+    "EUMEL/Elan ", // 0x47
+    "EUMEL/Elan ", // 0x48
+    "Unknown Type", // 0x49
+    "Mark Aitchison's ALFS/THIN Lightweight Filesystem", // 0x4A
+    "Unknown Type", // 0x4B
+    "Oberon", // 0x4C
+    "QNX 4.x", // 0x4D
+    "QNX 4.x", // 0x4E
+    "QNX 4.x", // 0x4F
+    "OnTrack Disk Manager", // 0x50
+    "OnTrack Disk Manager", // 0x51
+    "Microport SysV/AT", // 0x52
+    "OnTrack Disk Manager", // 0x53
+    "OnTrack Disk Manager", // 0x54
+    "EZ-Drive", // 0x55
+    "AT&T MS-DOS 3.x Logically Sectored FAT", // 0x56
+    "DrivePro", // 0x57
+    "Unknown Type", // 0x58
+    "Unknown Type", // 0x59
+    "Unknown Type", // 0x5A
+    "Unknown Type", // 0x5B
+    "Priam EDisk", // 0x5C
+    "Unknown Type", // 0x5D
+    "Unknown Type", // 0x5E
+    "Unknown Type", // 0x5F
+    "Unknown Type", // 0x60
+    "SpeedStor", // 0x61
+    "Unknown Type", // 0x62
+    "UNIX System V", // 0x63
+    "Novell Netware", // 0x64
+    "Novell Netware", // 0x65
+    "Novell Netware", // 0x66
+    "Novell Netware", // 0x67
+    "Novell Netware", // 0x68
+    "Novell Netware", // 0x69
+    "Unknown Type", // 0x6A
+    "Unknown Type", // 0x6B
+    "Unknown Type", // 0x6C
+    "Unknown Type", // 0x6D
+    "Unknown Type", // 0x6E
+    "Unknown Type", // 0x6F
+    "DiskSecure Multi-Boot", // 0x70
+    "Reserved", // 0x71
+    "Unknown Type", // 0x72
+    "Reserved", // 0x73
+    "Scramdisk", // 0x74
+    "IBM PC/IX", // 0x75
+    "Reserved", // 0x76
+    "VNDI", // 0x77
+    "XOSL FS", // 0x78
+    "Unknown Type", // 0x79
+    "Unknown Type", // 0x7A
+    "Unknown Type", // 0x7B
+    "Unknown Type", // 0x7C
+    "Unknown Type", // 0x7D
+    "Unused", // 0x7E
+    "Unused", // 0x7F
+    "MINIX <=v1.4a", // 0x80
+    "MINIX >=v1.4b, Early Linux", // 0x81
+    "Linux Swap / Solaris x86", // 0x82
+    "Linux", // 0x83
+    "Hibernation", // 0x84
+    "Linux Extended", // 0x85
+    "NTFS Volume Set", // 0x86
+    "NTFS Volume Set", // 0x87
+    "Unknown Type", // 0x88
+    "Unknown Type", // 0x89
+    "Linux Kernel", // 0x8A
+    "Legacy Fault Tolerant FAT32", // 0x8B
+    "Legacy Fault Tolerant FAT32 using BIOS extd INT 13h", // 0x8C
+    "Free FDISK Hidden Primary DOS FAT12", // 0x8D
+    "Linux Logical Volume Manager", // 0x8E
+    "Unknown Type", // 0x8F
+    "Free FDISK Hidden Primary DOS FAT16", // 0x90
+    "Free FDISK Hidden DOS Extended", // 0x91
+    "Free FDISK Hidden Primary DOS Large FAT16", // 0x92
+    "Linux Hidden", // 0x93
+    "Amoeba Bad Block Table", // 0x94
+    "MIT EXOPC", // 0x95
+    "Unknown Type", // 0x96
+    "Free FDISK Hidden Primary DOS FAT32", // 0x97
+    "Free FDISK Hidden Primary DOS FAT32 LBA", // 0x98
+    "DCE376 Logical Drive", // 0x99
+    "Free FDISK Hidden Primary DOS FAT16 LBA", // 0x9A
+    "Free FDISK Hidden DOS Extended LBA", // 0x9B
+    "Unknown Type", // 0x9C
+    "Unknown Type", // 0x9D
+    "Unknown Type", // 0x9E
+    "BSD/OS", // 0x9F
+    "Hibernation", // 0xA0
+    "Hibernation", // 0xA1
+    "Unknown Type", // 0xA2
+    "HP Volume Expansion (SpeedStor Variant)", // 0xA3
+    "HP Volume Expansion (SpeedStor Variant)", // 0xA4
+    "BSD/386, 386BSD, NetBSD, FreeBSD", // 0xA5
+    "OpenBSD", // 0xA6
+    "NeXTSTEP", // 0xA7
+    "Mac OS X", // 0xA8
+    "NetBSD", // 0xA9
+    "Olivetti Fat 12 1.44MB Service", // 0xAA
+    "Mac OS X Boot Partition", // 0xAB
+    "Unknown Type", // 0xAC
+    "Unknown Type", // 0xAD
+    "ShagOS Filesystem", // 0xAE
+    "Mac OS X HFS", // 0xAF
+    "BootStar Dummy", // 0xB0
+    "HP Volume Expansion (SpeedStor Variant)", // 0xB1
+    "Unknown Type", // 0xB2
+    "HP Volume Expansion (SpeedStor Variant)", // 0xB3
+    "HP Volume Expansion (SpeedStor Variant)", // 0xB4
+    "Unknown Type", // 0xB5
+    "Corrupted Windows NT Mirror Set Master FAT16", // 0xB6
+    "BSDI", // 0xB7
+    "BSDI Swap", // 0xB8
+    "Unknown Type", // 0xB9
+    "Unknown Type", // 0xBA
+    "Boot Wizard Hidden", // 0xBB
+    "Unknown Type", // 0xBC
+    "Unknown Type", // 0xBD
+    "Solaris 8 Boot", // 0xBE
+    "Unknown Type", // 0xBF
+    "DR-DOS Secured", // 0xC0
+    "DR-DOS Secured FAT12", // 0xC1
+    "Hidden Linux", // 0xC2
+    "Hidden Linux Swap", // 0xC3
+    "DR-DOS Secured FAT16 <32M", // 0xC4
+    "DR-DOS Secured Extended", // 0xC5
+    "Corrupted Windows NT Volume / Stripe Set", // 0xC6
+    "Corrupted Windows NT Volume / Stripe Set", // 0xC7
+    "Reserved for DR-DOS 8.0+", // 0xC8
+    "Reserved for DR-DOS 8.0+", // 0xC9
+    "Reserved for DR-DOS 8.0+", // 0xCA
+    "DR-DOS 7.04+ Secured FAT32 CHS", // 0xCB
+    "DR-DOS 7.04+ Secured FAT32 LBA", // 0xCC
+    "CTOS Memdump?", // 0xCD
+    "DR-DOS 7.04+ FAT16X LBA", // 0xCE
+    "DR-DOS 7.04+ Secured EXT DOS LBA", // 0xCF
+    "Multiuser DOS Secured", // 0xD0
+    "Old Multiuser DOS Secured FAT12", // 0xD1
+    "Unknown Type", // 0xD2
+    "Unknown Type", // 0xD3
+    "Old Multiuser DOS Secured FAT16 <32M", // 0xD4
+    "Old Multiuser DOS Secured extended", // 0xD5
+    "Old Multiuser DOS Secured FAT16 >=32M", // 0xD6
+    "Unknown Type", // 0xD7
+    "CP/M-86", // 0xD8
+    "Unknown Type", // 0xD9
+    "Non-FS Data", // 0xDA
+    "Digital Research CP/M, Concurrent CP/M, Concurrent DOS", // 0xDB
+    "Unknown Type", // 0xDC
+    "Hidden CTOS Memdump? ", // 0xDD
+    "Dell Utilities FAT", // 0xDE
+    "Unknown Type", // 0xDF
+    "Reserved by STMicroelectronics for ST AVFS.", // 0xE0
+    "DOS Access or SpeedStor 12-bit FAT Extended", // 0xE1
+    "Unknown Type", // 0xE2
+    "DOS R/O or SpeedStor", // 0xE3
+    "SpeedStor 16-bit FAT Extended <1024 cyl.", // 0xE4
+    "Tandy MS-DOS with Logically Sectored FAT", // 0xE5
+    "Storage Dimensions SpeedStor", // 0xE6
+    "Unknown Type", // 0xE7
+    "Unknown Type", // 0xE8
+    "Unknown Type", // 0xE9
+    "Unknown Type", // 0xEA
+    "BeOS BFS", // 0xEB
+    "Unknown Type", // 0xEC
+    "Unused", // 0xED
+    "GPT Safety Partition", // 0xEE
+    "EFI File System", // 0xEF
+    "Linux/PA-RISC Boot Loader", // 0xF0
+    "Storage Dimensions SpeedStor", // 0xF1
+    "DOS 3.3+ Secondary", // 0xF2
+    "Reserved", // 0xF3
+    "SpeedStor Large", // 0xF4
+    "Prologue Multi-Volume", // 0xF5
+    "Storage Dimensions SpeedStor", // 0xF6
+    "Unused", // 0xF7
+    "Unknown Type", // 0xF8
+    "pCache", // 0xF9
+    "Bochs", // 0xFA
+    "VMWare File System", // 0xFB
+    "VMWare Swap", // 0xFC
+    "Linux RAID", // 0xFD
+    "Windows NT Disk Administrator Hidden", // 0xFE
+    "Xenix Bad Block Table", // 0xFF
+];
 
 const GPT_TYPES: &[(Uuid, &str)] = &[
     (

@@ -205,6 +205,35 @@ pub(crate) fn plausible(e: &ShortEntry, cluster_count: u32) -> bool {
     name_ok && cluster_ok && date_ok(e.wrt_date) && date_ok(e.crt_date)
 }
 
+/// Whether a sector found in unallocated space looks like part of a
+/// directory: at least one plausible short entry and no implausible ones.
+pub(crate) fn sector_is_dir(sector: &[u8], cluster_count: u32) -> bool {
+    let mut good = 0;
+    for e in sector.as_chunks::<ENTRY_SIZE>().0 {
+        if e[0] == 0 {
+            continue;
+        }
+        if e[11] & ATTR_LFN == ATTR_LFN {
+            // LFN slot: sequence number (or deletion mark) must be sane.
+            let seq = e[0];
+            let index = seq & 0x1F;
+            if seq != DELETED && (index == 0 || index > 20 || seq & 0xA0 != 0) {
+                return false;
+            }
+            continue;
+        }
+        match ShortEntry::parse(e, true) {
+            Some(s) if plausible(&s, cluster_count) => {
+                if !s.is_dot() {
+                    good += 1;
+                }
+            }
+            _ => return false,
+        }
+    }
+    good > 0
+}
+
 /// Maps a code page 437 byte to Unicode (ASCII range passes through).
 fn cp437(b: u8) -> char {
     const HIGH: &str = "ÇüéâäàåçêëèïîìÄÅÉæÆôöòûùÿÖÜ¢£¥₧ƒáíóúñÑªº¿⌐¬½¼¡«»░▒▓│┤╡╢╖╕╣║╗╝╜╛┐└┴┬├─┼╞╟╚╔╩╦╠═╬╧╨╤╥╙╘╒╓╫╪┘┌█▄▌▐▀αßΓπΣσµτΦΘΩδ∞φε∩≡±≥≤⌠⌡÷≈°∙·√ⁿ²■\u{a0}";

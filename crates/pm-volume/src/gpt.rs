@@ -13,7 +13,6 @@ const MAX_ENTRY_ARRAY_BYTES: u64 = 16 * 1024 * 1024;
 #[derive(Debug)]
 struct Header {
     my_lba: u64,
-    alternate_lba: u64,
     disk_guid: Uuid,
     entries_lba: u64,
     num_entries: u32,
@@ -50,7 +49,6 @@ fn read_header(src: &dyn ReadAt, lba: u64, ss: u32) -> Result<Option<Header>, St
     let f = |r: Result<u64, pm_core::Truncated>| r.map_err(|e| e.to_string());
     let header = Header {
         my_lba: f(buf.u64_le(24))?,
-        alternate_lba: f(buf.u64_le(32))?,
         disk_guid: Uuid::from_bytes_le(buf.array(56).map_err(|e| e.to_string())?),
         entries_lba: f(buf.u64_le(72))?,
         num_entries: buf.u32_le(80).map_err(|e| e.to_string())?,
@@ -145,9 +143,6 @@ pub(crate) fn parse(src: &dyn ReadAt, ss: u32) -> Result<Option<VolumeSystem>, V
         entry_sectors,
         "Partition Table".into(),
     ));
-    if header.alternate_lba < disk_sectors && header.alternate_lba != header.my_lba {
-        slots.push(meta(header.alternate_lba, 1, "Backup GPT Header".into()));
-    }
 
     for (i, e) in entries.chunks_exact(header.entry_size as usize).enumerate() {
         let ty = Uuid::from_bytes_le(e.array(0).map_err(|x| corrupt(x.to_string()))?);
@@ -176,8 +171,12 @@ pub(crate) fn parse(src: &dyn ReadAt, ss: u32) -> Result<Option<VolumeSystem>, V
             start_sector: first,
             sector_count: last - first + 1,
             ptype: Some(PartitionType::Gpt(ty)),
-            description: gpt_type_name(&ty)
-                .map_or_else(|| ty.hyphenated().to_string(), str::to_owned),
+            // TSK describes GPT partitions by their name, falling back to type.
+            description: if name.is_empty() {
+                gpt_type_name(&ty).map_or_else(|| ty.hyphenated().to_string(), str::to_owned)
+            } else {
+                name.clone()
+            },
             name: (!name.is_empty()).then_some(name),
             unique_id: Some(unique),
             table: Some(0),

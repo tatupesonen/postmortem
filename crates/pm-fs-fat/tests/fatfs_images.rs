@@ -5,6 +5,7 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::indexing_slicing,
+    clippy::print_stderr,
     reason = "test code"
 )]
 
@@ -409,4 +410,131 @@ fn write_fuzz_seeds() {
     });
     // Keep the seed small: the metadata lives in the first ~40 KiB.
     std::fs::write(dir.join("fat12.img"), &img[..48 * 1024]).unwrap();
+}
+
+/// Our view of the tree in `fls -r -p` terms: (path, deleted, is_dir),
+/// including virtual files and the `$OrphanFiles` directory.
+fn fls_like(fs: &FatFs) -> Vec<(String, Option<String>, bool, bool)> {
+    let mut out = Vec::new();
+    walk(fs, &WalkOptions::default(), |i| {
+        let path = i.path().trim_start_matches('/').to_owned();
+        let alt = i.entry.short_name.as_ref().map(|s| {
+            let parent = i.parent_path.trim_start_matches('/');
+            if parent.is_empty() {
+                s.clone()
+            } else {
+                format!("{parent}/{s}")
+            }
+        });
+        out.push((
+            path,
+            alt,
+            !i.entry.allocated,
+            i.entry.kind == FileKind::Directory,
+        ));
+        ControlFlow::Continue(())
+    });
+    out.push(("$OrphanFiles".into(), None, false, true));
+    for o in fs.orphans().unwrap() {
+        out.push((
+            format!("$OrphanFiles/{}", o.name),
+            o.short_name.map(|s| format!("$OrphanFiles/{s}")),
+            true,
+            o.kind == FileKind::Directory,
+        ));
+    }
+    out.sort();
+    out
+}
+
+fn assert_matches_fls(name: &str, img: &[u8]) {
+    let dir = tempfile::tempdir().unwrap();
+    let path = dir.path().join(format!("{name}.dd"));
+    std::fs::write(&path, img).unwrap();
+    let Some(theirs) = pm_testkit::tsk::fls(&path, 0) else {
+        eprintln!("fls not available; skipping {name}");
+        return;
+    };
+    let ours = fls_like(&open(img.to_vec()));
+    let mut unmatched: Vec<_> = ours.clone();
+    for t in &theirs {
+        let is_dir = t.kind.ends_with("/d") || t.kind == "V/V";
+        // TSK truncates some deleted long names; accept a prefix match.
+        // TSK truncates some deleted long names and shows only the short
+        // name of orphans; we recover more, so accept those forms.
+        let pos = unmatched.iter().position(|(p, alt, del, dir)| {
+            *del == t.deleted
+                && *dir == is_dir
+                && (*p == t.path
+                    || alt.as_deref() == Some(t.path.as_str())
+                    || (t.deleted && p.starts_with(t.path.trim_end())))
+        });
+        match pos {
+            Some(i) => {
+                unmatched.remove(i);
+            }
+            None => panic!("{name}: TSK entry {t:?} missing from ours: {ours:#?}"),
+        }
+    }
+    assert!(
+        unmatched.is_empty(),
+        "{name}: entries TSK does not report: {unmatched:#?}"
+    );
+}
+
+#[rstest]
+#[case(FatType::Fat12, 2)]
+#[case(FatType::Fat16, 20)]
+#[case(FatType::Fat32, 40)]
+fn tree_matches_tsk_fls(#[case] fat: FatType, #[case] mib: usize) {
+    let img = build(fat, mib, |fs| {
+        write_file(fs, "keep.txt", b"keep");
+        write_file(
+            fs,
+            "Secret plans for world domination.txt",
+            &pattern(20_000, 3),
+        );
+        fs.root_dir()
+            .remove("Secret plans for world domination.txt")
+            .unwrap();
+        fs.root_dir().create_dir("gone").unwrap();
+        write_file(fs, "gone/inside.txt", b"inside");
+        fs.root_dir()
+            .open_dir("gone")
+            .unwrap()
+            .remove("inside.txt")
+            .unwrap();
+        fs.root_dir().remove("gone").unwrap();
+        fs.root_dir().create_dir("Documents").unwrap(); // overwrites "gone"'s entry
+        write_file(fs, "Documents/A long file name with spaces.docx", b"x");
+        fs.root_dir().create_dir("Documents/sub").unwrap();
+        write_file(fs, "Documents/sub/deep.bin", &pattern(5000, 1));
+    });
+    assert_matches_fls(&format!("{fat:?}"), &img);
+}
+
+#[test]
+fn orphan_found_when_parent_entry_overwritten() {
+    let img = build(FatType::Fat16, 20, |fs| {
+        fs.root_dir().create_dir("gone").unwrap();
+        write_file(fs, "gone/inside.txt", b"inside");
+        fs.root_dir()
+            .open_dir("gone")
+            .unwrap()
+            .remove("inside.txt")
+            .unwrap();
+        fs.root_dir().remove("gone").unwrap();
+        fs.root_dir().create_dir("Documents").unwrap();
+    });
+    let fs = open(img);
+    let orphans = fs.orphans().unwrap();
+    assert_eq!(orphans.len(), 1, "{orphans:?}");
+    assert_eq!(
+        orphans[0].name, "inside.txt",
+        "long name recovered from deleted LFN"
+    );
+    assert_eq!(orphans[0].short_name.as_deref(), Some("_NSIDE.TXT"));
+    assert!(!orphans[0].allocated);
+    // Unlike TSK, we still recover the orphan's content.
+    assert_eq!(read_all(&fs, orphans[0].inode), b"inside");
 }

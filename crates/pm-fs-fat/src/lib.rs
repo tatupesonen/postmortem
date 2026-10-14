@@ -17,12 +17,15 @@ mod boot;
 mod dirent;
 mod table;
 
+use std::collections::HashSet;
+use std::ops::ControlFlow;
 use std::sync::Arc;
 
 use jiff::tz::TimeZone;
 use pm_core::io::SliceSource;
 use pm_core::time::{dos_datetime, local_to_timestamp};
 use pm_core::{ReadAt, SharedSource};
+use pm_fs::walk::{WalkOptions, walk};
 use pm_fs::{
     DirEntry, Extent, ExtentKind, ExtentSource, FileKind, FileSystem, FsError, FsInfo, FsKind,
     InodeId, MetaFlags, Metadata, Result, Times,
@@ -41,6 +44,8 @@ pub const FAT_INODE_BASE: InodeId = 4;
 
 /// Refuse to load FATs bigger than this into memory.
 const MAX_FAT_BYTES: u64 = 512 * 1024 * 1024;
+/// Bytes of unallocated space read per IO while scanning for orphans.
+const ORPHAN_SCAN_CHUNK: u64 = 4 * 1024 * 1024;
 /// Upper bound on directory size (entries) to protect against loops/garbage.
 const MAX_DIR_BYTES: u64 = 64 * 1024 * 1024;
 
@@ -264,6 +269,61 @@ impl FatFs {
         v
     }
 
+    /// Decodes directory entries (skipping `.`/`..`, LFN slots and volume
+    /// labels, like TSK). With `strict`, every entry must pass the
+    /// plausibility check (used for slack and unallocated-space scans);
+    /// otherwise only entries after the end marker or deleted ones must.
+    fn parse_entries(&self, raw: &[(u64, [u8; 32])], strict: bool) -> Vec<DirEntry> {
+        let fat32 = self.is_fat32();
+        let mut out = Vec::new();
+        let mut lfn = LfnBuilder::default();
+        let mut past_end = strict;
+        for (off, e) in raw {
+            if e[0] == 0 {
+                past_end = true;
+                lfn.clear();
+                continue;
+            }
+            if e[11] & dirent::ATTR_LFN == dirent::ATTR_LFN {
+                if let Some(l) = LfnEntry::parse(e) {
+                    lfn.push(l);
+                }
+                continue;
+            }
+            let Some(s) = ShortEntry::parse(e, fat32) else {
+                lfn.clear();
+                continue;
+            };
+            if s.is_dot() || s.is_volume_label() {
+                lfn.clear();
+                continue;
+            }
+            if (past_end || s.deleted) && !dirent::plausible(&s, self.geo.cluster_count) {
+                lfn.clear();
+                continue;
+            }
+            let long = lfn.take(&s);
+            let short = s.short_name();
+            let (name, short_name) = match long {
+                Some(l) => (l, Some(short)),
+                None => (short, None),
+            };
+            out.push(DirEntry {
+                name,
+                short_name,
+                inode: off / ENTRY_SIZE as u64,
+                seq: None,
+                kind: if s.is_dir() {
+                    FileKind::Directory
+                } else {
+                    FileKind::Regular
+                },
+                allocated: !s.deleted,
+            });
+        }
+        out
+    }
+
     fn root_metadata(&self) -> Metadata {
         let size = if self.is_fat32() {
             self.fat.chain(self.geo.root_cluster, usize::MAX).len() as u64 * self.geo.cluster_size()
@@ -343,70 +403,18 @@ impl FileSystem for FatFs {
                     }),
             );
         }
-        let fat32 = self.is_fat32();
-        let mut lfn = LfnBuilder::default();
-        let mut past_end = false;
-        let mut first = true;
-        for (off, e) in raw {
-            let is_first = std::mem::replace(&mut first, false);
-            if e[0] == 0 {
-                past_end = true;
-                lfn.clear();
-                continue;
-            }
-            if e[11] & dirent::ATTR_LFN == dirent::ATTR_LFN {
-                if let Some(l) = LfnEntry::parse(&e) {
-                    lfn.push(l);
-                }
-                continue;
-            }
-            let Some(s) = ShortEntry::parse(&e, fat32) else {
-                lfn.clear();
-                continue;
-            };
-            // A reused deleted directory no longer starts with ".".
-            if is_first
-                && inode != ROOT_INODE
-                && !s.is_dot()
-                && self.entry(inode).is_ok_and(|parent| parent.deleted)
-            {
-                return Ok(out);
-            }
-            if s.is_dot() {
-                lfn.clear();
-                continue;
-            }
-            if (past_end || s.deleted) && !dirent::plausible(&s, self.geo.cluster_count) {
-                lfn.clear();
-                continue;
-            }
-            let long = lfn.take(&s);
-            let short = s.short_name();
-            let (name, short_name) = match long {
-                Some(l) => (l, Some(short)),
-                None => (short, None),
-            };
-            let name = if s.is_volume_label() {
-                format!("{name} (Volume Label Entry)")
-            } else {
-                name
-            };
-            let kind = if s.is_volume_label() {
-                FileKind::Virtual
-            } else if s.is_dir() {
-                FileKind::Directory
-            } else {
-                FileKind::Regular
-            };
-            out.push(DirEntry {
-                name,
-                short_name,
-                inode: off / ENTRY_SIZE as u64,
-                seq: None,
-                kind,
-                allocated: !s.deleted,
-            });
+        // A reused deleted directory no longer starts with "." (ignoring
+        // LFN slots, which some writers emit even for dot entries).
+        let first_short = raw
+            .iter()
+            .find(|(_, e)| e[0] != 0 && e[11] & dirent::ATTR_LFN != dirent::ATTR_LFN);
+        if inode != ROOT_INODE
+            && first_short.is_some_and(|(_, e)| !e.starts_with(b". "))
+            && self.entry(inode).is_ok_and(|parent| parent.deleted)
+        {
+            return Ok(out);
         }
+        out.extend(self.parse_entries(&raw, false));
         Ok(out)
     }
 
@@ -454,6 +462,50 @@ impl FileSystem for FatFs {
         }
         let size = self.entry_size(&e);
         Ok(self.cluster_extents(&self.content_clusters(&e, size)))
+    }
+
+    fn orphans(&self) -> Result<Vec<DirEntry>> {
+        let mut reachable = HashSet::new();
+        walk(self, &WalkOptions::default(), |item| {
+            reachable.insert(item.entry.inode);
+            ControlFlow::Continue(())
+        });
+        let bps = self.geo.bytes_per_sector as usize;
+        let cs = self.geo.cluster_size();
+        let mut out = Vec::new();
+        let mut seen = HashSet::new();
+        for (first, count) in self.fat.free_runs() {
+            // Read free runs in bounded chunks (unallocated space can be huge).
+            let per_read = (ORPHAN_SCAN_CHUNK / cs).max(1) as u32;
+            let mut c = first;
+            while c < first + count {
+                let n = per_read.min(first + count - c);
+                let off = self.geo.cluster_offset(c);
+                let data = self.src.read_vec_at(off, (u64::from(n) * cs) as usize)?;
+                for (i, sector) in data.chunks_exact(bps).enumerate() {
+                    if !dirent::sector_is_dir(sector, self.geo.cluster_count) {
+                        continue;
+                    }
+                    let base = off + (i * bps) as u64;
+                    let raw: Vec<(u64, [u8; 32])> = sector
+                        .as_chunks::<32>()
+                        .0
+                        .iter()
+                        .enumerate()
+                        .map(|(j, e)| (base + (j * ENTRY_SIZE) as u64, *e))
+                        .collect();
+                    for mut e in self.parse_entries(&raw, true) {
+                        if !reachable.contains(&e.inode) && seen.insert(e.inode) {
+                            // TSK cannot know an orphan's name type.
+                            e.allocated = false;
+                            out.push(e);
+                        }
+                    }
+                }
+                c += n;
+            }
+        }
+        Ok(out)
     }
 
     fn unallocated_blocks(&self) -> Result<Vec<(u64, u64)>> {

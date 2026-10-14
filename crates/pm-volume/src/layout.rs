@@ -3,15 +3,15 @@
 use crate::{Partition, SlotKind};
 
 /// Sorts `slots`, adds `Unallocated` gaps for sectors not covered by any
-/// allocated partition or table sector, and assigns sequential addresses.
+/// allocated partition, and assigns sequential addresses.
 ///
-/// Extended containers (`Meta` slots that span other slots) do not count as
-/// covering space, matching TSK, so unused space inside an extended
-/// partition is reported as unallocated.
+/// Matches TSK (`mmls`) exactly: only allocated partitions cover space, so
+/// gaps may overlap `Meta` slots (the MBR sector, EBRs, GPT header) and
+/// unused space inside an extended container is reported as unallocated.
 pub(crate) fn finish(mut slots: Vec<Partition>, disk_sectors: u64) -> Vec<Partition> {
     let mut covered: Vec<(u64, u64)> = slots
         .iter()
-        .filter(|p| p.kind == SlotKind::Allocated || (p.kind == SlotKind::Meta && !is_container(p)))
+        .filter(|p| p.kind == SlotKind::Allocated)
         .map(|p| {
             (
                 p.start_sector,

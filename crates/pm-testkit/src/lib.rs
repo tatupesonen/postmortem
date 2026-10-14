@@ -10,5 +10,6 @@
 )]
 
 pub mod disk;
+pub mod tsk;
 
 pub use disk::{DiskBuilder, GptPart, MbrPart};

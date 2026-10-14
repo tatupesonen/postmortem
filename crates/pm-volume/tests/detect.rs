@@ -2,6 +2,7 @@
     clippy::unwrap_used,
     clippy::expect_used,
     clippy::indexing_slicing,
+    clippy::print_stderr,
     reason = "test code"
 )]
 
@@ -63,7 +64,7 @@ fn single_primary_partition_layout_matches_tsk() {
         layout(&vs),
         vec![
             (Meta, 0, 1, "Primary Table (#0)".into()),
-            (Unallocated, 1, 2047, "Unallocated".into()),
+            (Unallocated, 0, 2048, "Unallocated".into()),
             (Allocated, 2048, 4096, "NTFS / exFAT (0x07)".into()),
             (Unallocated, 6144, 2048, "Unallocated".into()),
         ]
@@ -131,7 +132,7 @@ fn extended_chain_resolves_relative_offsets() {
         .collect();
     assert_eq!(
         unalloc,
-        vec![(1, 62), (4001, 62), (5963, 37), (6001, 62), (7063, 2937)]
+        vec![(0, 63), (4000, 63), (5963, 100), (7063, 2937)]
     );
 }
 
@@ -238,13 +239,13 @@ fn gpt_partitions_names_and_meta() {
             (
                 40,
                 200,
-                "EFI System Partition",
+                "EFI system partition",
                 Some("EFI system partition")
             ),
             (
                 240,
                 3757,
-                "Basic Data Partition",
+                "Basic data partition",
                 Some("Basic data partition")
             ),
         ]
@@ -257,12 +258,7 @@ fn gpt_partitions_names_and_meta() {
         .collect();
     assert_eq!(
         metas,
-        vec![
-            "Safety Table",
-            "GPT Header",
-            "Partition Table",
-            "Backup GPT Header"
-        ]
+        vec!["Safety Table", "GPT Header", "Partition Table",]
     );
 }
 

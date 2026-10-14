@@ -99,8 +99,12 @@ pub trait FileSystem: Send + Sync + std::fmt::Debug {
         Ok(Vec::new())
     }
 
-    /// Metadata entries not reachable from any directory (TSK `$OrphanFiles`).
-    fn orphans(&self) -> Result<Vec<InodeId>> {
+    /// Names whose parent directory is no longer reachable, plus metadata
+    /// with no name at all (TSK's `$OrphanFiles` virtual directory).
+    ///
+    /// May be expensive (scans unallocated space); callers should call it
+    /// once per filesystem and cache the result.
+    fn orphans(&self) -> Result<Vec<DirEntry>> {
         Ok(Vec::new())
     }
 }

@@ -82,7 +82,7 @@ ends.
   fixture images end-to-end and compare a normalised case-DB dump against a
   checked-in golden file (`insta`). Update goldens deliberately, never blindly.
 - Integration-test crates (`tests/*.rs`) start with
-  `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, reason = "test code")]`
+  `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::print_stderr, reason = "test code")]`
   because helper functions there are not covered by clippy.toml's test allowances.
 - Every public behaviour gets a test. Unit tests sit next to code; cross-crate
   behaviour goes in `tests/`.
