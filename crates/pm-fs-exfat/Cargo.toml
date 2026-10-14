@@ -1,0 +1,24 @@
+[package]
+name = "pm-fs-exfat"
+description = "Forensic exFAT parser for postmortem: entry sets with checksums, deleted entries, orphans, UTC offsets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+pm-fs.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+jiff.workspace = true
+parking_lot.workspace = true
+
+[dev-dependencies]
+pm-testkit.workspace = true
+flate2.workspace = true
+proptest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

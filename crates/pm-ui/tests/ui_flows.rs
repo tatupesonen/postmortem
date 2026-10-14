@@ -152,3 +152,10 @@ fn deleted_files_and_metadata_tab() {
             .unwrap();
     }
 }
+
+#[test]
+fn welcome_screen_screenshot() {
+    let mut h = harness(Vec::new());
+    h.run_steps(4);
+    shot(&mut h, "welcome");
+}

@@ -64,6 +64,7 @@ pub struct PostmortemApp {
     errors: Vec<String>,
     about_open: bool,
     exports: Vec<Task<Result<String, String>>>,
+    wordmark: Option<egui::TextureHandle>,
 }
 
 impl PostmortemApp {
@@ -94,6 +95,7 @@ impl PostmortemApp {
             errors: Vec::new(),
             about_open: false,
             exports: Vec::new(),
+            wordmark: None,
         };
         app.apply_time_pref();
         for p in open {
@@ -296,6 +298,19 @@ impl PostmortemApp {
             }
             Ok(dest.display().to_string())
         }));
+    }
+
+    /// The decoded wordmark texture (created on first use).
+    fn wordmark(&mut self, ctx: &egui::Context) -> Option<egui::TextureHandle> {
+        if self.wordmark.is_none() {
+            let img = image::load_from_memory(crate::WORDMARK_PNG)
+                .ok()?
+                .to_rgba8();
+            let size = [img.width() as usize, img.height() as usize];
+            let color = egui::ColorImage::from_rgba_unmultiplied(size, img.as_raw());
+            self.wordmark = Some(ctx.load_texture("wordmark", color, egui::TextureOptions::LINEAR));
+        }
+        self.wordmark.clone()
     }
 
     // ------------------------------------------------------------ panels
@@ -631,8 +646,13 @@ impl PostmortemApp {
 
     fn results(&mut self, ui: &mut egui::Ui) {
         let Some(node) = self.selected.clone() else {
-            ui.centered_and_justified(|ui| {
-                ui.weak("Add a data source to begin (Case › Add Data Source…)")
+            ui.vertical_centered(|ui| {
+                ui.add_space((ui.available_height() / 2.0 - 150.0).max(0.0));
+                if let Some(tex) = self.wordmark(ui.ctx()) {
+                    ui.add(egui::Image::new(&tex).max_width(560.0));
+                }
+                ui.add_space(18.0);
+                ui.weak("Add a data source to begin (Case › Add Data Source…), or drop a disk image here.");
             });
             return;
         };
@@ -861,8 +881,11 @@ impl PostmortemApp {
 
     fn dialogs(&mut self, ctx: &egui::Context) {
         if self.about_open {
+            let wordmark = self.wordmark(ctx);
             let r = egui::Modal::new(egui::Id::new("about")).show(ctx, |ui| {
-                ui.heading("postmortem");
+                if let Some(tex) = &wordmark {
+                    ui.add(egui::Image::new(tex).max_width(430.0));
+                }
                 ui.label(format!("Version {}", env!("CARGO_PKG_VERSION")));
                 ui.label("A digital forensics platform written in Rust,");
                 ui.label("inspired by Autopsy® and The Sleuth Kit®.");
