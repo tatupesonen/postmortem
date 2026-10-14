@@ -412,7 +412,7 @@ fn write_fuzz_seeds() {
     std::fs::write(dir.join("fat12.img"), &img[..48 * 1024]).unwrap();
 }
 
-/// Our view of the tree in `fls -r -p` terms: (path, deleted, is_dir),
+/// Our view of the tree in `fls -r -p` terms: (path, short-name path, deleted, `is_dir`),
 /// including virtual files and the `$OrphanFiles` directory.
 fn fls_like(fs: &FatFs) -> Vec<(String, Option<String>, bool, bool)> {
     let mut out = Vec::new();
