@@ -2,18 +2,28 @@
 
 ## Now
 
-- Bootstrap: Autopsy surveys are being written to `docs/inventory/01..08`.
-  Once they exist, write `docs/PLAN.md` (architecture, crate map, milestones,
-  task checklist), then start Milestone 1.
-- The test-parity survey (`docs/inventory/08-autopsy-tests.md`) still has to
-  be produced if it is missing. Cover every *Test.java, test/ regression
-  scripts and fixtures, ending in a parity checklist.
+- M1: set up `fuzz/` (cargo-fuzz, nightly) with targets for pm-volume and
+  pm-fs-fat, plus `scripts/fuzz-smoke.sh`. Then EWF in `pm-image`, then
+  `pm-fs-ntfs`, then `pm-evidence`.
+- PLAN.md is a first draft. When inventories 01 (case/data model), 07 (Rust
+  ecosystem) and 08 (Autopsy tests) land, refine the M2 schema tasks, pin
+  crate choices (ADR) and add test-parity tasks.
 
 ## Blockers
 
 _None._
 
 ## Log
+
+### 2026-10-14 — pm-fs-fat + PLAN draft
+- `pm-fs-fat`: BPB/geometry with MS cluster-count typing, FAT12/16/32 tables,
+  chain following with loop guards, LFN incl. deleted (checksum brute-force),
+  CP437 short names, case flags, volume-label entries, virtual $MBR/$FATn,
+  TSK recovery heuristic, reused-deleted-dir detection, unallocated sectors.
+  Tested against `fatfs`-generated images (FAT12/16/32): tree, content, LFN,
+  deleted recovery, cluster reuse, fragmentation, deleted dirs, time zones,
+  plus a 256-case corruption proptest. Workspace: 103 tests.
+- docs/PLAN.md drafted from inventories 02-06.
 
 ### 2026-10-14 — pm-image (raw)
 - `pm-image`: container sniffing (EWF/EWF2/VMDK/VHD/VHDX/QCOW/DMG magic),
