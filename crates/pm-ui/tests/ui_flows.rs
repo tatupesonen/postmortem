@@ -70,7 +70,9 @@ fn shot(h: &mut Harness<'_, PostmortemApp>, name: &str) {
 
 /// Clicks the first node whose label contains `label` (the tree renders
 /// before the table, so tree nodes win when both show the same name).
+/// Waits for the node to appear: listings load on background threads.
 fn click(h: &mut Harness<'_, PostmortemApp>, label: &str) {
+    settle(h, |h| h.query_all_by_label_contains(label).next().is_some());
     h.query_all_by_label_contains(label)
         .next()
         .unwrap_or_else(|| panic!("no node labelled {label:?}"))
@@ -80,6 +82,7 @@ fn click(h: &mut Harness<'_, PostmortemApp>, label: &str) {
 
 /// Clicks the first node whose label is exactly `label`.
 fn click_exact(h: &mut Harness<'_, PostmortemApp>, label: &str) {
+    settle(h, |h| h.query_all_by_label(label).next().is_some());
     h.query_all_by_label(label)
         .next()
         .unwrap_or_else(|| panic!("no node labelled exactly {label:?}"))

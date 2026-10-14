@@ -83,7 +83,11 @@ impl CaseDb {
         let mut conn = Connection::open(&path)?;
         configure(&conn, true)?;
         migrate(&mut conn)?;
-        Ok(Self { path, writer: Mutex::new(conn), readers: Mutex::new(Vec::new()) })
+        Ok(Self {
+            path,
+            writer: Mutex::new(conn),
+            readers: Mutex::new(Vec::new()),
+        })
     }
 
     pub fn path(&self) -> &Path {
@@ -92,13 +96,15 @@ impl CaseDb {
 
     /// Runs `f` on a pooled read-only connection.
     pub fn read<T>(&self, f: impl FnOnce(&Connection) -> Result<T>) -> Result<T> {
-        let conn = match self.readers.lock().pop() {
-            Some(c) => c,
-            None => {
-                let c = Connection::open_with_flags(&self.path, OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX)?;
-                configure(&c, false)?;
-                c
-            }
+        let conn = if let Some(c) = self.readers.lock().pop() {
+            c
+        } else {
+            let c = Connection::open_with_flags(
+                &self.path,
+                OpenFlags::SQLITE_OPEN_READ_ONLY | OpenFlags::SQLITE_OPEN_NO_MUTEX,
+            )?;
+            configure(&c, false)?;
+            c
         };
         let out = f(&conn);
         let mut pool = self.readers.lock();
@@ -122,7 +128,10 @@ impl CaseDb {
     pub fn bulk<T>(&self, f: impl FnOnce(&mut Bulk<'_>) -> Result<T>) -> Result<T> {
         let conn = self.writer.lock();
         conn.execute_batch("BEGIN")?;
-        let mut b = Bulk { conn: &conn, pending: 0 };
+        let mut b = Bulk {
+            conn: &conn,
+            pending: 0,
+        };
         match f(&mut b) {
             Ok(v) => {
                 conn.execute_batch("COMMIT")?;
@@ -135,8 +144,30 @@ impl CaseDb {
         }
     }
 
+    /// Drops the secondary indexes on `files` before a large load (index
+    /// maintenance dominates insert cost at scale). Pair with
+    /// [`Self::rebuild_file_indexes`].
+    pub fn defer_file_indexes(&self) -> Result<()> {
+        let conn = self.writer.lock();
+        for (name, _) in FILE_INDEXES {
+            conn.execute_batch(&format!("DROP INDEX IF EXISTS {name}"))?;
+        }
+        Ok(())
+    }
+
+    /// (Re)creates the secondary indexes on `files` and refreshes planner
+    /// statistics.
+    pub fn rebuild_file_indexes(&self) -> Result<()> {
+        let conn = self.writer.lock();
+        for (name, ddl) in FILE_INDEXES {
+            conn.execute_batch(&format!("CREATE INDEX IF NOT EXISTS {name} {ddl}"))?;
+        }
+        conn.execute_batch("ANALYZE files")?;
+        Ok(())
+    }
+
     pub fn schema_version(&self) -> Result<i64> {
-        self.read(|c| schema_version(c))
+        self.read(schema_version)
     }
 
     // ------------------------------------------------------------ meta
@@ -149,7 +180,12 @@ impl CaseDb {
     }
 
     pub fn meta(&self, key: &str) -> Result<Option<String>> {
-        self.read(|c| Ok(c.query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0)).optional()?))
+        self.read(|c| {
+            Ok(
+                c.query_row("SELECT value FROM meta WHERE key = ?1", [key], |r| r.get(0))
+                    .optional()?,
+            )
+        })
     }
 
     // ------------------------------------------------------ data sources
@@ -199,7 +235,14 @@ impl CaseDb {
     // ------------------------------------------------------------- files
 
     pub fn file(&self, id: i64) -> Result<Option<FileRecord>> {
-        self.read(|c| Ok(c.query_row(&format!("SELECT {FILE_COLS} FROM files WHERE id = ?1"), [id], FileRecord::from_row).optional()?))
+        self.read(|c| {
+            Ok(c.query_row(
+                &format!("SELECT {FILE_COLS} FROM files WHERE id = ?1"),
+                [id],
+                FileRecord::from_row,
+            )
+            .optional()?)
+        })
     }
 
     /// Children of a directory, directories first then by name.
@@ -219,22 +262,35 @@ impl CaseDb {
     }
 
     /// Files matching `q`, ordered by id, with keyset paging (`after_id`).
-    pub fn query_files(&self, q: &FileQuery, after_id: i64, limit: usize) -> Result<Vec<FileRecord>> {
-        let (clause, args) = q.where_clause();
+    pub fn query_files(
+        &self,
+        q: &FileQuery,
+        after_id: i64,
+        limit: usize,
+    ) -> Result<Vec<FileRecord>> {
+        let (clause, args) = q.where_clause(1);
         self.read(|c| {
-            let sql = format!("SELECT {FILE_COLS} FROM files WHERE id > ?1 AND {clause} ORDER BY id LIMIT {limit}");
+            let sql = format!(
+                "SELECT {FILE_COLS} FROM files WHERE id > ?1 AND {clause} ORDER BY id LIMIT {limit}"
+            );
             let mut st = c.prepare_cached(&sql)?;
             let mut all: Vec<rusqlite::types::Value> = vec![after_id.into()];
             all.extend(args);
-            let rows = st.query_map(rusqlite::params_from_iter(all), FileRecord::from_row)?.collect::<rusqlite::Result<Vec<_>>>()?;
+            let rows = st
+                .query_map(rusqlite::params_from_iter(all), FileRecord::from_row)?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
             Ok(rows)
         })
     }
 
     pub fn count_files(&self, q: &FileQuery) -> Result<u64> {
-        let (clause, args) = q.where_clause();
+        let (clause, args) = q.where_clause(0);
         self.read(|c| {
-            let n: i64 = c.query_row(&format!("SELECT COUNT(*) FROM files WHERE {clause}"), rusqlite::params_from_iter(args), |r| r.get(0))?;
+            let n: i64 = c.query_row(
+                &format!("SELECT COUNT(*) FROM files WHERE {clause}"),
+                rusqlite::params_from_iter(args),
+                |r| r.get(0),
+            )?;
             Ok(n.max(0) as u64)
         })
     }
@@ -269,7 +325,13 @@ impl CaseDb {
         })
     }
 
-    pub fn artifacts_of_type(&self, type_id: i64, ds_id: Option<i64>, after_id: i64, limit: usize) -> Result<Vec<ArtifactRecord>> {
+    pub fn artifacts_of_type(
+        &self,
+        type_id: i64,
+        ds_id: Option<i64>,
+        after_id: i64,
+        limit: usize,
+    ) -> Result<Vec<ArtifactRecord>> {
         self.read(|c| {
             let mut st = c.prepare_cached(&format!(
                 "SELECT {ARTIFACT_COLS} FROM artifacts WHERE type_id = ?1 AND (?2 IS NULL OR ds_id = ?2) AND id > ?3 AND review_status <> 2 ORDER BY id LIMIT {limit}"
@@ -281,8 +343,12 @@ impl CaseDb {
 
     pub fn artifacts_for_file(&self, file_id: i64) -> Result<Vec<ArtifactRecord>> {
         self.read(|c| {
-            let mut st = c.prepare_cached(&format!("SELECT {ARTIFACT_COLS} FROM artifacts WHERE file_id = ?1 ORDER BY id"))?;
-            let rows = st.query_map([file_id], ArtifactRecord::from_row)?.collect::<rusqlite::Result<Vec<_>>>()?;
+            let mut st = c.prepare_cached(&format!(
+                "SELECT {ARTIFACT_COLS} FROM artifacts WHERE file_id = ?1 ORDER BY id"
+            ))?;
+            let rows = st
+                .query_map([file_id], ArtifactRecord::from_row)?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
             Ok(rows)
         })
     }
@@ -307,7 +373,12 @@ impl CaseDb {
     }
 
     /// Registers (or finds) a custom artifact type.
-    pub fn artifact_type(&self, name: &str, display: &str, category: catalog::Category) -> Result<i64> {
+    pub fn artifact_type(
+        &self,
+        name: &str,
+        display: &str,
+        category: catalog::Category,
+    ) -> Result<i64> {
         self.write(|tx| {
             if let Some(id) = tx.query_row("SELECT id FROM artifact_types WHERE name = ?1", [name], |r| r.get(0)).optional()? {
                 return Ok(id);
@@ -318,7 +389,12 @@ impl CaseDb {
     }
 
     /// Registers (or finds) a custom attribute type.
-    pub fn attribute_type(&self, name: &str, display: &str, value_type: catalog::ValueType) -> Result<i64> {
+    pub fn attribute_type(
+        &self,
+        name: &str,
+        display: &str,
+        value_type: catalog::ValueType,
+    ) -> Result<i64> {
         self.write(|tx| {
             if let Some(id) = tx.query_row("SELECT id FROM attribute_types WHERE name = ?1", [name], |r| r.get(0)).optional()? {
                 return Ok(id);
@@ -330,8 +406,12 @@ impl CaseDb {
 
     pub fn artifact_type_names(&self) -> Result<Vec<(i64, String, String, i64)>> {
         self.read(|c| {
-            let mut st = c.prepare("SELECT id, name, display_name, category FROM artifact_types ORDER BY id")?;
-            let rows = st.query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?.collect::<rusqlite::Result<Vec<_>>>()?;
+            let mut st = c.prepare(
+                "SELECT id, name, display_name, category FROM artifact_types ORDER BY id",
+            )?;
+            let rows = st
+                .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
             Ok(rows)
         })
     }
@@ -348,12 +428,22 @@ impl CaseDb {
 
     pub fn add_tag_name(&self, name: &str, description: &str, notable: bool) -> Result<i64> {
         self.write(|tx| {
-            tx.execute("INSERT INTO tag_names (name, description, notable) VALUES (?1, ?2, ?3)", params![name, description, notable])?;
+            tx.execute(
+                "INSERT INTO tag_names (name, description, notable) VALUES (?1, ?2, ?3)",
+                params![name, description, notable],
+            )?;
             Ok(tx.last_insert_rowid())
         })
     }
 
-    pub fn tag_file(&self, file_id: i64, tag_name_id: i64, comment: &str, examiner: &str, now: i64) -> Result<i64> {
+    pub fn tag_file(
+        &self,
+        file_id: i64,
+        tag_name_id: i64,
+        comment: &str,
+        examiner: &str,
+        now: i64,
+    ) -> Result<i64> {
         self.write(|tx| {
             tx.execute(
                 "INSERT INTO file_tags (file_id, tag_name_id, comment, examiner, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
@@ -402,15 +492,26 @@ impl CaseDb {
     /// `(tag name id, count)` of tagged files.
     pub fn tag_counts(&self) -> Result<Vec<(i64, u64)>> {
         self.read(|c| {
-            let mut st = c.prepare("SELECT tag_name_id, COUNT(*) FROM file_tags GROUP BY tag_name_id")?;
-            let rows = st.query_map([], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?.max(0) as u64)))?.collect::<rusqlite::Result<Vec<_>>>()?;
+            let mut st =
+                c.prepare("SELECT tag_name_id, COUNT(*) FROM file_tags GROUP BY tag_name_id")?;
+            let rows = st
+                .query_map([], |r| {
+                    Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?.max(0) as u64))
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
             Ok(rows)
         })
     }
 
     // ------------------------------------------------------- ingest jobs
 
-    pub fn start_ingest_job(&self, ds_id: i64, settings_json: &str, now: i64, modules: &[(&str, &str)]) -> Result<i64> {
+    pub fn start_ingest_job(
+        &self,
+        ds_id: i64,
+        settings_json: &str,
+        now: i64,
+        modules: &[(&str, &str)],
+    ) -> Result<i64> {
         self.write(|tx| {
             tx.execute("INSERT INTO ingest_jobs (ds_id, started_at, status, settings) VALUES (?1, ?2, 0, ?3)", params![ds_id, now, settings_json])?;
             let id = tx.last_insert_rowid();
@@ -423,25 +524,44 @@ impl CaseDb {
 
     pub fn finish_ingest_job(&self, job_id: i64, cancelled: bool, now: i64) -> Result<()> {
         self.write(|tx| {
-            tx.execute("UPDATE ingest_jobs SET ended_at = ?2, status = ?3 WHERE id = ?1", params![job_id, now, if cancelled { 1 } else { 2 }])?;
+            tx.execute(
+                "UPDATE ingest_jobs SET ended_at = ?2, status = ?3 WHERE id = ?1",
+                params![job_id, now, if cancelled { 1 } else { 2 }],
+            )?;
             Ok(())
         })
     }
 }
 
 fn schema_version(c: &Connection) -> Result<i64> {
-    let exists: bool = c.query_row("SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = 'meta'", [], |r| r.get(0))?;
+    let exists: bool = c.query_row(
+        "SELECT COUNT(*) > 0 FROM sqlite_master WHERE type = 'table' AND name = 'meta'",
+        [],
+        |r| r.get(0),
+    )?;
     if !exists {
         return Ok(0);
     }
-    let v: Option<String> = c.query_row("SELECT value FROM meta WHERE key = 'schema_version'", [], |r| r.get(0)).optional()?;
-    v.map_or(Ok(0), |s| s.parse().map_err(|_| DbError::Invalid(format!("schema_version {s:?}"))))
+    let v: Option<String> = c
+        .query_row(
+            "SELECT value FROM meta WHERE key = 'schema_version'",
+            [],
+            |r| r.get(0),
+        )
+        .optional()?;
+    v.map_or(Ok(0), |s| {
+        s.parse()
+            .map_err(|_| DbError::Invalid(format!("schema_version {s:?}")))
+    })
 }
 
 fn migrate(conn: &mut Connection) -> Result<()> {
     let current = schema_version(conn)?;
     if current > SCHEMA_VERSION {
-        return Err(DbError::TooNew { found: current, supported: SCHEMA_VERSION });
+        return Err(DbError::TooNew {
+            found: current,
+            supported: SCHEMA_VERSION,
+        });
     }
     for (i, sql) in MIGRATIONS.iter().enumerate() {
         let version = i as i64 + 1;
@@ -461,11 +581,15 @@ fn migrate(conn: &mut Connection) -> Result<()> {
 }
 
 fn seed_catalog(tx: &rusqlite::Transaction<'_>) -> Result<()> {
-    let mut st = tx.prepare("INSERT INTO artifact_types (id, name, display_name, category) VALUES (?1, ?2, ?3, ?4)")?;
+    let mut st = tx.prepare(
+        "INSERT INTO artifact_types (id, name, display_name, category) VALUES (?1, ?2, ?3, ?4)",
+    )?;
     for (id, name, display, cat) in catalog::ARTIFACT_TYPES {
         st.execute(params![id, name, display, *cat as i64])?;
     }
-    let mut st = tx.prepare("INSERT INTO attribute_types (id, name, display_name, value_type) VALUES (?1, ?2, ?3, ?4)")?;
+    let mut st = tx.prepare(
+        "INSERT INTO attribute_types (id, name, display_name, value_type) VALUES (?1, ?2, ?3, ?4)",
+    )?;
     for (i, (name, display, vt)) in catalog::ATTRIBUTE_TYPES.iter().enumerate() {
         st.execute(params![i as i64 + 1, name, display, *vt as i64])?;
     }
@@ -473,7 +597,9 @@ fn seed_catalog(tx: &rusqlite::Transaction<'_>) -> Result<()> {
 }
 
 fn insert_artifact(tx: &Connection, a: &NewArtifact) -> Result<i64> {
-    let (sig, prio) = a.score.map_or((None, None), |(s, p)| (Some(s as i64), Some(p as i64)));
+    let (sig, prio) = a
+        .score
+        .map_or((None, None), |(s, p)| (Some(s as i64), Some(p as i64)));
     tx.prepare_cached(
         "INSERT INTO artifacts (type_id, ds_id, file_id, source_artifact_id, significance, priority, conclusion, configuration, justification, created_at) \
          VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10)",
@@ -484,8 +610,8 @@ fn insert_artifact(tx: &Connection, a: &NewArtifact) -> Result<i64> {
         "INSERT INTO attributes (artifact_id, type_id, source, value_text, value_int, value_double, value_blob) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
     for (type_id, value, source) in &a.attributes {
-        let (t, i, d, b) = value.columns();
-        st.execute(params![id, type_id, source, t, i, d, b])?;
+        let (text, int, double, blob) = value.columns();
+        st.execute(params![id, type_id, source, text, int, double, blob])?;
     }
     Ok(id)
 }
@@ -509,7 +635,8 @@ impl Bulk<'_> {
 
     pub fn add_data_source(&mut self, d: &NewDataSource) -> Result<i64> {
         let paths = serde_json::to_string(&d.paths).map_err(|e| DbError::Invalid(e.to_string()))?;
-        let acq = serde_json::to_string(&d.acquisition).map_err(|e| DbError::Invalid(e.to_string()))?;
+        let acq =
+            serde_json::to_string(&d.acquisition).map_err(|e| DbError::Invalid(e.to_string()))?;
         self.conn.execute(
             "INSERT INTO data_sources (name, kind, paths, size, sector_size, timezone, image_format, md5, sha1, sha256, acquisition, added_at) \
              VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8, ?9, ?10, ?11, ?12)",
@@ -518,7 +645,13 @@ impl Bulk<'_> {
         Ok(self.conn.last_insert_rowid())
     }
 
-    pub fn add_volume_system(&mut self, ds_id: i64, kind: i64, sector_size: u32, disk_guid: Option<&str>) -> Result<i64> {
+    pub fn add_volume_system(
+        &mut self,
+        ds_id: i64,
+        kind: i64,
+        sector_size: u32,
+        disk_guid: Option<&str>,
+    ) -> Result<i64> {
         self.conn.execute("INSERT INTO volume_systems (ds_id, kind, sector_size, disk_guid) VALUES (?1, ?2, ?3, ?4)", params![ds_id, kind, sector_size, disk_guid])?;
         Ok(self.conn.last_insert_rowid())
     }
@@ -541,11 +674,11 @@ impl Bulk<'_> {
 
     pub fn add_file(&mut self, f: &NewFile) -> Result<i64> {
         let mut st = self.conn.prepare_cached(INSERT_FILE)?;
-        let t = |x: Option<(i64, u32)>| (x.map(|v| v.0), x.map(|v| v.1));
-        let (m, m_ns) = t(f.times[0]);
-        let (a, a_ns) = t(f.times[1]);
-        let (c, c_ns) = t(f.times[2]);
-        let (b, b_ns) = t(f.times[3]);
+        let split = |x: Option<(i64, u32)>| (x.map(|v| v.0), x.map(|v| v.1));
+        let (mtime, mtime_ns) = split(f.times[0]);
+        let (atime, atime_ns) = split(f.times[1]);
+        let (ctime, ctime_ns) = split(f.times[2]);
+        let (crtime, crtime_ns) = split(f.times[3]);
         st.execute(params![
             f.ds_id,
             f.fs_id,
@@ -560,14 +693,14 @@ impl Bulk<'_> {
             f.meta_alloc,
             f.meta_flags,
             f.size as i64,
-            m,
-            m_ns,
-            a,
-            a_ns,
-            c,
-            c_ns,
-            b,
-            b_ns,
+            mtime,
+            mtime_ns,
+            atime,
+            atime_ns,
+            ctime,
+            ctime_ns,
+            crtime,
+            crtime_ns,
             f.mode,
             f.uid,
             f.gid,
@@ -597,10 +730,31 @@ impl Bulk<'_> {
 /// Lower-case extension of a file name (`""` if none), as stored.
 pub fn extension_of(name: &str) -> String {
     match name.rsplit_once('.') {
-        Some((stem, ext)) if !stem.is_empty() && !ext.contains(':') && ext.len() <= 16 => ext.to_lowercase(),
+        // Alternate data streams ("file.exe:Zone.Identifier") have no extension.
+        Some((stem, ext))
+            if !stem.is_empty() && !stem.contains(':') && !ext.contains(':') && ext.len() <= 16 =>
+        {
+            ext.to_lowercase()
+        }
         _ => String::new(),
     }
 }
+
+/// Secondary indexes on `files` (must match the migrations).
+const FILE_INDEXES: &[(&str, &str)] = &[
+    ("files_parent", "ON files(parent_id, name)"),
+    ("files_ds_kind", "ON files(ds_id, kind)"),
+    ("files_ext", "ON files(extension, ds_id) WHERE kind = 1"),
+    ("files_mime", "ON files(mime, ds_id) WHERE mime IS NOT NULL"),
+    ("files_md5", "ON files(md5) WHERE md5 IS NOT NULL"),
+    ("files_mtime", "ON files(mtime)"),
+    ("files_size", "ON files(size) WHERE kind = 1"),
+    (
+        "files_deleted",
+        "ON files(ds_id) WHERE name_alloc = 0 OR meta_alloc = 0",
+    ),
+    ("files_inode", "ON files(fs_id, inode)"),
+];
 
 const INSERT_FILE: &str = "INSERT INTO files (ds_id, fs_id, parent_id, origin, inode, stream, name, parent_path, kind, name_alloc, meta_alloc, meta_flags, size, \
     mtime, mtime_ns, atime, atime_ns, ctime, ctime_ns, crtime, crtime_ns, mode, uid, gid, seq, attributes, extension, derived_from, local_path) \

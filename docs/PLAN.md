@@ -188,7 +188,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] NTFS bulk MFT enumeration (sequential chunked scan, parallel record parsing) feeding the loader
 - [ ] Loader: deferred secondary-index creation, ≥ 200 k files/s, bounded memory (streaming parent-id resolution)
 - [ ] DB-backed views replace `pm-index`: tree, File Types, Deleted, Discovery, Gallery, Data Source Summary via indexed SQL + precomputed aggregate tables
-- [ ] File-name search index (FTS5 trigram) with sub-second substring search over 100 M names
+- [ ] File-name/path search index in Tantivy (n-gram tokenizer) with sub-second substring search over 100 M names (shared `pm-search` crate with the M5 content index)
 - [ ] Timeline: events table + pre-aggregated per-unit counts; counts view never scans events
 - [ ] Huge directory UX: keyset-paged listings, cached child counts
 - [ ] Memory/latency regression tests in CI for the 10 M-file synthetic case

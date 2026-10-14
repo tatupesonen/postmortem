@@ -135,8 +135,11 @@ Design budgets (to be enforced by benchmarks in `benches/` and a
   secondary indexes are built after the bulk load; WAL; queries always go
   through an index; UI listings use keyset pagination (never OFFSET, never
   "load all"); counts for tree badges are precomputed or cached.
-* **Search**: file-name and path search uses an index (FTS5 trigram or an
-  equivalent), not LIKE scans. Content search uses Tantivy. Analysis views
+* **Search uses Tantivy** (user direction): content/keyword search
+  (replacing Autopsy's Solr) *and* file-name/path search, using an n-gram
+  tokenised Tantivy index for substring queries over 100s of millions of
+  names (smaller and faster than SQLite FTS5 trigram at this scale). No LIKE
+  scans on large tables. Analysis views
   (Timeline counts, Discovery groups, Data Source Summary) read
   pre-aggregated tables updated at load/ingest time, never full scans on
   interaction.

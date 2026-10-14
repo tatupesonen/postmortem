@@ -73,7 +73,9 @@ impl DataSourceRecord {
             md5: r.get(8)?,
             sha1: r.get(9)?,
             sha256: r.get(10)?,
-            acquisition: acq.and_then(|a| serde_json::from_str(&a).ok()).unwrap_or_default(),
+            acquisition: acq
+                .and_then(|a| serde_json::from_str(&a).ok())
+                .unwrap_or_default(),
             added_at: r.get(12)?,
         })
     }
@@ -347,7 +349,7 @@ impl FileRecord {
     }
 }
 
-/// Conditions for [`crate::CaseDb::query_files`] (all are ANDed).
+/// Conditions for [`crate::CaseDb::query_files`] (all are `ANDed`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FileQuery {
     pub ds_id: Option<i64>,
@@ -363,14 +365,15 @@ pub struct FileQuery {
 }
 
 impl FileQuery {
-    pub(crate) fn where_clause(&self) -> (String, Vec<rusqlite::types::Value>) {
+    /// SQL condition and its arguments; placeholders are numbered after
+    /// `reserved` leading parameters (e.g. the keyset cursor).
+    pub(crate) fn where_clause(&self, reserved: usize) -> (String, Vec<rusqlite::types::Value>) {
         use rusqlite::types::Value;
         let mut parts = vec!["1=1".to_owned()];
         let mut args: Vec<Value> = Vec::new();
-        // Placeholders start at ?2 (?1 is the keyset id in query_files).
         let next = |v: Value, args: &mut Vec<Value>| {
             args.push(v);
-            format!("?{}", args.len() + 1)
+            format!("?{}", args.len() + reserved)
         };
         if let Some(ds) = self.ds_id {
             let p = next(ds.into(), &mut args);
@@ -380,7 +383,11 @@ impl FileQuery {
             parts.push("kind = 1".into());
         }
         if !self.extensions.is_empty() {
-            let ps: Vec<String> = self.extensions.iter().map(|e| next(e.to_lowercase().into(), &mut args)).collect();
+            let ps: Vec<String> = self
+                .extensions
+                .iter()
+                .map(|e| next(e.to_lowercase().into(), &mut args))
+                .collect();
             parts.push(format!("extension IN ({})", ps.join(", ")));
         }
         if let Some(m) = &self.mime_prefix {
@@ -496,13 +503,17 @@ impl Value {
         }
     }
 
-    /// Display form (DateTime stays numeric; the UI formats times).
+    /// Display form (`DateTime` stays numeric; the UI formats times).
     pub fn display(&self) -> String {
         match self {
             Self::Text(s) | Self::Json(s) => s.clone(),
             Self::Int(i) | Self::DateTime(i) => i.to_string(),
             Self::Double(d) => d.to_string(),
-            Self::Bytes(b) => b.iter().map(|x| format!("{x:02x}")).collect(),
+            Self::Bytes(b) => b.iter().fold(String::new(), |mut s, x| {
+                use std::fmt::Write as _;
+                let _ = write!(s, "{x:02x}");
+                s
+            }),
         }
     }
 }
@@ -548,7 +559,9 @@ impl ArtifactRecord {
             ds_id: r.get(2)?,
             file_id: r.get(3)?,
             source_artifact_id: r.get(4)?,
-            significance: r.get::<_, Option<i64>>(5)?.and_then(Significance::from_code),
+            significance: r
+                .get::<_, Option<i64>>(5)?
+                .and_then(Significance::from_code),
             priority: r.get(6)?,
             conclusion: r.get(7)?,
             configuration: r.get(8)?,
@@ -570,12 +583,12 @@ pub struct AttributeRecord {
 
 impl AttributeRecord {
     pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
-        let vt = crate::catalog::ValueType::from_code(r.get(3)?);
+        use crate::catalog::ValueType as V;
+        let vt = V::from_code(r.get(3)?);
         let text: Option<String> = r.get(5)?;
         let int: Option<i64> = r.get(6)?;
         let dbl: Option<f64> = r.get(7)?;
         let blob: Option<Vec<u8>> = r.get(8)?;
-        use crate::catalog::ValueType as V;
         let value = match vt {
             Some(V::DateTime) => Value::DateTime(int.unwrap_or(0)),
             Some(V::Integer | V::Long) => Value::Int(int.unwrap_or(0)),
@@ -584,7 +597,13 @@ impl AttributeRecord {
             Some(V::Json) => Value::Json(text.unwrap_or_default()),
             Some(V::String) | None => Value::Text(text.unwrap_or_default()),
         };
-        Ok(Self { type_id: r.get(0)?, name: r.get(1)?, display_name: r.get(2)?, value, source: r.get(4)? })
+        Ok(Self {
+            type_id: r.get(0)?,
+            name: r.get(1)?,
+            display_name: r.get(2)?,
+            value,
+            source: r.get(4)?,
+        })
     }
 }
 
@@ -599,7 +618,13 @@ pub struct TagName {
 
 impl TagName {
     pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
-        Ok(Self { id: r.get(0)?, name: r.get(1)?, description: r.get(2)?, color: r.get(3)?, notable: r.get(4)? })
+        Ok(Self {
+            id: r.get(0)?,
+            name: r.get(1)?,
+            description: r.get(2)?,
+            color: r.get(3)?,
+            notable: r.get(4)?,
+        })
     }
 }
 

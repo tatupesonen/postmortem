@@ -72,11 +72,21 @@ pub const ARTIFACT_TYPES: &[(i64, &str, &str, Category)] = &[
     (27, "TSK_SPEED_DIAL_ENTRY", "Speed Dial Entries", D),
     (28, "TSK_BLUETOOTH_PAIRING", "Bluetooth Pairings", D),
     (29, "TSK_GPS_BOOKMARK", "GPS Bookmarks", D),
-    (30, "TSK_GPS_LAST_KNOWN_LOCATION", "GPS Last Known Location", D),
+    (
+        30,
+        "TSK_GPS_LAST_KNOWN_LOCATION",
+        "GPS Last Known Location",
+        D,
+    ),
     (31, "TSK_GPS_SEARCH", "GPS Searches", D),
     (32, "TSK_PROG_RUN", "Run Programs", D),
     (33, "TSK_ENCRYPTION_DETECTED", "Encryption Detected", A),
-    (34, "TSK_EXT_MISMATCH_DETECTED", "Extension Mismatch Detected", A),
+    (
+        34,
+        "TSK_EXT_MISMATCH_DETECTED",
+        "Extension Mismatch Detected",
+        A,
+    ),
     (35, "TSK_INTERESTING_ARTIFACT_HIT", "Interesting Results", A),
     (36, "TSK_GPS_ROUTE", "GPS Route", D),
     (37, "TSK_REMOTE_DRIVE", "Remote Drive", D),
@@ -88,7 +98,12 @@ pub const ARTIFACT_TYPES: &[(i64, &str, &str, Category)] = &[
     (43, "TSK_DEVICE_INFO", "Device Info", D),
     (44, "TSK_SIM_ATTACHED", "SIM Attached", D),
     (45, "TSK_BLUETOOTH_ADAPTER", "Bluetooth Adapter", D),
-    (46, "TSK_WIFI_NETWORK_ADAPTER", "Wireless Network Adapters", D),
+    (
+        46,
+        "TSK_WIFI_NETWORK_ADAPTER",
+        "Wireless Network Adapters",
+        D,
+    ),
     (47, "TSK_VERIFICATION_FAILED", "Verification Failure", A),
     (48, "TSK_DATA_SOURCE_USAGE", "Data Source Usage", A),
     (49, "TSK_WEB_FORM_AUTOFILL", "Web Form Autofill", D),
@@ -98,7 +113,12 @@ pub const ARTIFACT_TYPES: &[(i64, &str, &str, Category)] = &[
     (53, "TSK_TL_EVENT", "TL Events", D),
     (54, "TSK_CLIPBOARD_CONTENT", "Clipboard Content", D),
     (55, "TSK_ASSOCIATED_OBJECT", "Associated Object", D),
-    (56, "TSK_USER_CONTENT_SUSPECTED", "User Content Suspected", A),
+    (
+        56,
+        "TSK_USER_CONTENT_SUSPECTED",
+        "User Content Suspected",
+        A,
+    ),
     (57, "TSK_METADATA", "Metadata", D),
     (58, "TSK_GPS_TRACK", "GPS Track", D),
     (59, "TSK_WEB_ACCOUNT_TYPE", "Web Account Type", A),
@@ -118,8 +138,13 @@ pub const ARTIFACT_TYPES: &[(i64, &str, &str, Category)] = &[
 ];
 
 /// Artifact types Autopsy hides from the tree.
-pub const HIDDEN_ARTIFACT_TYPES: &[&str] =
-    &["TSK_DATA_SOURCE_USAGE", "TSK_GEN_INFO", "TSK_DOWNLOAD_SOURCE", "TSK_TL_EVENT", "TSK_ASSOCIATED_OBJECT"];
+pub const HIDDEN_ARTIFACT_TYPES: &[&str] = &[
+    "TSK_DATA_SOURCE_USAGE",
+    "TSK_GEN_INFO",
+    "TSK_DOWNLOAD_SOURCE",
+    "TSK_TL_EVENT",
+    "TSK_ASSOCIATED_OBJECT",
+];
 
 use ValueType::{DateTime as T, Double as F, Integer as I, Json as J, Long as L, String as S};
 
@@ -216,7 +241,11 @@ pub const ATTRIBUTE_TYPES: &[(&str, &str, ValueType)] = &[
     ("TSK_CARD_SERVICE_CODE", "Card Service Code", S),
     ("TSK_CARD_DISCRETIONARY", "Card Discretionary", S),
     ("TSK_CARD_LRC", "Card Longitudinal Redundancy Check", S),
-    ("TSK_KEYWORD_SEARCH_DOCUMENT_ID", "Keyword Search Document ID", S),
+    (
+        "TSK_KEYWORD_SEARCH_DOCUMENT_ID",
+        "Keyword Search Document ID",
+        S,
+    ),
     ("TSK_CARD_SCHEME", "Card Scheme", S),
     ("TSK_CARD_TYPE", "Card Type", S),
     ("TSK_BRAND_NAME", "Brand Name", S),
@@ -224,7 +253,11 @@ pub const ATTRIBUTE_TYPES: &[(&str, &str, ValueType)] = &[
     ("TSK_COUNTRY", "Country", S),
     ("TSK_CITY", "City", S),
     ("TSK_ACCOUNT_TYPE", "Account Type", S),
-    ("TSK_KEYWORD_SEARCH_TYPE_2", "Keyword Search Type (legacy)", I),
+    (
+        "TSK_KEYWORD_SEARCH_TYPE_2",
+        "Keyword Search Type (legacy)",
+        I,
+    ),
     ("TSK_PHONE_NUMBER", "Phone Number", S),
     ("TSK_EMAIL_TO", "E-Mail To", S),
     ("TSK_EMAIL_FROM", "E-Mail From", S),
@@ -281,7 +314,10 @@ pub fn artifact_type_id(name: &str) -> Option<i64> {
 
 /// Id of a standard attribute type by name.
 pub fn attribute_type_id(name: &str) -> Option<i64> {
-    ATTRIBUTE_TYPES.iter().position(|t| t.0 == name).map(|i| i as i64 + 1)
+    ATTRIBUTE_TYPES
+        .iter()
+        .position(|t| t.0 == name)
+        .map(|i| i as i64 + 1)
 }
 
 #[cfg(test)]
@@ -291,7 +327,11 @@ mod tests {
 
     #[test]
     fn artifact_ids_are_tsk_ids_and_unique() {
-        assert_eq!(artifact_type_id("TSK_KEYWORD_HIT"), Some(9), "confirmed by Autopsy's SQL");
+        assert_eq!(
+            artifact_type_id("TSK_KEYWORD_HIT"),
+            Some(9),
+            "confirmed by Autopsy's SQL"
+        );
         let ids: HashSet<_> = ARTIFACT_TYPES.iter().map(|t| t.0).collect();
         assert_eq!(ids.len(), ARTIFACT_TYPES.len());
         let names: HashSet<_> = ARTIFACT_TYPES.iter().map(|t| t.1).collect();
