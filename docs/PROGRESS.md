@@ -15,6 +15,14 @@ _None._
 
 ## Log
 
+### 2026-10-14 — pm-volume
+- `pm-volume`: DOS/MBR (primary + EBR chains, loop guard, FS-boot-sector
+  rejection), GPT (CRC-validated header and array, backup fallback, 512/4096
+  sectors, 30+ type GUID names). TSK-style full layout with Meta and
+  Unallocated slots. `pm-testkit::DiskBuilder` builds MBR/EBR/GPT disks.
+- 16 integration tests + 3 proptests (random sector 0, random MBR/EBR,
+  GPT bit flips) checking layout invariants. Workspace total: 50 tests.
+
 ### 2026-10-14 — bootstrap
 - Workspace skeleton: virtual manifest, pinned toolchain 1.97.1, workspace
   lints (pedantic + no-panic restrictions), clippy.toml test allowances.

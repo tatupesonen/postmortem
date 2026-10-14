@@ -1,0 +1,22 @@
+[package]
+name = "pm-volume"
+description = "Volume system (partition table) parsing for postmortem: DOS/MBR with extended partitions and GPT"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+crc32fast.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+pm-testkit.workspace = true
+proptest.workspace = true
+rstest.workspace = true
+
+[lints]
+workspace = true
