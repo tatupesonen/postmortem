@@ -6,7 +6,10 @@
 
 mod app;
 mod format;
+mod gallery;
+mod index;
 mod model;
+mod summary;
 mod table;
 mod task;
 mod timeline;

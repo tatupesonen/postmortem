@@ -3,10 +3,9 @@
 //! The [`Timeline`] keeps events sorted by time in a compact columnar form
 //! so range queries are binary searches and aggregations are single passes,
 //! fast enough to recompute interactively for millions of events. It is
-//! storage-agnostic: today it is filled by walking filesystems
-//! ([`collect`]), later from the case database.
+//! storage-agnostic: today it is built from the in-memory file index
+//! ([`Timeline::from_index`]), later from the case database.
 
-pub mod collect;
 pub mod division;
 mod types;
 
@@ -18,49 +17,7 @@ use jiff::tz::TimeZone;
 pub use division::{TimeUnit, bins};
 pub use types::{Category, EventType, hsb};
 
-/// Coarse file categories for the File Types filter (Autopsy: Media,
-/// Documents, Executables, Other).
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub enum FileCategory {
-    Media,
-    Documents,
-    Executables,
-    Other,
-}
-
-impl FileCategory {
-    pub const ALL: [Self; 4] = [Self::Media, Self::Documents, Self::Executables, Self::Other];
-
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Media => "Media",
-            Self::Documents => "Documents",
-            Self::Executables => "Executables",
-            Self::Other => "Other",
-        }
-    }
-
-    /// Classifies by extension until MIME detection exists (`pm-filetype`).
-    pub fn from_name(name: &str) -> Self {
-        let ext = name
-            .rsplit_once('.')
-            .map(|(_, e)| e.to_ascii_lowercase())
-            .unwrap_or_default();
-        match ext.as_str() {
-            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tif" | "tiff" | "webp" | "heic" | "heif"
-            | "ico" | "raw" | "cr2" | "nef" | "mp4" | "mov" | "avi" | "mkv" | "wmv" | "flv"
-            | "m4v" | "3gp" | "webm" | "mp3" | "wav" | "flac" | "aac" | "ogg" | "m4a" | "wma" => {
-                Self::Media
-            }
-            "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "pdf" | "txt" | "rtf" | "odt"
-            | "ods" | "odp" | "csv" | "html" | "htm" | "xml" | "json" | "md" | "log" | "eml"
-            | "msg" => Self::Documents,
-            "exe" | "dll" | "sys" | "com" | "scr" | "msi" | "bat" | "cmd" | "ps1" | "vbs"
-            | "elf" | "so" | "dylib" | "app" | "sh" | "bin" => Self::Executables,
-            _ => Self::Other,
-        }
-    }
-}
+pub use pm_index::FileCategory;
 
 /// The thing an event is about (a file today; artifacts later).
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -202,6 +159,41 @@ pub struct Timeline {
 }
 
 impl Timeline {
+    /// File-system events (M, A, B, C) for every indexed file, as Autopsy
+    /// creates at data-source add time. Unset (zero) times produce no event.
+    pub fn from_index(index: &pm_index::FileIndex) -> Self {
+        let mut subjects = Vec::with_capacity(index.files.len());
+        let mut events = Vec::with_capacity(index.files.len() * 4);
+        for f in &index.files {
+            let idx = subjects.len() as u32;
+            let t = f.times;
+            for (time, kind) in [
+                (t.modified, EventType::FileModified),
+                (t.accessed, EventType::FileAccessed),
+                (t.created, EventType::FileCreated),
+                (t.changed, EventType::FileChanged),
+            ] {
+                if let Some(s) = time.map(jiff::Timestamp::as_second).filter(|&s| s != 0) {
+                    events.push(Event {
+                        time: s,
+                        kind,
+                        subject: idx,
+                    });
+                }
+            }
+            subjects.push(Subject {
+                ds: f.ds,
+                fs: f.fs,
+                inode: f.inode,
+                path: Arc::clone(&f.path),
+                deleted: f.deleted(),
+                size: f.size,
+                category: f.category,
+            });
+        }
+        Self::new(events, subjects, index.data_sources.clone())
+    }
+
     /// Builds from unsorted parts (events are sorted here).
     pub fn new(mut events: Vec<Event>, subjects: Vec<Subject>, data_sources: Vec<String>) -> Self {
         events.retain(|e| (e.subject as usize) < subjects.len());
@@ -419,7 +411,7 @@ mod tests {
         };
         assert_eq!(t.count(i64::MIN, i64::MAX, &types), 2);
         let media = Filter {
-            file_categories: [FileCategory::Media].into(),
+            file_categories: [FileCategory::Images].into(),
             ..Filter::default()
         };
         assert_eq!(t.count(i64::MIN, i64::MAX, &media), 1);
@@ -468,14 +460,6 @@ mod tests {
         assert_eq!(web[0].macb(), None);
     }
 
-    #[test]
-    fn file_categories() {
-        assert_eq!(FileCategory::from_name("x.JPG"), FileCategory::Media);
-        assert_eq!(FileCategory::from_name("x.pdf"), FileCategory::Documents);
-        assert_eq!(FileCategory::from_name("x.dll"), FileCategory::Executables);
-        assert_eq!(FileCategory::from_name("Makefile"), FileCategory::Other);
-    }
-
     proptest! {
         #[test]
         fn counts_sum_matches_query(times in proptest::collection::vec(-1_000_000i64..1_000_000, 0..200), start in -1_200_000i64..0, len in 1i64..2_400_000) {
@@ -491,5 +475,62 @@ mod tests {
             let in_bins: u64 = bins.iter().map(Bin::total).sum();
             prop_assert_eq!(in_bins as usize, t.count(first, last, &Filter::default()));
         }
+    }
+}
+
+#[cfg(test)]
+mod index_tests {
+    use super::*;
+    use pm_core::io::MemSource;
+    use pm_testkit::ntfs::{Deleted, FileOpts, NtfsBuilder};
+
+    #[test]
+    fn macb_events_from_index() {
+        let mut b = NtfsBuilder::new(4);
+        b.file("a.txt", b"a");
+        b.file_with(
+            "gone.txt",
+            b"g",
+            FileOpts {
+                deleted: Deleted::Unindexed,
+                ..Default::default()
+            },
+        );
+        let fs: Arc<dyn pm_fs::FileSystem> =
+            Arc::new(pm_fs_ntfs::NtfsFs::open(Arc::new(MemSource::new(b.build()))).unwrap());
+        let idx = pm_index::FileIndex::build(
+            &[pm_index::Source {
+                ds: 0,
+                fs_index: 0,
+                fs,
+            }],
+            vec!["img".into()],
+            &pm_index::Progress::default(),
+        );
+        let t = Timeline::from_index(&idx);
+        let a = t
+            .subjects()
+            .iter()
+            .position(|s| &*s.path == "/a.txt")
+            .unwrap() as u32;
+        let kinds: Vec<_> = t
+            .range(i64::MIN, i64::MAX)
+            .iter()
+            .filter(|e| e.subject == a)
+            .map(|e| e.kind)
+            .collect();
+        assert_eq!(kinds.len(), 4);
+        assert!(
+            t.subjects()
+                .iter()
+                .find(|s| &*s.path == "/gone.txt")
+                .unwrap()
+                .deleted
+        );
+        assert!(
+            t.range(i64::MIN, i64::MAX)
+                .iter()
+                .all(|e| e.time == 1_614_853_230)
+        );
     }
 }

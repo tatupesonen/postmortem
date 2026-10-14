@@ -1,0 +1,22 @@
+[package]
+name = "pm-index"
+description = "File catalogue of all data sources (parallel filesystem walk) feeding postmortem's analysis tools"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-fs.workspace = true
+jiff.workspace = true
+rayon.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+pm-core.workspace = true
+pm-testkit.workspace = true
+pm-fs-ntfs.workspace = true
+rstest.workspace = true
+
+[lints]
+workspace = true

@@ -2,18 +2,17 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::sync::atomic::Ordering;
 
 use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Stroke, StrokeKind, Vec2};
 use egui_extras::{Column, TableBuilder};
 use jiff::tz::TimeZone;
-use pm_timeline::collect::{Progress, Source};
 use pm_timeline::{
     Bin, Category, CountsQuery, DeletedFilter, EventType, FileCategory, Filter, ListRow, TimeUnit,
     Timeline, TypeZoom,
 };
 
 use crate::format::DisplayPrefs;
+use crate::index::SharedIndex;
 use crate::model::{Content, DataSource, FileRow};
 use crate::task::Task;
 use crate::viewers::ViewerPanel;
@@ -75,7 +74,8 @@ fn filter_key(f: &Filter) -> String {
 /// The timeline window's state.
 pub(crate) struct TimelineWindow {
     sources: Vec<DataSource>,
-    building: Option<(Task<Arc<Timeline>>, Arc<Progress>)>,
+    index: SharedIndex,
+    building: Option<Task<Arc<Timeline>>>,
     timeline: Option<Arc<Timeline>>,
     range: (i64, i64),
     filter: Filter,
@@ -93,7 +93,7 @@ pub(crate) struct TimelineWindow {
     viewer: ViewerPanel,
     prefs: DisplayPrefs,
     /// "View in Timeline" requested before events were ready.
-    pending_focus: Option<(i64, i64)>,
+    pending_focus: Option<((i64, i64), Filter)>,
 }
 
 impl std::fmt::Debug for TimelineWindow {
@@ -105,31 +105,12 @@ impl std::fmt::Debug for TimelineWindow {
 }
 
 impl TimelineWindow {
-    /// Starts collecting events from every filesystem of `sources`.
-    pub(crate) fn new(ctx: &egui::Context, sources: Vec<DataSource>, prefs: DisplayPrefs) -> Self {
-        let progress = Arc::new(Progress::default());
-        let p = Arc::clone(&progress);
-        let fs_sources: Vec<Source> = sources
-            .iter()
-            .flat_map(|ds| {
-                ds.evidence
-                    .filesystems
-                    .iter()
-                    .enumerate()
-                    .map(move |(i, f)| Source {
-                        ds: ds.id as u32,
-                        fs_index: i as u32,
-                        fs: Arc::clone(&f.fs),
-                    })
-            })
-            .collect();
-        let names = sources.iter().map(|d| d.name.clone()).collect();
-        let task = Task::spawn(ctx, move || {
-            Arc::new(pm_timeline::collect::collect(&fs_sources, names, &p))
-        });
+    /// Creates the window; events are built once the shared index is ready.
+    pub(crate) fn new(index: SharedIndex, sources: Vec<DataSource>, prefs: DisplayPrefs) -> Self {
         Self {
+            index,
             sources,
-            building: Some((task, progress)),
+            building: None,
             timeline: None,
             range: (0, 1),
             filter: Filter::default(),
@@ -152,10 +133,25 @@ impl TimelineWindow {
     /// Focuses the window on `[t - pad, t + pad]` in list mode ("View in Timeline").
     pub(crate) fn focus(&mut self, t: i64, pad: i64) {
         self.mode = Mode::List;
+        self.show((t - pad, t + pad + 1), self.filter.clone());
+    }
+
+    /// Shows `range` restricted to one data source (Data Source Summary's
+    /// "View in Timeline").
+    pub(crate) fn focus_data_source(&mut self, ds: u32, range: (i64, i64)) {
+        self.mode = Mode::Counts;
+        let filter = Filter {
+            data_sources: [ds].into(),
+            ..Filter::default()
+        };
+        self.show(range, filter);
+    }
+
+    fn show(&mut self, range: (i64, i64), filter: Filter) {
         if self.timeline.is_none() {
-            self.pending_focus = Some((t - pad, t + pad + 1));
+            self.pending_focus = Some((range, filter));
         } else {
-            self.push((t - pad, t + pad + 1), self.filter.clone());
+            self.push(range, filter);
         }
     }
 
@@ -262,26 +258,23 @@ impl TimelineWindow {
     // ------------------------------------------------------------------ UI
 
     pub(crate) fn ui(&mut self, ui: &mut egui::Ui) {
-        if let Some((task, progress)) = &mut self.building {
-            if let Some(t) = task.poll() {
-                let t = Arc::clone(t);
-                self.range = t.span().unwrap_or((0, 1));
-                self.timeline = Some(t);
-                self.building = None;
-                if let Some(r) = self.pending_focus.take() {
-                    self.push(r, self.filter.clone());
-                }
-            } else {
-                let files = progress.files.load(Ordering::Relaxed);
-                ui.vertical_centered(|ui| {
-                    ui.add_space(ui.available_height() / 3.0);
-                    ui.spinner();
-                    ui.heading("Building timeline…");
-                    ui.label(format!("{} files examined", crate::format::grouped(files)));
-                });
-                ui.ctx()
-                    .request_repaint_after(std::time::Duration::from_millis(200));
+        if self.timeline.is_none() {
+            let Some(idx) = self.index.ready_or_progress(ui) else {
                 return;
+            };
+            let task = self.building.get_or_insert_with(|| {
+                Task::spawn(ui.ctx(), move || Arc::new(Timeline::from_index(&idx)))
+            });
+            let Some(t) = task.poll() else {
+                ui.centered_and_justified(egui::Ui::spinner);
+                return;
+            };
+            let t = Arc::clone(t);
+            self.range = t.span().unwrap_or((0, 1));
+            self.timeline = Some(t);
+            self.building = None;
+            if let Some((r, f)) = self.pending_focus.take() {
+                self.push(r, f);
             }
         }
         let Some(timeline) = self.timeline.clone() else {
@@ -894,7 +887,8 @@ mod tests {
     fn timeline_builds_and_lists_events() {
         let (_dir, sources) = demo_sources();
         let ctx = egui::Context::default();
-        let win = TimelineWindow::new(&ctx, sources, DisplayPrefs::default());
+        let index = SharedIndex::build(&ctx, &sources);
+        let win = TimelineWindow::new(index, sources, DisplayPrefs::default());
         let mut h = Harness::builder()
             .with_size(egui::vec2(1300.0, 850.0))
             .build_ui_state(|ui, w: &mut TimelineWindow| w.ui(ui), win);

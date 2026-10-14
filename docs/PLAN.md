@@ -239,8 +239,11 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Timeline remaining: Details view (clustered stripes), artifact events (after M4/M6), tags/hash-hit filters, Add Event, Snapshot report, bottom range-slider histogram
 - [ ] Communications: accounts browser, relationship graph, message/contacts/call-log views, filters
 - [ ] Geolocation: map tiles (online plus offline MBTiles), waypoints/tracks/routes/areas, filters, KML export
-- [ ] Image Gallery: grouping, categories (Project VIC), hash-hit marking, slideshow, thumbnail cache
-- [ ] Discovery (file and domain), Data Source Summary (all tabs)
+- [x] Image Gallery (first cut): folder groups, background-decoded thumbnail grid, deleted marking, viewer + pop-out
+- [ ] Image Gallery remaining: categories (Project VIC), tags, hash-hit marking, slideshow, persisted thumbnail cache, group sorting/seen state
+- [x] Data Source Summary (first cut): Types (pie + counts), Recent Files, Timeline (30-day activity + View in Timeline), Container
+- [ ] Data Source Summary remaining tabs (User Activity, Analysis, Past Cases, Geolocation, Ingest History) after ingest
+- [ ] Discovery (file and domain)
 
 ### M8 — Central repository
 - [ ] `pm-centralrepo`: schema (SQLite and PostgreSQL), correlation types and normalisation, ingest module, notable flagging, Other Occurrences viewer, personas, organisations, Common Properties search, All Cases search, CR hash sets

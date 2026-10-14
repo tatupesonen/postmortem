@@ -63,6 +63,16 @@ impl<T: Send + 'static> Task<T> {
     }
 }
 
+/// Runs `f` on the pool, counted in [`running`] (for fire-and-forget jobs
+/// that publish their own results).
+pub(crate) fn spawn_detached(f: impl FnOnce() + Send + 'static) {
+    RUNNING.fetch_add(1, Ordering::Relaxed);
+    rayon::spawn(move || {
+        f();
+        RUNNING.fetch_sub(1, Ordering::Relaxed);
+    });
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

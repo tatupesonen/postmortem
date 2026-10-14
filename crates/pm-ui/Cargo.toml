@@ -13,6 +13,7 @@ pm-image.workspace = true
 pm-volume.workspace = true
 pm-evidence.workspace = true
 pm-timeline.workspace = true
+pm-index.workspace = true
 egui.workspace = true
 eframe.workspace = true
 egui_extras.workspace = true

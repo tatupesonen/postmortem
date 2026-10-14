@@ -18,6 +18,15 @@ _None._
 
 ## Log
 
+### 2026-10-14 — file index, Data Source Summary, Image Gallery
+- `pm-index`: parallel file catalogue built automatically per data source
+  (it stands in for the case DB's file table). Timeline now builds from it.
+- Data Source Summary in the result pane (Types pie with Autopsy colours,
+  Recent Files, 30-day activity + View in Timeline, Container).
+- Image Gallery window: folder groups, lazily decoded thumbnails, deleted
+  marking, viewer, double-click pop-out. UI tests with screenshots for
+  summary and gallery. Workspace: 219 tests.
+
 ### 2026-10-14 — ext + Timeline
 - `pm-fs-ext` (ext2/3/4) using `fstool` (pinned exact) as the fixture
   writer. Exact `fls` parity on ext2/3/4; wired into `pm-evidence`.

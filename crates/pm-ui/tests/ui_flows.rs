@@ -78,6 +78,15 @@ fn click(h: &mut Harness<'_, PostmortemApp>, label: &str) {
     h.run_steps(2);
 }
 
+/// Clicks the first node whose label is exactly `label`.
+fn click_exact(h: &mut Harness<'_, PostmortemApp>, label: &str) {
+    h.query_all_by_label(label)
+        .next()
+        .unwrap_or_else(|| panic!("no node labelled exactly {label:?}"))
+        .click();
+    h.run_steps(2);
+}
+
 #[test]
 fn empty_state_explains_what_to_do() {
     let mut h = harness(Vec::new());
@@ -94,8 +103,9 @@ fn browse_demo_disk_and_view_picture() {
     });
 
     // Data-source summary is shown first.
-    h.get_by_label_contains("Image format");
-    h.get_by_label_contains("NTFS at offset");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Allocated files").is_some()
+    });
 
     // Expand: data source → NTFS volume → root → Users → alice → Pictures.
     click(&mut h, "demo.dd");
@@ -151,6 +161,29 @@ fn deleted_files_and_metadata_tab() {
             .save(PathBuf::from(dir).join("deleted_metadata.png"))
             .unwrap();
     }
+}
+
+#[test]
+fn data_source_summary_tabs() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    settle(&mut h, |h| !h.state().data_sources().is_empty());
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Allocated files").is_some()
+    });
+    h.get_by_label_contains("Images:");
+    shot(&mut h, "summary_types");
+    click_exact(&mut h, "Recent Files");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Recently Modified Files")
+            .is_some()
+    });
+    click_exact(&mut h, "Timeline");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("View in Timeline").is_some()
+    });
+    shot(&mut h, "summary_timeline");
+    click_exact(&mut h, "Container");
+    h.get_by_label_contains("Image format");
 }
 
 #[test]

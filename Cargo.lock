@@ -3284,6 +3284,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-index"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "pm-core",
+ "pm-fs",
+ "pm-fs-ntfs",
+ "pm-testkit",
+ "rayon",
+ "rstest",
+ "tracing",
+]
+
+[[package]]
 name = "pm-testkit"
 version = "0.1.0"
 dependencies = [
@@ -3303,6 +3317,7 @@ dependencies = [
  "pm-core",
  "pm-fs",
  "pm-fs-ntfs",
+ "pm-index",
  "pm-testkit",
  "proptest",
  "rayon",
@@ -3325,6 +3340,7 @@ dependencies = [
  "pm-evidence",
  "pm-fs",
  "pm-image",
+ "pm-index",
  "pm-testkit",
  "pm-timeline",
  "pm-volume",

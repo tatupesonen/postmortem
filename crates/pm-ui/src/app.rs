@@ -10,7 +10,10 @@ use pm_evidence::OpenOptions;
 use pm_volume::SlotKind;
 
 use crate::format::{DisplayPrefs, size_long};
+use crate::gallery::GalleryWindow;
+use crate::index::SharedIndex;
 use crate::model::{Content, DataSource, FileRow, NodeId, list_dir, list_orphans};
+use crate::summary::{self, SummaryState};
 use crate::table::TableState;
 use crate::task::{self, Task};
 use crate::timeline::TimelineWindow;
@@ -68,6 +71,11 @@ pub struct PostmortemApp {
     wordmark: Option<egui::TextureHandle>,
     timeline: Option<Arc<Mutex<TimelineWindow>>>,
     timeline_closed: Arc<AtomicBool>,
+    gallery: Option<Arc<Mutex<GalleryWindow>>>,
+    gallery_closed: Arc<AtomicBool>,
+    /// File catalogue of all data sources (rebuilt when sources change).
+    index: Option<SharedIndex>,
+    summary: SummaryState,
 }
 
 impl PostmortemApp {
@@ -101,6 +109,10 @@ impl PostmortemApp {
             wordmark: None,
             timeline: None,
             timeline_closed: Arc::new(AtomicBool::new(false)),
+            gallery: None,
+            gallery_closed: Arc::new(AtomicBool::new(false)),
+            index: None,
+            summary: SummaryState::default(),
         };
         app.apply_time_pref();
         for p in open {
@@ -155,6 +167,10 @@ impl PostmortemApp {
                     ds.id = self.sources.len();
                     let id = ds.id;
                     self.sources.push(ds);
+                    self.index = None;
+                    if let Some(tl) = self.timeline.take() {
+                        drop(tl); // rebuilt with the new source on next open
+                    }
                     if self.selected.is_none() {
                         self.navigate(NodeId::DataSource(id));
                     }
@@ -305,6 +321,63 @@ impl PostmortemApp {
         }));
     }
 
+    /// The shared file index, (re)built when the set of data sources changes.
+    fn shared_index(&mut self, ctx: &egui::Context) -> SharedIndex {
+        if let Some(i) = &self.index
+            && i.covers() == self.sources.len()
+        {
+            return i.clone();
+        }
+        let i = SharedIndex::build(ctx, &self.sources);
+        self.index = Some(i.clone());
+        i
+    }
+
+    fn open_gallery(&mut self, ctx: &egui::Context) {
+        if self.sources.is_empty() {
+            self.errors
+                .push("Add a data source before opening the Image Gallery.".into());
+            return;
+        }
+        if self.gallery.is_none() || self.gallery_closed.swap(false, Ordering::Relaxed) {
+            let w = GalleryWindow::new(
+                self.shared_index(ctx),
+                self.sources.clone(),
+                self.prefs.clone(),
+            );
+            self.gallery = Some(Arc::new(Mutex::new(w)));
+        }
+        ctx.send_viewport_cmd_to(
+            egui::ViewportId::from_hash_of("gallery"),
+            egui::ViewportCommand::Focus,
+        );
+    }
+
+    fn show_gallery(&mut self, ctx: &egui::Context) {
+        if self.gallery_closed.swap(false, Ordering::Relaxed) {
+            self.gallery = None;
+        }
+        let Some(g) = self.gallery.clone() else {
+            return;
+        };
+        if let Some(c) = g.lock().popout.take() {
+            self.open_popout(c);
+        }
+        let closed = Arc::clone(&self.gallery_closed);
+        ctx.show_viewport_deferred(
+            egui::ViewportId::from_hash_of("gallery"),
+            egui::ViewportBuilder::default()
+                .with_title("Image Gallery — postmortem")
+                .with_inner_size([1300.0, 850.0]),
+            move |ui, _| {
+                g.lock().ui(ui);
+                if ui.ctx().input(|i| i.viewport().close_requested()) {
+                    closed.store(true, Ordering::Relaxed);
+                }
+            },
+        );
+    }
+
     /// Opens (or focuses) the Timeline window, building events if needed.
     fn open_timeline(&mut self, ctx: &egui::Context) -> Option<Arc<Mutex<TimelineWindow>>> {
         if self.sources.is_empty() {
@@ -314,7 +387,7 @@ impl PostmortemApp {
         }
         if self.timeline.is_none() || self.timeline_closed.swap(false, Ordering::Relaxed) {
             self.timeline = Some(Arc::new(Mutex::new(TimelineWindow::new(
-                ctx,
+                self.shared_index(ctx),
                 self.sources.clone(),
                 self.prefs.clone(),
             ))));
@@ -443,6 +516,16 @@ impl PostmortemApp {
                     self.open_timeline(ui.ctx());
                     ui.close();
                 }
+                if ui
+                    .add_enabled(
+                        !self.sources.is_empty(),
+                        egui::Button::new("🖼 Image Gallery"),
+                    )
+                    .clicked()
+                {
+                    self.open_gallery(ui.ctx());
+                    ui.close();
+                }
             });
             ui.menu_button("Window", |ui| {
                 let content = self.viewer.content().cloned();
@@ -510,6 +593,13 @@ impl PostmortemApp {
             {
                 self.open_timeline(ui.ctx());
             }
+            if ui
+                .add_enabled(!self.sources.is_empty(), egui::Button::new("🖼 Gallery"))
+                .on_hover_text("Open the Image Gallery (Tools › Image Gallery)")
+                .clicked()
+            {
+                self.open_gallery(ui.ctx());
+            }
             ui.separator();
             let has = self.viewer.content().is_some();
             if ui
@@ -526,6 +616,11 @@ impl PostmortemApp {
     fn status_bar(&self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             ui.label(format!("{} data source(s)", self.sources.len()));
+            if let Some(n) = self.index.as_ref().and_then(SharedIndex::building_count) {
+                ui.separator();
+                ui.spinner();
+                ui.label(format!("Indexing: {} files", crate::format::grouped(n)));
+            }
             let running = task::running();
             if running > 0 {
                 ui.separator();
@@ -806,61 +901,18 @@ impl PostmortemApp {
     }
 
     fn data_source_summary(&mut self, ui: &mut egui::Ui, ds: usize) {
-        let Some(d) = self.sources.get(ds) else {
+        let Some(d) = self.sources.get(ds).cloned() else {
             return;
         };
-        let info = &d.evidence.image.info;
-        ui.heading(&d.name);
-        egui::Grid::new("ds-summary")
-            .num_columns(2)
-            .striped(true)
-            .spacing([24.0, 4.0])
-            .show(ui, |ui| {
-                let mut kv = |k: &str, v: String| {
-                    ui.strong(k);
-                    ui.add(egui::Label::new(v).selectable(true));
-                    ui.end_row();
-                };
-                kv("Image format", info.format.to_string());
-                kv("Size", size_long(info.size));
-                kv("Sector size", info.sector_size.to_string());
-                for (i, p) in info.paths.iter().enumerate() {
-                    kv(
-                        if i == 0 { "Segments" } else { "" },
-                        p.display().to_string(),
-                    );
+        let index = self.shared_index(ui.ctx());
+        match self.summary.ui(ui, &d, &index, &self.prefs) {
+            Some(summary::Action::ShowFile(c)) => self.viewer.set_content(Some(*c)),
+            Some(summary::Action::ViewInTimeline { ds, range }) => {
+                if let Some(tl) = self.open_timeline(ui.ctx()) {
+                    tl.lock().focus_data_source(ds, range);
                 }
-                for (algo, h) in &info.stored_hashes {
-                    kv(&format!("Stored {algo:?}"), h.clone());
-                }
-                for (k, v) in &info.metadata {
-                    kv(k, v.clone());
-                }
-                kv(
-                    "Volume system",
-                    d.evidence.volume_system.as_ref().map_or_else(
-                        || "None (single volume)".to_owned(),
-                        |v| format!("{} ({} partitions)", v.kind, v.allocated().count()),
-                    ),
-                );
-                for f in &d.evidence.filesystems {
-                    let i = f.fs.info();
-                    kv(
-                        "File system",
-                        format!(
-                            "{} at offset {} — label {:?}, serial {}",
-                            i.kind,
-                            f.offset,
-                            i.label.as_deref().unwrap_or(""),
-                            i.serial.as_deref().unwrap_or("")
-                        ),
-                    );
-                }
-            });
-        if let Some(vs) = &d.evidence.volume_system {
-            for w in &vs.warnings {
-                ui.colored_label(ui.visuals().warn_fg_color, w);
             }
+            None => {}
         }
     }
 
@@ -991,6 +1043,10 @@ impl PostmortemApp {
     pub fn frame(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         self.poll_loading();
+        if !self.sources.is_empty() {
+            // Index eagerly so analysis tools open instantly.
+            self.shared_index(&ctx);
+        }
         self.shortcuts(&ctx);
         egui::Panel::top("menu").show(ui, |ui| {
             self.menu_bar(ui);
@@ -1018,6 +1074,7 @@ impl PostmortemApp {
         egui::CentralPanel::default().show(ui, |ui| self.results(ui));
         self.popouts(&ctx);
         self.show_timeline(&ctx);
+        self.show_gallery(&ctx);
         self.dialogs(&ctx);
         self.persisted.table = self.table.clone();
     }
