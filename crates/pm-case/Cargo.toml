@@ -1,0 +1,33 @@
+[package]
+name = "pm-case"
+description = "postmortem cases: case folders, data-source loading into the case database, content access"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+pm-fs.workspace = true
+pm-image.workspace = true
+pm-volume.workspace = true
+pm-evidence.workspace = true
+pm-casedb.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+jiff.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+crossbeam-channel.workspace = true
+parking_lot.workspace = true
+rayon.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+
+[dev-dependencies]
+pm-testkit.workspace = true
+tempfile.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

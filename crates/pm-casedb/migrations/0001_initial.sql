@@ -112,6 +112,7 @@ CREATE INDEX files_mtime   ON files(mtime);
 CREATE INDEX files_size    ON files(size) WHERE kind = 1;
 CREATE INDEX files_deleted ON files(ds_id) WHERE name_alloc = 0 OR meta_alloc = 0;
 CREATE INDEX files_inode   ON files(fs_id, inode);
+CREATE INDEX files_derived ON files(derived_from) WHERE derived_from IS NOT NULL;
 
 CREATE TABLE artifact_types (
     id           INTEGER PRIMARY KEY,

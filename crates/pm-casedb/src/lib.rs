@@ -220,6 +220,22 @@ impl CaseDb {
         })
     }
 
+    pub fn data_source(&self, id: i64) -> Result<Option<DataSourceRecord>> {
+        self.read(|c| {
+            Ok(c
+                .query_row("SELECT id, name, kind, paths, size, sector_size, timezone, image_format, md5, sha1, sha256, acquisition, added_at FROM data_sources WHERE id = ?1", [id], DataSourceRecord::from_row)
+                .optional()?)
+        })
+    }
+
+    pub fn file_system(&self, id: i64) -> Result<Option<FileSystemRecord>> {
+        self.read(|c| {
+            Ok(c
+                .query_row("SELECT id, ds_id, volume_id, kind, byte_offset, block_size, block_count, root_inode, label, serial FROM file_systems WHERE id = ?1", [id], FileSystemRecord::from_row)
+                .optional()?)
+        })
+    }
+
     pub fn file_systems(&self, ds_id: i64) -> Result<Vec<FileSystemRecord>> {
         self.read(|c| {
             let mut st = c.prepare("SELECT id, ds_id, volume_id, kind, byte_offset, block_size, block_count, root_inode, label, serial FROM file_systems WHERE ds_id = ?1 ORDER BY id")?;
@@ -240,16 +256,46 @@ impl CaseDb {
     }
 
     /// Removes a data source and everything derived from it.
+    ///
+    /// Foreign-key enforcement is suspended and dependents are deleted
+    /// explicitly, child-first: with enforcement on, every deleted file row
+    /// would probe each referencing column, which is quadratic while the
+    /// secondary indexes are deferred (e.g. when a load is cancelled).
     pub fn delete_data_source(&self, ds_id: i64) -> Result<()> {
+        let mut conn = self.writer.lock();
+        conn.pragma_update(None, "foreign_keys", "OFF")?;
+        let out = (|| -> Result<()> {
+            let tx = conn.transaction()?;
+            for sql in [
+                "DELETE FROM attributes WHERE artifact_id IN (SELECT id FROM artifacts WHERE ds_id = ?1)",
+                "DELETE FROM artifact_tags WHERE artifact_id IN (SELECT id FROM artifacts WHERE ds_id = ?1)",
+                "DELETE FROM artifacts WHERE ds_id = ?1",
+                "DELETE FROM file_tags WHERE file_id IN (SELECT id FROM files WHERE ds_id = ?1)",
+                "DELETE FROM files WHERE ds_id = ?1",
+                "DELETE FROM file_systems WHERE ds_id = ?1",
+                "DELETE FROM volumes WHERE vs_id IN (SELECT id FROM volume_systems WHERE ds_id = ?1)",
+                "DELETE FROM volume_systems WHERE ds_id = ?1",
+                "DELETE FROM ingest_job_modules WHERE job_id IN (SELECT id FROM ingest_jobs WHERE ds_id = ?1)",
+                "DELETE FROM ingest_jobs WHERE ds_id = ?1",
+                "DELETE FROM data_sources WHERE id = ?1",
+            ] {
+                tx.execute(sql, [ds_id])?;
+            }
+            tx.commit()?;
+            Ok(())
+        })();
+        conn.pragma_update(None, "foreign_keys", "ON")?;
+        out
+    }
+
+    /// Updates the image paths of a data source (evidence moved).
+    pub fn set_data_source_paths(&self, ds_id: i64, paths: &[String]) -> Result<()> {
+        let json = serde_json::to_string(paths).map_err(|e| DbError::Invalid(e.to_string()))?;
         self.write(|tx| {
-            // Explicit child-first deletes avoid deep cascade recursion.
-            tx.execute("DELETE FROM attributes WHERE artifact_id IN (SELECT id FROM artifacts WHERE ds_id = ?1)", [ds_id])?;
-            tx.execute("DELETE FROM artifact_tags WHERE artifact_id IN (SELECT id FROM artifacts WHERE ds_id = ?1)", [ds_id])?;
-            tx.execute("DELETE FROM artifacts WHERE ds_id = ?1", [ds_id])?;
-            tx.execute("DELETE FROM file_tags WHERE file_id IN (SELECT id FROM files WHERE ds_id = ?1)", [ds_id])?;
-            tx.execute("UPDATE files SET parent_id = NULL, derived_from = NULL WHERE ds_id = ?1", [ds_id])?;
-            tx.execute("DELETE FROM files WHERE ds_id = ?1", [ds_id])?;
-            tx.execute("DELETE FROM data_sources WHERE id = ?1", [ds_id])?;
+            tx.execute(
+                "UPDATE data_sources SET paths = ?2 WHERE id = ?1",
+                params![ds_id, json],
+            )?;
             Ok(())
         })
     }
@@ -778,6 +824,10 @@ const FILE_INDEXES: &[(&str, &str)] = &[
         "ON files(ds_id) WHERE name_alloc = 0 OR meta_alloc = 0",
     ),
     ("files_inode", "ON files(fs_id, inode)"),
+    (
+        "files_derived",
+        "ON files(derived_from) WHERE derived_from IS NOT NULL",
+    ),
 ];
 
 const INSERT_FILE: &str = "INSERT INTO files (ds_id, fs_id, parent_id, origin, inode, stream, name, parent_path, kind, name_alloc, meta_alloc, meta_flags, size, \
