@@ -122,7 +122,7 @@ impl FileRow {
 }
 
 fn row_for(fs: &dyn FileSystem, e: &pm_fs::DirEntry, parent: &str) -> Vec<FileRow> {
-    let meta = fs.metadata(e.inode).ok();
+    let meta = pm_fs::entry_metadata(fs, e).ok();
     let path = if parent.ends_with('/') {
         format!("{parent}{}", e.name)
     } else {

@@ -218,22 +218,39 @@ fn rows_match_a_reference_walk() {
             .filter(|f| !f.parent_path.starts_with("/$OrphanFiles/"))
             .map(|f| (f.path(), f))
             .collect();
+        let stream_paths: HashSet<String> = files
+            .iter()
+            .filter(|f| f.fs_id == Some(fs_id) && f.stream.is_some())
+            .map(FileRecord::path)
+            .collect();
         let mut seen = 0usize;
         walk(&*found.fs, &WalkOptions::default(), |item| {
             let path = item.path();
-            let row = rows
-                .get(&path)
-                .unwrap_or_else(|| panic!("{path} missing from case"));
+            let Some(row) = rows.get(&path) else {
+                // A file with only named streams is listed as `name:stream`.
+                assert!(
+                    stream_paths
+                        .iter()
+                        .any(|p| p.starts_with(&format!("{path}:"))),
+                    "{path} missing from case"
+                );
+                return ControlFlow::Continue(());
+            };
             assert_eq!(row.inode, Some(item.entry.inode), "{path}");
             assert_eq!(row.name_alloc, item.entry.allocated, "{path}");
-            let m = item.meta.as_ref().unwrap();
-            assert_eq!(row.size, m.size, "{path}");
-            assert_eq!(row.meta_alloc, m.is_allocated(), "{path}");
-            assert_eq!(
-                row.times[0].map(|t| t.0),
-                m.times.modified.map(jiff::Timestamp::as_second),
-                "{path}"
-            );
+            match item.meta.as_ref() {
+                Ok(m) => {
+                    assert_eq!(row.size, m.size, "{path}");
+                    assert_eq!(row.meta_alloc, m.is_allocated(), "{path}");
+                    assert_eq!(
+                        row.times[0].map(|t| t.0),
+                        m.times.modified.map(jiff::Timestamp::as_second),
+                        "{path}"
+                    );
+                }
+                // Metadata detached (reused entry): name only.
+                Err(_) => assert!(!row.meta_alloc && row.size == 0, "{path}"),
+            }
             seen += 1;
             ControlFlow::Continue(())
         });
@@ -678,4 +695,69 @@ fn load_rate() {
     );
     let size = std::fs::metadata(db.path()).unwrap().len();
     eprintln!("database size {:.1} MB", size as f64 / 1e6);
+}
+
+// ------------------------------------------------- real evidence vs. TSK
+
+/// Loads a real disk image (path in `PM_REAL_DISK`, e.g. the NIST "Hacking
+/// Case" `4Dell Latitude CPi.E01`) and requires every name of every file
+/// system to match `fls -r -p` on path, metadata address and allocation.
+/// Skipped when the variable is unset or TSK is not installed.
+#[test]
+fn real_disk_matches_tsk() {
+    use std::collections::BTreeMap;
+
+    let Some(image) = std::env::var_os("PM_REAL_DISK").map(PathBuf::from) else {
+        eprintln!("PM_REAL_DISK not set; skipping");
+        return;
+    };
+    if pm_testkit::tsk::tool("fls").is_none() {
+        eprintln!("fls not installed; skipping");
+        return;
+    }
+    let tmp = tempfile::tempdir().unwrap();
+    let case = Case::create(tmp.path().join("case"), details()).unwrap();
+    let s = add_image(
+        &case,
+        &image,
+        &LoadOptions::default(),
+        &LoadProgress::default(),
+    )
+    .unwrap();
+    let files = all_files(&case, s.ds_id);
+    for fs in case.db().file_systems(s.ds_id).unwrap() {
+        let tsk = pm_testkit::tsk::fls(&image, fs.byte_offset / 512).unwrap();
+        // (path, address, allocated) → count
+        let mut want: BTreeMap<(String, u64, bool), i32> = BTreeMap::new();
+        // TSK's `$OrphanFiles` directory has a synthetic address; ours is a
+        // virtual-directory row.
+        for r in tsk.iter().filter(|r| r.path != "$OrphanFiles") {
+            let addr = r.inode.split('-').next().unwrap().parse().unwrap();
+            *want.entry((r.path.clone(), addr, !r.deleted)).or_default() += 1;
+        }
+        let mut got: BTreeMap<(String, u64, bool), i32> = BTreeMap::new();
+        for f in files.iter().filter(|f| {
+            f.fs_id == Some(fs.id) && f.origin == Origin::FileSystem && f.parent_id.is_some()
+        }) {
+            let path = f.path().trim_start_matches('/').to_owned();
+            *got.entry((path, f.inode.unwrap(), f.name_alloc))
+                .or_default() += 1;
+        }
+        let missing: Vec<_> = want
+            .iter()
+            .filter(|(k, n)| got.get(k) != Some(n))
+            .take(20)
+            .collect();
+        let extra: Vec<_> = got
+            .iter()
+            .filter(|(k, n)| want.get(k) != Some(n))
+            .take(20)
+            .collect();
+        assert!(
+            missing.is_empty() && extra.is_empty(),
+            "fs at {}: TSK-only {missing:#?}\nours-only {extra:#?}",
+            fs.byte_offset
+        );
+        eprintln!("fs at {}: {} names match TSK", fs.byte_offset, want.len());
+    }
 }

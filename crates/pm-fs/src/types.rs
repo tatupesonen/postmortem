@@ -185,6 +185,9 @@ pub enum StreamKind {
     ResourceFork,
     /// Extended attribute exposed as content.
     ExtendedAttribute,
+    /// A named NTFS index other than `$I30` (`$Secure:$SDH`,
+    /// `$Extend/$Quota:$O`); content is the index root.
+    Index,
 }
 
 /// Describes one content stream of an inode.

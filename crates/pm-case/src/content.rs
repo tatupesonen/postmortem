@@ -5,7 +5,7 @@ use std::sync::Arc;
 use pm_casedb::{FileRecord, Origin};
 use pm_core::SharedSource;
 use pm_core::io::{FileSource, MemSource};
-use pm_fs::{Extent, ExtentKind, ExtentSource};
+use pm_fs::{Extent, ExtentKind, ExtentSource, MetaFlags};
 
 use crate::{Case, CaseError, Result, io_err};
 
@@ -33,6 +33,14 @@ impl Case {
                 let inode = f
                     .inode
                     .ok_or_else(|| CaseError::NotFound(format!("inode of file {}", f.id)))?;
+                // A name whose metadata is gone (address 0, or the entry
+                // was reused by another file) has no recoverable content;
+                // reading the inode would return the *other* file's data.
+                let no_meta =
+                    !f.meta_alloc && f.meta_flags & u32::from(MetaFlags::USED.bits()) == 0;
+                if no_meta && f.stream.is_none() {
+                    return Ok(Arc::new(MemSource::new(Vec::new())));
+                }
                 Ok(self.filesystem(fs_id)?.open(inode, f.stream)?)
             }
             Origin::UnallocBlocks | Origin::Carved => {

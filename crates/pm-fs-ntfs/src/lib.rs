@@ -279,7 +279,7 @@ impl NtfsFs {
         f.attrs
             .iter()
             .find(|a| {
-                a.ty == ATTR_DATA
+                (a.ty == ATTR_DATA || (stream.is_some() && is_named_index(a)))
                     && match stream {
                         None => a.name.is_none(),
                         Some(id) => u32::from(a.id) == id,
@@ -338,7 +338,12 @@ impl NtfsFs {
             .and_then(Attr::resident)
             .ok_or(FsError::NotADirectory(f.rec.number))?;
         let block_size = root.u32_le(8).map_or(self.boot.index_record_size, |s| s);
-        index::parse_node(root, 16, &mut out);
+        let ctx = index::NodeCtx {
+            dir: f.rec.number,
+            last_inum: self.mft_records.saturating_sub(1),
+            deleted: false,
+        };
+        index::parse_node(root, 16, ctx, &mut out);
         if let Some(alloc) = f.attr(ATTR_INDEX_ALLOCATION, Some(I30)) {
             let bytes = Self::read_attr(&self.src, &self.boot, alloc)?;
             let bitmap = f
@@ -355,18 +360,21 @@ impl NtfsFs {
                     continue;
                 }
                 let in_use = bitmap.get(k / 8).is_some_and(|b| b & (1 << (k % 8)) != 0);
-                let before = out.len();
-                index::parse_node(&block, 24, &mut out);
-                if !in_use {
-                    // Everything in an unused INDX block is a remnant.
-                    for e in out.get_mut(before..).unwrap_or_default() {
-                        e.from_slack = true;
-                    }
-                }
+                // Everything in an unused INDX block is a remnant.
+                let ctx = index::NodeCtx {
+                    deleted: !in_use,
+                    ..ctx
+                };
+                index::parse_node(&block, 24, ctx, &mut out);
             }
         }
         Ok(out)
     }
+}
+
+/// A named index other than the directory index (`$Secure:$SDH`).
+fn is_named_index(a: &Attr) -> bool {
+    a.ty == ATTR_INDEX_ROOT && a.name.as_deref().is_some_and(|n| n != "$I30")
 }
 
 /// Joins fragments of the same non-resident attribute (split across
@@ -474,6 +482,21 @@ impl FileSystem for NtfsFs {
         Ok(m)
     }
 
+    /// TSK's rule: NTFS increments an MFT entry's sequence number when it
+    /// is freed, so a deleted record matches a name carrying the previous
+    /// sequence; any other mismatch means the entry was reused.
+    fn name_matches_meta(&self, entry: &DirEntry, meta: &Metadata) -> bool {
+        let (Some(name_seq), Some(seq)) = (entry.seq, meta.seq) else {
+            return true;
+        };
+        let expected = if meta.is_allocated() {
+            seq
+        } else {
+            seq.saturating_sub(1)
+        };
+        name_seq == expected
+    }
+
     fn read_dir(&self, inode: InodeId) -> Result<Vec<DirEntry>> {
         let dir = self.file(inode)?;
         if !dir.rec.is_dir {
@@ -516,7 +539,9 @@ impl FileSystem for NtfsFs {
                     name: fname.name.clone(),
                     short_name: None,
                     inode: *child,
-                    seq: Some(u32::from(*child_seq)),
+                    // The record's sequence was bumped when it was freed;
+                    // the name refers to the one before (as TSK reports).
+                    seq: Some(u32::from(child_seq.saturating_sub(1))),
                     kind: if is_dir {
                         FileKind::Directory
                     } else {
@@ -533,11 +558,13 @@ impl FileSystem for NtfsFs {
         let f = self.file(inode)?;
         Ok(f.attrs
             .iter()
-            .filter(|a| a.ty == ATTR_DATA)
+            .filter(|a| a.ty == ATTR_DATA || is_named_index(a))
             .map(|a| StreamInfo {
                 id: u32::from(a.id),
                 name: a.name.clone(),
-                kind: if a.name.is_some() {
+                kind: if a.ty == ATTR_INDEX_ROOT {
+                    StreamKind::Index
+                } else if a.name.is_some() {
                     StreamKind::AlternateData
                 } else {
                     StreamKind::Data
@@ -616,7 +643,8 @@ impl FileSystem for NtfsFs {
                     name: fname.name.clone(),
                     short_name: None,
                     inode: *child,
-                    seq: Some(u32::from(*seq)),
+                    // Freed records carry the next sequence (see TSK).
+                    seq: Some(u32::from(seq.saturating_sub(1))),
                     kind: if is_dir {
                         FileKind::Directory
                     } else {

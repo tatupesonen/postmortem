@@ -15,7 +15,7 @@
 //! * Cancelling or failing removes the partially added data source, as
 //!   Autopsy reverts a cancelled "Add Data Source".
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
@@ -26,6 +26,7 @@ use pm_casedb::{
     CaseDb, DataSourceKind, FileKindCode, NewDataSource, NewFile, NewFileSystem, NewVolume, Origin,
 };
 use pm_evidence::Evidence;
+use pm_fs::walk::{Ancestors, MAX_LISTINGS_PER_DIR};
 use pm_fs::{DirEntry, FileKind, FileSystem, FsError, FsKind, InodeId, Metadata, StreamKind};
 use pm_image::HashAlgo;
 use pm_volume::{SlotKind, VsKind};
@@ -289,6 +290,8 @@ struct Dir {
     /// Path of the directory, `/`-terminated (its children's `parent_path`).
     path: Arc<str>,
     depth: usize,
+    /// Directories from the root to this one (cycle detection).
+    ancestors: Arc<Ancestors>,
 }
 
 /// State shared by the walkers of one file system.
@@ -299,7 +302,9 @@ struct Walk<'a> {
     next_id: &'a AtomicI64,
     tx: Sender<Vec<NewFile>>,
     progress: &'a LoadProgress,
-    visited: Vec<Mutex<HashSet<InodeId>>>,
+    /// Times each directory has been listed (capped, see
+    /// [`MAX_LISTINGS_PER_DIR`]).
+    listings: Vec<Mutex<HashMap<InodeId, u8>>>,
     warnings: Mutex<Vec<String>>,
     /// Whether to look for alternate data streams.
     streams: bool,
@@ -316,11 +321,18 @@ impl Walk<'_> {
         self.progress.is_cancelled() || self.failed.load(Ordering::Relaxed)
     }
 
-    fn first_visit(&self, inode: InodeId) -> bool {
+    /// Whether `inode` may be listed once more (TSK lists a directory under
+    /// every name that reaches it; the cap stops crafted lattices).
+    fn may_list(&self, inode: InodeId) -> bool {
         let shard = (inode.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 58) as usize % VISITED_SHARDS;
-        self.visited
-            .get(shard)
-            .is_some_and(|s| s.lock().insert(inode))
+        self.listings.get(shard).is_some_and(|s| {
+            let mut s = s.lock();
+            let n = s.entry(inode).or_default();
+            *n < MAX_LISTINGS_PER_DIR && {
+                *n += 1;
+                true
+            }
+        })
     }
 
     fn send(&self, rows: Vec<NewFile>) {
@@ -357,22 +369,30 @@ impl Walk<'_> {
         let mut rows = Vec::with_capacity(entries.len());
         let mut subdirs = Vec::new();
         for e in entries {
-            let meta = self.fs.metadata(e.inode);
+            let meta = pm_fs::entry_metadata(self.fs, &e);
             let id = self.id();
-            let is_dir = matches!(&meta, Ok(m) if m.kind == FileKind::Directory);
-            if is_dir && parent.depth < MAX_DEPTH && self.first_visit(e.inode) {
+            let descend = matches!(&meta, Ok(m) if pm_fs::should_descend(&e, m));
+            if descend
+                && parent.depth < MAX_DEPTH
+                && !parent.ancestors.contains(e.inode)
+                && self.may_list(e.inode)
+            {
                 subdirs.push(Dir {
                     inode: e.inode,
                     id,
                     path: Arc::from(format!("{}{}/", parent.path, e.name)),
                     depth: parent.depth + 1,
+                    ancestors: parent.ancestors.child(e.inode),
                 });
             }
             let row = self.row(id, parent, &e, &meta);
+            let mut keep_base = true;
             if self.streams && meta.is_ok() {
-                self.stream_rows(&row, &mut rows);
+                keep_base = self.stream_rows(&row, &mut rows);
             }
-            rows.push(row);
+            if keep_base {
+                rows.push(row);
+            }
         }
         self.send(rows);
         for d in subdirs {
@@ -418,12 +438,19 @@ impl Walk<'_> {
         f
     }
 
-    /// Alternate data streams appear as sibling rows named `file:stream`.
-    fn stream_rows(&self, file: &NewFile, out: &mut Vec<NewFile>) {
-        let Some(inode) = file.inode else { return };
-        let Ok(streams) = self.fs.streams(inode) else {
-            return;
+    /// Named streams appear as sibling rows named `file:stream` (alternate
+    /// data streams and named NTFS indexes). Returns whether the plain
+    /// name gets a row too: like TSK, not for a non-directory that has only
+    /// named streams (`$Secure` → `$Secure:$SDS`, `:$SDH`, `:$SII`).
+    fn stream_rows(&self, file: &NewFile, out: &mut Vec<NewFile>) -> bool {
+        let Some(inode) = file.inode else {
+            return true;
         };
+        let Ok(streams) = self.fs.streams(inode) else {
+            return true;
+        };
+        let has_default = streams.iter().any(|s| s.kind == StreamKind::Data);
+        let mut named = 0;
         for s in streams.into_iter().filter(|s| s.kind != StreamKind::Data) {
             let mut r = file.clone();
             r.id = Some(self.id());
@@ -432,7 +459,9 @@ impl Walk<'_> {
             r.kind = FileKindCode::Regular;
             r.size = s.size;
             out.push(r);
+            named += 1;
         }
+        has_default || named == 0 || file.kind == FileKindCode::Directory
     }
 }
 
@@ -557,8 +586,8 @@ fn load_files(
                 next_id: &next_id,
                 tx: tx.clone(),
                 progress,
-                visited: (0..VISITED_SHARDS)
-                    .map(|_| Mutex::new(HashSet::new()))
+                listings: (0..VISITED_SHARDS)
+                    .map(|_| Mutex::new(HashMap::new()))
                     .collect(),
                 warnings: Mutex::new(Vec::new()),
                 streams: info.kind == FsKind::Ntfs,
@@ -595,6 +624,7 @@ fn load_fs(
         id: walk.id(),
         path: Arc::from("/"),
         depth: 0,
+        ancestors: Ancestors::root(root_inode),
     };
     let root_entry = DirEntry {
         name: String::new(),
@@ -608,7 +638,6 @@ fn load_fs(
     let mut root_row = walk.row(root_id, &root, &root_entry, &fs.metadata(root_inode));
     root_row.parent_id = None;
     walk.send(vec![root_row]);
-    walk.first_visit(root_inode);
     pool.scope(|s| walk.list(&root, s));
 
     let is_fat = matches!(info.kind, FsKind::Fat12 | FsKind::Fat16 | FsKind::Fat32);
@@ -617,6 +646,7 @@ fn load_fs(
         id: root_id,
         path: Arc::from("/"),
         depth: 0,
+        ancestors: Ancestors::root(root_inode),
     };
     if !walk.stopped() && (!is_fat || opts.fat_orphans) {
         progress.set_stage(format!("Finding orphan files on {}", info.kind));
@@ -625,6 +655,7 @@ fn load_fs(
             id: walk.id(),
             path: Arc::from("/$OrphanFiles/"),
             depth: 1,
+            ancestors: Ancestors::root(InodeId::MAX),
         };
         walk.send(vec![virtual_dir(
             orphan_dir.id,
@@ -647,6 +678,7 @@ fn load_fs(
                     id: walk.id(),
                     path: Arc::from("/$Unalloc/"),
                     depth: 1,
+                    ancestors: Ancestors::root(InodeId::MAX),
                 };
                 let mut rows = vec![virtual_dir(
                     dir.id, walk.ds_id, walk.fs_id, &root_dir, "$Unalloc",

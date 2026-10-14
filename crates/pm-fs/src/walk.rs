@@ -5,11 +5,11 @@
 //! …). The walker visits every directory inode at most once and caps depth,
 //! so traversal always terminates.
 
-use std::collections::HashSet;
+use std::collections::HashMap;
 use std::ops::ControlFlow;
 use std::sync::Arc;
 
-use crate::{DirEntry, FileKind, FileSystem, FsError, InodeId, Metadata};
+use crate::{DirEntry, FileSystem, FsError, InodeId, Metadata};
 
 /// Traversal options.
 #[derive(Debug, Clone)]
@@ -69,8 +69,53 @@ pub struct WalkStats {
     pub warnings: Vec<WalkWarning>,
 }
 
+/// How many times one directory may be listed in a single walk. TSK only
+/// guards against cycles on the current path, so a directory reachable
+/// through several names is listed under each; the cap keeps crafted
+/// images (a lattice of directories) from exploding.
+pub const MAX_LISTINGS_PER_DIR: u8 = 8;
+
+/// Directories on the path from the root to the current one.
+#[derive(Debug)]
+pub struct Ancestors {
+    inode: InodeId,
+    parent: Option<Arc<Ancestors>>,
+}
+
+impl Ancestors {
+    pub fn root(inode: InodeId) -> Arc<Self> {
+        Arc::new(Self {
+            inode,
+            parent: None,
+        })
+    }
+
+    pub fn child(self: &Arc<Self>, inode: InodeId) -> Arc<Self> {
+        Arc::new(Self {
+            inode,
+            parent: Some(Arc::clone(self)),
+        })
+    }
+
+    /// Whether `inode` is this directory or one of its ancestors.
+    pub fn contains(&self, inode: InodeId) -> bool {
+        let mut cur = Some(self);
+        while let Some(a) = cur {
+            if a.inode == inode {
+                return true;
+            }
+            cur = a.parent.as_deref();
+        }
+        false
+    }
+}
+
 /// Visits every name reachable from the root, depth-first (pre-order),
 /// calling `visit` for each. Returning `ControlFlow::Break` stops the walk.
+///
+/// Follows TSK's rules: metadata comes from [`crate::entry_metadata`],
+/// directories are entered per [`crate::should_descend`], and a directory
+/// already on the current path is a cycle.
 pub fn walk(
     fs: &dyn FileSystem,
     opts: &WalkOptions,
@@ -78,11 +123,12 @@ pub fn walk(
 ) -> WalkStats {
     let mut stats = WalkStats::default();
     let root = fs.root();
-    let mut visited: HashSet<InodeId> = HashSet::from([root]);
-    // Stack of (dir inode, dir path, depth).
-    let mut stack: Vec<(InodeId, Arc<str>, usize)> = vec![(root, Arc::from("/"), 0)];
+    let mut listings: HashMap<InodeId, u8> = HashMap::new();
+    // Stack of (dir inode, dir path, depth, path from the root).
+    let mut stack: Vec<(InodeId, Arc<str>, usize, Arc<Ancestors>)> =
+        vec![(root, Arc::from("/"), 0, Ancestors::root(root))];
 
-    while let Some((dir, dir_path, depth)) = stack.pop() {
+    while let Some((dir, dir_path, depth, ancestors)) = stack.pop() {
         stats.directories += 1;
         let entries = match fs.read_dir(dir) {
             Ok(e) => e,
@@ -97,11 +143,7 @@ pub fn walk(
         };
         let mut subdirs = Vec::new();
         for entry in entries {
-            let meta = fs.metadata(entry.inode);
-            let is_dir = match &meta {
-                Ok(m) => m.kind == FileKind::Directory,
-                Err(_) => entry.kind == FileKind::Directory,
-            };
+            let meta = crate::entry_metadata(fs, &entry);
             let item = WalkItem {
                 parent_path: Arc::clone(&dir_path),
                 parent_inode: dir,
@@ -113,15 +155,24 @@ pub fn walk(
             if visit(&item).is_break() {
                 return stats;
             }
-            let descend = is_dir
-                && item.meta.is_ok()
+            let descend = item
+                .meta
+                .as_ref()
+                .is_ok_and(|m| crate::should_descend(&item.entry, m))
                 && (item.entry.allocated || opts.descend_deleted_dirs)
                 && depth < opts.max_depth;
             if descend {
-                if visited.insert(item.entry.inode) {
-                    subdirs.push((item.entry.inode, Arc::from(item.path()), depth + 1));
-                } else {
+                let n = listings.entry(item.entry.inode).or_default();
+                if ancestors.contains(item.entry.inode) || *n >= MAX_LISTINGS_PER_DIR {
                     stats.skipped_cycles += 1;
+                } else {
+                    *n += 1;
+                    subdirs.push((
+                        item.entry.inode,
+                        Arc::from(item.path()),
+                        depth + 1,
+                        ancestors.child(item.entry.inode),
+                    ));
                 }
             }
         }
@@ -134,7 +185,7 @@ pub fn walk(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{FsInfo, FsKind};
+    use crate::{FileKind, FsInfo, FsKind};
     use pm_core::SharedSource;
     use pm_core::io::MemSource;
     use std::collections::HashMap;
@@ -145,6 +196,7 @@ mod tests {
         info: FsInfo,
         dirs: HashMap<InodeId, Vec<DirEntry>>,
         kinds: HashMap<InodeId, FileKind>,
+        unallocated: std::collections::HashSet<InodeId>,
     }
 
     impl MemFs {
@@ -163,6 +215,7 @@ mod tests {
                 info,
                 dirs: HashMap::new(),
                 kinds: HashMap::new(),
+                unallocated: std::collections::HashSet::new(),
             };
             s.kinds.insert(1, FileKind::Directory);
             s
@@ -193,7 +246,11 @@ mod tests {
         }
         fn metadata(&self, inode: InodeId) -> crate::Result<Metadata> {
             let kind = *self.kinds.get(&inode).ok_or(FsError::NotFound(inode))?;
-            Ok(Metadata::new(inode, kind, 0))
+            let mut m = Metadata::new(inode, kind, 0);
+            if self.unallocated.contains(&inode) {
+                m.flags = crate::MetaFlags::USED;
+            }
+            Ok(m)
         }
         fn read_dir(&self, inode: InodeId) -> crate::Result<Vec<DirEntry>> {
             Ok(self.dirs.get(&inode).cloned().unwrap_or_default())
@@ -238,9 +295,45 @@ mod tests {
     }
 
     #[test]
+    fn deleted_name_of_reallocated_dir_is_not_followed() {
+        let mut fs = MemFs::new();
+        // Inode 2 was "old" (deleted name) and is now allocated as "new".
+        fs.add(1, "old", 2, FileKind::Directory, false);
+        fs.add(1, "new", 2, FileKind::Directory, true);
+        fs.add(2, "file", 3, FileKind::Regular, true);
+        let (p, _) = paths(&fs, &WalkOptions::default());
+        assert_eq!(p, ["/old", "/new", "/new/file"]);
+    }
+
+    #[test]
+    fn directory_with_two_names_is_listed_under_both() {
+        let mut fs = MemFs::new();
+        fs.add(1, "a", 2, FileKind::Directory, true);
+        fs.add(1, "b", 2, FileKind::Directory, true);
+        fs.add(2, "f", 3, FileKind::Regular, true);
+        let (p, _) = paths(&fs, &WalkOptions::default());
+        assert_eq!(p, ["/a", "/b", "/a/f", "/b/f"]);
+    }
+
+    #[test]
+    fn lattice_of_shared_directories_is_capped() {
+        // Each level has two names for the same next directory: 2^30 paths
+        // without a cap.
+        let mut fs = MemFs::new();
+        for level in 0..30u64 {
+            let (dir, next) = (if level == 0 { 1 } else { level + 1 }, level + 2);
+            fs.add(dir, "x", next, FileKind::Directory, true);
+            fs.add(dir, "y", next, FileKind::Directory, true);
+        }
+        let (_, stats) = paths(&fs, &WalkOptions::default());
+        assert!(stats.directories <= 30 * u64::from(MAX_LISTINGS_PER_DIR) + 1);
+    }
+
+    #[test]
     fn deleted_dirs_optional() {
         let mut fs = MemFs::new();
         fs.add(1, "gone", 2, FileKind::Directory, false);
+        fs.unallocated.insert(2);
         fs.add(2, "inner", 3, FileKind::Regular, false);
         let (p, _) = paths(&fs, &WalkOptions::default());
         assert_eq!(p, ["/gone", "/gone/inner"]);
