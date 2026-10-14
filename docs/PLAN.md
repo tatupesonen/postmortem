@@ -193,6 +193,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Autopsy-case importer (stretch; TSK SQLite → pm schema)
 
 ### M3 — UI shell and browsing (first usable release)
+- [x] First visible slice (evidence-backed, pre-case-DB): eframe app, menus/toolbar/status bar, data-source tree (volumes, dirs, $OrphanFiles), virtualised sortable table with keyboard nav + context menu (pop out, extract, copy path), viewers Hex/Strings/Text/Application(picture)/File Metadata with auto tab choice, deferred-viewport pop-out windows, back/forward, drag-and-drop, themes, local/UTC time, persisted settings; `pm-testkit::demo` disk
 - [ ] eframe app skeleton, theming (light/dark), fonts, icons, settings persistence
 - [ ] Main window: menu tree, toolbar, status bar, dock layout (`egui_dock`), reset windows
 - [ ] Welcome window, recent cases, new-case wizard, open case, case properties

@@ -1,0 +1,32 @@
+[package]
+name = "pm-ui"
+description = "egui user interface for postmortem"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+pm-fs.workspace = true
+pm-image.workspace = true
+pm-volume.workspace = true
+pm-evidence.workspace = true
+egui.workspace = true
+eframe.workspace = true
+egui_extras.workspace = true
+rfd.workspace = true
+image.workspace = true
+rayon.workspace = true
+parking_lot.workspace = true
+jiff.workspace = true
+serde.workspace = true
+tracing.workspace = true
+
+[dev-dependencies]
+pm-testkit.workspace = true
+egui_kittest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

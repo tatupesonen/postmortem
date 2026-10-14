@@ -12,6 +12,7 @@ pm-core.workspace = true
 crc32fast.workspace = true
 uuid.workspace = true
 tempfile.workspace = true
+fatfs.workspace = true
 
 [lints]
 workspace = true

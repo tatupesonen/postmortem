@@ -21,6 +21,8 @@ pm-image = { path = "crates/pm-image" }
 pm-fs = { path = "crates/pm-fs" }
 pm-fs-fat = { path = "crates/pm-fs-fat" }
 pm-fs-ntfs = { path = "crates/pm-fs-ntfs" }
+pm-evidence = { path = "crates/pm-evidence" }
+pm-ui = { path = "crates/pm-ui" }
 
 # Foundations
 thiserror = "2.0.21"
@@ -36,10 +38,20 @@ crc32fast = "1.5.2"
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
 uuid = "1.28.0"
 
+# GUI
+egui = "0.36.2"
+eframe = { version = "0.36.2", default-features = false, features = ["wgpu", "accesskit", "default_fonts", "persistence", "wayland", "x11"] }
+egui_extras = { version = "0.36.2", default-features = false, features = ["image"] }
+rfd = "0.17.2"
+image = { version = "0.25.10", default-features = false, features = ["rayon", "jpeg", "png", "gif", "webp", "tiff", "bmp", "ico"] }
+serde = { version = "1.0.229", features = ["derive"] }
+tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
+
 # Testing
 proptest = "1.12.0"
 rstest = "0.27.0"
 insta = "1.49.0"
+egui_kittest = { version = "0.36.2", features = ["wgpu", "snapshot"] }
 tempfile = "3.27.0"
 md-5 = "0.11.0"
 sha1 = "0.11.0"
