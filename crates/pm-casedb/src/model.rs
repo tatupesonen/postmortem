@@ -657,3 +657,22 @@ impl FileTag {
         })
     }
 }
+
+/// Ingest scheduling class of a file (Autopsy `IngestTasksScheduler` root
+/// priorities), processed in declaration order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum IngestPriority {
+    /// Under `Users`, `Documents and Settings`, `home`, `ProgramData`.
+    High = 0,
+    /// Everything else (including `Program Files`).
+    Medium = 1,
+    /// Under `$OrphanFiles` and `Windows`.
+    Low = 2,
+    /// `pagefile*`, `hiberfil*`, and content not from a file system
+    /// (unallocated space, carved, derived and local files).
+    Last = 3,
+}
+
+impl IngestPriority {
+    pub const ALL: [Self; 4] = [Self::High, Self::Medium, Self::Low, Self::Last];
+}

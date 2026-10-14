@@ -351,6 +351,28 @@ impl CaseDb {
         })
     }
 
+    /// Files of a data source in one ingest priority class, by id, with
+    /// keyset paging (Autopsy's root-directory priorities; see
+    /// [`IngestPriority`]).
+    pub fn ingest_files(
+        &self,
+        ds_id: i64,
+        class: IngestPriority,
+        after_id: i64,
+        limit: usize,
+    ) -> Result<Vec<FileRecord>> {
+        self.read(|c| {
+            let sql = format!(
+                "SELECT {FILE_COLS} FROM files WHERE id > ?1 AND ds_id = ?2 AND ({INGEST_CLASS}) = ?3 ORDER BY id LIMIT {limit}"
+            );
+            let mut st = c.prepare_cached(&sql)?;
+            let rows = st
+                .query_map(params![after_id, ds_id, class as i64], FileRecord::from_row)?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+    }
+
     pub fn count_files(&self, q: &FileQuery) -> Result<u64> {
         let (clause, args) = q.where_clause(0);
         self.read(|c| {
@@ -684,6 +706,42 @@ fn insert_artifact(tx: &Connection, a: &NewArtifact) -> Result<i64> {
     Ok(id)
 }
 
+fn artifact_exists(c: &Connection, a: &NewArtifact, key: &[i64]) -> Result<bool> {
+    let Some(file_id) = a.file_id else {
+        return Ok(false);
+    };
+    let wanted: Vec<(i64, &Value)> = a
+        .attributes
+        .iter()
+        .filter(|(t, _, _)| key.contains(t))
+        .map(|(t, v, _)| (*t, v))
+        .collect();
+    let mut st =
+        c.prepare_cached("SELECT id FROM artifacts WHERE file_id = ?1 AND type_id = ?2")?;
+    let ids = st
+        .query_map(params![file_id, a.type_id], |r| r.get::<_, i64>(0))?
+        .collect::<rusqlite::Result<Vec<_>>>()?;
+    let mut attrs = c.prepare_cached(
+        "SELECT COUNT(*) FROM attributes WHERE artifact_id = ?1 AND type_id = ?2 \
+         AND value_text IS ?3 AND value_int IS ?4 AND value_double IS ?5 AND value_blob IS ?6",
+    )?;
+    for id in ids {
+        let mut all = true;
+        for (t, v) in &wanted {
+            let (text, int, double, blob) = v.columns();
+            let n: i64 = attrs.query_row(params![id, t, text, int, double, blob], |r| r.get(0))?;
+            if n == 0 {
+                all = false;
+                break;
+            }
+        }
+        if all {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
 /// Batched writer used while loading data sources and during ingest.
 #[derive(Debug)]
 pub struct Bulk<'c> {
@@ -791,6 +849,20 @@ impl Bulk<'_> {
         Ok(id)
     }
 
+    /// Adds `a` unless the same file already has an artifact of the same
+    /// type whose attributes include `a`'s attributes of the `key` types
+    /// (Autopsy's `artifactExists`). Returns the new id, or `None`.
+    pub fn add_artifact_unless_exists(
+        &mut self,
+        a: &NewArtifact,
+        key: &[i64],
+    ) -> Result<Option<i64>> {
+        if artifact_exists(self.conn, a, key)? {
+            return Ok(None);
+        }
+        self.add_artifact(a).map(Some)
+    }
+
     pub fn set_file_analysis(&mut self, id: i64, update: &FileAnalysis) -> Result<()> {
         update.apply(self.conn, id)?;
         self.tick()
@@ -836,6 +908,15 @@ const INSERT_FILE: &str = "INSERT INTO files (ds_id, fs_id, parent_id, origin, i
 
 pub(crate) const FILE_COLS: &str = "id, ds_id, fs_id, parent_id, origin, inode, stream, name, parent_path, kind, name_alloc, meta_alloc, meta_flags, size, \
     mtime, mtime_ns, atime, atime_ns, ctime, ctime_ns, crtime, crtime_ns, mode, uid, gid, seq, attributes, extension, mime, md5, sha1, sha256, known, derived_from, local_path";
+
+/// SQL computing a file's [`IngestPriority`] from the first component of
+/// its path (`LIKE` is ASCII case-insensitive, as Autopsy's patterns are).
+const INGEST_CLASS: &str = "CASE WHEN origin <> 0 THEN 3 ELSE (SELECT CASE \
+      WHEN t LIKE 'pagefile%' OR t LIKE 'hiberfil%' THEN 3 \
+      WHEN t LIKE 'users%' OR t LIKE 'documents and settings%' OR t LIKE 'home%' OR t LIKE 'programdata%' THEN 0 \
+      WHEN t LIKE '$orphanfiles%' OR t LIKE 'windows%' THEN 2 \
+      ELSE 1 END FROM (SELECT CASE WHEN parent_path = '/' THEN name \
+      ELSE substr(parent_path, 2, instr(substr(parent_path, 2), '/') - 1) END AS t)) END";
 
 pub(crate) const ARTIFACT_COLS: &str = "id, type_id, ds_id, file_id, source_artifact_id, significance, priority, conclusion, configuration, justification, review_status, created_at";
 

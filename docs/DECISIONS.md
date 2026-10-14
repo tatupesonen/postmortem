@@ -148,3 +148,46 @@ Design budgets (to be enforced by benchmarks in `benches/` and a
   fetch pages on demand.
 * **IO**: positional reads with large, aligned requests; caches bounded
   (sharded LRU); hashing and ingest parallel per file with back-pressure.
+
+## ADR-015 — Ingest framework design
+
+**Status:** accepted (2026-10-14)
+
+**Context.** Autopsy's ingest framework (inventory 03 §1) defines the module
+contract that every analyser is written against: four module kinds, one
+module instance per worker thread, pipeline order rules, tiers, file
+filters, re-injection of derived files, batched persistence of
+`known`/MIME/hashes, inbox messages and job records. Its scheduler expands
+directories lazily under one global lock and saves each file through the
+`AbstractFile` object.
+
+**Decision.** `pm-ingest` keeps the externally visible semantics and changes
+the machinery:
+* **Contract.** `ModuleFactory::start(job, settings) -> Arc<dyn ModuleJob>`
+  creates explicit per-job shared state (replacing Autopsy's static
+  reference-counter maps). `ModuleJob` hands out one `FileModule` per worker,
+  optional data-source modules for a numbered stage, and gets `finish()`
+  once after every instance has shut down (summary messages). Settings are
+  `serde_json::Value` per module id, so a module can version them.
+* **Scheduling.** Files are streamed from the case DB with keyset paging, one
+  pass per Autopsy root priority class (`Users`… first, `pagefile`/
+  non-file-system content last). Memory is bounded by the page and queue
+  sizes, never by the file count. Derived files go into a priority queue
+  that workers drain first.
+* **Execution.** N workers, each with its own pipeline instances in pipeline
+  order. Content is opened once per file and shared by the modules; the
+  first bytes are cached for signature checks.
+* **Persistence.** Modules record MIME types, hashes, `known` and artifacts
+  through the job context. One writer thread applies them in short
+  transactions (≤ 5 000 operations), so other writers such as tagging are
+  never locked out for long. Artifact posting is idempotent (same file, type
+  and attributes ⇒ no duplicate), which gives re-ingest Autopsy's
+  `artifactExists` behaviour.
+* **Stages.** Data-source modules declare a stage; stage *n + 1* starts when
+  every task of stage *n* has finished (Autopsy's tiers, generalised).
+* **Errors.** A module error is recorded and the pipeline continues. A
+  `start` failure aborts the job before any data is touched.
+
+**Consequences.** Modules are plain Rust structs that can be unit-tested
+against an in-memory case. The same contract is exposed to WebAssembly
+plugins (ADR-013) through a thin adapter.

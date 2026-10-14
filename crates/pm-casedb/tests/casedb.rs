@@ -556,6 +556,147 @@ fn preassigned_ids_and_layout() {
 }
 
 #[test]
+fn ingest_priority_classes() {
+    let (_d, db) = new_db();
+    let ds_id = db
+        .bulk(|b| {
+            let ds_id = b.add_data_source(&ds())?;
+            let fs_id = b.add_file_system(&NewFileSystem {
+                ds_id,
+                volume_id: None,
+                kind: "NTFS".into(),
+                byte_offset: 0,
+                block_size: 4096,
+                block_count: 1,
+                root_inode: 5,
+                label: None,
+                serial: None,
+            })?;
+            let d = FileKindCode::Directory;
+            let r = FileKindCode::Regular;
+            let root = b.add_file(&file(ds_id, fs_id, None, "/", "", d, 0, true))?;
+            for (pp, name, kind) in [
+                ("/", "Users", d),
+                ("/Users/", "alice.txt", r),
+                ("/", "users_backup", d),
+                ("/", "Windows", d),
+                ("/Windows/System32/", "cmd.exe", r),
+                ("/", "Program Files", d),
+                ("/Program Files/x/", "y.dll", r),
+                ("/", "pagefile.sys", r),
+                ("/", "HIBERFIL.SYS", r),
+                ("/", "$OrphanFiles", d),
+                ("/$OrphanFiles/", "lost.doc", r),
+                ("/", "Documents and Settings", d),
+                ("/home/bob/", ".bashrc", r),
+                ("/ProgramData/", "cfg", r),
+            ] {
+                b.add_file(&file(ds_id, fs_id, Some(root), pp, name, kind, 1, true))?;
+            }
+            let mut u = file(
+                ds_id,
+                fs_id,
+                Some(root),
+                "/$Unalloc/",
+                "Unalloc_1_0_9",
+                r,
+                9,
+                false,
+            );
+            u.origin = Origin::UnallocBlocks;
+            b.add_file(&u)?;
+            Ok(ds_id)
+        })
+        .unwrap();
+    let class = |p: IngestPriority| -> Vec<String> {
+        let mut out = Vec::new();
+        let mut after = 0;
+        loop {
+            // Tiny pages exercise the keyset cursor.
+            let page = db.ingest_files(ds_id, p, after, 2).unwrap();
+            let Some(last) = page.last() else { break };
+            after = last.id;
+            out.extend(page.into_iter().map(|f| f.path()));
+        }
+        out
+    };
+    assert_eq!(
+        class(IngestPriority::High),
+        [
+            "/Users",
+            "/Users/alice.txt",
+            "/users_backup",
+            "/Documents and Settings",
+            "/home/bob/.bashrc",
+            "/ProgramData/cfg"
+        ]
+    );
+    assert_eq!(
+        class(IngestPriority::Medium),
+        ["/", "/Program Files", "/Program Files/x/y.dll"]
+    );
+    assert_eq!(
+        class(IngestPriority::Low),
+        [
+            "/Windows",
+            "/Windows/System32/cmd.exe",
+            "/$OrphanFiles",
+            "/$OrphanFiles/lost.doc"
+        ]
+    );
+    assert_eq!(
+        class(IngestPriority::Last),
+        ["/pagefile.sys", "/HIBERFIL.SYS", "/$Unalloc/Unalloc_1_0_9"]
+    );
+}
+
+#[test]
+fn artifacts_are_not_duplicated_on_reingest() {
+    let (_d, db) = new_db();
+    let (ds_id, ..) = populate(&db);
+    let f = db
+        .query_files(&FileQuery::default(), 0, 100)
+        .unwrap()
+        .into_iter()
+        .find(|f| f.name == "z.exe")
+        .unwrap();
+    let set = catalog::attribute_type_id("TSK_SET_NAME").unwrap();
+    let comment = catalog::attribute_type_id("TSK_COMMENT").unwrap();
+    let hit = |set_name: &str, note: &str| NewArtifact {
+        type_id: catalog::artifact_type_id("TSK_HASHSET_HIT").unwrap(),
+        ds_id,
+        file_id: Some(f.id),
+        source_artifact_id: None,
+        score: Some((Significance::Notable, Priority::Normal)),
+        conclusion: None,
+        configuration: Some(set_name.into()),
+        justification: None,
+        created_at: 1,
+        attributes: vec![
+            (set, Value::Text(set_name.into()), "Hash Lookup".into()),
+            (comment, Value::Text(note.into()), "Hash Lookup".into()),
+        ],
+    };
+    let added = db
+        .bulk(|b| {
+            Ok([
+                b.add_artifact_unless_exists(&hit("NSRL bad", "one"), &[set])?,
+                // Same set, different comment: keyed on the set name only.
+                b.add_artifact_unless_exists(&hit("NSRL bad", "two"), &[set])?,
+                b.add_artifact_unless_exists(&hit("Other set", "x"), &[set])?,
+                // Key on both attributes: differs in comment, so it is new.
+                b.add_artifact_unless_exists(&hit("Other set", "y"), &[set, comment])?,
+            ])
+        })
+        .unwrap();
+    assert!(added[0].is_some());
+    assert!(added[1].is_none());
+    assert!(added[2].is_some());
+    assert!(added[3].is_some());
+    assert_eq!(db.artifacts_for_file(f.id).unwrap().len(), 3);
+}
+
+#[test]
 fn extension_rules() {
     assert_eq!(extension_of("a.TXT"), "txt");
     assert_eq!(extension_of(".bashrc"), "");

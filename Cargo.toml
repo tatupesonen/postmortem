@@ -29,6 +29,10 @@ pm-index = { path = "crates/pm-index" }
 pm-discovery = { path = "crates/pm-discovery" }
 pm-casedb = { path = "crates/pm-casedb" }
 pm-case = { path = "crates/pm-case" }
+pm-ingest = { path = "crates/pm-ingest" }
+pm-modules = { path = "crates/pm-modules" }
+pm-hashdb = { path = "crates/pm-hashdb" }
+pm-filetype = { path = "crates/pm-filetype" }
 pm-ui = { path = "crates/pm-ui" }
 
 # Foundations
