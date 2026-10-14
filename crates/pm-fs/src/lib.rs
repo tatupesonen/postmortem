@@ -11,12 +11,14 @@
 //! File content is exposed per *stream* (NTFS alternate data streams, HFS+
 //! resource forks) as a [`SharedSource`].
 
+mod extent_source;
 mod types;
 pub mod walk;
 
 use pm_core::SharedSource;
 use thiserror::Error;
 
+pub use extent_source::ExtentSource;
 pub use types::{
     DirEntry, Extent, ExtentKind, FileKind, FsInfo, FsKind, InodeId, MetaFlags, Metadata,
     StreamInfo, StreamKind, Times,

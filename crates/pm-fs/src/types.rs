@@ -131,6 +131,8 @@ pub struct Metadata {
     pub link_count: u32,
     /// NTFS sequence number / ext generation.
     pub seq: Option<u32>,
+    /// DOS/NTFS file attribute bits (read-only, hidden, system, archive, …).
+    pub attributes: Option<u32>,
 }
 
 impl Metadata {
@@ -148,6 +150,7 @@ impl Metadata {
             gid: None,
             link_count: 1,
             seq: None,
+            attributes: None,
         }
     }
 

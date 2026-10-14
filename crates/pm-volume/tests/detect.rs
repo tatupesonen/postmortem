@@ -1,4 +1,9 @@
-#![allow(clippy::indexing_slicing, reason = "test code")]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    reason = "test code"
+)]
 
 use pm_core::ReadAt;
 use pm_core::io::MemSource;

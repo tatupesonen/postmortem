@@ -18,6 +18,7 @@ pm-testkit = { path = "crates/pm-testkit" }
 pm-volume = { path = "crates/pm-volume" }
 pm-image = { path = "crates/pm-image" }
 pm-fs = { path = "crates/pm-fs" }
+pm-fs-fat = { path = "crates/pm-fs-fat" }
 
 # Foundations
 thiserror = "2.0.21"
@@ -37,6 +38,7 @@ proptest = "1.12.0"
 rstest = "0.27.0"
 insta = "1.49.0"
 tempfile = "3.27.0"
+fatfs = { version = "0.3.6", default-features = false, features = ["std", "alloc"] }
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

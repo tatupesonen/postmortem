@@ -1,0 +1,22 @@
+[package]
+name = "pm-fs-fat"
+description = "Forensic FAT12/16/32 filesystem parser for postmortem (deleted-file recovery, LFN, slack-aware)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+pm-fs.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+jiff.workspace = true
+
+[dev-dependencies]
+fatfs.workspace = true
+proptest.workspace = true
+rstest.workspace = true
+
+[lints]
+workspace = true
