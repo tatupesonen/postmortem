@@ -4,7 +4,9 @@
 //! result table (centre) and content viewers (bottom). Any viewer can be
 //! popped out into its own native window (egui deferred viewports).
 
+mod analysis;
 mod app;
+mod case_ui;
 mod discovery;
 mod format;
 mod gallery;

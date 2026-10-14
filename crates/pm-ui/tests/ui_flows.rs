@@ -12,7 +12,7 @@ use std::sync::LazyLock;
 use std::time::{Duration, Instant};
 
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use pm_ui::{Persisted, PostmortemApp};
 
 static DEMO: LazyLock<(tempfile::TempDir, PathBuf)> = LazyLock::new(|| {
@@ -22,20 +22,50 @@ static DEMO: LazyLock<(tempfile::TempDir, PathBuf)> = LazyLock::new(|| {
     (dir, path)
 });
 
-fn harness(open: Vec<PathBuf>) -> Harness<'static, PostmortemApp> {
+/// Cases created by the app during tests.
+static CASES: LazyLock<tempfile::TempDir> = LazyLock::new(|| tempfile::tempdir().unwrap());
+
+fn harness_with(open: Vec<PathBuf>, case: bool) -> Harness<'static, PostmortemApp> {
+    static NEXT: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
     let ctx = egui::Context::default();
-    let app = PostmortemApp::with_state(
+    let mut app = PostmortemApp::with_state(
         &ctx,
         Persisted {
             theme: egui::ThemePreference::Light,
+            // Never create cases in the user's home folder from tests.
+            case_root: Some(CASES.path().to_path_buf()),
             ..Default::default()
         },
-        open,
+        Vec::new(),
     );
+    if case {
+        let n = NEXT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+        app.create_case(
+            &ctx,
+            &CASES.path().join(format!("case{n}")),
+            pm_case::CaseDetails {
+                name: format!("Test case {n}"),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+    }
+    for p in open {
+        if p.extension().is_some_and(|e| e == "pmcase") {
+            app.open_case(&ctx, &p).unwrap();
+        } else {
+            app.add_data_source(&ctx, p);
+        }
+    }
     Harness::builder()
         .with_size(egui::vec2(1400.0, 900.0))
         .with_theme(egui::Theme::Light)
         .build_ui_state(|ui, app: &mut PostmortemApp| app.frame(ui), app)
+}
+
+/// A harness with a fresh case containing `open`.
+fn harness(open: Vec<PathBuf>) -> Harness<'static, PostmortemApp> {
+    harness_with(open, true)
 }
 
 /// Steps until `done` holds (background tasks finish off-thread).
@@ -56,6 +86,14 @@ fn settle(
         std::thread::sleep(Duration::from_millis(5));
     }
     h.run_steps(3);
+}
+
+/// Waits until background analysis has finished (the status bar shows
+/// the file being analysed, which would match label queries for paths).
+fn wait_analysed(h: &mut Harness<'_, PostmortemApp>) {
+    settle(h, |h| {
+        h.query_by_label_contains("Analysed demo.dd").is_some()
+    });
 }
 
 /// Saves a screenshot when `PM_UI_SCREENSHOT_DIR` is set.
@@ -91,16 +129,71 @@ fn click_exact(h: &mut Harness<'_, PostmortemApp>, label: &str) {
 }
 
 #[test]
-fn empty_state_explains_what_to_do() {
+fn without_a_case_only_case_actions_are_offered() {
+    let mut h = harness_with(Vec::new(), false);
+    h.run_steps(2);
+    h.get_by_label_contains("No case open");
+    h.get_by_label("🗁  New Case");
+    h.get_by_label("📂  Open Case");
+    assert!(
+        h.get_by_label("➕ Add Data Source")
+            .accesskit_node()
+            .is_disabled()
+    );
+    shot(&mut h, "welcome-no-case");
+}
+
+#[test]
+fn empty_case_offers_add_data_source() {
     let mut h = harness(Vec::new());
     h.run_steps(2);
     h.get_by_label_contains("No data sources");
-    h.get_by_label_contains("Add a data source to begin");
+    h.get_by_label("➕  Add Data Source");
+    assert!(
+        !h.get_by_label("➕ Add Data Source")
+            .accesskit_node()
+            .is_disabled()
+    );
+}
+
+#[test]
+fn new_case_wizard_creates_the_case() {
+    let mut h = harness_with(Vec::new(), false);
+    h.run_steps(2);
+    click_exact(&mut h, "🗁 New Case");
+    h.get_by_label_contains("Step 1 of 2");
+    // Next without a name is refused.
+    click_exact(&mut h, "Next ›");
+    h.get_by_label_contains("Enter a case name");
+    let name_box = h
+        .get_all_by_role(egui::accesskit::Role::TextInput)
+        .next()
+        .unwrap();
+    name_box.click();
+    h.run_steps(1);
+    h.get_all_by_role(egui::accesskit::Role::TextInput)
+        .next()
+        .unwrap()
+        .type_text("Operation Teapot");
+    h.run_steps(2);
+    h.get_by_label_contains("Operation Teapot");
+    shot(&mut h, "new-case-step1");
+    click_exact(&mut h, "Next ›");
+    h.get_by_label_contains("Step 2 of 2");
+    shot(&mut h, "new-case-step2");
+    click_exact(&mut h, "Finish");
+    h.run_steps(3);
+    assert!(h.state().has_case());
+    let dir = h.state().analysis_case_dir().unwrap();
+    assert_eq!(dir, CASES.path().join("Operation Teapot"));
+    assert!(dir.join("case.pmcase").is_file());
+    h.get_by_label_contains("No data sources");
 }
 
 #[test]
 fn browse_demo_disk_and_view_picture() {
     let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
     settle(&mut h, |h| {
         !h.state().data_sources().is_empty() && !h.state().is_loading()
     });
@@ -111,7 +204,7 @@ fn browse_demo_disk_and_view_picture() {
     });
 
     // Expand: data source → NTFS volume → root → Users → alice → Pictures.
-    click(&mut h, "demo.dd");
+    click_exact(&mut h, "🖴 demo.dd");
     for (label, wait) in [
         ("NTFS / exFAT", false),
         ("/ (NTFS)", true),
@@ -121,7 +214,9 @@ fn browse_demo_disk_and_view_picture() {
     ] {
         click(&mut h, label);
         if wait {
-            settle(&mut h, |h| h.query_by_label_contains("Loading").is_none());
+            settle(&mut h, |h| {
+                h.query_all_by_label_contains("Loading").next().is_none()
+            });
         }
     }
     // The table lists the pictures; select one.
@@ -143,11 +238,14 @@ fn browse_demo_disk_and_view_picture() {
 #[test]
 fn deleted_files_and_metadata_tab() {
     let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
     settle(&mut h, |h| !h.state().data_sources().is_empty());
-    click(&mut h, "demo.dd");
+    click_exact(&mut h, "🖴 demo.dd");
     for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
         click(&mut h, label);
-        settle(&mut h, |h| h.query_by_label_contains("Loading").is_none());
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
     }
     settle(&mut h, |h| {
         h.query_by_label_contains("secret_plan.docx").is_some()
@@ -169,6 +267,7 @@ fn deleted_files_and_metadata_tab() {
 #[test]
 fn data_source_summary_tabs() {
     let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
     settle(&mut h, |h| !h.state().data_sources().is_empty());
     settle(&mut h, |h| {
         h.query_by_label_contains("Allocated files").is_some()
@@ -191,7 +290,44 @@ fn data_source_summary_tabs() {
 
 #[test]
 fn welcome_screen_screenshot() {
-    let mut h = harness(Vec::new());
+    let mut h = harness_with(Vec::new(), false);
     h.run_steps(4);
     shot(&mut h, "welcome");
+}
+
+#[test]
+fn adding_an_image_loads_and_analyses_it() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    // The status bar reports the finished analysis.
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Analysed demo.dd").is_some()
+    });
+    shot(&mut h, "analysis-done");
+    let case = h.state().analysis_case_dir().expect("case created");
+    assert!(case.starts_with(CASES.path()));
+    assert!(case.join("case.pmcase").is_file());
+    // Hash Lookup ran: every regular file got an MD5.
+    let hashed = h.state().analysis_hashed_files();
+    assert!(hashed > 20, "{hashed} files hashed");
+}
+
+#[test]
+fn reopening_a_case_restores_its_data_sources_without_reanalysis() {
+    let dir = {
+        let mut h = harness(vec![DEMO.1.clone()]);
+        settle(&mut h, |h| {
+            h.query_by_label_contains("Analysed demo.dd").is_some()
+        });
+        h.state().analysis_case_dir().unwrap()
+    };
+    let mut h = harness_with(vec![dir.join("case.pmcase")], false);
+    settle(&mut h, |h| {
+        !h.state().data_sources().is_empty() && !h.state().is_loading()
+    });
+    assert!(h.state().has_case());
+    assert_eq!(h.state().data_sources().len(), 1);
+    // Results from the first session are still there; nothing re-ran.
+    assert!(h.state().analysis_hashed_files() > 20);
+    assert!(h.query_by_label_contains("Analysed demo.dd").is_none());
+    shot(&mut h, "reopened-case");
 }

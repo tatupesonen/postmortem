@@ -9,6 +9,8 @@ use parking_lot::Mutex;
 use pm_evidence::OpenOptions;
 use pm_volume::SlotKind;
 
+use crate::analysis::Analysis;
+use crate::case_ui::{NewCaseWizard, WelcomeAction, WizardAction};
 use crate::discovery::DiscoveryWindow;
 use crate::format::{DisplayPrefs, size_long};
 use crate::gallery::GalleryWindow;
@@ -30,6 +32,10 @@ pub struct Persisted {
     pub local_time: bool,
     pub recent: Vec<PathBuf>,
     pub table: TableState,
+    /// Default base directory for new cases (`~/postmortem/Cases`).
+    pub case_root: Option<PathBuf>,
+    /// Recently opened case folders, newest first.
+    pub recent_cases: Vec<PathBuf>,
 }
 
 impl Default for Persisted {
@@ -39,6 +45,8 @@ impl Default for Persisted {
             local_time: false,
             recent: Vec::new(),
             table: TableState::default(),
+            case_root: None,
+            recent_cases: Vec::new(),
         }
     }
 }
@@ -80,6 +88,11 @@ pub struct PostmortemApp {
     /// File catalogue of all data sources (rebuilt when sources change).
     index: Option<SharedIndex>,
     summary: SummaryState,
+    /// The case, and adding/analysing data sources in the background.
+    analysis: Arc<Mutex<Analysis>>,
+    progress_open: bool,
+    progress_closed: Arc<AtomicBool>,
+    case_wizard: Option<NewCaseWizard>,
 }
 
 impl PostmortemApp {
@@ -119,16 +132,49 @@ impl PostmortemApp {
             discovery_closed: Arc::new(AtomicBool::new(false)),
             index: None,
             summary: SummaryState::default(),
+            analysis: Arc::new(Mutex::new(Analysis::default())),
+            progress_open: false,
+            progress_closed: Arc::new(AtomicBool::new(false)),
+            case_wizard: None,
         };
         app.apply_time_pref();
+        // Command line: a case (folder or case.pmcase) is opened; images are
+        // added to it.
         for p in open {
-            app.add_data_source(ctx, p);
+            if crate::case_ui::is_case_path(&p) {
+                if let Err(e) = app.open_case(ctx, &p) {
+                    app.errors.push(e);
+                }
+            } else {
+                app.add_data_source(ctx, p);
+            }
         }
         app
     }
 
     pub fn data_sources(&self) -> &[DataSource] {
         &self.sources
+    }
+
+    /// Folder of the open case, once one exists.
+    pub fn analysis_case_dir(&self) -> Option<PathBuf> {
+        self.analysis.lock().case().map(|c| c.dir().to_path_buf())
+    }
+
+    /// Files with an MD5 in the case (for tests and diagnostics).
+    pub fn analysis_hashed_files(&self) -> u64 {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return 0;
+        };
+        case.db()
+            .read(|c| {
+                Ok(c.query_row(
+                    "SELECT COUNT(*) FROM files WHERE md5 IS NOT NULL",
+                    [],
+                    |r| r.get::<_, i64>(0),
+                )?)
+            })
+            .map_or(0, |n| u64::try_from(n).unwrap_or(0))
     }
 
     pub fn is_loading(&self) -> bool {
@@ -143,8 +189,22 @@ impl PostmortemApp {
         };
     }
 
-    /// Opens a disk image in the background.
+    /// Adds a disk image to the open case: it is loaded into the case
+    /// database and analysed in the background, and opened for browsing.
     pub fn add_data_source(&mut self, ctx: &egui::Context, path: PathBuf) {
+        let tz = self.prefs.timezone.iana_name().unwrap_or("UTC").to_owned();
+        if let Err(e) = self.analysis.lock().start(ctx, path.clone(), tz) {
+            self.errors.push(e);
+            return;
+        }
+        self.persisted.recent.retain(|r| r != &path);
+        self.persisted.recent.insert(0, path.clone());
+        self.persisted.recent.truncate(10);
+        self.browse_image(ctx, path);
+    }
+
+    /// Opens a disk image for browsing (no analysis).
+    fn browse_image(&mut self, ctx: &egui::Context, path: PathBuf) {
         let id = self.sources.len() + self.loading.len();
         let opts = OpenOptions {
             timezone: self.prefs.timezone.clone(),
@@ -158,10 +218,96 @@ impl PostmortemApp {
             );
             Ok(DataSource { id, name, evidence })
         });
-        self.persisted.recent.retain(|r| r != &path);
-        self.persisted.recent.insert(0, path.clone());
-        self.persisted.recent.truncate(10);
         self.loading.push((path, task));
+    }
+
+    /// Whether a case is open.
+    pub fn has_case(&self) -> bool {
+        self.analysis.lock().case().is_some()
+    }
+
+    /// Creates a case and makes it the open case.
+    pub fn create_case(
+        &mut self,
+        ctx: &egui::Context,
+        dir: &std::path::Path,
+        details: pm_case::CaseDetails,
+    ) -> Result<(), String> {
+        let case = pm_case::Case::create(dir, details)
+            .map_err(|e| format!("Cannot create case in {}: {e}", dir.display()))?;
+        self.set_case(ctx, case);
+        Ok(())
+    }
+
+    /// Opens an existing case (its folder or `case.pmcase`) and re-opens
+    /// its data sources for browsing; their analysis results are kept.
+    pub fn open_case(&mut self, ctx: &egui::Context, path: &std::path::Path) -> Result<(), String> {
+        let case = pm_case::Case::open(path)
+            .map_err(|e| format!("Cannot open case {}: {e}", path.display()))?;
+        let sources = case.db().data_sources().map_err(|e| e.to_string())?;
+        self.set_case(ctx, case);
+        for ds in sources {
+            match ds.paths.first() {
+                Some(p) if std::path::Path::new(p).is_file() => {
+                    self.browse_image(ctx, PathBuf::from(p));
+                }
+                _ => self.errors.push(format!(
+                    "Data source {} was not found at {}. It may have been moved.",
+                    ds.name,
+                    ds.paths.first().map_or("(no path)", String::as_str)
+                )),
+            }
+        }
+        Ok(())
+    }
+
+    fn set_case(&mut self, ctx: &egui::Context, case: pm_case::Case) {
+        self.close_case(ctx);
+        let dir = case.dir().to_path_buf();
+        let title = format!("{} — postmortem", case.details().name);
+        self.analysis.lock().set_case(Arc::new(case));
+        self.persisted.recent_cases.retain(|r| r != &dir);
+        self.persisted.recent_cases.insert(0, dir);
+        self.persisted.recent_cases.truncate(10);
+        ctx.send_viewport_cmd(egui::ViewportCommand::Title(title));
+    }
+
+    /// Closes the case and everything shown from it.
+    pub fn close_case(&mut self, ctx: &egui::Context) {
+        self.analysis.lock().close();
+        self.sources.clear();
+        self.loading.clear();
+        self.listings.clear();
+        self.selected = None;
+        self.back.clear();
+        self.forward.clear();
+        self.viewer.set_content(None);
+        self.index = None;
+        self.timeline = None;
+        self.gallery = None;
+        self.discovery = None;
+        ctx.send_viewport_cmd(egui::ViewportCommand::Title("postmortem".into()));
+    }
+
+    fn new_case_wizard(&mut self) {
+        let base = self
+            .persisted
+            .case_root
+            .clone()
+            .unwrap_or_else(crate::analysis::default_case_root);
+        self.case_wizard = Some(NewCaseWizard::new(&base));
+    }
+
+    fn pick_case(&mut self, ctx: &egui::Context) {
+        let picked = rfd::FileDialog::new()
+            .set_title("Open Case")
+            .add_filter("postmortem case", &["pmcase"])
+            .pick_file();
+        if let Some(p) = picked
+            && let Err(e) = self.open_case(ctx, &p)
+        {
+            self.errors.push(e);
+        }
     }
 
     fn poll_loading(&mut self) {
@@ -498,31 +644,57 @@ impl PostmortemApp {
     fn menu_bar(&mut self, ui: &mut egui::Ui) {
         egui::MenuBar::new().ui(ui, |ui| {
             ui.menu_button("Case", |ui| {
-                if ui.button("Add Data Source…").clicked() {
+                let has_case = self.has_case();
+                if ui.button("New Case…").clicked() {
                     ui.close();
-                    self.pick_image(ui.ctx());
+                    self.new_case_wizard();
                 }
-                ui.menu_button("Recent Images", |ui| {
-                    if self.persisted.recent.is_empty() {
+                if ui.button("Open Case…").clicked() {
+                    ui.close();
+                    self.pick_case(ui.ctx());
+                }
+                ui.menu_button("Open Recent Case", |ui| {
+                    if self.persisted.recent_cases.is_empty() {
                         ui.weak("None");
                     }
-                    for p in self.persisted.recent.clone() {
+                    for p in self.persisted.recent_cases.clone() {
                         if ui.button(p.display().to_string()).clicked() {
                             ui.close();
-                            self.add_data_source(ui.ctx(), p);
+                            if let Err(e) = self.open_case(ui.ctx(), &p) {
+                                self.errors.push(e);
+                            }
                         }
                     }
                 });
-                ui.separator();
-                if ui.button("Close All Data Sources").clicked() {
+                if ui
+                    .add_enabled(has_case, egui::Button::new("Close Case"))
+                    .clicked()
+                {
                     ui.close();
-                    self.sources.clear();
-                    self.listings.clear();
-                    self.selected = None;
-                    self.back.clear();
-                    self.forward.clear();
-                    self.viewer.set_content(None);
+                    self.close_case(ui.ctx());
                 }
+                ui.separator();
+                if ui
+                    .add_enabled(has_case, egui::Button::new("Add Data Source…"))
+                    .clicked()
+                {
+                    ui.close();
+                    self.pick_image(ui.ctx());
+                }
+                ui.add_enabled_ui(has_case, |ui| {
+                    ui.menu_button("Add Recent Image", |ui| {
+                        if self.persisted.recent.is_empty() {
+                            ui.weak("None");
+                        }
+                        for p in self.persisted.recent.clone() {
+                            if ui.button(p.display().to_string()).clicked() {
+                                ui.close();
+                                self.add_data_source(ui.ctx(), p);
+                            }
+                        }
+                    });
+                });
+                ui.separator();
                 if ui.button("Quit").clicked() {
                     ui.ctx().send_viewport_cmd(egui::ViewportCommand::Close);
                 }
@@ -566,6 +738,11 @@ impl PostmortemApp {
                 }
             });
             ui.menu_button("Tools", |ui| {
+                if ui.button("⚙ Ingest Progress").clicked() {
+                    self.progress_open = true;
+                    ui.close();
+                }
+                ui.separator();
                 if ui
                     .add_enabled(!self.sources.is_empty(), egui::Button::new("⏱ Timeline"))
                     .clicked()
@@ -628,8 +805,23 @@ impl PostmortemApp {
     fn toolbar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal(|ui| {
             if ui
-                .button("➕ Add Data Source")
-                .on_hover_text("Open a disk image (Ctrl/⌘+O)")
+                .button("🗁 New Case")
+                .on_hover_text("Create a case (Case › New Case…)")
+                .clicked()
+            {
+                self.new_case_wizard();
+            }
+            if ui
+                .button("📂 Open Case")
+                .on_hover_text("Open an existing case (Case › Open Case…)")
+                .clicked()
+            {
+                self.pick_case(ui.ctx());
+            }
+            if ui
+                .add_enabled(self.has_case(), egui::Button::new("➕ Add Data Source"))
+                .on_hover_text("Add a disk image to the case (Ctrl/⌘+O)")
+                .on_disabled_hover_text("Create or open a case first")
                 .clicked()
             {
                 self.pick_image(ui.ctx());
@@ -684,9 +876,48 @@ impl PostmortemApp {
         });
     }
 
-    fn status_bar(&self, ui: &mut egui::Ui) {
+    fn status_bar(&mut self, ui: &mut egui::Ui) {
+        let mut open_progress = false;
         ui.horizontal(|ui| {
             ui.label(format!("{} data source(s)", self.sources.len()));
+            {
+                let analysis = self.analysis.lock();
+                for job in analysis.jobs.iter().filter(|j| j.is_active()) {
+                    ui.separator();
+                    open_progress |= crate::analysis::status_line(ui, job);
+                }
+                if !analysis.any_active()
+                    && let Some(job) = analysis.jobs.last()
+                {
+                    ui.separator();
+                    let text = match job.stage() {
+                        crate::analysis::Stage::Done {
+                            artifacts,
+                            cancelled,
+                            ..
+                        } => format!(
+                            "{} {} — {} results",
+                            if cancelled {
+                                "⏹ Analysis cancelled:"
+                            } else {
+                                "✔ Analysed"
+                            },
+                            job.name,
+                            crate::format::grouped(artifacts)
+                        ),
+                        crate::analysis::Stage::Failed(e) => format!("⛔ {}: {e}", job.name),
+                        _ => String::new(),
+                    };
+                    open_progress |= ui
+                        .add(
+                            egui::Label::new(text)
+                                .truncate()
+                                .sense(egui::Sense::click()),
+                        )
+                        .on_hover_text("Show ingest progress and messages")
+                        .clicked();
+                }
+            }
             if let Some(n) = self.index.as_ref().and_then(SharedIndex::building_count) {
                 ui.separator();
                 ui.spinner();
@@ -710,13 +941,53 @@ impl PostmortemApp {
                 });
             });
         });
+        if open_progress {
+            self.progress_open = true;
+        }
+        if self.analysis.lock().any_active() {
+            ui.ctx()
+                .request_repaint_after(std::time::Duration::from_millis(250));
+        }
+    }
+
+    fn show_progress(&mut self, ctx: &egui::Context) {
+        if self.progress_closed.swap(false, Ordering::Relaxed) {
+            self.progress_open = false;
+        }
+        if !self.progress_open {
+            return;
+        }
+        let analysis = Arc::clone(&self.analysis);
+        let closed = Arc::clone(&self.progress_closed);
+        ctx.show_viewport_deferred(
+            egui::ViewportId::from_hash_of("ingest-progress"),
+            egui::ViewportBuilder::default()
+                .with_title("Ingest Progress — postmortem")
+                .with_inner_size([820.0, 620.0]),
+            move |ui, _| {
+                egui::CentralPanel::default().show(ui, |ui| {
+                    crate::analysis::details_ui(ui, &analysis.lock());
+                });
+                if analysis.lock().any_active() {
+                    ui.ctx()
+                        .request_repaint_after(std::time::Duration::from_millis(250));
+                }
+                if ui.ctx().input(|i| i.viewport().close_requested()) {
+                    closed.store(true, Ordering::Relaxed);
+                }
+            },
+        );
     }
 
     fn tree(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
             ui.heading("Data Sources");
             if self.sources.is_empty() && self.loading.is_empty() {
-                ui.weak("No data sources. Use Case › Add Data Source.");
+                ui.weak(if self.has_case() {
+                    "No data sources. Use Case › Add Data Source."
+                } else {
+                    "No case open. Use Case › New Case or Open Case."
+                });
             }
             for (path, _) in &self.loading {
                 ui.horizontal(|ui| {
@@ -879,14 +1150,40 @@ impl PostmortemApp {
 
     fn results(&mut self, ui: &mut egui::Ui) {
         let Some(node) = self.selected.clone() else {
+            let wordmark = self.wordmark(ui.ctx());
+            if !self.has_case() {
+                let recent = self.persisted.recent_cases.clone();
+                match crate::case_ui::welcome(ui, wordmark.as_ref(), &recent) {
+                    WelcomeAction::None => {}
+                    WelcomeAction::NewCase => self.new_case_wizard(),
+                    WelcomeAction::OpenCase => self.pick_case(ui.ctx()),
+                    WelcomeAction::OpenRecent(p) => {
+                        if let Err(e) = self.open_case(ui.ctx(), &p) {
+                            self.errors.push(e);
+                        }
+                    }
+                }
+                return;
+            }
+            let mut add = false;
             ui.vertical_centered(|ui| {
                 ui.add_space((ui.available_height() / 2.0 - 150.0).max(0.0));
-                if let Some(tex) = self.wordmark(ui.ctx()) {
-                    ui.add(egui::Image::new(&tex).max_width(420.0));
+                if let Some(tex) = &wordmark {
+                    ui.add(egui::Image::new(tex).max_width(420.0));
                 }
                 ui.add_space(18.0);
-                ui.weak("Add a data source to begin (Case › Add Data Source…), or drop a disk image here.");
+                add = ui
+                    .add(
+                        egui::Button::new(egui::RichText::new("➕  Add Data Source").size(16.0))
+                            .min_size(egui::vec2(220.0, 36.0)),
+                    )
+                    .clicked();
+                ui.add_space(8.0);
+                ui.weak("Add a disk image to the case to begin, or drop one here.");
             });
+            if add {
+                self.pick_image(ui.ctx());
+            }
             return;
         };
         match &node {
@@ -1057,7 +1354,7 @@ impl PostmortemApp {
                 i.consume_key(egui::Modifiers::ALT, egui::Key::ArrowRight),
             )
         });
-        if open {
+        if open && self.has_case() {
             self.pick_image(ctx);
         }
         if back {
@@ -1074,12 +1371,35 @@ impl PostmortemApp {
                 .map(|f| f.path().to_path_buf())
                 .collect()
         });
+        // Dropping a case opens it; dropping images adds them to the case.
         for p in dropped {
-            self.add_data_source(ctx, p);
+            if crate::case_ui::is_case_path(&p) {
+                if let Err(e) = self.open_case(ctx, &p) {
+                    self.errors.push(e);
+                }
+            } else {
+                self.add_data_source(ctx, p);
+            }
         }
     }
 
     fn dialogs(&mut self, ctx: &egui::Context) {
+        if let Some(w) = self.case_wizard.as_mut() {
+            match w.ui(ctx) {
+                WizardAction::None => {}
+                WizardAction::Cancel => self.case_wizard = None,
+                WizardAction::Create { dir, details } => {
+                    match self.create_case(ctx, &dir, details) {
+                        Ok(()) => self.case_wizard = None,
+                        Err(e) => {
+                            if let Some(w) = self.case_wizard.as_mut() {
+                                w.error = Some(e);
+                            }
+                        }
+                    }
+                }
+            }
+        }
         if self.about_open {
             let wordmark = self.wordmark(ctx);
             let r = egui::Modal::new(egui::Id::new("about")).show(ctx, |ui| {
@@ -1148,6 +1468,7 @@ impl PostmortemApp {
         self.show_timeline(&ctx);
         self.show_gallery(&ctx);
         self.show_discovery(&ctx);
+        self.show_progress(&ctx);
         self.dialogs(&ctx);
         self.persisted.table = self.table.clone();
     }

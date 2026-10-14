@@ -1,7 +1,9 @@
 //! postmortem desktop application.
 //!
-//! Usage: `postmortem [IMAGE ...]` — any image paths given are opened as
-//! data sources on start-up (first segment of split/E01 sets).
+//! Usage: `postmortem [CASE] [IMAGE ...]` — `CASE` (a case folder or its
+//! `case.pmcase`) is opened on start-up; images given after it are added
+//! to that case as data sources (first segment of split/E01 sets). As in
+//! Autopsy, images can only be added to an open case.
 
 use std::path::PathBuf;
 
@@ -12,8 +14,8 @@ fn main() -> std::process::ExitCode {
                 .unwrap_or_else(|_| "info,wgpu=warn,naga=warn".into()),
         )
         .init();
-    let images: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
-    match pm_ui::run(images) {
+    let paths: Vec<PathBuf> = std::env::args_os().skip(1).map(PathBuf::from).collect();
+    match pm_ui::run(paths) {
         Ok(()) => std::process::ExitCode::SUCCESS,
         Err(e) => {
             tracing::error!("UI failed: {e}");
