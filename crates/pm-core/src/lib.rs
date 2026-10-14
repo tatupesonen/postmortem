@@ -5,7 +5,9 @@
 //! * [`decode`] — bounds-checked binary field decoding for hostile input.
 //! * [`time`] — epoch conversions (FILETIME, HFS, Cocoa, WebKit, DOS, ...).
 //! * [`units`] — human-readable (metric by default) size formatting.
+//! * [`cache`] — sharded, thread-safe LRU cache for decoded structures.
 
+pub mod cache;
 pub mod decode;
 pub mod io;
 pub mod time;

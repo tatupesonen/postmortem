@@ -20,6 +20,7 @@ pm-volume = { path = "crates/pm-volume" }
 pm-image = { path = "crates/pm-image" }
 pm-fs = { path = "crates/pm-fs" }
 pm-fs-fat = { path = "crates/pm-fs-fat" }
+pm-fs-ntfs = { path = "crates/pm-fs-ntfs" }
 
 # Foundations
 thiserror = "2.0.21"
@@ -43,6 +44,7 @@ tempfile = "3.27.0"
 md-5 = "0.11.0"
 sha1 = "0.11.0"
 sha2 = "0.11.1"
+ntfs = "0.4.0"
 fatfs = { version = "0.3.6", default-features = false, features = ["std", "alloc"] }
 
 [workspace.lints.rust]

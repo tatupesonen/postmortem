@@ -94,6 +94,8 @@ ends.
 - UI: `egui_kittest` interaction tests for key flows.
 - Fuzz targets (`cargo fuzz`, in `fuzz/`) for every binary parser; a short
   smoke run at milestone ends.
+- Every fuzz crash/timeout is fixed, its input saved under
+  `fuzz/regressions/<target>/`, and replayed by a normal `cargo test`.
 - Benchmarks (`divan`/`criterion`) for hot paths (hashing, NTFS MFT walk,
   keyword search, table queries).
 

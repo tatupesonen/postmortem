@@ -48,12 +48,37 @@ Workarounds for known multi-viewport bugs (macOS focus/resize) are listed in
 inventory 07 §1.1. Upgrade to 0.37 once released (it needs `default_fonts`
 explicitly).
 
-## ADR-009 — Third-party forensic parsers are oracles, not dependencies
-The 2026 pure-Rust forensic crates (keramics, SecurityRonin, hadris, …) are
-young and unvetted. They may be used as **dev-dependencies for differential
-tests**, never on the evidence path, except well-established format crates
-listed in inventory 07 §20 (e.g. `evtx`, `cfb`, `plist`, `mail-parser`,
-`notatin`), each of which needs an audit note in this file before adoption.
+## ADR-009 — Prefer existing crates when they meet requirements
+(Revised 2026-10-14 per user direction: "use existing crates if they meet
+your needs; if not, write it yourself.")
+
+For every component, first evaluate existing crates against:
+1. **Forensic completeness**: deleted/unallocated data, corrupt-input
+   tolerance (recover what is readable instead of failing).
+2. **Robustness**: no panics on hostile input (check with our fuzz/proptest
+   harness before adoption).
+3. **API fit**: works over shared positional readers (`ReadAt`) for
+   multi-threaded ingest, or can be wrapped cheaply.
+4. **Licence** (ADR-010), **maintenance** and **maturity**.
+
+Adopt when the crate passes. Otherwise write it ourselves and keep the crate
+as a dev-only differential oracle. Record each evaluation here.
+
+Evaluations:
+- **NTFS: `ntfs` 0.4.0 (Colin Finck, MIT/Apache) → oracle only.** It cannot
+  read an `$MFT` that has an attribute list (fragmented MFTs on real disks),
+  treats fixup mismatches (torn records) as hard errors, has no LZNT1 /
+  compressed-attribute support and no `$I30` slack recovery, and re-reads
+  MFT record 0 on every `file()` call. Our `pm-fs-ntfs` is in-house; `ntfs`
+  is a dev-dependency for differential tests.
+- **FAT: `fatfs` 0.3.6 → test-fixture writer only.** It has no
+  deleted-entry or orphan recovery.
+- **EWF: in-house.** The candidates were young (2026) single-author crates.
+  Verified against libewf's `ewfacquire`.
+- **To evaluate when reached**: `notatin` (registry), `evtx`, `lnk`, `cfb`,
+  `plist`, `mail-parser`, `outlook-pst`, `zip`, `sevenz-rust2`, `rars`,
+  `tantivy`, `yara-x`, `nom-exif`/`kamadak-exif`, `file-format`/`infer`,
+  `hayro`, `calamine`. These are expected to be adopted (inventory 07 §20).
 
 ## ADR-010 — Licence policy
 The product is Apache-2.0. GPL/AGPL/LGPL crates are banned from shipped

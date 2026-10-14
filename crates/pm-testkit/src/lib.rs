@@ -6,10 +6,13 @@
 #![allow(
     clippy::indexing_slicing,
     clippy::unwrap_used,
-    clippy::missing_panics_doc
+    clippy::pedantic,
+    reason = "test-only fixture builders: panics on misuse are intended, style lints relaxed"
 )]
 
 pub mod disk;
+pub mod lznt1;
+pub mod ntfs;
 pub mod tsk;
 
 pub use disk::{DiskBuilder, GptPart, MbrPart};

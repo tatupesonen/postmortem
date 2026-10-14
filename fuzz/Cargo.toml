@@ -14,6 +14,7 @@ pm-volume = { path = "../crates/pm-volume" }
 pm-fs = { path = "../crates/pm-fs" }
 pm-fs-fat = { path = "../crates/pm-fs-fat" }
 pm-image = { path = "../crates/pm-image" }
+pm-fs-ntfs = { path = "../crates/pm-fs-ntfs" }
 
 [workspace]
 members = ["."]
@@ -35,6 +36,13 @@ bench = false
 [[bin]]
 name = "ewf_read"
 path = "fuzz_targets/ewf_read.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "ntfs_walk"
+path = "fuzz_targets/ntfs_walk.rs"
 test = false
 doc = false
 bench = false

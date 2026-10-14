@@ -116,7 +116,7 @@ content viewer, data source processor). On top of it sit two hosts:
 | `pm-fs` | FileSystem trait, ExtentSource, walker | done |
 | `pm-fs-fat` | FAT12/16/32 | done |
 | `pm-fs-exfat` | exFAT | — |
-| `pm-fs-ntfs` | NTFS incl. ADS, compression, $LogFile/$UsnJrnl access, slack | — |
+| `pm-fs-ntfs` | NTFS incl. ADS, compression, $LogFile/$UsnJrnl access, slack | core done |
 | `pm-fs-ext` | ext2/3/4 incl. extents, inline data, journal | — |
 | `pm-fs-hfs` | HFS+/HFSX incl. resource forks, compression | — |
 | `pm-fs-apfs` | APFS (unencrypted; snapshots later) | — |
@@ -167,7 +167,8 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [x] `fuzz/` crate with targets for volume, FAT; smoke script `scripts/fuzz-smoke.sh` (seeds in `fuzz/seeds/`)
 - [x] `pm-image` EWF v1 (E01/s01): segments (E01…ZZZ), zlib/stored chunks, >2 GiB offset overflow, stored MD5/SHA-1, header2/header metadata, error2; verified against ewfacquire (9 format variants, multi-segment) + fuzz target
 - [ ] `pm-image` EWF2 (Ex01/Lx01) and L01 logical evidence (file tree in `ltree`)
-- [ ] `pm-fs-ntfs`: boot, MFT, attribute lists, runlists, resident/non-resident, compressed (LZNT1), sparse, ADS, $FILE_NAME times, deleted entries, orphans, $I30 index + slack entries, $Secure/owner later, unallocated clusters; fixtures (testkit NTFS builder or hdiutil-free generation; document provenance)
+- [x] `pm-fs-ntfs`: boot, MFT (incl. fragmented $MFT via attribute list), fixups (torn-tolerant), runlists, resident/non-resident, LZNT1, sparse, init size, ADS, $SI+$FN times, deleted via parent map, $I30 slack, orphans, unallocated clusters. In-house `NtfsBuilder` (pm-testkit) validated by TSK; differential vs `fls` + `ntfs` crate oracle; fuzz target
+- [ ] NTFS extras: $Secure/owner SIDs, reparse points/junctions, $UsnJrnl/$LogFile parsing, EFS flagging, WOF/compact compression, hard-link enumeration, bulk MFT enumeration fast path
 - [ ] `pm-evidence`: probe chain (image → VS → FS registry), unallocated-space virtual files, partitions with unknown FS, "no VS" fallback, logical files & folders DSP, local disk DSP (read-only)
 - [ ] `pm-fs-exfat`
 - [ ] `pm-fs-ext` (ext2/3/4)

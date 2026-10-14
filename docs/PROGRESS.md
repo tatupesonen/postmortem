@@ -2,18 +2,33 @@
 
 ## Now
 
-- M1: `pm-fs-ntfs` is next. NTFS fixtures: there is no mkntfs; options are
-  (a) `brew install ntfs-3g` for mkntfs plus a FUSE-free population route,
-  (b) a Docker image, (c) an in-house NTFS writer in pm-testkit for unit
-  tests and the `ntfs`/`mft` crates as dev-only oracles (ADR-009). Prefer (c)
-  plus TSK `fls`/`istat`/`icat` differential tests on any generated image.
-- Then `pm-evidence` (probe chain image → VS → FS) so M2 can start.
+- **User asked to see the UI next (2026-10-14).** Build `pm-evidence`
+  (image → VS → FS probe chain) and `pm-ui` (eframe) for a first visible
+  slice: open an image, then tree / table / content viewers (hex, strings,
+  text, metadata, image) with pop-out windows. Back it with the evidence
+  layer directly behind a data-provider trait; switch to `pm-casedb` once M2
+  lands.
+- Then resume M1 (`pm-fs-exfat`, ext, HFS+/APFS, ISO; VMDK/VHD/QCOW) and M2.
 
 ## Blockers
 
 _None._
 
 ## Log
+
+### 2026-10-14 — NTFS
+- `pm-fs-ntfs` in-house (ADR-009 evaluation: the `ntfs` crate lacks MFT
+  attribute lists, torn-record tolerance, LZNT1 and slack recovery, so it is
+  used as an oracle). `pm-testkit::ntfs::NtfsBuilder` writes complete NTFS
+  3.1 volumes (system files, multi-level $I30 B-trees, ADS, fragmented and
+  compressed data, deleted files in slack, unindexed or orphaned). TSK reads
+  them correctly (fls/icat/istat).
+- Tests: tree/contents/ADS/metadata/deleted/orphans/unallocated, a `fls`
+  differential, an `ntfs`-crate differential, a 128-case corruption
+  proptest and a slack-scanner unit test. Fuzzing found 1 overflow and 1
+  unbounded scan (fixed). Regressions are replayed from
+  `fuzz/regressions/`.
+- `pm_core::cache::ShardedLru`. Workspace: 150 tests.
 
 ### 2026-10-14 — TSK differential harness, EWF
 - All 8 inventories landed (01–08). ADRs 007–012 record the crate and

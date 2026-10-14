@@ -306,6 +306,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-fs-ntfs"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "pm-core",
+ "pm-fs",
+ "thiserror",
+ "tracing",
+]
+
+[[package]]
 name = "pm-fuzz"
 version = "0.0.0"
 dependencies = [
@@ -313,6 +324,7 @@ dependencies = [
  "pm-core",
  "pm-fs",
  "pm-fs-fat",
+ "pm-fs-ntfs",
  "pm-image",
  "pm-volume",
 ]
