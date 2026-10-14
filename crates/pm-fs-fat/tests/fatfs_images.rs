@@ -389,3 +389,24 @@ mod robustness {
         }
     }
 }
+
+/// Regenerates fuzz seeds: `cargo test -p pm-fs-fat -- --ignored write_fuzz_seeds`.
+#[test]
+#[ignore = "writes files into fuzz/seeds"]
+fn write_fuzz_seeds() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fuzz/seeds/fat_walk");
+    std::fs::create_dir_all(&dir).unwrap();
+    let img = build(FatType::Fat12, 1, |fs| {
+        write_file(fs, "a long name.txt", &pattern(3000, 1));
+        fs.root_dir().create_dir("d").unwrap();
+        write_file(fs, "d/x.bin", &pattern(5000, 2));
+        write_file(fs, "d/gone.bin", &pattern(700, 3));
+        fs.root_dir()
+            .open_dir("d")
+            .unwrap()
+            .remove("gone.bin")
+            .unwrap();
+    });
+    // Keep the seed small: the metadata lives in the first ~40 KiB.
+    std::fs::write(dir.join("fat12.img"), &img[..48 * 1024]).unwrap();
+}

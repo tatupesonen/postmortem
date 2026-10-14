@@ -1,0 +1,32 @@
+[package]
+name = "pm-fuzz"
+version = "0.0.0"
+publish = false
+edition = "2024"
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4.13"
+pm-core = { path = "../crates/pm-core" }
+pm-volume = { path = "../crates/pm-volume" }
+pm-fs = { path = "../crates/pm-fs" }
+pm-fs-fat = { path = "../crates/pm-fs-fat" }
+
+[workspace]
+members = ["."]
+
+[[bin]]
+name = "volume_detect"
+path = "fuzz_targets/volume_detect.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "fat_walk"
+path = "fuzz_targets/fat_walk.rs"
+test = false
+doc = false
+bench = false

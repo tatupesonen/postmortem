@@ -164,7 +164,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [x] `pm-fs-fat`: FAT12/16/32 with deleted-file recovery
 
 ### M1 — Evidence layer (vertical-slice subset first)
-- [ ] `fuzz/` crate with targets for volume, FAT; CI-style smoke script `scripts/fuzz-smoke.sh`
+- [x] `fuzz/` crate with targets for volume, FAT; smoke script `scripts/fuzz-smoke.sh` (seeds in `fuzz/seeds/`)
 - [ ] `pm-image` EWF (E01/Ex01 v1): segments, zlib chunks, table/table2, stored hashes, metadata; generate fixtures (in-house EWF writer in testkit)
 - [ ] `pm-fs-ntfs`: boot, MFT, attribute lists, runlists, resident/non-resident, compressed (LZNT1), sparse, ADS, $FILE_NAME times, deleted entries, orphans, $I30 index + slack entries, $Secure/owner later, unallocated clusters; fixtures (testkit NTFS builder or hdiutil-free generation; document provenance)
 - [ ] `pm-evidence`: probe chain (image → VS → FS registry), unallocated-space virtual files, partitions with unknown FS, "no VS" fallback, logical files & folders DSP, local disk DSP (read-only)
