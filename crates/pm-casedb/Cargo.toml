@@ -1,0 +1,21 @@
+[package]
+name = "pm-casedb"
+description = "postmortem case database: schema, migrations, batched writer and typed queries (SQLite; PostgreSQL later)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+rusqlite.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+tempfile.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

@@ -183,6 +183,16 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Work through the 126-item parity checklist in `docs/inventory/08-autopsy-tests.md`, ticking items there as each area lands (credit-card vectors → M5, correlation normalisers → M8, ingest filters → M4, …)
 - [ ] `cargo-deny` licence/ban checks in the gate (ADR-010)
 
+### Scale track (ADR-014: tens of TB, hundreds of millions of files)
+- [ ] Synthetic scale generators (pm-testkit): NTFS volumes and file tables with 1 M / 10 M entries; `benches/` with divan; recorded budgets in docs/PERF.md
+- [ ] NTFS bulk MFT enumeration (sequential chunked scan, parallel record parsing) feeding the loader
+- [ ] Loader: deferred secondary-index creation, ≥ 200 k files/s, bounded memory (streaming parent-id resolution)
+- [ ] DB-backed views replace `pm-index`: tree, File Types, Deleted, Discovery, Gallery, Data Source Summary via indexed SQL + precomputed aggregate tables
+- [ ] File-name search index (FTS5 trigram) with sub-second substring search over 100 M names
+- [ ] Timeline: events table + pre-aggregated per-unit counts; counts view never scans events
+- [ ] Huge directory UX: keyset-paged listings, cached child counts
+- [ ] Memory/latency regression tests in CI for the 10 M-file synthetic case
+
 ### M2 — Case database & data sources
 - [ ] `pm-casedb` schema v1 (SQLite) + migrations + typed API (objects, files, VS/FS, data sources, artifacts/attributes with all standard types, tags, hosts/persons/OS accounts, accounts/relationships, events, ingest jobs, reports, scores)
 - [ ] Standard artifact & attribute type catalogue (from inventory 01) as Rust enums + DB seed

@@ -2,15 +2,18 @@
 
 ## Now
 
-- User asked (2026-10-14) for the analysis tools, starting with the Timeline
-  (first cut done). Next, analysis tools that the file index supports
-  without ingest: **Data Source Summary** (Types tab: counts by
-  category/extension/deleted/size), **Image Gallery** (pictures grouped by
-  folder, with thumbnails), **File Discovery** (filters by
-  type/size/time/path). Then the remaining Timeline items, then M2 (case DB)
-  so analysis results persist.
-- M1 leftovers: HFS+/APFS, ISO, XFS (fstool can write fixtures for most),
-  VMDK/VHD/QCOW2 (qemu-img).
+- **M2 case database** (user agreed ADR-013 on 2026-10-14; the analysis
+  tools now need persistent results). Steps:
+  1. `pm-casedb`: schema v1 (SQLite, WAL), migration runner, typed models,
+     batched writer, query API (children, files, artifacts, attributes,
+     tags), with tests.
+  2. Standard artifact/attribute type catalogue (inventory 01 §artifacts)
+     as Rust enums + seed.
+  3. `pm-case`: case folder (`case.pmcase` TOML + `case.db`),
+     create/open/close, add data source → bulk loader (walk → channel →
+     batched writer).
+  4. UI: New/Open Case, tree and table backed by the DB, tags.
+  5. Then M4 ingest (hash, file type, EXIF, …) feeding artifacts.
 
 ## Blockers
 

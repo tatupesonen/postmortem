@@ -64,7 +64,9 @@ ends.
   targets for each binary format parser.
 - **Errors**: `thiserror` in libraries, `anyhow` only in binaries/tests.
 - **Logging**: `tracing`. No `println!` in libraries.
-- **Performance**: stream; never read whole evidence files into memory; batch
+- **Performance (ADR-014: tens of TB, 100s of millions of files)**: no
+  O(files) RAM structures; indexed queries only; keyset pagination;
+  benchmark new hot paths against the scale budgets. Stream; never read whole evidence files into memory; batch
   DB writes in transactions; parallelise with rayon at the file level; UI never
   blocks on IO (background jobs + channels, virtualised tables).
 - **Pure Rust** for parsing. A C dependency needs an ADR.

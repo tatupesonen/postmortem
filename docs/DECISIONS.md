@@ -114,3 +114,34 @@ an alternative and the improvement is documented in the test.
 * **No embedded Python.** Autopsy's Jython plugin API is not reproduced.
   External tools (aLEAPP/iLEAPP, Plaso, Volatility) may still run as
   subprocesses with their output imported, as Autopsy does.
+
+## ADR-014 — Scale target: tens of terabytes, hundreds of millions of files
+(User requirement, 2026-10-14: "should work for filesystems up to multiple
+terabytes, even tens of terabytes … search and everything stays performant".)
+
+Design budgets (to be enforced by benchmarks in `benches/` and a
+`scale-tests` feature; see PLAN "Scale" track):
+* **Evidence size**: 50 TB images, 500 M files across a case; single
+  directories with ≥ 1 M entries; MFTs of tens of GB.
+* **Memory**: bounded by working set, not by evidence size. No structure
+  may be O(number of files) in RAM unless it is ≤ ~16 bytes per file and
+  optional. The in-memory `pm-index` catalogue is a stop-gap and is replaced
+  by DB-backed queries (M2) before ingest lands.
+* **Enumeration**: NTFS uses a sequential bulk MFT scan (large sequential
+  reads, parsed in parallel chunks) to build the file table, not a recursive
+  directory walk. Other filesystems walk directories with read-ahead.
+  Target ≥ 200 k files/s loaded on SSD.
+* **Database**: bulk loads in large transactions with prepared statements;
+  secondary indexes are built after the bulk load; WAL; queries always go
+  through an index; UI listings use keyset pagination (never OFFSET, never
+  "load all"); counts for tree badges are precomputed or cached.
+* **Search**: file-name and path search uses an index (FTS5 trigram or an
+  equivalent), not LIKE scans. Content search uses Tantivy. Analysis views
+  (Timeline counts, Discovery groups, Data Source Summary) read
+  pre-aggregated tables updated at load/ingest time, never full scans on
+  interaction.
+* **UI**: every operation that can touch more than ~10 k rows runs off the
+  UI thread with progress and cancellation; tables are virtualised and
+  fetch pages on demand.
+* **IO**: positional reads with large, aligned requests; caches bounded
+  (sharded LRU); hashing and ingest parallel per file with back-pressure.

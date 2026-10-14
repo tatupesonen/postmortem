@@ -27,6 +27,8 @@ pm-evidence = { path = "crates/pm-evidence" }
 pm-timeline = { path = "crates/pm-timeline" }
 pm-index = { path = "crates/pm-index" }
 pm-discovery = { path = "crates/pm-discovery" }
+pm-casedb = { path = "crates/pm-casedb" }
+pm-case = { path = "crates/pm-case" }
 pm-ui = { path = "crates/pm-ui" }
 
 # Foundations
@@ -52,6 +54,9 @@ image = { version = "0.25.10", default-features = false, features = ["rayon", "j
 serde = { version = "1.0.229", features = ["derive"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 resvg = "0.48.1"
+rusqlite = { version = "0.40.2", features = ["bundled", "blob", "backup", "functions", "limits", "window"] }
+serde_json = "1.0.154"
+toml = "1.1.8"
 
 # Testing
 proptest = "1.12.0"
