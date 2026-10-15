@@ -3447,7 +3447,11 @@ dependencies = [
  "pm-core",
  "pm-hashdb",
  "pm-ingest",
+ "pm-lnk",
+ "pm-prefetch",
+ "pm-registry",
  "pm-testkit",
+ "pm-winartifacts",
  "proptest",
  "rusqlite",
  "serde",
@@ -3558,6 +3562,19 @@ dependencies = [
  "thiserror 2.0.21",
  "tracing",
  "uuid",
+]
+
+[[package]]
+name = "pm-winartifacts"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "pm-core",
+ "pm-lnk",
+ "pm-registry",
+ "proptest",
+ "serde_json",
+ "tracing",
 ]
 
 [[package]]

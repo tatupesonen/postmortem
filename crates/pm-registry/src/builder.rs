@@ -92,7 +92,7 @@ impl HiveBuilder {
 
     fn find_or_add(&mut self, path: &str, deleted: bool) -> usize {
         let mut cur = 0usize;
-        for part in path.split(['\\', '/']).filter(|p| !p.is_empty()) {
+        for part in path.split('\\').filter(|p| !p.is_empty()) {
             let existing =
                 self.keys[cur].children.iter().copied().find(|&c| {
                     self.keys[c].name.eq_ignore_ascii_case(part) && !self.keys[c].deleted

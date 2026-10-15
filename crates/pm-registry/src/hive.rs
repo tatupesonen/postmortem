@@ -108,8 +108,9 @@ impl Hive {
         Key::load(self, self.root_offset)
     }
 
-    /// Looks up a key by path relative to the root (`\` or `/` separated,
-    /// case-insensitive). `""` is the root.
+    /// Looks up a key by path relative to the root (`\` separated,
+    /// case-insensitive; `/` is a valid character in key names). `""` is
+    /// the root.
     pub fn key(&self, path: &str) -> Result<Option<Key<'_>>> {
         self.root()?.subkey_path(path)
     }
@@ -360,10 +361,10 @@ impl<'h> Key<'h> {
         Ok(None)
     }
 
-    /// Follows a relative path of subkeys (`\` or `/` separated).
+    /// Follows a relative path of subkeys (`\` separated).
     pub fn subkey_path(&self, path: &str) -> Result<Option<Key<'h>>> {
         let mut cur = self.clone();
-        for part in path.split(['\\', '/']).filter(|p| !p.is_empty()) {
+        for part in path.split('\\').filter(|p| !p.is_empty()) {
             match cur.subkey(part)? {
                 Some(k) => cur = k,
                 None => return Ok(None),

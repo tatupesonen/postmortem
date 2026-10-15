@@ -69,7 +69,7 @@ fn keys_values_and_lists_of_every_kind() {
         assert!(root.is_root());
         assert_eq!(root.name(), "CMI-CreateHive{2A7FB991}");
         let cv = hive
-            .key("microsoft/windows nt\\CURRENTVERSION")
+            .key("microsoft\\windows nt\\CURRENTVERSION")
             .unwrap()
             .expect("lookup is case-insensitive");
         assert_eq!(cv.path(), "Microsoft\\Windows NT\\CurrentVersion");
@@ -107,6 +107,10 @@ fn keys_values_and_lists_of_every_kind() {
         assert!(many.subkey("sub039").unwrap().is_some());
         assert!(many.subkey("sub040").unwrap().is_none());
         assert!(hive.key("Nope\\Nothing").unwrap().is_none());
+        assert!(
+            hive.key("Microsoft/Windows NT").unwrap().is_none(),
+            "'/' is part of a name"
+        );
 
         let big = hive
             .key("Big")

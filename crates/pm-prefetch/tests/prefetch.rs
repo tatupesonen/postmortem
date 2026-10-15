@@ -119,7 +119,9 @@ proptest! {
         let _ = parse(&data);
         let mut pf = sample(30, false).build();
         let n = pf.len().min(data.len());
-        pf[8..n.max(8)].copy_from_slice(&data[8..n.max(8)]);
+        if n > 8 {
+            pf[8..n].copy_from_slice(&data[8..n]);
+        }
         let _ = parse(&pf);
         let mut mam = b"MAM\x04".to_vec();
         mam.extend((size as u32).to_le_bytes());
