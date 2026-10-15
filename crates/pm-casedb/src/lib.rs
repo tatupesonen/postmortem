@@ -322,6 +322,29 @@ impl CaseDb {
     }
 
     /// Children of a directory, directories first then by name.
+    /// The file-system file with metadata address `inode` (and alternate
+    /// stream `stream`) in file system `fs_id` (indexed lookup).
+    pub fn file_by_inode(
+        &self,
+        fs_id: i64,
+        inode: u64,
+        stream: Option<u32>,
+    ) -> Result<Option<FileRecord>> {
+        let Ok(inode) = i64::try_from(inode) else {
+            return Ok(None);
+        };
+        self.read(|c| {
+            Ok(c.query_row(
+                &format!(
+                    "SELECT {FILE_COLS} FROM files WHERE fs_id = ?1 AND inode = ?2 AND stream IS ?3 AND origin = 0 ORDER BY id LIMIT 1"
+                ),
+                params![fs_id, inode, stream],
+                FileRecord::from_row,
+            )
+            .optional()?)
+        })
+    }
+
     pub fn children(&self, parent_id: i64) -> Result<Vec<FileRecord>> {
         self.read(|c| {
             let mut st = c.prepare_cached(&format!("SELECT {FILE_COLS} FROM files WHERE parent_id = ?1 ORDER BY kind <> 2, name COLLATE NOCASE"))?;

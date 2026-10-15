@@ -511,3 +511,30 @@ fn views_list_files_by_type_from_the_case_database() {
         h.query_by_label_contains("deleted_photo.bmp").is_some()
     });
 }
+
+#[test]
+fn file_metadata_shows_hashes_after_analysis() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
+    settle(&mut h, |h| {
+        !h.state().data_sources().is_empty() && !h.state().is_loading()
+    });
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    settle(&mut h, |h| {
+        h.query_by_label_contains("secret_plan.docx").is_some()
+    });
+    // The first match is the file itself, listed before its ADS.
+    click(&mut h, "setup.exe");
+    click(&mut h, "File Metadata");
+    let md5 = setup_exe_md5();
+    settle(&mut h, |h| h.query_by_label(&md5).is_some());
+    h.get_by_label("SHA-1");
+    h.get_by_label("SHA-256");
+    shot(&mut h, "metadata-hashes");
+}

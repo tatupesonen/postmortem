@@ -107,6 +107,8 @@ pub struct PostmortemApp {
     was_analysing: bool,
     was_analysing_views: bool,
     add_wizard: Option<crate::add_source::AddSourceWizard>,
+    /// Case folder and data-source count the hash resolver was built for.
+    resolver_key: Option<(PathBuf, usize)>,
     view_counts: crate::views::Counts,
     view_rows: HashMap<crate::views::View, Task<Result<Arc<crate::views::ViewRows>, String>>>,
 }
@@ -158,6 +160,7 @@ impl PostmortemApp {
             was_analysing: false,
             was_analysing_views: false,
             add_wizard: None,
+            resolver_key: None,
             view_counts: crate::views::Counts::default(),
             view_rows: HashMap::new(),
         };
@@ -1252,6 +1255,8 @@ impl PostmortemApp {
             if let Some(t) = &self.timeline {
                 t.lock().invalidate();
             }
+            // Hashes were just computed.
+            self.viewer.refresh_hashes();
         }
         self.was_analysing = live;
         let counts = self.result_counts.get(ui.ctx(), case.as_ref(), live);
@@ -1806,10 +1811,78 @@ impl PostmortemApp {
         }
     }
 
+    /// Lets the content viewer show hashes from the case database: maps a
+    /// browsed file system to its case file system (same image, same byte
+    /// offset) and looks the file up by inode/stream (indexed).
+    fn update_hash_resolver(&mut self) {
+        let case = self.analysis.lock().case().cloned();
+        let key = case
+            .as_ref()
+            .map(|c| (c.dir().to_path_buf(), self.sources.len()));
+        if key == self.resolver_key {
+            return;
+        }
+        self.resolver_key = key;
+        let Some(case) = case else {
+            self.viewer.set_hash_resolver(None);
+            return;
+        };
+        let fss: Vec<(Arc<dyn pm_fs::FileSystem>, PathBuf, u64)> = self
+            .sources
+            .iter()
+            .flat_map(|s| {
+                let path = s
+                    .evidence
+                    .image
+                    .info
+                    .paths
+                    .first()
+                    .cloned()
+                    .unwrap_or_default();
+                s.evidence
+                    .filesystems
+                    .iter()
+                    .map(move |f| (Arc::clone(&f.fs), path.clone(), f.offset))
+            })
+            .collect();
+        let resolver = move |c: &Content| -> Option<crate::viewers::FileHashes> {
+            let same = |a: &Arc<dyn pm_fs::FileSystem>| {
+                std::ptr::addr_eq(Arc::as_ptr(a), Arc::as_ptr(&c.fs))
+            };
+            let (_, path, offset) = fss.iter().find(|(fs, ..)| same(fs))?;
+            let db = case.db();
+            let ds = db
+                .data_sources()
+                .ok()?
+                .into_iter()
+                .find(|d| d.paths.first().map(PathBuf::from).as_ref() == Some(path))?;
+            let fs = db
+                .file_systems(ds.id)
+                .ok()?
+                .into_iter()
+                .find(|f| f.byte_offset == *offset)?;
+            let f = db.file_by_inode(fs.id, c.row.inode, c.row.stream).ok()??;
+            let hex = |v: Option<Vec<u8>>| v.map(|b| pm_core::decode::to_hex(&b));
+            Some(crate::viewers::FileHashes {
+                md5: hex(f.md5),
+                sha1: hex(f.sha1),
+                sha256: hex(f.sha256),
+                known: match f.known {
+                    pm_casedb::Known::Known => "Known".into(),
+                    pm_casedb::Known::Notable => "Notable".into(),
+                    pm_casedb::Known::Unknown => "Unknown".into(),
+                },
+            })
+        };
+        self.viewer
+            .set_hash_resolver(Some(crate::viewers::HashResolver(Arc::new(resolver))));
+    }
+
     /// Draws one frame (shared by eframe and UI tests).
     pub fn frame(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
         self.poll_loading();
+        self.update_hash_resolver();
         if !self.sources.is_empty() {
             // Index eagerly so analysis tools open instantly.
             self.shared_index(&ctx);

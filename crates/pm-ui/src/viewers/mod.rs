@@ -10,6 +10,8 @@ mod metadata;
 mod strings;
 mod text;
 
+use std::sync::Arc;
+
 use pm_core::SharedSource;
 
 use crate::format::DisplayPrefs;
@@ -86,6 +88,27 @@ pub(crate) fn sniff(head: &[u8]) -> Sniffed {
 }
 
 /// State of one viewer panel (main window or a pop-out).
+/// Hashes and known status of the shown file, from the case database.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub(crate) struct FileHashes {
+    pub(crate) md5: Option<String>,
+    pub(crate) sha1: Option<String>,
+    pub(crate) sha256: Option<String>,
+    pub(crate) known: String,
+}
+
+type ResolveFn = dyn Fn(&Content) -> Option<FileHashes> + Send + Sync;
+
+/// Looks up a shown file's hashes in the case (`None`: not in the case).
+#[derive(Clone)]
+pub(crate) struct HashResolver(pub(crate) Arc<ResolveFn>);
+
+impl std::fmt::Debug for HashResolver {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("HashResolver")
+    }
+}
+
 #[derive(Debug)]
 pub(crate) struct ViewerPanel {
     content: Option<Content>,
@@ -98,6 +121,8 @@ pub(crate) struct ViewerPanel {
     strings: StringsView,
     text: TextView,
     image: ImageView,
+    hash_resolver: Option<HashResolver>,
+    hashes: Option<FileHashes>,
 }
 
 impl Default for ViewerPanel {
@@ -112,6 +137,8 @@ impl Default for ViewerPanel {
             strings: StringsView::default(),
             text: TextView::default(),
             image: ImageView::default(),
+            hash_resolver: None,
+            hashes: None,
         }
     }
 }
@@ -122,6 +149,20 @@ impl ViewerPanel {
     }
 
     /// Shows `content` (no-op if already shown).
+    /// Sets how hashes of shown files are found (the open case).
+    pub(crate) fn set_hash_resolver(&mut self, resolver: Option<HashResolver>) {
+        self.hash_resolver = resolver;
+        self.refresh_hashes();
+    }
+
+    /// Re-reads the shown file's hashes (e.g. after analysis finished).
+    pub(crate) fn refresh_hashes(&mut self) {
+        self.hashes = match (&self.hash_resolver, &self.content) {
+            (Some(r), Some(c)) => (r.0)(c),
+            _ => None,
+        };
+    }
+
     pub(crate) fn set_content(&mut self, content: Option<Content>) {
         if self.content == content {
             return;
@@ -144,6 +185,7 @@ impl ViewerPanel {
             _ => Sniffed::Empty,
         };
         self.content = content;
+        self.refresh_hashes();
         self.tab = self
             .pinned
             .filter(|t| self.supports(*t))
@@ -203,7 +245,7 @@ impl ViewerPanel {
         }
         let src = self.source.as_ref().and_then(|s| s.as_ref().ok()).cloned();
         match (self.tab, src) {
-            (Tab::Metadata, _) => metadata::ui(ui, &content, prefs),
+            (Tab::Metadata, _) => metadata::ui(ui, &content, prefs, self.hashes.as_ref()),
             (Tab::Hex, Some(src)) => self.hex.ui(ui, &src),
             (Tab::Strings, Some(src)) => self.strings.ui(ui, &src),
             (Tab::Text, Some(src)) => self.text.ui(ui, &src),

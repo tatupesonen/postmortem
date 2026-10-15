@@ -20,7 +20,12 @@ fn times(ui: &mut egui::Ui, title: &str, t: &Times, prefs: &DisplayPrefs) {
     row(ui, "  Created", prefs.time(t.created));
 }
 
-pub(super) fn ui(ui: &mut egui::Ui, c: &Content, prefs: &DisplayPrefs) {
+pub(super) fn ui(
+    ui: &mut egui::Ui,
+    c: &Content,
+    prefs: &DisplayPrefs,
+    hashes: Option<&super::FileHashes>,
+) {
     egui::ScrollArea::vertical()
         .auto_shrink(false)
         .show(ui, |ui| {
@@ -34,6 +39,18 @@ pub(super) fn ui(ui: &mut egui::Ui, c: &Content, prefs: &DisplayPrefs) {
                     row(ui, "Path", &r.path);
                     row(ui, "Type", format!("{:?}", r.kind));
                     row(ui, "Size", size_long(r.size));
+                    // Hashes from the case database (computed by Hash Lookup),
+                    // right after the size as in Autopsy.
+                    if let Some(h) = hashes {
+                        let hash = |ui: &mut egui::Ui, k: &str, v: &Option<String>| match v {
+                            Some(v) => row(ui, k, egui::RichText::new(v).monospace()),
+                            None => row(ui, k, egui::RichText::new("Not calculated").weak()),
+                        };
+                        hash(ui, "MD5", &h.md5);
+                        hash(ui, "SHA-1", &h.sha1);
+                        hash(ui, "SHA-256", &h.sha256);
+                        row(ui, "Known", &h.known);
+                    }
                     row(
                         ui,
                         "Name",

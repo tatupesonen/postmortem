@@ -853,3 +853,29 @@ fn bulk_load_rate() {
         .unwrap();
     eprintln!("deleted count {c} in {:?}", t3.elapsed());
 }
+
+#[test]
+fn file_by_inode_finds_default_and_stream_rows() {
+    let (_d, db) = new_db();
+    let (ds_id, fs_id, root, _) = populate(&db);
+    let mut ads = file(
+        ds_id,
+        fs_id,
+        Some(root),
+        "/",
+        "z.exe:Zone.Identifier",
+        FileKindCode::Regular,
+        26,
+        true,
+    );
+    ads.inode = Some(7); // same inode as z.exe (size 7 is used as inode by `file`)
+    ads.stream = Some(3);
+    db.bulk(|b| b.add_file(&ads)).unwrap();
+    let plain = db.file_by_inode(fs_id, 7, None).unwrap().unwrap();
+    assert_eq!(plain.name, "z.exe");
+    let stream = db.file_by_inode(fs_id, 7, Some(3)).unwrap().unwrap();
+    assert_eq!(stream.name, "z.exe:Zone.Identifier");
+    assert!(db.file_by_inode(fs_id, 7, Some(9)).unwrap().is_none());
+    assert!(db.file_by_inode(fs_id + 1, 7, None).unwrap().is_none());
+    assert!(db.file_by_inode(fs_id, u64::MAX, None).unwrap().is_none());
+}
