@@ -13,6 +13,7 @@
 mod chromium;
 mod ie;
 mod search;
+mod windows;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -70,14 +71,15 @@ pub(crate) struct Visit {
 }
 
 /// One browser extractor: posts artifacts and collects history visits.
-type Step = fn(&JobContext, &mut Vec<Visit>) -> Result<(), ModuleError>;
+pub(crate) type Step = fn(&JobContext, &mut Vec<Visit>) -> Result<(), ModuleError>;
 
 impl DataSourceModule for Extractor {
     fn process(&mut self, ctx: &JobContext, progress: &DsProgress<'_>) -> Result<(), ModuleError> {
-        let steps: [(&str, Step); 2] = [
+        let mut steps: Vec<(&str, Step)> = vec![
             ("Chromium browsers", chromium::extract),
             ("Internet Explorer", ie::extract),
         ];
+        steps.extend(windows::steps());
         progress.set_total(steps.len() as u64 + 1);
         let mut visits = Vec::new();
         for (i, (label, step)) in steps.iter().enumerate() {

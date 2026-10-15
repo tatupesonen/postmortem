@@ -14,3 +14,4 @@ Sample Windows event logs from the `evtx` crate's repository
 (https://github.com/omerbenamram/evtx, `samples/`, commit 7479d02; MIT OR Apache-2.0):
 `new-user-security.evtx` and `Security_short_selected.evtx` (70 kB each).
 Used by `pm-evtlog` and the Windows Event Logs module tests.
+| `recyclebin/win10_I2JRX90`, `win7_ID5HSV3.exe`, `xp_INFO2`, `xp_INFO2_MultiFiles` | 44 B – 3.2 kB | Copied from Eric Zimmerman's RBCmd test data (`RecycleBin.Test/TestFiles`, MIT licence) | Real `$I` (versions 2 and 1) and XP `INFO2` files; expected values in `pm-winartifacts/tests/analyses.rs` were computed independently from the raw bytes |

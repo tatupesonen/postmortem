@@ -1,0 +1,24 @@
+[package]
+name = "pm-lnk"
+description = "Windows shell artefacts for postmortem: shell links (.lnk), shell item ID lists (shellbags), jump lists (OLE compound files, DestList, CustomDestinations)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# Writers for LNK files, shell items and compound files (tests, fuzz seeds).
+builder = []
+
+[dependencies]
+pm-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+jiff.workspace = true
+
+[dev-dependencies]
+pm-lnk = { path = ".", features = ["builder"] }
+proptest.workspace = true
+
+[lints]
+workspace = true

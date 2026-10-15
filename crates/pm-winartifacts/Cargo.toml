@@ -1,0 +1,23 @@
+[package]
+name = "pm-winartifacts"
+description = "Windows OS artefact analyses for postmortem: registry (OS info, SAM accounts, USB, MRUs, shellbags, BAM, ShimCache, Amcache, UserAssist, networks), recycle bin, Zone.Identifier, RecentFileCache, USB ID database"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+pm-registry.workspace = true
+pm-lnk.workspace = true
+tracing.workspace = true
+jiff.workspace = true
+serde_json.workspace = true
+
+[dev-dependencies]
+pm-registry = { workspace = true, features = ["builder"] }
+pm-lnk = { workspace = true, features = ["builder"] }
+proptest.workspace = true
+
+[lints]
+workspace = true

@@ -17,6 +17,9 @@ pm-image = { path = "../crates/pm-image" }
 pm-fs-ntfs = { path = "../crates/pm-fs-ntfs" }
 pm-fs-exfat = { path = "../crates/pm-fs-exfat" }
 pm-evtlog = { path = "../crates/pm-evtlog" }
+pm-registry = { path = "../crates/pm-registry" }
+pm-lnk = { path = "../crates/pm-lnk" }
+pm-prefetch = { path = "../crates/pm-prefetch" }
 
 [workspace]
 members = ["."]
@@ -59,6 +62,29 @@ bench = false
 [[bin]]
 name = "evtlog_parse"
 path = "fuzz_targets/evtlog_parse.rs"
+name = "registry_hive"
+path = "fuzz_targets/registry_hive.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "lnk_parse"
+path = "fuzz_targets/lnk_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "jumplist_parse"
+path = "fuzz_targets/jumplist_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "prefetch_parse"
+path = "fuzz_targets/prefetch_parse.rs"
 test = false
 doc = false
 bench = false

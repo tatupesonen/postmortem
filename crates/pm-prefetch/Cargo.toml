@@ -1,0 +1,23 @@
+[package]
+name = "pm-prefetch"
+description = "Windows prefetch (.pf) parser for postmortem: versions 17/23/26/30/31 and Windows 10+ MAM (LZXPRESS Huffman) compression"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# Prefetch writer and LZXPRESS Huffman encoder for tests and fuzz seeds.
+builder = []
+
+[dependencies]
+pm-core.workspace = true
+thiserror.workspace = true
+jiff.workspace = true
+
+[dev-dependencies]
+pm-prefetch = { path = ".", features = ["builder"] }
+proptest.workspace = true
+
+[lints]
+workspace = true

@@ -21,8 +21,15 @@ md-5.workspace = true
 sha2.workspace = true
 jiff.workspace = true
 rusqlite.workspace = true
+pm-registry.workspace = true
+pm-lnk.workspace = true
+pm-prefetch.workspace = true
+pm-winartifacts.workspace = true
 
 [dev-dependencies]
+pm-registry = { workspace = true, features = ["builder"] }
+pm-lnk = { workspace = true, features = ["builder"] }
+pm-prefetch = { workspace = true, features = ["builder"] }
 pm-case.workspace = true
 pm-testkit.workspace = true
 tempfile.workspace = true

@@ -14,6 +14,7 @@
 pub mod catalog;
 mod derived;
 mod model;
+mod windows_artifacts;
 
 use std::path::{Path, PathBuf};
 
