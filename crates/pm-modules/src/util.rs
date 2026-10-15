@@ -42,6 +42,37 @@ impl Art {
         }
     }
 
+    /// A data artifact of a custom (database-registered) type.
+    pub(crate) fn data_of_type(
+        ctx: &JobContext,
+        module: &'static str,
+        type_id: i64,
+        file_id: i64,
+    ) -> Self {
+        let mut s = Self::data(ctx, module, "TSK_GEN_INFO", file_id);
+        s.a.type_id = type_id;
+        s
+    }
+
+    /// An attribute of a custom (database-registered) type; empty values
+    /// are left out.
+    pub(crate) fn custom_text(mut self, type_id: i64, v: Option<String>) -> Self {
+        if let Some(v) = v.filter(|v| !v.is_empty()) {
+            self.a
+                .attributes
+                .push((type_id, Value::Text(v), self.module.to_owned()));
+        }
+        self
+    }
+
+    /// An integer attribute of a custom type.
+    pub(crate) fn custom_int(mut self, type_id: i64, v: i64) -> Self {
+        self.a
+            .attributes
+            .push((type_id, Value::Int(v), self.module.to_owned()));
+        self
+    }
+
     /// An analysis result with a score.
     pub(crate) fn result(
         ctx: &JobContext,

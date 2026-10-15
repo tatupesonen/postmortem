@@ -261,6 +261,13 @@ fn hex_parsing() {
 }
 
 #[test]
+fn empty_file_is_not_a_hash_set() {
+    let dir = tempfile::tempdir().unwrap();
+    let p = write(dir.path(), "empty.md5", "");
+    assert!(matches!(detect(&p), Err(HashDbError::UnknownFormat(_))));
+}
+
+#[test]
 fn unknown_format() {
     let dir = tempfile::tempdir().unwrap();
     let p = write(dir.path(), "x.txt", "hello world\n");
@@ -271,7 +278,7 @@ proptest! {
     #![proptest_config(ProptestConfig::with_cases(24))]
     #[test]
     fn lookups_agree_with_a_set(
-        members in prop::collection::vec(0u64..5_000, 0..1500),
+        members in prop::collection::vec(0u64..5_000, 1..1500),
         queries in prop::collection::vec(0u64..5_000, 0..200),
         chunk in 1usize..600,
     ) {

@@ -12,6 +12,7 @@
 
 pub mod demo;
 pub mod disk;
+pub mod evt;
 pub mod ext;
 pub mod lznt1;
 pub mod ntfs;

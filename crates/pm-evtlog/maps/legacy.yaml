@@ -1,0 +1,1376 @@
+# postmortem maps for legacy .evt logs (Windows NT/2000/XP/2003).
+# Values '#N' are the N-th insertion string; positions follow Microsoft's
+# Windows Server 2003 security event documentation.
+---
+Description: "Successful logon"
+EventId: 528
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#7"
+      -
+        Name: address
+        Value: "#14"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#4"
+  -
+    Property: PayloadData2
+    PropertyValue: "LogonId: %LogonId%"
+    Values:
+      -
+        Name: LogonId
+        Value: "#3"
+  -
+    Property: PayloadData3
+    PropertyValue: "LogonProcess: %proc% AuthPackage: %pkg%"
+    Values:
+      -
+        Name: proc
+        Value: "#5"
+      -
+        Name: pkg
+        Value: "#6"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Successful network logon"
+EventId: 540
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#7"
+      -
+        Name: address
+        Value: "#14"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#4"
+  -
+    Property: PayloadData2
+    PropertyValue: "LogonId: %LogonId%"
+    Values:
+      -
+        Name: LogonId
+        Value: "#3"
+  -
+    Property: PayloadData3
+    PropertyValue: "LogonProcess: %proc% AuthPackage: %pkg%"
+    Values:
+      -
+        Name: proc
+        Value: "#5"
+      -
+        Name: pkg
+        Value: "#6"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Failed logon: unknown user name or bad password"
+EventId: 529
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#6"
+      -
+        Name: address
+        Value: "#12"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Failed logon: account logon time restriction"
+EventId: 530
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#6"
+      -
+        Name: address
+        Value: "#12"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Failed logon: account disabled"
+EventId: 531
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#6"
+      -
+        Name: address
+        Value: "#12"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Failed logon: account expired"
+EventId: 532
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#6"
+      -
+        Name: address
+        Value: "#12"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Failed logon: not allowed to log on at this computer"
+EventId: 533
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#6"
+      -
+        Name: address
+        Value: "#12"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Failed logon: logon type not granted"
+EventId: 534
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#6"
+      -
+        Name: address
+        Value: "#12"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Failed logon: password expired"
+EventId: 535
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#6"
+      -
+        Name: address
+        Value: "#12"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Failed logon: NetLogon not active"
+EventId: 536
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#6"
+      -
+        Name: address
+        Value: "#12"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Failed logon: unexpected error"
+EventId: 537
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#6"
+      -
+        Name: address
+        Value: "#12"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Failed logon: account locked out"
+EventId: 539
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%workstation% (%address%)"
+    Values:
+      -
+        Name: workstation
+        Value: "#6"
+      -
+        Name: address
+        Value: "#12"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "Logoff"
+EventId: 538
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: PayloadData1
+    PropertyValue: "LogonType %LogonType%"
+    Values:
+      -
+        Name: LogonType
+        Value: "#4"
+  -
+    Property: PayloadData2
+    PropertyValue: "LogonId: %LogonId%"
+    Values:
+      -
+        Name: LogonId
+        Value: "#3"
+Lookups:
+  -
+    Name: LogonType
+    Default: Unknown logon type
+    Values:
+      2: Interactive
+      3: Network
+      4: Batch
+      5: Service
+      7: Unlock
+      8: NetworkCleartext
+      9: NewCredentials
+      10: RemoteInteractive
+      11: CachedInteractive
+---
+Description: "User initiated logoff"
+EventId: 551
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+---
+Description: "Logon with explicit credentials"
+EventId: 552
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%server% (%address%)"
+    Values:
+      -
+        Name: server
+        Value: "#8"
+      -
+        Name: address
+        Value: "#11"
+  -
+    Property: PayloadData1
+    PropertyValue: "Target: %tdomain%\\%tuser%"
+    Values:
+      -
+        Name: tdomain
+        Value: "#6"
+      -
+        Name: tuser
+        Value: "#5"
+---
+Description: "Special privileges assigned to new logon"
+EventId: 576
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: PayloadData1
+    PropertyValue: "Privileges: %priv%"
+    Values:
+      -
+        Name: priv
+        Value: "#4"
+---
+Description: "Security log cleared"
+EventId: 517
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#5"
+      -
+        Name: user
+        Value: "#4"
+---
+Description: "System time changed"
+EventId: 520
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#4"
+      -
+        Name: user
+        Value: "#3"
+  -
+    Property: ExecutableInfo
+    PropertyValue: "%proc%"
+    Values:
+      -
+        Name: proc
+        Value: "#2"
+  -
+    Property: PayloadData1
+    PropertyValue: "Old: %od% %ot% New: %nd% %nt%"
+    Values:
+      -
+        Name: ot
+        Value: "#9"
+      -
+        Name: od
+        Value: "#10"
+      -
+        Name: nt
+        Value: "#11"
+      -
+        Name: nd
+        Value: "#12"
+---
+Description: "Process created"
+EventId: 592
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#5"
+      -
+        Name: user
+        Value: "#4"
+  -
+    Property: ExecutableInfo
+    PropertyValue: "%image%"
+    Values:
+      -
+        Name: image
+        Value: "#2"
+  -
+    Property: PayloadData1
+    PropertyValue: "PID: %pid% Parent PID: %ppid%"
+    Values:
+      -
+        Name: pid
+        Value: "#1"
+      -
+        Name: ppid
+        Value: "#3"
+---
+Description: "Process exited"
+EventId: 593
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#4"
+      -
+        Name: user
+        Value: "#3"
+  -
+    Property: ExecutableInfo
+    PropertyValue: "%image%"
+    Values:
+      -
+        Name: image
+        Value: "#2"
+---
+Description: "Service install attempt"
+EventId: 601
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: ExecutableInfo
+    PropertyValue: "%file%"
+    Values:
+      -
+        Name: file
+        Value: "#1"
+  -
+    Property: PayloadData1
+    PropertyValue: "Service: %name%"
+    Values:
+      -
+        Name: name
+        Value: "#2"
+  -
+    Property: PayloadData2
+    PropertyValue: "StartType: %start% Account: %acct%"
+    Values:
+      -
+        Name: start
+        Value: "#4"
+      -
+        Name: acct
+        Value: "#5"
+---
+Description: "User account created"
+EventId: 624
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#5"
+      -
+        Name: user
+        Value: "#4"
+  -
+    Property: PayloadData1
+    PropertyValue: "Target: %tdomain%\\%tuser%"
+    Values:
+      -
+        Name: tdomain
+        Value: "#2"
+      -
+        Name: tuser
+        Value: "#1"
+---
+Description: "User account enabled"
+EventId: 626
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#5"
+      -
+        Name: user
+        Value: "#4"
+  -
+    Property: PayloadData1
+    PropertyValue: "Target: %tdomain%\\%tuser%"
+    Values:
+      -
+        Name: tdomain
+        Value: "#2"
+      -
+        Name: tuser
+        Value: "#1"
+---
+Description: "User account disabled"
+EventId: 629
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#5"
+      -
+        Name: user
+        Value: "#4"
+  -
+    Property: PayloadData1
+    PropertyValue: "Target: %tdomain%\\%tuser%"
+    Values:
+      -
+        Name: tdomain
+        Value: "#2"
+      -
+        Name: tuser
+        Value: "#1"
+---
+Description: "User account deleted"
+EventId: 630
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#5"
+      -
+        Name: user
+        Value: "#4"
+  -
+    Property: PayloadData1
+    PropertyValue: "Target: %tdomain%\\%tuser%"
+    Values:
+      -
+        Name: tdomain
+        Value: "#2"
+      -
+        Name: tuser
+        Value: "#1"
+---
+Description: "Password change attempted"
+EventId: 627
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#5"
+      -
+        Name: user
+        Value: "#4"
+  -
+    Property: PayloadData1
+    PropertyValue: "Target: %tdomain%\\%tuser%"
+    Values:
+      -
+        Name: tdomain
+        Value: "#2"
+      -
+        Name: tuser
+        Value: "#1"
+---
+Description: "Password set"
+EventId: 628
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#5"
+      -
+        Name: user
+        Value: "#4"
+  -
+    Property: PayloadData1
+    PropertyValue: "Target: %tdomain%\\%tuser%"
+    Values:
+      -
+        Name: tdomain
+        Value: "#2"
+      -
+        Name: tuser
+        Value: "#1"
+---
+Description: "User account changed"
+EventId: 642
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#5"
+      -
+        Name: user
+        Value: "#4"
+  -
+    Property: PayloadData1
+    PropertyValue: "Target: %tdomain%\\%tuser%"
+    Values:
+      -
+        Name: tdomain
+        Value: "#2"
+      -
+        Name: tuser
+        Value: "#1"
+---
+Description: "User account locked out"
+EventId: 644
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#5"
+      -
+        Name: user
+        Value: "#4"
+  -
+    Property: PayloadData1
+    PropertyValue: "Target: %tdomain%\\%tuser%"
+    Values:
+      -
+        Name: tdomain
+        Value: "#2"
+      -
+        Name: tuser
+        Value: "#1"
+---
+Description: "Member added to global group"
+EventId: 632
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#7"
+      -
+        Name: user
+        Value: "#6"
+  -
+    Property: PayloadData1
+    PropertyValue: "Member: %member%"
+    Values:
+      -
+        Name: member
+        Value: "#1"
+  -
+    Property: PayloadData2
+    PropertyValue: "Group: %gdomain%\\%group%"
+    Values:
+      -
+        Name: gdomain
+        Value: "#4"
+      -
+        Name: group
+        Value: "#3"
+---
+Description: "Member added to local group"
+EventId: 636
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#7"
+      -
+        Name: user
+        Value: "#6"
+  -
+    Property: PayloadData1
+    PropertyValue: "Member: %member%"
+    Values:
+      -
+        Name: member
+        Value: "#1"
+  -
+    Property: PayloadData2
+    PropertyValue: "Group: %gdomain%\\%group%"
+    Values:
+      -
+        Name: gdomain
+        Value: "#4"
+      -
+        Name: group
+        Value: "#3"
+---
+Description: "Member added to universal group"
+EventId: 660
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#7"
+      -
+        Name: user
+        Value: "#6"
+  -
+    Property: PayloadData1
+    PropertyValue: "Member: %member%"
+    Values:
+      -
+        Name: member
+        Value: "#1"
+  -
+    Property: PayloadData2
+    PropertyValue: "Group: %gdomain%\\%group%"
+    Values:
+      -
+        Name: gdomain
+        Value: "#4"
+      -
+        Name: group
+        Value: "#3"
+---
+Description: "Session reconnected (RDP)"
+EventId: 682
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%client% (%address%)"
+    Values:
+      -
+        Name: client
+        Value: "#5"
+      -
+        Name: address
+        Value: "#6"
+  -
+    Property: PayloadData1
+    PropertyValue: "Session: %session%"
+    Values:
+      -
+        Name: session
+        Value: "#4"
+---
+Description: "Session disconnected (RDP)"
+EventId: 683
+Channel: Security
+Provider: Security
+Maps:
+  -
+    Property: UserName
+    PropertyValue: "%domain%\\%user%"
+    Values:
+      -
+        Name: domain
+        Value: "#2"
+      -
+        Name: user
+        Value: "#1"
+  -
+    Property: RemoteHost
+    PropertyValue: "%client% (%address%)"
+    Values:
+      -
+        Name: client
+        Value: "#5"
+      -
+        Name: address
+        Value: "#6"
+  -
+    Property: PayloadData1
+    PropertyValue: "Session: %session%"
+    Values:
+      -
+        Name: session
+        Value: "#4"
+---
+Description: "Event log service started (boot)"
+EventId: 6005
+Channel: System
+Provider: EventLog
+Maps:
+  -
+    Property: PayloadData1
+    PropertyValue: "Event log service started"
+    Values:
+      -
+        Name: x
+        Value: "#1"
+---
+Description: "Event log service stopped (shutdown)"
+EventId: 6006
+Channel: System
+Provider: EventLog
+Maps:
+  -
+    Property: PayloadData1
+    PropertyValue: "Event log service stopped"
+    Values:
+      -
+        Name: x
+        Value: "#1"
+---
+Description: "Unexpected shutdown"
+EventId: 6008
+Channel: System
+Provider: EventLog
+Maps:
+  -
+    Property: PayloadData1
+    PropertyValue: "Previous shutdown at %time% on %date% was unexpected"
+    Values:
+      -
+        Name: time
+        Value: "#1"
+      -
+        Name: date
+        Value: "#2"
+---
+Description: "OS version at boot"
+EventId: 6009
+Channel: System
+Provider: EventLog
+Maps:
+  -
+    Property: PayloadData1
+    PropertyValue: "Version %ver% build %build% %sp%"
+    Values:
+      -
+        Name: ver
+        Value: "#1"
+      -
+        Name: build
+        Value: "#2"
+      -
+        Name: sp
+        Value: "#3"
+---
+Description: "System uptime"
+EventId: 6013
+Channel: System
+Provider: EventLog
+Maps:
+  -
+    Property: PayloadData1
+    PropertyValue: "Uptime %secs% seconds"
+    Values:
+      -
+        Name: secs
+        Value: "#5"
+---
+Description: "Service control sent"
+EventId: 7035
+Channel: System
+Provider: Service Control Manager
+Maps:
+  -
+    Property: PayloadData1
+    PropertyValue: "%svc%: %ctl%"
+    Values:
+      -
+        Name: svc
+        Value: "#1"
+      -
+        Name: ctl
+        Value: "#2"
+---
+Description: "Service state change"
+EventId: 7036
+Channel: System
+Provider: Service Control Manager
+Maps:
+  -
+    Property: PayloadData1
+    PropertyValue: "%svc%: %state%"
+    Values:
+      -
+        Name: svc
+        Value: "#1"
+      -
+        Name: state
+        Value: "#2"
+---
+Description: "Service crashed"
+EventId: 7034
+Channel: System
+Provider: Service Control Manager
+Maps:
+  -
+    Property: PayloadData1
+    PropertyValue: "%svc% terminated unexpectedly (%n% times)"
+    Values:
+      -
+        Name: svc
+        Value: "#1"
+      -
+        Name: n
+        Value: "#2"
+---
+Description: "Service installed"
+EventId: 7045
+Channel: System
+Provider: Service Control Manager
+Maps:
+  -
+    Property: PayloadData1
+    PropertyValue: "Service: %svc%"
+    Values:
+      -
+        Name: svc
+        Value: "#1"
+  -
+    Property: ExecutableInfo
+    PropertyValue: "%path%"
+    Values:
+      -
+        Name: path
+        Value: "#2"

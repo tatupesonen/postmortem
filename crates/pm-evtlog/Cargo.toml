@@ -1,0 +1,24 @@
+[package]
+name = "pm-evtlog"
+description = "Windows event logs: EVTX (Vista+) and legacy EVT (NT/2000/XP/2003) records in one model"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+jiff.workspace = true
+roxmltree = "=0.21.1"
+yaml-rust2 = "=0.13.0"
+fancy-regex = "=0.19.2"
+evtx = { version = "=0.12.3", default-features = false }
+
+[dev-dependencies]
+pm-testkit.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true

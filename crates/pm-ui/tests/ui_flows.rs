@@ -479,7 +479,14 @@ fn add_data_source_wizard_runs_configured_hash_lookup() {
 fn views_list_files_by_type_from_the_case_database() {
     let mut h = harness(vec![DEMO.1.clone()]);
     wait_analysed(&mut h);
-    settle(&mut h, |h| h.query_by_label_contains("Images (").is_some());
+    // Counts refresh in the background; wait for the loaded value.
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("Images (").any(|n| {
+            n.accesskit_node()
+                .label()
+                .is_some_and(|l| l != "Images (0)")
+        })
+    });
     let label = h
         .query_all_by_label_contains("Images (")
         .next()

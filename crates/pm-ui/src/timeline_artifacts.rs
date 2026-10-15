@@ -72,8 +72,12 @@ pub(crate) fn load(case: &Arc<Case>, sources: &[DataSource]) -> (Vec<Event>, Vec
     let mut events = Vec::new();
     let mut subjects = Vec::new();
     let mut locations: HashMap<i64, Location> = HashMap::new();
+    // Custom types (e.g. PM_EVENT_LOG) are registered in the case database.
+    let custom = db.artifact_type_names().unwrap_or_default();
     for (ty, kind, time_attrs, desc_attrs) in MAPPING {
-        let Some(type_id) = artifact_type_id(ty) else {
+        let Some(type_id) =
+            artifact_type_id(ty).or_else(|| custom.iter().find(|t| t.1 == *ty).map(|t| t.0))
+        else {
             continue;
         };
         let mut after = 0;

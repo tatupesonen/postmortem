@@ -33,6 +33,7 @@ pm-ingest = { path = "crates/pm-ingest" }
 pm-modules = { path = "crates/pm-modules" }
 pm-hashdb = { path = "crates/pm-hashdb" }
 pm-filetype = { path = "crates/pm-filetype" }
+pm-evtlog = { path = "crates/pm-evtlog" }
 pm-ui = { path = "crates/pm-ui" }
 
 # Foundations

@@ -16,6 +16,7 @@ pm-fs-fat = { path = "../crates/pm-fs-fat" }
 pm-image = { path = "../crates/pm-image" }
 pm-fs-ntfs = { path = "../crates/pm-fs-ntfs" }
 pm-fs-exfat = { path = "../crates/pm-fs-exfat" }
+pm-evtlog = { path = "../crates/pm-evtlog" }
 
 [workspace]
 members = ["."]
@@ -51,6 +52,13 @@ bench = false
 [[bin]]
 name = "exfat_walk"
 path = "fuzz_targets/exfat_walk.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "evtlog_parse"
+path = "fuzz_targets/evtlog_parse.rs"
 test = false
 doc = false
 bench = false

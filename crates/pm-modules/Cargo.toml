@@ -11,6 +11,7 @@ pm-core.workspace = true
 pm-casedb.workspace = true
 pm-ingest.workspace = true
 pm-hashdb.workspace = true
+pm-evtlog.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 serde.workspace = true
