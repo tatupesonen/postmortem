@@ -13,8 +13,14 @@
      NOT run; only its own crates checked). Expect conflicts in
      `crates/pm-modules/src/recent_activity/mod.rs` with the merged
      windows step list (keep both: browser rewrite + `windows::steps()`).
-   - core-file-modules, search, email-mobile: told to make WIP commits
-     without the gate and stop; check each branch's `docs/agents/*.md`.
+   - `worktree-agent-a7f517951264ab1af` (email-mobile, WIP `517bcc5`,
+     gate NOT run): pm-email (MBOX/MIME/PST/vCard/threading), accounts &
+     relationships helpers (`pm-casedb/src/communications.rs`), Email
+     Parser, Android Analyzer (22 apps). Its Android browser code calls
+     `crate::recent_activity::extract_domain` — keep that name/path when
+     merging the browsers rewrite. GPX/DJI/YARA/VM extractor not started.
+   - core-file-modules, search: told to make WIP commits without the
+     gate and stop; check each branch's `docs/agents/*.md`.
    - derived-and-carving: infrastructure merged; `pm-archive` +
      extractor + carving are parked in that worktree's `.wip-derived/`.
 3. Then resume each track for its remaining items (see the track docs),
