@@ -389,7 +389,7 @@ fn analysis_results_are_listed_and_open_the_source_file() {
     settle(&mut h, |h| {
         !h.state().data_sources().is_empty() && !h.state().is_loading()
     });
-    click_exact(&mut h, "Hashset Hits (1)");
+    click_exact(&mut h, "# Hashset Hits (1)");
     settle(&mut h, |h| h.query_by_label_contains("Notable").is_some());
     // Configuration and Set Name columns.
     assert_eq!(h.get_all_by_label("Malware").count(), 2);
@@ -471,7 +471,7 @@ fn add_data_source_wizard_runs_configured_hash_lookup() {
     settle(&mut h, |h| {
         h.query_by_label_contains("Analysed demo.dd").is_some()
     });
-    settle(&mut h, |h| h.query_by_label("Hashset Hits (1)").is_some());
+    settle(&mut h, |h| h.query_by_label("# Hashset Hits (1)").is_some());
     shot(&mut h, "add-source-done");
 }
 
@@ -484,7 +484,7 @@ fn views_list_files_by_type_from_the_case_database() {
         h.query_all_by_label_contains("Images (").any(|n| {
             n.accesskit_node()
                 .label()
-                .is_some_and(|l| l != "Images (0)")
+                .is_some_and(|l| l != "🖼 Images (0)")
         })
     });
     let label = h
@@ -494,7 +494,7 @@ fn views_list_files_by_type_from_the_case_database() {
         .accesskit_node()
         .label()
         .unwrap_or_default();
-    assert_ne!(label, "Images (0)", "{label}");
+    assert_ne!(label, "🖼 Images (0)", "{label}");
     click_exact(&mut h, &label);
     settle(&mut h, |h| {
         h.query_by_label_contains("sunset.bmp").is_some()

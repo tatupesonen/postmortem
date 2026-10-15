@@ -11,6 +11,7 @@ mod case_ui;
 mod discovery;
 mod format;
 mod gallery;
+mod icons;
 mod index;
 mod model;
 mod results;

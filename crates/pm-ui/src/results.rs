@@ -21,6 +21,8 @@ const REFRESH: Duration = Duration::from_secs(2);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TypeCount {
     pub(crate) type_id: i64,
+    /// Type name (`TSK_WEB_HISTORY`), for the tree icon.
+    pub(crate) name: String,
     pub(crate) display: String,
     pub(crate) category: Category,
     pub(crate) count: u64,
@@ -34,9 +36,10 @@ pub(crate) fn load_counts(case: &Case) -> Result<Vec<TypeCount>, String> {
     let mut out: Vec<TypeCount> = counts
         .into_iter()
         .filter_map(|(type_id, count)| {
-            let (_, _, display, cat) = names.iter().find(|n| n.0 == type_id)?;
+            let (_, name, display, cat) = names.iter().find(|n| n.0 == type_id)?;
             Some(TypeCount {
                 type_id,
+                name: name.clone(),
                 display: display.clone(),
                 category: if *cat == Category::AnalysisResult as i64 {
                     Category::AnalysisResult

@@ -72,6 +72,9 @@ proptest = "1.12.0"
 rstest = "0.27.0"
 insta = "1.49.0"
 egui_kittest = { version = "0.36.2", features = ["wgpu", "snapshot"] }
+# Glyph coverage checks of egui's bundled fonts (tests).
+epaint_default_fonts = "0.36.2"
+skrifa = "0.44.0"
 tempfile = "3.27.0"
 md-5 = "0.11.0"
 sha1 = "0.11.0"

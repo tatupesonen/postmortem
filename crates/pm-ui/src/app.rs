@@ -14,6 +14,7 @@ use crate::case_ui::{NewCaseWizard, WelcomeAction, WizardAction};
 use crate::discovery::DiscoveryWindow;
 use crate::format::{DisplayPrefs, size_long};
 use crate::gallery::GalleryWindow;
+use crate::icons;
 use crate::index::SharedIndex;
 use crate::model::{Content, DataSource, FileRow, NodeId, list_dir, list_orphans};
 use crate::summary::{self, SummaryState};
@@ -1051,7 +1052,7 @@ impl PostmortemApp {
 
     fn tree(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
-            ui.heading("Data Sources");
+            ui.heading(format!("{} Data Sources", icons::DATA_SOURCES));
             if self.sources.is_empty() && self.loading.is_empty() {
                 ui.weak(if self.has_case() {
                     "No data sources. Use Case › Add Data Source."
@@ -1071,9 +1072,15 @@ impl PostmortemApp {
             }
             for ds in self.sources.clone() {
                 let node = NodeId::DataSource(ds.id);
-                self.tree_node(ui, &node, &format!("🖴 {}", ds.name), true, |app, ui| {
-                    app.data_source_children(ui, &ds);
-                });
+                self.tree_node(
+                    ui,
+                    &node,
+                    &format!("{} {}", icons::DATA_SOURCE, ds.name),
+                    true,
+                    |app, ui| {
+                        app.data_source_children(ui, &ds);
+                    },
+                );
             }
             self.views_tree(ui);
             self.results_tree(ui);
@@ -1098,15 +1105,15 @@ impl PostmortemApp {
         let c = self.view_counts.get(ui.ctx(), case.as_ref(), live, hide);
         let n = |v: Option<&u64>| crate::format::grouped(v.copied().unwrap_or(0));
         ui.add_space(8.0);
-        ui.heading("Views");
+        ui.heading(format!("{} Views", icons::VIEWS));
         let leaf = |app: &mut Self, ui: &mut egui::Ui, view: View, label: String| {
             app.tree_node(ui, &NodeId::View(view), &label, false, |_, _| {});
         };
-        egui::CollapsingHeader::new("File Types")
+        egui::CollapsingHeader::new(format!("{} File Types", icons::FILE_TYPES))
             .id_salt("views-types")
             .default_open(true)
             .show(ui, |ui| {
-                egui::CollapsingHeader::new("By Extension")
+                egui::CollapsingHeader::new(format!("{} By Extension", icons::BY_EXTENSION))
                     .id_salt("views-ext")
                     .default_open(true)
                     .show(ui, |ui| {
@@ -1115,11 +1122,12 @@ impl PostmortemApp {
                                 self,
                                 ui,
                                 View::Ext(i),
-                                format!("{name} ({})", n(c.ext.get(i))),
+                                format!("{} {name} ({})", icons::file_group(name), n(c.ext.get(i))),
                             );
                         }
                         egui::CollapsingHeader::new(format!(
-                            "Documents ({})",
+                            "{} Documents ({})",
+                            icons::file_group("Documents"),
                             crate::format::grouped(c.doc.iter().sum())
                         ))
                         .id_salt("views-docs")
@@ -1129,12 +1137,16 @@ impl PostmortemApp {
                                     self,
                                     ui,
                                     View::Doc(i),
-                                    format!("{name} ({})", n(c.doc.get(i))),
+                                    format!(
+                                        "{} {name} ({})",
+                                        icons::file_group(name),
+                                        n(c.doc.get(i))
+                                    ),
                                 );
                             }
                         });
                     });
-                egui::CollapsingHeader::new("By MIME Type")
+                egui::CollapsingHeader::new(format!("{} By MIME Type", icons::BY_MIME))
                     .id_salt("views-mime")
                     .show(ui, |ui| {
                         if c.mime.is_empty() {
@@ -1145,7 +1157,7 @@ impl PostmortemApp {
                             let (top, sub) = mime.split_once('/').unwrap_or((mime.as_str(), ""));
                             if top != media {
                                 top.clone_into(&mut media);
-                                ui.strong(&media);
+                                ui.strong(format!("{} {media}", icons::media_type(&media)));
                             }
                             leaf(
                                 self,
@@ -1156,23 +1168,27 @@ impl PostmortemApp {
                         }
                     });
             });
-        egui::CollapsingHeader::new(format!("Deleted Files ({})", n(c.deleted.get(1))))
-            .id_salt("views-deleted")
-            .show(ui, |ui| {
-                leaf(
-                    self,
-                    ui,
-                    View::Deleted(true),
-                    format!("File System ({})", n(c.deleted.first())),
-                );
-                leaf(
-                    self,
-                    ui,
-                    View::Deleted(false),
-                    format!("All ({})", n(c.deleted.get(1))),
-                );
-            });
-        egui::CollapsingHeader::new("File Size")
+        egui::CollapsingHeader::new(format!(
+            "{} Deleted Files ({})",
+            icons::DELETED,
+            n(c.deleted.get(1))
+        ))
+        .id_salt("views-deleted")
+        .show(ui, |ui| {
+            leaf(
+                self,
+                ui,
+                View::Deleted(true),
+                format!("{} File System ({})", icons::DELETED, n(c.deleted.first())),
+            );
+            leaf(
+                self,
+                ui,
+                View::Deleted(false),
+                format!("{} All ({})", icons::DELETED, n(c.deleted.get(1))),
+            );
+        });
+        egui::CollapsingHeader::new(format!("{} File Size", icons::FILE_SIZE))
             .id_salt("views-size")
             .show(ui, |ui| {
                 for (i, (name, ..)) in crate::views::SIZE_BUCKETS.iter().enumerate() {
@@ -1180,7 +1196,7 @@ impl PostmortemApp {
                         self,
                         ui,
                         View::Size(i),
-                        format!("{name} ({})", n(c.size.get(i))),
+                        format!("{} {name} ({})", icons::FILE_SIZE, n(c.size.get(i))),
                     );
                 }
             });
@@ -1274,15 +1290,20 @@ impl PostmortemApp {
                 self.result_rows.remove(&t.type_id);
             }
         }
-        for (heading, cat) in [
-            ("Data Artifacts", pm_casedb::catalog::Category::DataArtifact),
+        for (icon, heading, cat) in [
             (
+                icons::DATA_ARTIFACTS,
+                "Data Artifacts",
+                pm_casedb::catalog::Category::DataArtifact,
+            ),
+            (
+                icons::ANALYSIS_RESULTS,
                 "Analysis Results",
                 pm_casedb::catalog::Category::AnalysisResult,
             ),
         ] {
             ui.add_space(8.0);
-            ui.heading(heading);
+            ui.heading(format!("{icon} {heading}"));
             let of_cat: Vec<_> = counts
                 .iter()
                 .filter(|t| t.category == cat)
@@ -1297,7 +1318,9 @@ impl PostmortemApp {
             }
             for t in of_cat {
                 let node = NodeId::Results { type_id: t.type_id };
-                let label = format!("{} ({})", t.display, crate::format::grouped(t.count));
+                let icon =
+                    icons::artifact(&t.name, cat == pm_casedb::catalog::Category::AnalysisResult);
+                let label = format!("{icon} {} ({})", t.display, crate::format::grouped(t.count));
                 self.tree_node(ui, &node, &label, false, |_, _| {});
             }
         }
@@ -1354,7 +1377,12 @@ impl PostmortemApp {
                     continue;
                 }
                 let label = format!(
-                    "vol{} ({}: {}-{})",
+                    "{} vol{} ({}: {}-{})",
+                    if p.kind == SlotKind::Unallocated {
+                        icons::UNALLOCATED
+                    } else {
+                        icons::VOLUME
+                    },
                     p.addr,
                     p.description,
                     p.start_sector,
@@ -1393,14 +1421,20 @@ impl PostmortemApp {
             inode: fs.root(),
             path: Arc::from("/"),
         };
-        let label = format!("🗀 / ({})", fs.info().kind);
+        let label = format!("{} / ({})", icons::FOLDER, fs.info().kind);
         self.tree_node(ui, &root, &label, true, |app, ui| {
             app.dir_children(ui, &root);
             let orphans = NodeId::Orphans {
                 ds: ds.id,
                 fs: fs_idx,
             };
-            app.tree_node(ui, &orphans, "🗀 $OrphanFiles", false, |_, _| {});
+            app.tree_node(
+                ui,
+                &orphans,
+                &format!("{} $OrphanFiles", icons::FOLDER),
+                false,
+                |_, _| {},
+            );
         });
     }
 
@@ -1431,9 +1465,9 @@ impl PostmortemApp {
                         path: Arc::from(r.path.as_str()),
                     };
                     let label = if r.deleted() {
-                        format!("🗀 {} ✖", r.name)
+                        format!("{} {} ✖", icons::FOLDER, r.name)
                     } else {
-                        format!("🗀 {}", r.name)
+                        format!("{} {}", icons::FOLDER, r.name)
                     };
                     self.tree_node(ui, &child, &label, true, |app, ui| {
                         app.dir_children(ui, &child);
