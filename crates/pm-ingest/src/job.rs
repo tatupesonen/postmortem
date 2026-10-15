@@ -13,8 +13,9 @@ use pm_casedb::{
 };
 use serde::{Deserialize, Serialize};
 
-use crate::context::WriteOp;
+use crate::context::{FilesReply, WriteOp};
 use crate::progress::{DsStatus, Phase};
+use crate::sched::Scheduler;
 use crate::{
     DataSourceModule, DsProgress, FileModule, Inbox, IngestFile, IngestProgress, JobContext,
     ModuleFactory, ModuleInfo, ModuleJob,
@@ -144,6 +145,14 @@ pub fn run_job(
     let settings_json = serde_json::to_string(settings).unwrap_or_default();
     let job_id = db.start_ingest_job(ds_id, &settings_json, now(), &modules)?;
 
+    // Files added while the job runs (derived, carved) get ids from here
+    // on; the producer leaves them to the high-priority queue.
+    let id_limit = db.file_ids().peek();
+    let threads = if settings.threads == 0 {
+        std::thread::available_parallelism().map_or(4, std::num::NonZero::get)
+    } else {
+        settings.threads
+    };
     let (sink, ops) = bounded::<WriteOp>(WRITE_BATCH * 2);
     let ctx = JobContext {
         ds_id,
@@ -153,6 +162,8 @@ pub fn run_job(
         sink,
         inbox: Arc::clone(inbox),
         progress: Arc::clone(progress),
+        sched: Arc::new(Scheduler::new(threads * 64)),
+        filter: settings.filter,
     };
 
     std::thread::scope(|s| -> Result<JobSummary, IngestError> {
@@ -197,9 +208,15 @@ pub fn run_job(
         std::thread::scope(|s2| {
             if !stages.is_empty() {
                 let ctx = &ctx;
-                s2.spawn(move || run_ds_modules(ctx, stages));
+                // Stage-1 data-source modules may add derived files: the
+                // file workers wait for them.
+                let hold = ctx.sched.hold();
+                s2.spawn(move || {
+                    run_ds_modules(ctx, stages);
+                    drop(hold);
+                });
             }
-            run_files(s2, &ctx, &jobs, settings, &db, progress);
+            run_files(s2, &ctx, &jobs, threads, &db, Some(id_limit));
         });
 
         // Later stages, one after another (sorted by stage above).
@@ -214,7 +231,13 @@ pub fn run_job(
             }
             progress.set_phase(Phase::DataSource(st));
             run_ds_modules(&ctx, group);
+            // Files a later stage added still get the file pipeline.
+            if ctx.sched.queued() > 0 && !progress.is_cancelled() {
+                progress.set_phase(Phase::Files);
+                std::thread::scope(|s2| run_files(s2, &ctx, &jobs, threads, &db, None));
+            }
         }
+        ctx.sched.clear();
 
         progress.set_phase(Phase::Finishing);
         for (_, j) in &jobs {
@@ -257,20 +280,19 @@ fn stop_writer(ctx: &JobContext, writer: std::thread::ScopedJoinHandle<'_, Resul
     }
 }
 
-/// Streams the data source's files in priority order to the workers.
+/// Runs the file workers until no work is left. With `produce`, also
+/// streams the data source's files with ids below the limit in priority
+/// order (files added during the job arrive through the high-priority
+/// queue instead).
 fn run_files<'s>(
     s: &'s std::thread::Scope<'s, '_>,
     ctx: &'s JobContext,
     jobs: &[(ModuleInfo, Arc<dyn ModuleJob>)],
-    settings: &JobSettings,
+    threads: usize,
     db: &CaseDb,
-    progress: &Arc<IngestProgress>,
+    produce: Option<i64>,
 ) {
-    let threads = if settings.threads == 0 {
-        std::thread::available_parallelism().map_or(4, std::num::NonZero::get)
-    } else {
-        settings.threads
-    };
+    let progress = &ctx.progress;
     let pipelines: Vec<Vec<(&'static str, Box<dyn FileModule>)>> = (0..threads)
         .map(|_| {
             jobs.iter()
@@ -282,63 +304,70 @@ fn run_files<'s>(
         return;
     }
     progress.set_workers(threads);
-    let (tx, rx) = bounded::<FileRecord>(threads * 64);
+    // Taken before the workers start, so they cannot see an idle
+    // scheduler and stop before the first file is queued.
+    let producer = produce.map(|_| ctx.sched.hold());
     let workers: Vec<_> = pipelines
         .into_iter()
         .enumerate()
-        .map(|(i, pipeline)| {
-            let rx = rx.clone();
-            s.spawn(move || run_worker(i, &rx, pipeline, ctx))
-        })
+        .map(|(i, pipeline)| s.spawn(move || run_worker(i, pipeline, ctx)))
         .collect();
-    drop(rx);
 
-    'classes: for class in IngestPriority::ALL {
-        let mut after = 0;
-        loop {
-            if progress.is_cancelled() {
-                break 'classes;
-            }
-            let page = match db.ingest_files(ctx.ds_id, class, after, PAGE) {
-                Ok(p) => p,
-                Err(e) => {
-                    progress.record_error("Ingest", &format!("listing files: {e}"));
+    if let Some(id_limit) = produce {
+        let cancelled = || progress.is_cancelled();
+        'classes: for class in IngestPriority::ALL {
+            let mut after = 0;
+            loop {
+                if progress.is_cancelled() {
                     break 'classes;
                 }
-            };
-            let Some(last) = page.last() else { break };
-            after = last.id;
-            for f in page {
-                if !settings.filter.accepts(&f) {
-                    progress.files_done.fetch_add(1, Ordering::Relaxed);
-                    continue;
-                }
-                if tx.send(f).is_err() {
-                    break 'classes;
+                let page = match db.ingest_files(ctx.ds_id, class, after, PAGE) {
+                    Ok(p) => p,
+                    Err(e) => {
+                        progress.record_error("Ingest", &format!("listing files: {e}"));
+                        break 'classes;
+                    }
+                };
+                let Some(last) = page.last() else { break };
+                after = last.id;
+                for f in page {
+                    // Pages are ordered by id: the rest were added by
+                    // this job and are scheduled by whoever added them.
+                    if f.id >= id_limit {
+                        continue 'classes;
+                    }
+                    if !ctx.filter.accepts(&f) {
+                        progress.files_done.fetch_add(1, Ordering::Relaxed);
+                        continue;
+                    }
+                    if !ctx.sched.push_normal(f, &cancelled) {
+                        break 'classes;
+                    }
                 }
             }
         }
     }
-    drop(tx);
+    drop(producer);
     for w in workers {
         if w.join().is_err() {
             progress.record_error("Ingest", "file worker panicked");
         }
     }
+    if progress.is_cancelled() {
+        ctx.sched.clear();
+    }
 }
 
 fn run_worker(
     idx: usize,
-    rx: &Receiver<FileRecord>,
     mut pipeline: Vec<(&'static str, Box<dyn FileModule>)>,
     ctx: &JobContext,
 ) {
     let progress = &ctx.progress;
+    let cancelled = || progress.is_cancelled();
     let mut times: HashMap<&'static str, Duration> = HashMap::new();
-    for rec in rx {
-        if progress.is_cancelled() {
-            break;
-        }
+    while let Some(task) = ctx.sched.next(&cancelled) {
+        let rec = task.file.clone();
         let path = rec.path();
         let id = rec.id;
         let mut file = IngestFile::new(rec, Arc::clone(&ctx.case));
@@ -359,6 +388,9 @@ fn run_worker(
             let _ = ctx.sink.send(WriteOp::Analysis(id, update));
         }
         progress.files_done.fetch_add(1, Ordering::Relaxed);
+        // Finished last: derived files this task added keep the other
+        // workers alive until it is done.
+        drop(task);
     }
     progress.set_activity(idx, None, "");
     for (name, module) in &mut pipeline {
@@ -403,6 +435,8 @@ fn run_writer(
         };
         let mut stop = false;
         let mut artifacts = 0u64;
+        // Derived-file inserts are acknowledged once committed.
+        let mut replies: Vec<(FilesReply, Vec<FileRecord>)> = Vec::new();
         let result = db.bulk(|b| {
             let mut next = Some(first);
             let mut n = 0;
@@ -422,6 +456,16 @@ fn run_writer(
                         b.add_artifact(&a)?;
                         artifacts += 1;
                     }
+                    WriteOp::Files(files, reply) => {
+                        let mut recs = Vec::with_capacity(files.len());
+                        for f in &files {
+                            let id = b.add_file(f)?;
+                            recs.push(f.to_record(id));
+                        }
+                        replies.push((reply, recs));
+                        // Commit now: a module is waiting.
+                        break;
+                    }
                 }
                 n += 1;
                 if n < WRITE_BATCH {
@@ -431,9 +475,15 @@ fn run_writer(
             Ok(())
         });
         if let Err(e) = result {
+            for (reply, _) in replies {
+                let _ = reply.send(Err(format!("saving derived files: {e}")));
+            }
             // Results can no longer be saved: stop the job.
             progress.cancel();
             return Err(e);
+        }
+        for (reply, recs) in replies {
+            let _ = reply.send(Ok(recs));
         }
         progress.artifacts.fetch_add(artifacts, Ordering::Relaxed);
         if stop {

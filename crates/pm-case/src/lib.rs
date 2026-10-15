@@ -15,6 +15,7 @@
 
 mod case;
 mod content;
+pub mod derived;
 pub mod load;
 
 pub use case::{CASE_FILE, Case, CaseDetails, CaseKind, DB_FILE, Examiner, SUBDIRS};

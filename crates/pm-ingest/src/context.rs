@@ -1,16 +1,22 @@
 //! What modules see: the job context and the file being analysed.
 
+use std::ops::Range;
+use std::sync::atomic::Ordering;
 use std::sync::{Arc, OnceLock};
 
-use crossbeam_channel::Sender;
+use crossbeam_channel::{Sender, bounded};
 use pm_case::Case;
-use pm_casedb::{FileAnalysis, FileKindCode, FileRecord, Known, NewArtifact, Origin};
+use pm_casedb::{FileAnalysis, FileKindCode, FileRecord, Known, NewArtifact, NewFile, Origin};
 use pm_core::SharedSource;
 
-use crate::{Inbox, IngestMessage, IngestProgress, ModuleError};
+use crate::sched::Scheduler;
+use crate::{FileFilter, Inbox, IngestMessage, IngestProgress, ModuleError};
 
 /// Bytes of each file cached for signature checks.
 pub const HEAD_LEN: usize = 8192;
+
+/// Where the writer reports the records of inserted derived files.
+pub(crate) type FilesReply = Sender<Result<Vec<FileRecord>, String>>;
 
 /// Database writes produced by modules, applied by the job's writer thread.
 #[derive(Debug)]
@@ -19,6 +25,9 @@ pub(crate) enum WriteOp {
     /// Artifact plus the attribute types that identify a duplicate
     /// (`None`: insert without a duplicate check).
     Artifact(NewArtifact, Option<Vec<i64>>),
+    /// New derived/carved files; the writer commits, then replies with
+    /// their records.
+    Files(Vec<NewFile>, FilesReply),
     /// End of the job: the writer commits and exits.
     Stop,
 }
@@ -35,6 +44,8 @@ pub struct JobContext {
     pub(crate) sink: Sender<WriteOp>,
     pub(crate) inbox: Arc<Inbox>,
     pub(crate) progress: Arc<IngestProgress>,
+    pub(crate) sched: Arc<Scheduler>,
+    pub(crate) filter: FileFilter,
 }
 
 impl JobContext {
@@ -65,6 +76,51 @@ impl JobContext {
     /// they have already processed).
     pub fn post_artifact_unchecked(&self, artifact: NewArtifact) {
         let _ = self.sink.send(WriteOp::Artifact(artifact, None));
+    }
+
+    /// Reserves `n` consecutive file ids, so a tree of derived files can
+    /// reference its parents before the rows are written.
+    pub fn reserve_file_ids(&self, n: u64) -> Range<i64> {
+        self.case.db().file_ids().reserve(n)
+    }
+
+    /// Adds derived, carved or local files (Autopsy `addDerivedFile` +
+    /// `addFilesToJob`): the job's writer inserts them (parents before
+    /// children) and commits, then they are scheduled ahead of all other
+    /// files so they run through the whole file pipeline, recursively.
+    /// Rows without an id get one from the shared allocator.
+    pub fn add_derived_files(&self, files: Vec<NewFile>) -> Result<Vec<FileRecord>, ModuleError> {
+        if files.is_empty() {
+            return Ok(Vec::new());
+        }
+        let (reply, answer) = bounded(1);
+        self.sink
+            .send(WriteOp::Files(files, reply))
+            .map_err(|_| ModuleError::new("the result writer has stopped"))?;
+        let records = answer
+            .recv()
+            .map_err(|_| ModuleError::new("the result writer has stopped"))?
+            .map_err(ModuleError)?;
+        self.add_files_to_job(records.clone());
+        Ok(records)
+    }
+
+    /// Schedules files that are already in the case database as
+    /// high-priority tasks of this job (Autopsy `addFilesToJob`). Files
+    /// the job's file filter rejects are skipped; nothing is scheduled
+    /// once the job is cancelled.
+    pub fn add_files_to_job(&self, files: Vec<FileRecord>) {
+        if self.is_cancelled() {
+            return;
+        }
+        let files: Vec<FileRecord> = files
+            .into_iter()
+            .filter(|f| self.filter.accepts(f))
+            .collect();
+        self.progress
+            .files_total
+            .fetch_add(files.len() as u64, Ordering::Relaxed);
+        self.sched.push_high(files);
     }
 
     /// Posts an ingest inbox message.
