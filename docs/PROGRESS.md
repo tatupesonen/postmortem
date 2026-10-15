@@ -7,8 +7,11 @@
    `fb8ab99` timeline Details fix (only its UI test run). Last green
    master gate: `9b482d5` (381 tests).
 2. **Merge the paused agent branches** (worktrees under
-   `.claude/worktrees/`, status in `docs/agents/<track>.md`), one at a
-   time with a gate after each:
+   `.claude/worktrees/`, status in `docs/agents/<track>.md` — copies of
+   each branch's status file are on master), one at a time with at least
+   `cargo check` + clippy + tests after each. **Order: search first (user
+   priority — then build its Keyword Search module + UI and let the user
+   test), then core-file-modules, email-mobile, browsers.**
    - `worktree-agent-a7b6ec3a36039f4b0` (browsers, WIP `59d0936`, gate
      NOT run; only its own crates checked). Expect conflicts in
      `crates/pm-modules/src/recent_activity/mod.rs` with the merged
