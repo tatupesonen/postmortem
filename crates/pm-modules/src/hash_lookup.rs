@@ -21,6 +21,7 @@ use pm_ingest::{
     ModuleInfo, ModuleJob,
 };
 use serde::{Deserialize, Serialize};
+use sha1::Sha1;
 use sha2::Sha256;
 
 use crate::util::{Art, hex};
@@ -194,15 +195,20 @@ impl Job {
         };
         ctx.post_message(
             IngestMessage::new(MessageKind::Info, NAME, "Hash Lookup Results").details(format!(
-                "Notable files found: {}\nNo-change items found: {}\n\
-                 Total calculation time: {} ms\nTotal lookup time: {} ms\n\
-                 Notable hash sets used:\n{}\nNo-change hash sets used:\n{}",
+                "Notables found: {}\nTotal Calculation Time: {} ms\nTotal Lookup Time: {} ms\n\
+                 Hash Sets Used:\n{}{}",
                 self.stats.notable.load(Ordering::Relaxed),
-                self.stats.no_change.load(Ordering::Relaxed),
                 ms(&self.stats.hash_ns),
                 ms(&self.stats.lookup_ns),
                 list(SetKind::Notable),
-                list(SetKind::NoChange),
+                {
+                    let nc = list(SetKind::NoChange);
+                    if nc.is_empty() {
+                        String::new()
+                    } else {
+                        format!("\n{nc}")
+                    }
+                },
             )),
         );
     }
@@ -231,7 +237,10 @@ struct Worker {
 
 impl FileModule for Worker {
     fn process(&mut self, ctx: &JobContext, file: &mut IngestFile) -> Result<(), ModuleError> {
-        if file.is_unallocated_space() || !file.is_file() {
+        // Autopsy skips only unallocated blocks, slack and directories:
+        // virtual files ($MBR, $FAT1), symlinks, devices and deleted names
+        // without metadata are hashed too.
+        if file.is_unallocated_space() || file.is_dir() {
             return Ok(());
         }
         let job = Arc::clone(&self.job);
@@ -242,8 +251,12 @@ impl FileModule for Worker {
         if !any_lookup && !job.calculate {
             return Ok(());
         }
-        // Reuse hashes computed earlier (both must be present, as in Autopsy).
-        let existing = file.sha256().and(file.md5()).and_then(to16);
+        // Reuse hashes computed earlier only when all of them are present.
+        let existing = file
+            .sha256()
+            .and(file.sha1())
+            .and(file.md5())
+            .and_then(to16);
         let md5 = if let Some(m) = existing {
             m
         } else {
@@ -256,24 +269,27 @@ impl FileModule for Worker {
                 Ok(Some(m)) => m,
                 Ok(None) => return Ok(()), // cancelled mid-file
                 Err(e) => {
-                    let state = if file.is_deleted() {
-                        "Deleted File"
-                    } else {
+                    // Autopsy reports the read error and carries on (there is
+                    // no hash to look up).
+                    let state = if file.rec.meta_alloc {
                         "Allocated File"
+                    } else {
+                        "Deleted File"
                     };
+                    tracing::warn!(file = %file.rec.path(), "error calculating hash: {e}");
                     ctx.post_message(
                         IngestMessage::new(
                             MessageKind::Error,
                             NAME,
-                            format!(
-                                "Error encountered while calculating the hash value for {} ({state}).",
-                                file.rec.path()
-                            ),
+                            format!("Read Error: {}", file.rec.name),
                         )
-                        .details(e.0.clone())
+                        .details(format!(
+                            "Error encountered while calculating the hash value for {} ({state}).",
+                            file.rec.path()
+                        ))
                         .file(file.rec.id),
                     );
-                    return Err(e);
+                    return Ok(());
                 }
             }
         };
@@ -288,7 +304,8 @@ impl FileModule for Worker {
 }
 
 impl Worker {
-    /// MD5 and SHA-256 in one pass; `None` if the job was cancelled.
+    /// MD5, SHA-1 and SHA-256 in one pass (Autopsy computes MD5 and
+    /// SHA-256; postmortem adds SHA-1); `None` if the job was cancelled.
     fn hash(
         &mut self,
         ctx: &JobContext,
@@ -297,6 +314,7 @@ impl Worker {
         let src = file.content()?;
         let size = src.size();
         let mut md5 = Md5::new();
+        let mut sha1 = Sha1::new();
         let mut sha = Sha256::new();
         let mut off = 0u64;
         while off < size {
@@ -313,11 +331,13 @@ impl Worker {
             }
             let chunk = buf.get(..n).unwrap_or_default();
             md5.update(chunk);
+            sha1.update(chunk);
             sha.update(chunk);
             off += n as u64;
         }
         let m: [u8; 16] = md5.finalize().into();
         file.set_md5(m.to_vec());
+        file.set_sha1(sha1.finalize().to_vec());
         file.set_sha256(sha.finalize().to_vec());
         Ok(Some(m))
     }
@@ -378,7 +398,7 @@ impl Worker {
                     }
                 }
                 Ok(None) => {}
-                Err(e) => errors.push(format!("{}: {e}", set.name)),
+                Err(e) => errors.push((set.kind, format!("{}: {e}", set.name))),
             }
         }
         if !notable_hit {
@@ -389,24 +409,35 @@ impl Worker {
                         break;
                     }
                     Ok(false) => {}
-                    Err(e) => errors.push(format!("{}: {e}", set.name)),
+                    Err(e) => errors.push((SetKind::Known, format!("{}: {e}", set.name))),
                 }
             }
         }
         if errors.is_empty() {
-            Ok(())
-        } else {
-            let msg = errors.join("; ");
+            return Ok(());
+        }
+        for (kind, cause) in &errors {
+            let what = match kind {
+                SetKind::Notable => "notable",
+                SetKind::NoChange => "no change",
+                SetKind::Known => "known",
+            };
+            tracing::warn!(file = %file.rec.path(), "hash set lookup failed: {cause}");
             ctx.post_message(
                 IngestMessage::new(
                     MessageKind::Error,
                     NAME,
-                    format!("Hash set lookup error for {}", file.rec.path()),
+                    format!("Hash Lookup Error: {}", file.rec.name),
                 )
-                .details(msg.clone()),
+                .details(format!(
+                    "Error encountered while looking up {what} hash value for {}.",
+                    file.rec.name
+                ))
+                .file(file.rec.id),
             );
-            Err(ModuleError::new(msg))
         }
+        let causes: Vec<&str> = errors.iter().map(|(_, c)| c.as_str()).collect();
+        Err(ModuleError::new(causes.join("; ")))
     }
 }
 

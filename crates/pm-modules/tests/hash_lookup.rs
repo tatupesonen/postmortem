@@ -106,12 +106,15 @@ fn hashes_and_hash_set_hits() {
     let (summary, inbox) = demo.run(&settings(&cfg), vec![Arc::new(HashLookupFactory)]);
     assert!(summary.errors.is_empty(), "{:?}", summary.errors);
 
-    // Every regular file has correct MD5 and SHA-256.
-    let after = demo.files();
+    // Every file except directories and unallocated space has correct
+    // MD5, SHA-1 and SHA-256 — virtual files ($MBR, $FAT1…), ADS rows and
+    // deleted names included, as in Autopsy (+ SHA-1).
     // (System streams such as `$BadClus:$Bad` are filtered out of ingest.)
+    let after = demo.files();
+    let mut virtual_hashed = 0;
     for f in after.iter().filter(|f| {
-        f.kind == FileKindCode::Regular
-            && f.origin == Origin::FileSystem
+        f.kind != FileKindCode::Directory
+            && !matches!(f.origin, Origin::UnallocBlocks | Origin::Slack)
             && pm_ingest::FileFilter::default().accepts(f)
     }) {
         let data = read_all(&*demo.case.content(f).unwrap());
@@ -122,12 +125,32 @@ fn hashes_and_hash_set_hits() {
             f.path()
         );
         assert_eq!(
+            f.sha1.as_deref(),
+            Some(sha1::Sha1::digest(&data).as_slice()),
+            "{}",
+            f.path()
+        );
+        assert_eq!(
             f.sha256.as_deref(),
             Some(sha2::Sha256::digest(&data).as_slice()),
             "{}",
             f.path()
         );
+        if f.kind == FileKindCode::Virtual {
+            virtual_hashed += 1;
+        }
     }
+    assert!(
+        virtual_hashed > 0,
+        "FAT virtual files ($MBR, $FAT1…) must be hashed"
+    );
+    // Directories are not hashed.
+    assert!(
+        after
+            .iter()
+            .filter(|f| f.kind == FileKindCode::Directory)
+            .all(|f| f.md5.is_none() && f.sha1.is_none() && f.sha256.is_none())
+    );
     // Unallocated space is not hashed.
     assert!(
         after
@@ -186,7 +209,7 @@ fn hashes_and_hash_set_hits() {
         .find(|m| m.subject == "Hash Lookup Results")
         .unwrap();
     assert!(
-        summary_msg.details.contains("Notable files found: 1"),
+        summary_msg.details.contains("Notables found: 1"),
         "{}",
         summary_msg.details
     );

@@ -97,3 +97,22 @@ Reference: `HashDbIngestModule.java`, `IngestTasksScheduler.shouldEnqueueFileTas
 
 ## Untested
 Everything above "Done" except that the three crates compile.
+
+
+## Update (coordinator, 2026-10-15)
+Done in `pm-modules/src/hash_lookup.rs` (commit after this note):
+- Skip rules now match Autopsy: only unallocated blocks/slack and
+  directories are skipped (virtual files, symlinks, devices, deleted names
+  without metadata are hashed).
+- MD5 + **SHA-1** + SHA-256 in one pass; existing hashes reused only when
+  all three are present.
+- Autopsy's message texts: `Read Error: {name}` (details "Error encountered
+  while calculating the hash value for … (Allocated File|Deleted File)."),
+  processing continues; `Hash Lookup Error: {name}` per failing set with the
+  per-kind text; summary labels Notables found / Total Calculation Time /
+  Total Lookup Time / Hash Sets Used.
+- Test: every eligible demo file's MD5/SHA-1/SHA-256 equals an independent
+  computation; FAT virtual files hashed; directories not.
+Still open: hash indexes migration (0002_hash_indexes), FileQuery
+sha1/sha256 + any-hash helper, UI (table columns, metadata viewer,
+Search by Hash), throughput benchmark.
