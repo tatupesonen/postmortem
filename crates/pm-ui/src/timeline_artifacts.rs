@@ -16,13 +16,48 @@ use crate::model::DataSource;
 /// Artifact type → event type, the time attributes to use (first present
 /// wins) and the attributes making up the description.
 const MAPPING: &[(&str, EventType, &[&str], &[&str])] = &[
-    ("TSK_WEB_HISTORY", EventType::WebHistory, &["TSK_DATETIME_ACCESSED"], &["TSK_URL", "TSK_TITLE"]),
-    ("TSK_WEB_DOWNLOAD", EventType::WebDownloads, &["TSK_DATETIME_ACCESSED"], &["TSK_PATH", "TSK_URL"]),
-    ("TSK_WEB_COOKIE", EventType::WebCookies, &["TSK_DATETIME_ACCESSED", "TSK_DATETIME_CREATED"], &["TSK_URL", "TSK_NAME", "TSK_VALUE"]),
-    ("TSK_WEB_BOOKMARK", EventType::WebBookmarks, &["TSK_DATETIME_CREATED"], &["TSK_URL", "TSK_TITLE"]),
-    ("TSK_WEB_SEARCH_QUERY", EventType::WebSearches, &["TSK_DATETIME_ACCESSED"], &["TSK_TEXT", "TSK_DOMAIN", "TSK_PROG_NAME"]),
-    ("TSK_WEB_FORM_AUTOFILL", EventType::WebFormAutofill, &["TSK_DATETIME_ACCESSED", "TSK_DATETIME_CREATED"], &["TSK_NAME", "TSK_VALUE"]),
-    ("TSK_METADATA_EXIF", EventType::Exif, &["TSK_DATETIME_CREATED"], &["TSK_DEVICE_MAKE", "TSK_DEVICE_MODEL"]),
+    (
+        "TSK_WEB_HISTORY",
+        EventType::WebHistory,
+        &["TSK_DATETIME_ACCESSED"],
+        &["TSK_URL", "TSK_TITLE"],
+    ),
+    (
+        "TSK_WEB_DOWNLOAD",
+        EventType::WebDownloads,
+        &["TSK_DATETIME_ACCESSED"],
+        &["TSK_PATH", "TSK_URL"],
+    ),
+    (
+        "TSK_WEB_COOKIE",
+        EventType::WebCookies,
+        &["TSK_DATETIME_ACCESSED", "TSK_DATETIME_CREATED"],
+        &["TSK_URL", "TSK_NAME", "TSK_VALUE"],
+    ),
+    (
+        "TSK_WEB_BOOKMARK",
+        EventType::WebBookmarks,
+        &["TSK_DATETIME_CREATED"],
+        &["TSK_URL", "TSK_TITLE"],
+    ),
+    (
+        "TSK_WEB_SEARCH_QUERY",
+        EventType::WebSearches,
+        &["TSK_DATETIME_ACCESSED"],
+        &["TSK_TEXT", "TSK_DOMAIN", "TSK_PROG_NAME"],
+    ),
+    (
+        "TSK_WEB_FORM_AUTOFILL",
+        EventType::WebFormAutofill,
+        &["TSK_DATETIME_ACCESSED", "TSK_DATETIME_CREATED"],
+        &["TSK_NAME", "TSK_VALUE"],
+    ),
+    (
+        "TSK_METADATA_EXIF",
+        EventType::Exif,
+        &["TSK_DATETIME_CREATED"],
+        &["TSK_DEVICE_MAKE", "TSK_DEVICE_MODEL"],
+    ),
 ];
 
 const PAGE: usize = 5_000;
@@ -49,7 +84,9 @@ pub(crate) fn load(case: &Arc<Case>, sources: &[DataSource]) -> (Vec<Event>, Vec
             let Some(last) = page.last() else { break };
             after = last.id;
             for art in page {
-                let Ok(attrs) = db.attributes(art.id) else { continue };
+                let Ok(attrs) = db.attributes(art.id) else {
+                    continue;
+                };
                 let Some(time) = time_attrs.iter().find_map(|t| time_of(&attrs, t)) else {
                     continue;
                 };
@@ -93,7 +130,10 @@ fn time_of(attrs: &[AttributeRecord], name: &str) -> Option<i64> {
 }
 
 fn text_of(attrs: &[AttributeRecord], name: &str) -> Option<String> {
-    attrs.iter().find(|a| a.name == name).map(|a| a.value.display())
+    attrs
+        .iter()
+        .find(|a| a.name == name)
+        .map(|a| a.value.display())
 }
 
 /// The browsed data source / file system index of a case file.

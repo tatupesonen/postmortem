@@ -62,7 +62,13 @@ pub(crate) fn describe(full: &str, level: DescLevel) -> String {
         let comps: Vec<&str> = full.split('/').filter(|c| !c.is_empty()).collect();
         return match level {
             DescLevel::Short => format!("/{}", comps.first().copied().unwrap_or_default()),
-            _ => format!("/{}", comps.get(..comps.len().saturating_sub(1)).unwrap_or_default().join("/")),
+            _ => format!(
+                "/{}",
+                comps
+                    .get(..comps.len().saturating_sub(1))
+                    .unwrap_or_default()
+                    .join("/")
+            ),
         };
     }
     full.to_owned()
@@ -70,13 +76,23 @@ pub(crate) fn describe(full: &str, level: DescLevel) -> String {
 
 /// Groups and clusters events; `gap` is the largest time distance (s)
 /// between events of one cluster.
-pub(crate) fn clusters(rows: &[ListRow], timeline: &Timeline, level: DescLevel, gap: i64) -> Vec<Cluster> {
+pub(crate) fn clusters(
+    rows: &[ListRow],
+    timeline: &Timeline,
+    level: DescLevel,
+    gap: i64,
+) -> Vec<Cluster> {
     let mut groups: HashMap<(EventType, String), Vec<(i64, u32)>> = HashMap::new();
     for r in rows {
-        let Some(s) = timeline.subject(r.subject) else { continue };
+        let Some(s) = timeline.subject(r.subject) else {
+            continue;
+        };
         let desc = describe(&s.path, level);
         for k in &r.kinds {
-            groups.entry((*k, desc.clone())).or_default().push((r.time, r.subject));
+            groups
+                .entry((*k, desc.clone()))
+                .or_default()
+                .push((r.time, r.subject));
         }
     }
     let mut out = Vec::new();
@@ -166,11 +182,22 @@ pub(crate) fn view(
         .max_height(height)
         .auto_shrink([false, false])
         .show(ui, |ui| {
-            let (rect, resp) = ui.allocate_exact_size(Vec2::new(width, content_h.max(height)), Sense::click_and_drag());
+            let (rect, resp) = ui.allocate_exact_size(
+                Vec2::new(width, content_h.max(height)),
+                Sense::click_and_drag(),
+            );
             let painter = ui.painter_at(rect);
             let v = ui.visuals().clone();
-            let bg = if v.dark_mode { Color32::from_gray(30) } else { Color32::WHITE };
-            let grid = if v.dark_mode { Color32::from_gray(55) } else { Color32::from_gray(225) };
+            let bg = if v.dark_mode {
+                Color32::from_gray(30)
+            } else {
+                Color32::WHITE
+            };
+            let grid = if v.dark_mode {
+                Color32::from_gray(55)
+            } else {
+                Color32::from_gray(225)
+            };
             painter.rect_filled(rect, 0.0, bg);
             // Time axis with vertical grid lines.
             let unit = TimeUnit::for_range(range.0, range.1);
@@ -179,14 +206,29 @@ pub(crate) fn view(
             while t < range.1 && guard < 200 {
                 let x = rect.left() + x_of(t);
                 if x >= rect.left() {
-                    painter.line_segment([Pos2::new(x, rect.top() + AXIS_H - 4.0), Pos2::new(x, rect.bottom())], Stroke::new(1.0, grid));
-                    painter.text(Pos2::new(x + 3.0, rect.top() + 4.0), Align2::LEFT_TOP, unit.label(t, tz), FontId::proportional(11.0), v.weak_text_color());
+                    painter.line_segment(
+                        [
+                            Pos2::new(x, rect.top() + AXIS_H - 4.0),
+                            Pos2::new(x, rect.bottom()),
+                        ],
+                        Stroke::new(1.0, grid),
+                    );
+                    painter.text(
+                        Pos2::new(x + 3.0, rect.top() + 4.0),
+                        Align2::LEFT_TOP,
+                        unit.label(t, tz),
+                        FontId::proportional(11.0),
+                        v.weak_text_color(),
+                    );
                 }
                 t = unit.next(t, tz);
                 guard += 1;
             }
             painter.line_segment(
-                [Pos2::new(rect.left(), rect.top() + AXIS_H - 4.0), Pos2::new(rect.right(), rect.top() + AXIS_H - 4.0)],
+                [
+                    Pos2::new(rect.left(), rect.top() + AXIS_H - 4.0),
+                    Pos2::new(rect.right(), rect.top() + AXIS_H - 4.0),
+                ],
                 Stroke::new(1.0, v.weak_text_color()),
             );
             // Stripes.
@@ -196,15 +238,25 @@ pub(crate) fn view(
                 let Some(c) = clusters.get(i) else { continue };
                 let y = rect.top() + AXIS_H + row as f32 * ROW_H;
                 let col = rgb(c.kind.color());
-                let full = Rect::from_min_max(Pos2::new(rect.left() + x0, y + 2.0), Pos2::new(rect.left() + end, y + ROW_H - 2.0));
+                let full = Rect::from_min_max(
+                    Pos2::new(rect.left() + x0, y + 2.0),
+                    Pos2::new(rect.left() + end, y + ROW_H - 2.0),
+                );
                 let is_hover = pointer.is_some_and(|p| full.contains(p));
                 if is_hover {
                     hovered = Some(i);
                 }
-                let fill = col.gamma_multiply(if is_hover || selected == Some(i) { 0.35 } else { 0.18 });
+                let fill = col.gamma_multiply(if is_hover || selected == Some(i) {
+                    0.35
+                } else {
+                    0.18
+                });
                 painter.rect_filled(full, 3.0, fill);
                 // Time extent of the cluster.
-                let bar = Rect::from_min_max(Pos2::new(rect.left() + x0, y + 5.0), Pos2::new(rect.left() + bar_x1, y + ROW_H - 5.0));
+                let bar = Rect::from_min_max(
+                    Pos2::new(rect.left() + x0, y + 5.0),
+                    Pos2::new(rect.left() + bar_x1, y + ROW_H - 5.0),
+                );
                 painter.rect_filled(bar, 2.0, col);
                 // Type marker + label.
                 painter.circle_filled(Pos2::new(rect.left() + x0 + 5.0, y + ROW_H / 2.0), 4.0, col);
@@ -213,9 +265,20 @@ pub(crate) fn view(
                 } else {
                     c.description.clone()
                 };
-                painter.text(Pos2::new(rect.left() + x0 + 12.0, y + ROW_H / 2.0), Align2::LEFT_CENTER, label, font.clone(), v.text_color());
+                painter.text(
+                    Pos2::new(rect.left() + x0 + 12.0, y + ROW_H / 2.0),
+                    Align2::LEFT_CENTER,
+                    label,
+                    font.clone(),
+                    v.text_color(),
+                );
                 if selected == Some(i) {
-                    painter.rect_stroke(full, 3.0, Stroke::new(2.0, v.selection.stroke.color), StrokeKind::Outside);
+                    painter.rect_stroke(
+                        full,
+                        3.0,
+                        Stroke::new(2.0, v.selection.stroke.color),
+                        StrokeKind::Outside,
+                    );
                 }
             }
             if let Some(i) = hovered
@@ -254,7 +317,10 @@ pub(crate) fn view(
     if clusters.is_empty() {
         ui.weak("No events in this time range.");
     } else if placed.len() < clusters.len() {
-        ui.weak(format!("{} clusters not shown — zoom in to see them.", clusters.len() - placed.len()));
+        ui.weak(format!(
+            "{} clusters not shown — zoom in to see them.",
+            clusters.len() - placed.len()
+        ));
     }
     events
 }
@@ -267,12 +333,21 @@ mod tests {
     fn description_levels() {
         let u = "http://www.google.com/search?q=x";
         assert_eq!(describe(u, DescLevel::Short), "www.google.com");
-        assert_eq!(describe(u, DescLevel::Medium), "http://www.google.com/search?q=x");
-        assert_eq!(describe("https://a.com/x/y", DescLevel::Medium), "https://a.com/x");
+        assert_eq!(
+            describe(u, DescLevel::Medium),
+            "http://www.google.com/search?q=x"
+        );
+        assert_eq!(
+            describe("https://a.com/x/y", DescLevel::Medium),
+            "https://a.com/x"
+        );
         let p = "/Users/alice/Pictures/sunset.bmp";
         assert_eq!(describe(p, DescLevel::Short), "/Users");
         assert_eq!(describe(p, DescLevel::Medium), "/Users/alice/Pictures");
         assert_eq!(describe(p, DescLevel::Full), p);
-        assert_eq!(describe("hacking tools — google.com", DescLevel::Short), "hacking tools — google.com");
+        assert_eq!(
+            describe("hacking tools — google.com", DescLevel::Short),
+            "hacking tools — google.com"
+        );
     }
 }

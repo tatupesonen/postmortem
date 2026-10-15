@@ -5,7 +5,10 @@
 use pm_casedb::FileRecord;
 use pm_ingest::{JobContext, ModuleError};
 
-use super::{NAME, Visit, already_done, extract_domain, find_by_extension, find_files, history, read_all};
+use super::{
+    HistoryEntry, NAME, Visit, already_done, extract_domain, find_by_extension, find_files,
+    history, read_all,
+};
 use crate::util::Art;
 
 const PROGRAM: &str = "Internet Explorer";
@@ -73,7 +76,15 @@ fn index_dat(ctx: &JobContext, f: &FileRecord, visits: &mut Vec<Visit>) -> Resul
     let data = read_all(ctx, f)?;
     for rec in parse_index_dat(&data) {
         let (user, url) = split_user(&rec.location);
-        history(ctx, f, &url, rec.accessed, None, None, PROGRAM, &user).post_unchecked(ctx);
+        let entry = HistoryEntry {
+            url: &url,
+            time: rec.accessed,
+            referrer: None,
+            title: None,
+            program: PROGRAM,
+            user: &user,
+        };
+        history(ctx, f, entry).post_unchecked(ctx);
         visits.push(Visit {
             file_id: f.id,
             url,
@@ -151,7 +162,9 @@ pub(crate) fn parse_index_dat(d: &[u8]) -> Vec<UrlRecord> {
             break;
         }
         let blocks = u32_at(d, table + 4).unwrap_or(0);
-        let end = table.saturating_add(blocks.saturating_mul(BLOCK)).min(d.len());
+        let end = table
+            .saturating_add(blocks.saturating_mul(BLOCK))
+            .min(d.len());
         let mut e = table + 16;
         while e + 8 <= end {
             let hash = u32_at(d, e).unwrap_or(0);
@@ -161,7 +174,7 @@ pub(crate) fn parse_index_dat(d: &[u8]) -> Vec<UrlRecord> {
             if hash == 0x3 || hash == 0x1 || rec == 0 || rec == 0x0BAD_F00D || rec == 0xDEAD_BEEF {
                 continue;
             }
-            if rec % BLOCK != 0 || !seen_records.insert(rec) {
+            if !rec.is_multiple_of(BLOCK) || !seen_records.insert(rec) {
                 continue;
             }
             if let Some(r) = url_record(d, rec) {
@@ -214,7 +227,13 @@ mod tests {
         d[0x5014..0x5018].copy_from_slice(&0x6000u32.to_le_bytes());
         d[0x5018..0x501C].copy_from_slice(&3u32.to_le_bytes());
         d[0x501C..0x5020].copy_from_slice(&0x6100u32.to_le_bytes());
-        for (at, url) in [(0x6000usize, "Visited: Mr. Evil@http://www.google.com/search?q=hacking+tools"), (0x6100, "http://free.example.com/")] {
+        for (at, url) in [
+            (
+                0x6000usize,
+                "Visited: Mr. Evil@http://www.google.com/search?q=hacking+tools",
+            ),
+            (0x6100, "http://free.example.com/"),
+        ] {
             d[at..at + 4].copy_from_slice(b"URL ");
             d[at + 4..at + 8].copy_from_slice(&2u32.to_le_bytes());
             // 2004-08-26 15:00:00 UTC as FILETIME.
@@ -230,7 +249,10 @@ mod tests {
     fn parses_referenced_url_records() {
         let recs = parse_index_dat(&sample());
         assert_eq!(recs.len(), 1);
-        assert_eq!(recs[0].location, "Visited: Mr. Evil@http://www.google.com/search?q=hacking+tools");
+        assert_eq!(
+            recs[0].location,
+            "Visited: Mr. Evil@http://www.google.com/search?q=hacking+tools"
+        );
         assert_eq!(recs[0].accessed, Some(1_093_532_400));
         assert_eq!(recs[0].modified, None);
         assert!(parse_index_dat(b"not an index").is_empty());
@@ -250,7 +272,10 @@ mod tests {
             split_user("Cookie:mr. evil@google.com/"),
             ("Cookie:mr. evil".into(), "google.com/".into())
         );
-        assert_eq!(split_user("http://a.example.com/x"), (String::new(), "http://a.example.com/x".into()));
+        assert_eq!(
+            split_user("http://a.example.com/x"),
+            (String::new(), "http://a.example.com/x".into())
+        );
         assert_eq!(remove_colon_groups(":a: b :c:d"), " b d");
     }
 

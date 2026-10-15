@@ -69,9 +69,12 @@ pub(crate) struct Visit {
     pub(crate) time: Option<i64>,
 }
 
+/// One browser extractor: posts artifacts and collects history visits.
+type Step = fn(&JobContext, &mut Vec<Visit>) -> Result<(), ModuleError>;
+
 impl DataSourceModule for Extractor {
     fn process(&mut self, ctx: &JobContext, progress: &DsProgress<'_>) -> Result<(), ModuleError> {
-        let steps: [(&str, fn(&JobContext, &mut Vec<Visit>) -> Result<(), ModuleError>); 2] = [
+        let steps: [(&str, Step); 2] = [
             ("Chromium browsers", chromium::extract),
             ("Internet Explorer", ie::extract),
         ];
@@ -84,8 +87,12 @@ impl DataSourceModule for Extractor {
             progress.message(format!("Extracting {label}"));
             if let Err(e) = step(ctx, &mut visits) {
                 ctx.post_message(
-                    IngestMessage::new(MessageKind::Error, NAME, format!("{label}: extraction failed"))
-                        .details(e.0.clone()),
+                    IngestMessage::new(
+                        MessageKind::Error,
+                        NAME,
+                        format!("{label}: extraction failed"),
+                    )
+                    .details(e.0.clone()),
                 );
             }
             progress.set_done(i as u64 + 1);
@@ -101,7 +108,11 @@ impl DataSourceModule for Extractor {
 
 /// Files of the data source named `name` (case-insensitive) whose path
 /// contains `location` (case-insensitive; empty = anywhere).
-pub(crate) fn find_files(ctx: &JobContext, name: &str, location: &str) -> Result<Vec<FileRecord>, ModuleError> {
+pub(crate) fn find_files(
+    ctx: &JobContext,
+    name: &str,
+    location: &str,
+) -> Result<Vec<FileRecord>, ModuleError> {
     let q = FileQuery {
         ds_id: Some(ctx.ds_id),
         regular_only: true,
@@ -112,7 +123,11 @@ pub(crate) fn find_files(ctx: &JobContext, name: &str, location: &str) -> Result
 }
 
 /// Files with extension `ext` whose path contains `location`.
-pub(crate) fn find_by_extension(ctx: &JobContext, ext: &str, location: &str) -> Result<Vec<FileRecord>, ModuleError> {
+pub(crate) fn find_by_extension(
+    ctx: &JobContext,
+    ext: &str,
+    location: &str,
+) -> Result<Vec<FileRecord>, ModuleError> {
     let q = FileQuery {
         ds_id: Some(ctx.ds_id),
         regular_only: true,
@@ -213,7 +228,13 @@ fn write(p: &Path, data: &[u8]) -> Result<(), ModuleError> {
 
 fn sanitize(name: &str) -> String {
     name.chars()
-        .map(|c| if c.is_alphanumeric() || c == '.' { c } else { '_' })
+        .map(|c| {
+            if c.is_alphanumeric() || c == '.' {
+                c
+            } else {
+                '_'
+            }
+        })
         .collect()
 }
 
@@ -234,10 +255,11 @@ pub(crate) fn user_from_path(path: &str) -> String {
 
 /// Microseconds since 1601 (WebKit/Chromium) → Unix seconds; 0 = absent.
 pub(crate) fn webkit_time(us: Option<i64>) -> Option<i64> {
-    us.filter(|&t| t > 0).map(|t| t / 1_000_000 - 11_644_473_600)
+    us.filter(|&t| t > 0)
+        .map(|t| t / 1_000_000 - 11_644_473_600)
 }
 
-/// Microseconds since 1970 (Mozilla PRTime) → Unix seconds; 0 = absent.
+/// Microseconds since 1970 (Mozilla `PRTime`) → Unix seconds; 0 = absent.
 #[allow(dead_code, reason = "for the Firefox extractor (pending)")]
 pub(crate) fn prtime(us: Option<i64>) -> Option<i64> {
     us.filter(|&t| t > 0).map(|t| t / 1_000_000)
@@ -246,11 +268,53 @@ pub(crate) fn prtime(us: Option<i64>) -> Option<i64> {
 /// Multi-label public suffixes handled when reducing a host to its base
 /// domain (Autopsy uses the full public-suffix list via `DomainTokenizer`).
 const SECOND_LEVEL: &[&str] = &[
-    "co.uk", "org.uk", "ac.uk", "gov.uk", "me.uk", "ltd.uk", "plc.uk", "net.uk", "com.au", "net.au",
-    "org.au", "edu.au", "gov.au", "co.nz", "org.nz", "co.jp", "ne.jp", "or.jp", "ac.jp", "co.kr",
-    "or.kr", "com.br", "com.cn", "net.cn", "org.cn", "gov.cn", "com.hk", "com.tw", "com.sg",
-    "com.mx", "com.ar", "com.tr", "co.in", "co.za", "co.il", "com.ru", "com.ua", "co.id", "com.my",
-    "com.ph", "com.vn", "com.sa", "com.eg", "com.pl", "co.th", "github.io", "blogspot.com",
+    "co.uk",
+    "org.uk",
+    "ac.uk",
+    "gov.uk",
+    "me.uk",
+    "ltd.uk",
+    "plc.uk",
+    "net.uk",
+    "com.au",
+    "net.au",
+    "org.au",
+    "edu.au",
+    "gov.au",
+    "co.nz",
+    "org.nz",
+    "co.jp",
+    "ne.jp",
+    "or.jp",
+    "ac.jp",
+    "co.kr",
+    "or.kr",
+    "com.br",
+    "com.cn",
+    "net.cn",
+    "org.cn",
+    "gov.cn",
+    "com.hk",
+    "com.tw",
+    "com.sg",
+    "com.mx",
+    "com.ar",
+    "com.tr",
+    "co.in",
+    "co.za",
+    "co.il",
+    "com.ru",
+    "com.ua",
+    "co.id",
+    "com.my",
+    "com.ph",
+    "com.vn",
+    "com.sa",
+    "com.eg",
+    "com.pl",
+    "co.th",
+    "github.io",
+    "blogspot.com",
 ];
 
 /// Autopsy `NetworkUtils.extractDomain`: the registrable domain of a URL's
@@ -261,12 +325,13 @@ pub(crate) fn extract_domain(url: &str) -> String {
         return String::new();
     }
     let no_scheme = lower.split_once("://").map_or(lower.as_str(), |(_, r)| r);
-    let host_port = no_scheme
-        .split(['/', '?', '#'])
-        .next()
-        .unwrap_or_default();
+    let host_port = no_scheme.split(['/', '?', '#']).next().unwrap_or_default();
     let host_port = host_port.rsplit_once('@').map_or(host_port, |(_, h)| h);
-    let host = host_port.split(':').next().unwrap_or_default().trim_matches('.');
+    let host = host_port
+        .split(':')
+        .next()
+        .unwrap_or_default()
+        .trim_matches('.');
     if host.is_empty() {
         return String::new();
     }
@@ -283,7 +348,9 @@ pub(crate) fn extract_domain(url: &str) -> String {
     }
     let labels: Vec<&str> = host.split('.').collect();
     let take = if labels.len() >= 3
-        && SECOND_LEVEL.iter().any(|s| host.ends_with(&format!(".{s}")) || host == *s)
+        && SECOND_LEVEL
+            .iter()
+            .any(|s| host.ends_with(&format!(".{s}")) || host == *s)
     {
         3
     } else {
@@ -293,25 +360,26 @@ pub(crate) fn extract_domain(url: &str) -> String {
     labels.get(start..).unwrap_or_default().join(".")
 }
 
-/// Common history attributes (Autopsy `Extract.createHistoryAttributes`).
-pub(crate) fn history(
-    ctx: &JobContext,
-    file: &FileRecord,
-    url: &str,
-    time: Option<i64>,
-    referrer: Option<String>,
-    title: Option<String>,
-    program: &str,
-    user: &str,
-) -> Art {
+/// One web history visit (Autopsy `Extract.createHistoryAttributes`).
+pub(crate) struct HistoryEntry<'a> {
+    pub(crate) url: &'a str,
+    pub(crate) time: Option<i64>,
+    pub(crate) referrer: Option<String>,
+    pub(crate) title: Option<String>,
+    pub(crate) program: &'a str,
+    pub(crate) user: &'a str,
+}
+
+/// The `TSK_WEB_HISTORY` artifact for `h` on `file`.
+pub(crate) fn history(ctx: &JobContext, file: &FileRecord, h: HistoryEntry<'_>) -> Art {
     Art::data(ctx, NAME, "TSK_WEB_HISTORY", file.id)
-        .text("TSK_URL", url)
-        .time("TSK_DATETIME_ACCESSED", time)
-        .text_opt("TSK_REFERRER", referrer)
-        .text_opt("TSK_TITLE", title)
-        .text("TSK_PROG_NAME", program)
-        .text("TSK_DOMAIN", extract_domain(url))
-        .text_opt("TSK_USER_NAME", Some(user.to_owned()))
+        .text("TSK_URL", h.url)
+        .time("TSK_DATETIME_ACCESSED", h.time)
+        .text_opt("TSK_REFERRER", h.referrer)
+        .text_opt("TSK_TITLE", h.title)
+        .text("TSK_PROG_NAME", h.program)
+        .text("TSK_DOMAIN", extract_domain(h.url))
+        .text_opt("TSK_USER_NAME", Some(h.user.to_owned()))
 }
 
 #[cfg(test)]
@@ -320,21 +388,33 @@ mod tests {
 
     #[test]
     fn domains() {
-        assert_eq!(extract_domain("https://www.google.com/search?q=x"), "google.com");
+        assert_eq!(
+            extract_domain("https://www.google.com/search?q=x"),
+            "google.com"
+        );
         assert_eq!(extract_domain("http://news.bbc.co.uk/x"), "bbc.co.uk");
         assert_eq!(extract_domain("http://192.168.1.1:8080/"), "192.168.1.1");
         assert_eq!(extract_domain("res://ieframe.dll/acr.htm"), "");
         assert_eq!(extract_domain("file:///C:/x.html"), "");
         assert_eq!(extract_domain("localhost"), "");
-        assert_eq!(extract_domain("Mr. Evil@http://www.example.com/"), "example.com");
+        assert_eq!(
+            extract_domain("Mr. Evil@http://www.example.com/"),
+            "example.com"
+        );
     }
 
     #[test]
     fn users_and_times() {
         assert_eq!(user_from_path("/Users/alice/AppData/Local/x"), "alice");
-        assert_eq!(user_from_path("/Documents and Settings/Mr. Evil/Cookies/a.txt"), "Mr. Evil");
+        assert_eq!(
+            user_from_path("/Documents and Settings/Mr. Evil/Cookies/a.txt"),
+            "Mr. Evil"
+        );
         assert_eq!(user_from_path("/Windows/x"), "");
-        assert_eq!(webkit_time(Some(13_000_000_000_000_000)), Some(1_355_526_400));
+        assert_eq!(
+            webkit_time(Some(13_000_000_000_000_000)),
+            Some(1_355_526_400)
+        );
         assert_eq!(webkit_time(Some(0)), None);
         assert_eq!(prtime(Some(1_600_000_000_000_000)), Some(1_600_000_000));
     }

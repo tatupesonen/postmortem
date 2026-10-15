@@ -28,7 +28,8 @@ pub(crate) fn engines() -> Vec<Engine> {
     let mut out: Vec<Engine> = Vec::new();
     for tag in MAPPINGS.split('<').skip(1) {
         if tag.starts_with("SearchEngine ") {
-            if let (Some(name), Some(domain)) = (attr(tag, "engine"), attr(tag, "domainSubstring")) {
+            if let (Some(name), Some(domain)) = (attr(tag, "engine"), attr(tag, "domainSubstring"))
+            {
                 out.push(Engine {
                     name,
                     domain,
@@ -52,7 +53,10 @@ fn decode(s: &str) -> String {
     while let Some(&c) = b.get(i) {
         match c {
             b'+' => out.push(b' '),
-            b'%' => match b.get(i + 1..i + 3).and_then(|h| u8::from_str_radix(std::str::from_utf8(h).ok()?, 16).ok()) {
+            b'%' => match b
+                .get(i + 1..i + 3)
+                .and_then(|h| u8::from_str_radix(std::str::from_utf8(h).ok()?, 16).ok())
+            {
                 Some(v) => {
                     out.push(v);
                     i += 2;
@@ -108,7 +112,11 @@ mod tests {
         let google = es.iter().find(|e| e.name == "Google").unwrap();
         assert!(google.tokens.contains(&"&q=".to_owned()));
         assert_eq!(
-            query_of(google, "http://www.google.com/search?hl=en&q=hacking+tools%21&btnG=x").as_deref(),
+            query_of(
+                google,
+                "http://www.google.com/search?hl=en&q=hacking+tools%21&btnG=x"
+            )
+            .as_deref(),
             Some("hacking tools!")
         );
         assert_eq!(query_of(google, "http://www.google.com/"), None);

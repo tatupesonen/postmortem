@@ -640,7 +640,11 @@ impl TimelineWindow {
             self.detail_sel = None;
         }
         let tz = self.tz().clone();
-        let cl = self.details.as_ref().map(|d| d.1.clone()).unwrap_or_default();
+        let cl = self
+            .details
+            .as_ref()
+            .map(|d| d.1.clone())
+            .unwrap_or_default();
         for e in view(ui, height, &cl, range, &tz, self.detail_sel) {
             match e {
                 DetailsEvent::Select(sel) => {

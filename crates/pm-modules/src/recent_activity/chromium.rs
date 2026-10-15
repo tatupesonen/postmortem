@@ -4,7 +4,7 @@ use pm_casedb::FileRecord;
 use pm_ingest::{JobContext, ModuleError};
 
 use super::{
-    NAME, TempDb, Visit, already_done, extract_domain, find_files, history, read_all,
+    HistoryEntry, NAME, TempDb, Visit, already_done, extract_domain, find_files, history, read_all,
     user_from_path, webkit_time,
 };
 use crate::util::Art;
@@ -92,13 +92,26 @@ fn i(r: &rusqlite::Row<'_>, c: &str) -> Option<i64> {
     r.get::<_, Option<i64>>(c).ok().flatten()
 }
 
-fn history_of(ctx: &JobContext, f: &FileRecord, browser: &str, visits: &mut Vec<Visit>) -> Result<(), ModuleError> {
+fn history_of(
+    ctx: &JobContext,
+    f: &FileRecord,
+    browser: &str,
+    visits: &mut Vec<Visit>,
+) -> Result<(), ModuleError> {
     let db = TempDb::open(ctx, f)?;
     let user = user_from_path(&f.parent_path);
     each(&db, HISTORY, |r| {
         let url = s(r, "url").unwrap_or_default();
         let time = webkit_time(i(r, "visit_time"));
-        history(ctx, f, &url, time, s(r, "referrer"), s(r, "title"), browser, &user).post_unchecked(ctx);
+        let entry = HistoryEntry {
+            url: &url,
+            time,
+            referrer: s(r, "referrer"),
+            title: s(r, "title"),
+            program: browser,
+            user: &user,
+        };
+        history(ctx, f, entry).post_unchecked(ctx);
         visits.push(Visit {
             file_id: f.id,
             url,
@@ -116,7 +129,10 @@ fn cookies(ctx: &JobContext, f: &FileRecord, browser: &str) -> Result<(), Module
         let domain = host.trim_start_matches('.').to_owned();
         Art::data(ctx, NAME, "TSK_WEB_COOKIE", f.id)
             .text("TSK_URL", &host)
-            .time("TSK_DATETIME_ACCESSED", webkit_time(i(r, "last_access_utc")))
+            .time(
+                "TSK_DATETIME_ACCESSED",
+                webkit_time(i(r, "last_access_utc")),
+            )
             .time("TSK_DATETIME_CREATED", webkit_time(i(r, "creation_utc")))
             .text("TSK_NAME", s(r, "name").unwrap_or_default())
             .text("TSK_VALUE", s(r, "value").unwrap_or_default())
@@ -166,7 +182,10 @@ fn bookmarks(ctx: &JobContext, f: &FileRecord, browser: &str) -> Result<(), Modu
         if node.get("type").and_then(serde_json::Value::as_str) != Some("url") {
             continue;
         }
-        let url = node.get("url").and_then(serde_json::Value::as_str).unwrap_or_default();
+        let url = node
+            .get("url")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or_default();
         let created = node
             .get("date_added")
             .and_then(serde_json::Value::as_str)
@@ -175,7 +194,9 @@ fn bookmarks(ctx: &JobContext, f: &FileRecord, browser: &str) -> Result<(), Modu
             .text("TSK_URL", url)
             .text_opt(
                 "TSK_TITLE",
-                node.get("name").and_then(serde_json::Value::as_str).map(str::to_owned),
+                node.get("name")
+                    .and_then(serde_json::Value::as_str)
+                    .map(str::to_owned),
             )
             .time("TSK_DATETIME_CREATED", webkit_time(created))
             .text("TSK_PROG_NAME", browser)
@@ -209,9 +230,18 @@ fn autofill(ctx: &JobContext, f: &FileRecord, browser: &str) -> Result<(), Modul
         Art::data(ctx, NAME, "TSK_WEB_FORM_AUTOFILL", f.id)
             .text("TSK_NAME", s(r, "name").unwrap_or_default())
             .text("TSK_VALUE", s(r, "value").unwrap_or_default())
-            .value("TSK_COUNT", pm_casedb::Value::Int(i(r, "count").unwrap_or(0)))
-            .time("TSK_DATETIME_CREATED", i(r, "date_created").filter(|t| *t > 0))
-            .time("TSK_DATETIME_ACCESSED", i(r, "date_last_used").filter(|t| *t > 0))
+            .value(
+                "TSK_COUNT",
+                pm_casedb::Value::Int(i(r, "count").unwrap_or(0)),
+            )
+            .time(
+                "TSK_DATETIME_CREATED",
+                i(r, "date_created").filter(|t| *t > 0),
+            )
+            .time(
+                "TSK_DATETIME_ACCESSED",
+                i(r, "date_last_used").filter(|t| *t > 0),
+            )
             .text("TSK_PROG_NAME", browser)
             .post_unchecked(ctx);
     };

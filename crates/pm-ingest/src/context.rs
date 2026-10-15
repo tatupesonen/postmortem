@@ -55,7 +55,9 @@ impl JobContext {
     pub fn post_artifact(&self, artifact: NewArtifact, key: &[i64]) {
         // The writer only disappears when the job is failing; the error
         // is reported there.
-        let _ = self.sink.send(WriteOp::Artifact(artifact, Some(key.to_vec())));
+        let _ = self
+            .sink
+            .send(WriteOp::Artifact(artifact, Some(key.to_vec())));
     }
 
     /// Posts an artifact without the duplicate check (for bulk extractors
