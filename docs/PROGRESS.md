@@ -39,8 +39,13 @@
    - Reported fmt/clippy failures on master in `pm-ui/src/timeline*.rs`,
      `pm-ingest/src/context.rs`, `pm-modules/src/recent_activity/*` —
      fix in step 1.
-   - hashing (single agent, started after the pause): hash parity audit +
-     MD5/SHA-256 in the file table and File Metadata viewer.
+   - hashing: merged `af99033` (fixes a duplicate `CaseDb::child_named`
+     that broke the build after the windows-artifacts merge; master now
+     compiles — `cargo check --workspace --all-targets` OK at `ea6b33b`,
+     tests not run). Audit + next steps in `docs/agents/hashing.md`:
+     hash all non-dir/non-unalloc files (not only regular), SHA-1 in the
+     same pass, Autopsy's message texts, hash indexes migration (take
+     `0002_hash_indexes`; WP-0 becomes `0003`), UI columns/viewer/search.
    - derived-and-carving: infrastructure merged; `pm-archive` +
      extractor + carving are parked in that worktree's `.wip-derived/`.
 3. Then resume each track for its remaining items (see the track docs),
