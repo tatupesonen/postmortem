@@ -29,13 +29,13 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
         let Some(root) = db.fs_root(fs.id)? else {
             continue;
         };
-        if let Some(bin) = db.child_named(root.id, "$Recycle.Bin")? {
+        if let Some(bin) = db.child_named_nocase(root.id, "$Recycle.Bin")? {
             for dir in db.children(bin.id)? {
                 dollar_i_dir(ctx, ty, &users, &dir, &mut batch)?;
             }
         }
         for name in ["RECYCLER", "RECYCLED"] {
-            let Some(bin) = db.child_named(root.id, name)? else {
+            let Some(bin) = db.child_named_nocase(root.id, name)? else {
                 continue;
             };
             info2_dir(ctx, ty, &users, &bin, &mut batch)?;
@@ -101,7 +101,7 @@ fn info2_dir(
     batch: &mut Batch,
 ) -> Result<(), ModuleError> {
     let db = ctx.case.db();
-    let Some(info2) = db.child_named(dir.id, "INFO2")? else {
+    let Some(info2) = db.child_named_nocase(dir.id, "INFO2")? else {
         return Ok(());
     };
     let Some(data) = read_small(ctx, &info2) else {
@@ -112,7 +112,7 @@ fn info2_dir(
         let content = if rec.removed {
             None
         } else {
-            db.child_named(dir.id, &rec.content_name())?
+            db.child_named_nocase(dir.id, &rec.content_name())?
         };
         let comment = if rec.removed {
             Some(REMOVED)

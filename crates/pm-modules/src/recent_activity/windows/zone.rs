@@ -37,7 +37,7 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
         };
         let downloaded = s
             .parent_id
-            .and_then(|p| db.child_named(p, base_name).ok().flatten())
+            .and_then(|p| db.child_named_nocase(p, base_name).ok().flatten())
             .filter(|d| d.inode == s.inode && d.stream.is_none());
         let Some(d) = downloaded else { continue };
         if known.contains(&d.id) {
