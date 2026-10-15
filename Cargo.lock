@@ -3424,6 +3424,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-lnk"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "pm-core",
+ "pm-lnk",
+ "proptest",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
 name = "pm-modules"
 version = "0.1.0"
 dependencies = [
@@ -3442,6 +3454,29 @@ dependencies = [
  "serde_json",
  "sha2",
  "tempfile",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
+name = "pm-prefetch"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "pm-core",
+ "pm-prefetch",
+ "proptest",
+ "thiserror 2.0.21",
+]
+
+[[package]]
+name = "pm-registry"
+version = "0.1.0"
+dependencies = [
+ "jiff",
+ "pm-core",
+ "pm-registry",
+ "proptest",
  "thiserror 2.0.21",
  "tracing",
 ]

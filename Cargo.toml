@@ -34,6 +34,9 @@ pm-modules = { path = "crates/pm-modules" }
 pm-hashdb = { path = "crates/pm-hashdb" }
 pm-filetype = { path = "crates/pm-filetype" }
 pm-ui = { path = "crates/pm-ui" }
+pm-registry = { path = "crates/pm-registry" }
+pm-lnk = { path = "crates/pm-lnk" }
+pm-prefetch = { path = "crates/pm-prefetch" }
 
 # Foundations
 thiserror = "2.0.21"

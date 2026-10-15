@@ -1,0 +1,24 @@
+[package]
+name = "pm-registry"
+description = "Forensic Windows registry hive parser for postmortem: regf cells, big data, transaction-log replay, deleted-key recovery"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# Hive and transaction-log writers for tests and fuzz seeds.
+builder = []
+
+[dependencies]
+pm-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+jiff.workspace = true
+
+[dev-dependencies]
+pm-registry = { path = ".", features = ["builder"] }
+proptest.workspace = true
+
+[lints]
+workspace = true
