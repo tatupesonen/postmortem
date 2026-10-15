@@ -538,3 +538,174 @@ fn file_metadata_shows_hashes_after_analysis() {
     h.get_by_label("SHA-256");
     shot(&mut h, "metadata-hashes");
 }
+
+/// Scrolls the table under `pos` horizontally to its right end.
+fn scroll_right(h: &mut Harness<'_, PostmortemApp>, pos: egui::Pos2) {
+    h.hover_at(pos);
+    h.run_steps(2);
+    for _ in 0..20 {
+        h.event(egui::Event::MouseWheel {
+            unit: egui::MouseWheelUnit::Point,
+            delta: egui::vec2(-200.0, 0.0),
+            phase: egui::TouchPhase::Move,
+            modifiers: egui::Modifiers::NONE,
+        });
+        h.run_steps(1);
+    }
+    h.run_steps(3);
+}
+
+/// Whether the node labelled `label` lies inside the window horizontally.
+fn fully_visible(h: &Harness<'_, PostmortemApp>, label: &str) -> bool {
+    h.query_by_label(label).is_some_and(|n| {
+        n.accesskit_node()
+            .bounding_box()
+            .is_some_and(|r| r.x0 >= 0.0 && r.x1 <= 1400.0)
+    })
+}
+
+#[test]
+fn file_listing_scrolls_to_last_column() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
+    settle(&mut h, |h| !h.state().data_sources().is_empty());
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    settle(&mut h, |h| {
+        h.query_by_label_contains("secret_plan.docx").is_some()
+    });
+    shot(&mut h, "hscroll-before");
+    scroll_right(&mut h, egui::pos2(800.0, 300.0));
+    shot(&mut h, "hscroll-after");
+    assert!(fully_visible(&h, "Meta Addr"));
+}
+
+/// A case whose web history has three visits, with enough attribute
+/// columns to be wider than the window.
+fn case_with_history(name: &str) -> PathBuf {
+    let dir = CASES.path().join(name);
+    let case = pm_case::Case::create(&dir, pm_case::CaseDetails::default()).unwrap();
+    let s = pm_case::add_image(
+        &case,
+        &DEMO.1,
+        &pm_case::LoadOptions::default(),
+        &pm_case::LoadProgress::default(),
+    )
+    .unwrap();
+    let attr = |n: &str| pm_casedb::catalog::attribute_type_id(n).unwrap();
+    let text = |s: &str| pm_casedb::Value::Text(s.into());
+    for (url, t) in [
+        ("https://c.example/", 300),
+        ("https://a.example/", 100),
+        ("https://b.example/", 200),
+    ] {
+        case.db()
+            .add_artifact(&pm_casedb::NewArtifact {
+                type_id: pm_casedb::catalog::artifact_type_id("TSK_WEB_HISTORY").unwrap(),
+                ds_id: s.ds_id,
+                file_id: None,
+                source_artifact_id: None,
+                score: None,
+                conclusion: None,
+                configuration: None,
+                justification: None,
+                created_at: 0,
+                attributes: [
+                    (attr("TSK_URL"), text(url)),
+                    (
+                        attr("TSK_DATETIME_ACCESSED"),
+                        pm_casedb::Value::DateTime(1_600_000_000 + t),
+                    ),
+                    (attr("TSK_TITLE"), text("A page title")),
+                    (attr("TSK_REFERRER"), text("https://referrer.example/")),
+                    (attr("TSK_PROG_NAME"), text("Internet Explorer")),
+                    (attr("TSK_DOMAIN"), text("example")),
+                    (attr("TSK_USER_NAME"), text("alice")),
+                ]
+                .into_iter()
+                .map(|(a, v)| (a, v, "test".to_owned()))
+                .collect(),
+            })
+            .unwrap();
+    }
+    dir.join("case.pmcase")
+}
+
+/// Top edge of the node labelled `label`.
+fn top(h: &Harness<'_, PostmortemApp>, label: &str) -> f64 {
+    h.get_by_label(label)
+        .accesskit_node()
+        .bounding_box()
+        .unwrap()
+        .y0
+}
+
+#[test]
+fn result_table_sorts_by_column() {
+    let mut h = harness_with(vec![case_with_history("sort-results")], false);
+    settle(&mut h, |h| {
+        !h.state().data_sources().is_empty() && !h.state().is_loading()
+    });
+    click(&mut h, "Web History (3)");
+    settle(&mut h, |h| h.query_by_label("https://c.example/").is_some());
+    let order = |h: &Harness<'_, PostmortemApp>| {
+        let mut urls = [
+            "https://a.example/",
+            "https://b.example/",
+            "https://c.example/",
+        ];
+        urls.sort_by(|a, b| top(h, a).total_cmp(&top(h, b)));
+        urls
+    };
+    // Unsorted: database order.
+    assert_eq!(
+        order(&h),
+        [
+            "https://c.example/",
+            "https://a.example/",
+            "https://b.example/"
+        ]
+    );
+    click_exact(&mut h, "URL");
+    assert_eq!(
+        order(&h),
+        [
+            "https://a.example/",
+            "https://b.example/",
+            "https://c.example/"
+        ]
+    );
+    // Again: descending.
+    click(&mut h, "URL ⏶");
+    assert_eq!(
+        order(&h),
+        [
+            "https://c.example/",
+            "https://b.example/",
+            "https://a.example/"
+        ]
+    );
+    shot(&mut h, "results-sorted");
+}
+
+#[test]
+fn result_table_scrolls_to_last_column() {
+    let mut h = harness_with(vec![case_with_history("wide-results")], false);
+    settle(&mut h, |h| {
+        !h.state().data_sources().is_empty() && !h.state().is_loading()
+    });
+    click(&mut h, "Web History (3)");
+    settle(&mut h, |h| h.query_by_label("https://c.example/").is_some());
+    assert!(
+        !fully_visible(&h, "Path"),
+        "table should be wider than the window"
+    );
+    scroll_right(&mut h, egui::pos2(800.0, 150.0));
+    shot(&mut h, "results-scrolled");
+    assert!(fully_visible(&h, "Path"));
+}

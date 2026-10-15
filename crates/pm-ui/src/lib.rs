@@ -15,6 +15,7 @@ mod icons;
 mod index;
 mod model;
 mod results;
+mod sortable;
 mod summary;
 mod table;
 mod task;

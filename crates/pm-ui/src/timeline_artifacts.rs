@@ -162,3 +162,105 @@ fn locate(case: &Case, sources: &[DataSource], file_id: i64) -> Location {
         f.deleted(),
     ))
 }
+
+#[cfg(test)]
+mod tests {
+    use pm_casedb::NewArtifact;
+    use pm_casedb::catalog::attribute_type_id;
+    use pm_timeline::{Filter, Timeline};
+
+    use super::*;
+
+    /// A case (with the demo disk as its data source) holding `arts`:
+    /// `(artifact type, [(attribute, value)])`.
+    fn case_with(arts: &[(&str, Vec<(&str, Value)>)]) -> (tempfile::TempDir, Arc<Case>) {
+        let dir = tempfile::tempdir().unwrap();
+        let img = dir.path().join("demo.dd");
+        std::fs::write(&img, pm_testkit::demo::demo_disk()).unwrap();
+        let case = Case::create(dir.path().join("case"), pm_case::CaseDetails::default()).unwrap();
+        let s = pm_case::add_image(
+            &case,
+            &img,
+            &pm_case::LoadOptions::default(),
+            &pm_case::LoadProgress::default(),
+        )
+        .unwrap();
+        let custom = case.db().artifact_type_names().unwrap();
+        for (ty, attrs) in arts {
+            let type_id = artifact_type_id(ty)
+                .or_else(|| custom.iter().find(|t| t.1 == *ty).map(|t| t.0))
+                .unwrap_or_else(|| panic!("{ty}"));
+            case.db()
+                .add_artifact(&NewArtifact {
+                    type_id,
+                    ds_id: s.ds_id,
+                    file_id: None,
+                    source_artifact_id: None,
+                    score: None,
+                    conclusion: None,
+                    configuration: None,
+                    justification: None,
+                    created_at: 0,
+                    attributes: attrs
+                        .iter()
+                        .map(|(n, v)| {
+                            (
+                                attribute_type_id(n).unwrap_or_else(|| panic!("{n}")),
+                                v.clone(),
+                                "test".to_owned(),
+                            )
+                        })
+                        .collect(),
+                })
+                .unwrap();
+        }
+        (dir, Arc::new(case))
+    }
+
+    fn kinds(case: &Arc<Case>) -> Vec<EventType> {
+        let (events, subjects) = load(case, &[]);
+        let t = Timeline::new(events, subjects, Vec::new());
+        let (s, e) = t.span().unwrap();
+        t.list(s, e, &Filter::default())
+            .into_iter()
+            .flat_map(|r| r.kinds)
+            .collect()
+    }
+
+    #[test]
+    fn web_artifacts_become_events() {
+        let t = |s: i64| Value::DateTime(1_093_000_000 + s);
+        let text = |s: &str| Value::Text(s.into());
+        let (_dir, case) = case_with(&[
+            (
+                "TSK_WEB_COOKIE",
+                vec![
+                    ("TSK_DATETIME_CREATED", t(1)),
+                    ("TSK_URL", text("example.com")),
+                ],
+            ),
+            (
+                "TSK_WEB_SEARCH_QUERY",
+                vec![
+                    ("TSK_DATETIME_ACCESSED", t(2)),
+                    ("TSK_TEXT", text("forensics")),
+                ],
+            ),
+            (
+                "TSK_WEB_BOOKMARK",
+                vec![
+                    ("TSK_DATETIME_CREATED", t(3)),
+                    ("TSK_URL", text("https://example.com")),
+                ],
+            ),
+        ]);
+        assert_eq!(
+            kinds(&case),
+            [
+                EventType::WebCookies,
+                EventType::WebSearches,
+                EventType::WebBookmarks
+            ]
+        );
+    }
+}

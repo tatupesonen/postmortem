@@ -1,6 +1,7 @@
 //! Analysis results and data artifacts from the case database (Autopsy's
 //! "Data Artifacts" / "Analysis Results" tree and result viewer).
 
+use std::cmp::Ordering;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
@@ -10,6 +11,7 @@ use pm_casedb::catalog::Category;
 use pm_casedb::{ArtifactRecord, FileRecord, Significance, Value};
 
 use crate::format::{DisplayPrefs, grouped};
+use crate::sortable::{Order, Sort, cmp_text};
 use crate::task::Task;
 
 /// Rows shown per result type (the table is not paged yet).
@@ -114,6 +116,8 @@ pub(crate) struct ResultRow {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum AttrValue {
     Text(String),
+    Int(i64),
+    Double(f64),
     Time(i64),
 }
 
@@ -121,7 +125,32 @@ impl AttrValue {
     fn show(&self, prefs: &DisplayPrefs) -> String {
         match self {
             Self::Text(s) => s.clone(),
+            Self::Int(i) => i.to_string(),
+            Self::Double(d) => d.to_string(),
             Self::Time(t) => prefs.time(jiff::Timestamp::from_second(*t).ok()),
+        }
+    }
+
+    /// Sort order: numbers and times by value, text case-insensitively;
+    /// different kinds (rare within one column) group by kind.
+    fn sort_cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::Text(a), Self::Text(b)) => cmp_text(a, b),
+            (Self::Int(a), Self::Int(b)) | (Self::Time(a), Self::Time(b)) => a.cmp(b),
+            (Self::Double(a), Self::Double(b)) => a.total_cmp(b),
+            #[expect(clippy::cast_precision_loss, reason = "ordering only")]
+            (Self::Int(a), Self::Double(b)) => (*a as f64).total_cmp(b),
+            #[expect(clippy::cast_precision_loss, reason = "ordering only")]
+            (Self::Double(a), Self::Int(b)) => a.total_cmp(&(*b as f64)),
+            _ => self.rank().cmp(&other.rank()),
+        }
+    }
+
+    fn rank(&self) -> u8 {
+        match self {
+            Self::Int(_) | Self::Double(_) => 0,
+            Self::Time(_) => 1,
+            Self::Text(_) => 2,
         }
     }
 }
@@ -155,6 +184,8 @@ pub(crate) fn load_rows(case: &Case, type_id: i64) -> Result<ResultRows, String>
             .map(|a| {
                 let v = match a.value {
                     Value::DateTime(t) => AttrValue::Time(t),
+                    Value::Int(i) => AttrValue::Int(i),
+                    Value::Double(d) => AttrValue::Double(d),
                     other => AttrValue::Text(other.display()),
                 };
                 (a.display_name, v)
@@ -182,131 +213,215 @@ fn score_text(s: Option<Significance>) -> &'static str {
     s.map_or("", Significance::name)
 }
 
-/// Draws the result table; returns the row clicked this frame.
-pub(crate) fn table_ui(
-    ui: &mut egui::Ui,
-    title: &str,
-    data: &ResultRows,
-    prefs: &DisplayPrefs,
-    selected: Option<usize>,
-) -> Option<usize> {
-    ui.style_mut().interaction.selectable_labels = false;
-    ui.horizontal(|ui| {
-        ui.strong(title);
-        ui.weak(format!(
-            "{} results{}",
-            grouped(data.rows.len() as u64),
-            if data.truncated {
-                format!(" (first {} shown)", grouped(MAX_ROWS as u64))
-            } else {
-                String::new()
-            }
-        ));
-    });
-    let has_score = data.rows.iter().any(|r| r.artifact.significance.is_some());
-    let has_conf = data.rows.iter().any(|r| r.artifact.configuration.is_some());
-    let has_just = data.rows.iter().any(|r| r.artifact.justification.is_some());
-    let mut clicked = None;
-    let mut table = TableBuilder::new(ui)
-        .striped(true)
-        .resizable(true)
-        .sense(egui::Sense::click())
-        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-        .column(Column::initial(200.0).at_least(80.0).clip(true));
-    if has_score {
-        table = table.column(Column::initial(110.0).clip(true));
+/// A result-table column.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResultCol {
+    SourceFile,
+    Score,
+    Configuration,
+    Justification,
+    /// Index into [`ResultRows::columns`].
+    Attr(usize),
+    Path,
+}
+
+impl ResultCol {
+    fn title(self, data: &ResultRows) -> &str {
+        match self {
+            Self::SourceFile => "Source File",
+            Self::Score => "Score",
+            Self::Configuration => "Configuration",
+            Self::Justification => "Justification",
+            Self::Attr(i) => data.columns.get(i).map_or("", String::as_str),
+            Self::Path => "Path",
+        }
     }
-    if has_conf {
-        table = table.column(Column::initial(140.0).clip(true));
+
+    /// Ascending order of two rows by this column.
+    fn cmp<'a>(self, data: &ResultRows, a: &'a ResultRow, b: &'a ResultRow) -> Ordering {
+        fn name(r: &ResultRow) -> &str {
+            r.file.as_ref().map_or("", |f| f.name.as_str())
+        }
+        match self {
+            Self::SourceFile => cmp_text(name(a), name(b)),
+            Self::Score => a.artifact.significance.cmp(&b.artifact.significance),
+            Self::Configuration => cmp_opt_text(
+                a.artifact.configuration.as_deref(),
+                b.artifact.configuration.as_deref(),
+            ),
+            Self::Justification => cmp_opt_text(
+                a.artifact.justification.as_deref(),
+                b.artifact.justification.as_deref(),
+            ),
+            Self::Attr(col) => {
+                let Some(name) = data.columns.get(col) else {
+                    return Ordering::Equal;
+                };
+                let first =
+                    |r: &'a ResultRow| r.attrs.iter().find(|(n, _)| n == name).map(|(_, v)| v);
+                match (first(a), first(b)) {
+                    (Some(x), Some(y)) => x.sort_cmp(y),
+                    (x, y) => x.is_some().cmp(&y.is_some()),
+                }
+            }
+            Self::Path => cmp_text(
+                &a.file.as_ref().map_or_else(String::new, FileRecord::path),
+                &b.file.as_ref().map_or_else(String::new, FileRecord::path),
+            ),
+        }
     }
-    if has_just {
-        table = table.column(Column::initial(200.0).clip(true));
+}
+
+/// Missing values first, then case-insensitive text.
+fn cmp_opt_text(a: Option<&str>, b: Option<&str>) -> Ordering {
+    match (a, b) {
+        (Some(x), Some(y)) => cmp_text(x, y),
+        (x, y) => x.is_some().cmp(&y.is_some()),
     }
-    for _ in &data.columns {
-        table = table.column(Column::initial(180.0).at_least(60.0).clip(true));
+}
+
+/// The columns shown for `data`.
+fn columns(data: &ResultRows) -> Vec<ResultCol> {
+    let mut cols = vec![ResultCol::SourceFile];
+    if data.rows.iter().any(|r| r.artifact.significance.is_some()) {
+        cols.push(ResultCol::Score);
     }
-    table = table.column(Column::remainder().at_least(120.0).clip(true));
-    table
-        .header(22.0, |mut h| {
-            h.col(|ui| {
-                ui.strong("Source File");
-            });
-            if has_score {
-                h.col(|ui| {
-                    ui.strong("Score");
-                });
-            }
-            if has_conf {
-                h.col(|ui| {
-                    ui.strong("Configuration");
-                });
-            }
-            if has_just {
-                h.col(|ui| {
-                    ui.strong("Justification");
-                });
-            }
-            for c in &data.columns {
-                h.col(|ui| {
-                    ui.strong(c);
-                });
-            }
-            h.col(|ui| {
-                ui.strong("Path");
-            });
-        })
-        .body(|body| {
-            body.rows(20.0, data.rows.len(), |mut row| {
-                let i = row.index();
-                let Some(r) = data.rows.get(i) else { return };
-                row.set_selected(selected == Some(i));
-                let name = r.file.as_ref().map_or("", |f| f.name.as_str());
-                row.col(|ui| {
-                    ui.label(name);
-                });
-                if has_score {
-                    row.col(|ui| {
-                        let s = r.artifact.significance;
-                        let text = egui::RichText::new(score_text(s));
-                        ui.label(match s {
-                            Some(Significance::Notable) => text.color(ui.visuals().error_fg_color),
-                            Some(Significance::LikelyNotable) => {
-                                text.color(ui.visuals().warn_fg_color)
-                            }
-                            _ => text,
-                        });
-                    });
+    if data.rows.iter().any(|r| r.artifact.configuration.is_some()) {
+        cols.push(ResultCol::Configuration);
+    }
+    if data.rows.iter().any(|r| r.artifact.justification.is_some()) {
+        cols.push(ResultCol::Justification);
+    }
+    cols.extend((0..data.columns.len()).map(ResultCol::Attr));
+    cols.push(ResultCol::Path);
+    cols
+}
+
+/// A sortable, horizontally scrolling table of results.
+#[derive(Debug, Default)]
+pub(crate) struct ResultTable {
+    sort: Option<Sort>,
+    order: Order,
+}
+
+impl ResultTable {
+    /// Draws the table; `selected` and the returned clicked row are
+    /// indices into `data.rows`.
+    pub(crate) fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        title: &str,
+        data: &ResultRows,
+        prefs: &DisplayPrefs,
+        selected: Option<usize>,
+    ) -> Option<usize> {
+        ui.style_mut().interaction.selectable_labels = false;
+        ui.horizontal(|ui| {
+            ui.strong(title);
+            ui.weak(format!(
+                "{} results{}",
+                grouped(data.rows.len() as u64),
+                if data.truncated {
+                    format!(" (first {} shown)", grouped(MAX_ROWS as u64))
+                } else {
+                    String::new()
                 }
-                if has_conf {
-                    row.col(|ui| {
-                        ui.label(r.artifact.configuration.as_deref().unwrap_or(""));
-                    });
-                }
-                if has_just {
-                    row.col(|ui| {
-                        ui.label(r.artifact.justification.as_deref().unwrap_or(""));
-                    });
-                }
-                for c in &data.columns {
-                    row.col(|ui| {
-                        let v: Vec<String> = r
-                            .attrs
-                            .iter()
-                            .filter(|(n, _)| n == c)
-                            .map(|(_, v)| v.show(prefs))
-                            .collect();
-                        ui.label(v.join("; "));
-                    });
-                }
-                row.col(|ui| {
-                    ui.monospace(r.file.as_ref().map_or_else(String::new, FileRecord::path));
-                });
-                if row.response().clicked() {
-                    clicked = Some(i);
-                }
-            });
+            ));
         });
-    clicked
+        let cols = columns(data);
+        let order = self.order.get(
+            std::ptr::from_ref(data) as usize,
+            data.rows.len(),
+            self.sort,
+            |a, b, c| match (data.rows.get(a), data.rows.get(b), cols.get(c)) {
+                (Some(a), Some(b), Some(col)) => col.cmp(data, a, b),
+                _ => Ordering::Equal,
+            },
+        );
+        let mut clicked = None;
+        let mut sort = self.sort;
+        crate::sortable::hscroll(ui, "results-h", |ui| {
+            let mut table = TableBuilder::new(ui)
+                .id_salt("results")
+                .striped(true)
+                .resizable(true)
+                .sense(egui::Sense::click())
+                .cell_layout(egui::Layout::left_to_right(egui::Align::Center));
+            for c in &cols {
+                table = table.column(match c {
+                    ResultCol::SourceFile => Column::initial(200.0).at_least(80.0).clip(true),
+                    ResultCol::Score => Column::initial(110.0).clip(true),
+                    ResultCol::Configuration => Column::initial(140.0).clip(true),
+                    ResultCol::Justification => Column::initial(200.0).clip(true),
+                    ResultCol::Attr(_) => Column::initial(180.0).at_least(60.0).clip(true),
+                    ResultCol::Path => Column::remainder().at_least(240.0).clip(true),
+                });
+            }
+            table
+                .header(22.0, |mut h| {
+                    for (i, c) in cols.iter().enumerate() {
+                        h.col(|ui| {
+                            crate::sortable::header_mut(ui, c.title(data), &mut sort, i);
+                        });
+                    }
+                })
+                .body(|body| {
+                    body.rows(20.0, order.len(), |mut row| {
+                        let Some(i) = order.get(row.index()).copied() else {
+                            return;
+                        };
+                        let Some(r) = data.rows.get(i) else { return };
+                        row.set_selected(selected == Some(i));
+                        for c in &cols {
+                            row.col(|ui| cell(ui, data, r, *c, prefs));
+                        }
+                        if row.response().clicked() {
+                            clicked = Some(i);
+                        }
+                    });
+                });
+        });
+        self.sort = sort;
+        clicked
+    }
+}
+
+fn cell(ui: &mut egui::Ui, data: &ResultRows, r: &ResultRow, c: ResultCol, prefs: &DisplayPrefs) {
+    match c {
+        ResultCol::SourceFile => {
+            ui.label(r.file.as_ref().map_or("", |f| f.name.as_str()));
+        }
+        ResultCol::Score => {
+            let s = r.artifact.significance;
+            let text = egui::RichText::new(score_text(s));
+            ui.label(match s {
+                Some(Significance::Notable) => text.color(ui.visuals().error_fg_color),
+                Some(Significance::LikelyNotable) => text.color(ui.visuals().warn_fg_color),
+                _ => text,
+            });
+        }
+        ResultCol::Configuration => {
+            ui.label(r.artifact.configuration.as_deref().unwrap_or(""));
+        }
+        ResultCol::Justification => {
+            ui.label(r.artifact.justification.as_deref().unwrap_or(""));
+        }
+        ResultCol::Attr(i) => {
+            let Some(name) = data.columns.get(i) else {
+                return;
+            };
+            let v: Vec<String> = r
+                .attrs
+                .iter()
+                .filter(|(n, _)| n == name)
+                .map(|(_, v)| v.show(prefs))
+                .collect();
+            ui.label(v.join("; "));
+        }
+        ResultCol::Path => {
+            ui.monospace(r.file.as_ref().map_or_else(String::new, FileRecord::path));
+        }
+    }
 }
 
 #[cfg(test)]

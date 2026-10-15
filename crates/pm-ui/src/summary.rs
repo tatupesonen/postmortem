@@ -9,6 +9,7 @@ use pm_index::{FileCategory, FileIndex, IndexedFile};
 use crate::format::{DisplayPrefs, grouped, size_long};
 use crate::index::SharedIndex;
 use crate::model::{Content, DataSource, FileRow};
+use crate::sortable::{Sort, cmp_text};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum Tab {
@@ -224,29 +225,62 @@ fn recent(
             ] {
                 ui.add_space(8.0);
                 ui.strong(title);
-                egui::Grid::new(title)
-                    .striped(true)
-                    .num_columns(2)
-                    .spacing([24.0, 3.0])
-                    .show(ui, |ui| {
-                        for f in idx.most_recent(ds.id as u32, 10, pick) {
-                            ui.label(prefs.time(pick(&f.times)));
-                            let text = egui::RichText::new(&*f.path);
-                            let text = if f.deleted() {
-                                text.color(ui.visuals().error_fg_color)
-                            } else {
-                                text
-                            };
-                            if ui
-                                .link(text)
-                                .on_hover_text("Show this file in the content viewer")
-                                .clicked()
-                            {
-                                action = content(ds, f).map(|c| Action::ShowFile(Box::new(c)));
-                            }
-                            ui.end_row();
-                        }
+                let mut files = idx.most_recent(ds.id as u32, 10, pick);
+                // The sort lives in egui memory (these lists are tiny).
+                let sort_id = ui.id().with(("recent-sort", title));
+                let mut sort: Option<Sort> = ui.data(|d| d.get_temp(sort_id)).flatten();
+                if let Some(s) = sort {
+                    files.sort_by(|a, b| {
+                        let o = if s.col == 0 {
+                            pick(&a.times).cmp(&pick(&b.times))
+                        } else {
+                            cmp_text(&a.path, &b.path)
+                        };
+                        if s.ascending { o } else { o.reverse() }
                     });
+                }
+                let row_h = egui::TextStyle::Body.resolve(ui.style()).size + 6.0;
+                ui.push_id(title, |ui| {
+                    egui_extras::TableBuilder::new(ui)
+                        .striped(true)
+                        .vscroll(false)
+                        .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                        .column(egui_extras::Column::initial(190.0))
+                        .column(egui_extras::Column::remainder().at_least(200.0).clip(true))
+                        .header(row_h + 2.0, |mut header| {
+                            for (i, t) in ["Date/Time", "Path"].into_iter().enumerate() {
+                                header.col(|ui| {
+                                    crate::sortable::header_mut(ui, t, &mut sort, i);
+                                });
+                            }
+                        })
+                        .body(|mut body| {
+                            for f in &files {
+                                body.row(row_h, |mut row| {
+                                    row.col(|ui| {
+                                        ui.label(prefs.time(pick(&f.times)));
+                                    });
+                                    row.col(|ui| {
+                                        let text = egui::RichText::new(&*f.path);
+                                        let text = if f.deleted() {
+                                            text.color(ui.visuals().error_fg_color)
+                                        } else {
+                                            text
+                                        };
+                                        if ui
+                                            .link(text)
+                                            .on_hover_text("Show this file in the content viewer")
+                                            .clicked()
+                                        {
+                                            action = content(ds, f)
+                                                .map(|c| Action::ShowFile(Box::new(c)));
+                                        }
+                                    });
+                                });
+                            }
+                        });
+                });
+                ui.data_mut(|d| d.insert_temp(sort_id, sort));
             }
         });
     action

@@ -14,6 +14,7 @@ use pm_timeline::{
 use crate::format::DisplayPrefs;
 use crate::index::SharedIndex;
 use crate::model::{Content, DataSource, FileRow};
+use crate::sortable::{Order, Sort, cmp_text};
 use crate::task::Task;
 use crate::viewers::ViewerPanel;
 
@@ -89,6 +90,9 @@ pub(crate) struct TimelineWindow {
     /// Selected bin (start, end) in the counts view.
     selection: Option<(i64, i64)>,
     selected_row: Option<usize>,
+    /// Event list sort (`None`: by time) and its cached row order.
+    event_sort: Option<Sort>,
+    event_order: Order,
     cache: Cache,
     viewer: ViewerPanel,
     prefs: DisplayPrefs,
@@ -135,6 +139,8 @@ impl TimelineWindow {
             unit_override: None,
             selection: None,
             selected_row: None,
+            event_sort: None,
+            event_order: Order::default(),
             cache: Cache::default(),
             viewer: ViewerPanel::default(),
             prefs,
@@ -266,6 +272,7 @@ impl TimelineWindow {
             }
             self.cache.rows_key = Some(key);
             self.selected_row = None;
+            self.event_order.clear();
         }
         &self.cache.rows
     }
@@ -687,91 +694,114 @@ impl TimelineWindow {
                 ));
             }
         });
-        let mut clicked = None;
-        egui::ScrollArea::horizontal()
-            .id_salt("tl-events-h")
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                ui.style_mut().interaction.selectable_labels = false;
-                let row_h = egui::TextStyle::Body.resolve(ui.style()).size + 6.0;
-                TableBuilder::new(ui)
-                    .id_salt("tl-events")
-                    .striped(true)
-                    .resizable(true)
-                    .sense(Sense::click())
-                    .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                    .column(Column::initial(170.0))
-                    .column(Column::initial(130.0))
-                    .column(Column::initial(520.0).clip(true))
-                    .column(Column::initial(140.0).clip(true))
-                    .column(Column::remainder().at_least(60.0))
-                    .header(row_h + 2.0, |mut header| {
-                        for t in [
-                            "Date/Time",
-                            "Event Type",
-                            "Description",
-                            "Data Source",
-                            "Deleted",
-                        ] {
-                            header.col(|ui| {
-                                ui.strong(t);
-                            });
-                        }
-                    })
-                    .body(|body| {
-                        body.rows(row_h, rows.len(), |mut row| {
-                            let i = row.index();
-                            let Some(r) = rows.get(i) else { return };
-                            let Some(s) = timeline.subject(r.subject) else {
-                                return;
-                            };
-                            row.set_selected(self.selected_row == Some(i));
-                            row.col(|ui| {
-                                ui.label(TimeUnit::Seconds.label(r.time, &tz));
-                            });
-                            row.col(|ui| {
-                                match r.macb() {
-                                    Some(m) => ui.monospace(m).on_hover_text(
-                                        r.kinds
-                                            .iter()
-                                            .map(|k| k.name())
-                                            .collect::<Vec<_>>()
-                                            .join(", "),
-                                    ),
-                                    None => ui.label(
-                                        r.kinds
-                                            .iter()
-                                            .map(|k| k.name())
-                                            .collect::<Vec<_>>()
-                                            .join(", "),
-                                    ),
-                                };
-                            });
-                            row.col(|ui| {
-                                let text = egui::RichText::new(&*s.path);
-                                ui.label(if s.deleted {
-                                    text.color(ui.visuals().error_fg_color)
-                                } else {
-                                    text
-                                });
-                            });
-                            row.col(|ui| {
-                                ui.label(
-                                    timeline
-                                        .data_sources()
-                                        .get(s.ds as usize)
-                                        .map_or("", String::as_str),
-                                );
-                            });
-                            row.col(|ui| {
-                                ui.label(if s.deleted { "yes" } else { "" });
-                            });
-                            if row.response().clicked() {
-                                clicked = Some(i);
-                            }
-                        });
-                    });
+        let kinds = |r: &ListRow| {
+            r.kinds
+                .iter()
+                .map(|k| k.name())
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        let subject = |r: &ListRow| timeline.subject(r.subject);
+        let order = self
+            .event_order
+            .get(0, rows.len(), self.event_sort, |a, b, col| {
+                let (Some(a), Some(b)) = (rows.get(a), rows.get(b)) else {
+                    return std::cmp::Ordering::Equal;
+                };
+                let (sa, sb) = (subject(a), subject(b));
+                match col {
+                    0 => a.time.cmp(&b.time),
+                    1 => cmp_text(&kinds(a), &kinds(b)),
+                    2 => cmp_text(sa.map_or("", |s| &*s.path), sb.map_or("", |s| &*s.path)),
+                    3 => {
+                        let ds = |s: Option<&pm_timeline::Subject>| {
+                            s.and_then(|s| timeline.data_sources().get(s.ds as usize))
+                                .map_or("", String::as_str)
+                        };
+                        cmp_text(ds(sa), ds(sb))
+                    }
+                    _ => sa
+                        .is_some_and(|s| s.deleted)
+                        .cmp(&sb.is_some_and(|s| s.deleted)),
+                }
             });
+        let mut clicked = None;
+        let mut sort = self.event_sort;
+        crate::sortable::hscroll(ui, "tl-events-h", |ui| {
+            ui.style_mut().interaction.selectable_labels = false;
+            let row_h = egui::TextStyle::Body.resolve(ui.style()).size + 6.0;
+            TableBuilder::new(ui)
+                .id_salt("tl-events")
+                .striped(true)
+                .resizable(true)
+                .sense(Sense::click())
+                .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                .column(Column::initial(170.0))
+                .column(Column::initial(130.0))
+                .column(Column::initial(520.0).clip(true))
+                .column(Column::initial(140.0).clip(true))
+                .column(Column::remainder().at_least(60.0))
+                .header(row_h + 2.0, |mut header| {
+                    for (i, t) in [
+                        "Date/Time",
+                        "Event Type",
+                        "Description",
+                        "Data Source",
+                        "Deleted",
+                    ]
+                    .into_iter()
+                    .enumerate()
+                    {
+                        header.col(|ui| {
+                            crate::sortable::header_mut(ui, t, &mut sort, i);
+                        });
+                    }
+                })
+                .body(|body| {
+                    body.rows(row_h, order.len(), |mut row| {
+                        let Some(i) = order.get(row.index()).copied() else {
+                            return;
+                        };
+                        let Some(r) = rows.get(i) else { return };
+                        let Some(s) = timeline.subject(r.subject) else {
+                            return;
+                        };
+                        row.set_selected(self.selected_row == Some(i));
+                        row.col(|ui| {
+                            ui.label(TimeUnit::Seconds.label(r.time, &tz));
+                        });
+                        row.col(|ui| {
+                            match r.macb() {
+                                Some(m) => ui.monospace(m).on_hover_text(kinds(r)),
+                                None => ui.label(kinds(r)),
+                            };
+                        });
+                        row.col(|ui| {
+                            let text = egui::RichText::new(&*s.path);
+                            ui.label(if s.deleted {
+                                text.color(ui.visuals().error_fg_color)
+                            } else {
+                                text
+                            });
+                        });
+                        row.col(|ui| {
+                            ui.label(
+                                timeline
+                                    .data_sources()
+                                    .get(s.ds as usize)
+                                    .map_or("", String::as_str),
+                            );
+                        });
+                        row.col(|ui| {
+                            ui.label(if s.deleted { "yes" } else { "" });
+                        });
+                        if row.response().clicked() {
+                            clicked = Some(i);
+                        }
+                    });
+                });
+        });
+        self.event_sort = sort;
         if let Some(i) = clicked {
             self.selected_row = Some(i);
             let content = rows.get(i).and_then(|r| self.content_for(r));

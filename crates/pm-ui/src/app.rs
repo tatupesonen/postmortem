@@ -104,6 +104,7 @@ pub struct PostmortemApp {
     result_counts: crate::results::Counts,
     result_rows: HashMap<i64, Task<Result<Arc<crate::results::ResultRows>, String>>>,
     result_selected: Option<usize>,
+    result_table: crate::results::ResultTable,
     /// Analysis was running last frame (refresh results when it stops).
     was_analysing: bool,
     was_analysing_views: bool,
@@ -158,6 +159,7 @@ impl PostmortemApp {
             result_counts: crate::results::Counts::default(),
             result_rows: HashMap::new(),
             result_selected: None,
+            result_table: crate::results::ResultTable::default(),
             was_analysing: false,
             was_analysing_views: false,
             add_wizard: None,
@@ -451,6 +453,7 @@ impl PostmortemApp {
         self.selected = Some(node);
         self.table.reset();
         self.result_selected = None;
+        self.result_table = crate::results::ResultTable::default();
     }
 
     fn go_back(&mut self) {
@@ -1564,8 +1567,9 @@ impl PostmortemApp {
             .ok()
             .and_then(|n| n.into_iter().find(|t| t.0 == type_id).map(|t| t.2))
             .unwrap_or_default();
-        if let Some(i) =
-            crate::results::table_ui(ui, &title, &rows, &self.prefs, self.result_selected)
+        if let Some(i) = self
+            .result_table
+            .ui(ui, &title, &rows, &self.prefs, self.result_selected)
         {
             self.result_selected = Some(i);
             let content = rows

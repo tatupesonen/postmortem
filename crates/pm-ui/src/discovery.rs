@@ -12,6 +12,7 @@ use crate::format::{DisplayPrefs, grouped};
 use crate::gallery::self_content;
 use crate::index::SharedIndex;
 use crate::model::{Content, DataSource};
+use crate::sortable::{Order, Sort, cmp_text};
 use crate::thumbs::ThumbCache;
 use crate::viewers::ViewerPanel;
 
@@ -32,6 +33,10 @@ pub(crate) struct DiscoveryWindow {
     page: usize,
     page_size: usize,
     selected: Option<usize>,
+    /// List view column sort (`None`: the "Order Within Groups By"
+    /// choice); applies to the whole group, not just the page.
+    list_sort: Option<Sort>,
+    list_order: Order,
     thumbs: ThumbCache<usize>,
     viewer: ViewerPanel,
     prefs: DisplayPrefs,
@@ -63,6 +68,8 @@ impl DiscoveryWindow {
             page: 0,
             page_size: 100,
             selected: None,
+            list_sort: None,
+            list_order: Order::default(),
             thumbs: ThumbCache::default(),
             viewer: ViewerPanel::default(),
             prefs,
@@ -90,6 +97,7 @@ impl DiscoveryWindow {
         self.group = 0;
         self.page = 0;
         self.selected = None;
+        self.list_order.clear();
         self.thumbs.clear();
     }
 
@@ -346,17 +354,34 @@ impl DiscoveryWindow {
                     }
                 });
         });
-        let page: Vec<usize> = g
-            .files
+        let list = self.criteria.result_type != ResultType::Images;
+        let order = self.list_order.get(
+            self.group,
+            g.files.len(),
+            self.list_sort.filter(|_| list),
+            |a, b, col| {
+                let file = |i: usize| g.files.get(i).and_then(|&fi| idx.files.get(fi));
+                let (Some(a), Some(b)) = (file(a), file(b)) else {
+                    return std::cmp::Ordering::Equal;
+                };
+                match col {
+                    0 => cmp_text(a.name(), b.name()),
+                    1 => a.size.cmp(&b.size),
+                    2 => a.times.modified.cmp(&b.times.modified),
+                    _ => cmp_text(a.parent(), b.parent()),
+                }
+            },
+        );
+        let page: Vec<usize> = order
             .iter()
             .skip(self.page * self.page_size)
             .take(self.page_size)
-            .copied()
+            .filter_map(|&i| g.files.get(i).copied())
             .collect();
-        if self.criteria.result_type == ResultType::Images {
-            self.thumb_grid(ui, &idx, &page);
-        } else {
+        if list {
             self.list(ui, &idx, &page);
+        } else {
+            self.thumb_grid(ui, &idx, &page);
         }
     }
 
@@ -433,39 +458,74 @@ impl DiscoveryWindow {
     }
 
     fn list(&mut self, ui: &mut egui::Ui, idx: &Arc<FileIndex>, page: &[usize]) {
+        use egui_extras::{Column, TableBuilder};
         let mut action = None;
-        egui::ScrollArea::vertical()
-            .auto_shrink(false)
-            .show(ui, |ui| {
-                egui::Grid::new("disc-list")
-                    .striped(true)
-                    .num_columns(3)
-                    .spacing([16.0, 4.0])
-                    .show(ui, |ui| {
-                        ui.strong("Name");
-                        ui.strong("Size");
-                        ui.strong("Path");
-                        ui.end_row();
-                        for &fi in page {
-                            let Some(f) = idx.files.get(fi) else { continue };
+        let mut sort = self.list_sort;
+        ui.style_mut().interaction.selectable_labels = false;
+        crate::sortable::hscroll(ui, "disc-list-h", |ui| {
+            let row_h = egui::TextStyle::Body.resolve(ui.style()).size + 6.0;
+            TableBuilder::new(ui)
+                .id_salt("disc-list")
+                .striped(true)
+                .resizable(true)
+                .sense(Sense::click())
+                .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
+                .column(Column::initial(260.0).at_least(80.0).clip(true))
+                .column(Column::initial(90.0))
+                .column(Column::initial(170.0))
+                .column(Column::remainder().at_least(240.0).clip(true))
+                .header(row_h + 2.0, |mut header| {
+                    for (i, t) in ["Name", "Size", "Modified Time", "Path"]
+                        .into_iter()
+                        .enumerate()
+                    {
+                        header.col(|ui| {
+                            crate::sortable::header_mut(ui, t, &mut sort, i);
+                        });
+                    }
+                })
+                .body(|body| {
+                    body.rows(row_h, page.len(), |mut row| {
+                        let Some(&fi) = page.get(row.index()) else {
+                            return;
+                        };
+                        let Some(f) = idx.files.get(fi) else { return };
+                        row.set_selected(self.selected == Some(fi));
+                        row.col(|ui| {
                             let text = egui::RichText::new(f.name());
-                            let text = if f.deleted() {
+                            ui.label(if f.deleted() {
                                 text.color(ui.visuals().error_fg_color)
                             } else {
                                 text
-                            };
-                            let r = ui.selectable_label(self.selected == Some(fi), text);
-                            if r.double_clicked() {
-                                action = Some((fi, true));
-                            } else if r.clicked() {
-                                action = Some((fi, false));
-                            }
-                            ui.label(pm_core::units::format_size(f.size));
+                            });
+                        });
+                        row.col(|ui| {
+                            ui.with_layout(
+                                egui::Layout::right_to_left(egui::Align::Center),
+                                |ui| {
+                                    ui.label(pm_core::units::format_size(f.size));
+                                },
+                            );
+                        });
+                        row.col(|ui| {
+                            ui.label(self.prefs.time(f.times.modified));
+                        });
+                        row.col(|ui| {
                             ui.weak(f.parent());
-                            ui.end_row();
+                        });
+                        let r = row.response();
+                        if r.double_clicked() {
+                            action = Some((fi, true));
+                        } else if r.clicked() {
+                            action = Some((fi, false));
                         }
                     });
-            });
+                });
+        });
+        if sort != self.list_sort {
+            self.list_sort = sort;
+            self.page = 0;
+        }
         if let Some((fi, open)) = action {
             self.select(idx, fi, open);
         }
