@@ -26,7 +26,19 @@
      started. It reports clippy errors in `pm-ui/src/timeline_chart.rs`
      on master — fix during step 1. It also touched
      `recent_activity/{ie,mod}.rs` (clippy + fmt) → merge conflicts likely.
-   - search: told to make a WIP commit without the gate and stop.
+   - `worktree-agent-aa0dd6f7121b0f9da` (search, WIP `2a327b8`, not yet
+     merged with master): pm-text (all extractors, strings, chunker) and
+     pm-search (Tantivy content + name indexes, keyword lists, inline
+     matcher, credit cards) — unit-tested. NOT done: Keyword Search
+     ingest module, all UI (name search box, keyword panel, extracted-text
+     viewer). **User priority: finish search first, then test it.**
+   - carving (`bd8b5fa`): plan only, in `docs/agents/derived-and-carving.md`.
+   - Bug to fix: the Add Data Source wizard enables every module not in
+     `IngestPrefs::disabled`, ignoring `ModuleInfo::enabled_by_default`
+     (Keyword Search must default to off).
+   - Reported fmt/clippy failures on master in `pm-ui/src/timeline*.rs`,
+     `pm-ingest/src/context.rs`, `pm-modules/src/recent_activity/*` —
+     fix in step 1.
    - hashing (single agent, started after the pause): hash parity audit +
      MD5/SHA-256 in the file table and File Metadata viewer.
    - derived-and-carving: infrastructure merged; `pm-archive` +
