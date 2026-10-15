@@ -18,6 +18,7 @@ mod inbox;
 mod job;
 mod module;
 mod progress;
+mod sched;
 
 pub use context::{HEAD_LEN, IngestFile, JobContext};
 pub use inbox::{Inbox, IngestMessage, MAX_ERROR_MESSAGES, MessageKind};

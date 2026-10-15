@@ -12,6 +12,7 @@
 //! end (multi-user cases, M11) can share it.
 
 pub mod catalog;
+mod derived;
 mod model;
 
 use std::path::{Path, PathBuf};
@@ -20,6 +21,7 @@ use parking_lot::Mutex;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, Row, params};
 use thiserror::Error;
 
+pub use derived::{DerivedUpdate, FileIds};
 pub use model::*;
 
 /// Current schema version written by this build.
@@ -62,6 +64,7 @@ pub struct CaseDb {
     path: PathBuf,
     writer: Mutex<Connection>,
     readers: Mutex<Vec<Connection>>,
+    file_ids: FileIds,
 }
 
 impl CaseDb {
@@ -83,10 +86,12 @@ impl CaseDb {
         let mut conn = Connection::open(&path)?;
         configure(&conn, true)?;
         migrate(&mut conn)?;
+        let file_ids = FileIds::load(&conn)?;
         Ok(Self {
             path,
             writer: Mutex::new(conn),
             readers: Mutex::new(Vec::new()),
+            file_ids,
         })
     }
 
@@ -131,6 +136,7 @@ impl CaseDb {
         let mut b = Bulk {
             conn: &conn,
             pending: 0,
+            ids: &self.file_ids,
         };
         match f(&mut b) {
             Ok(v) => {
@@ -166,7 +172,8 @@ impl CaseDb {
         Ok(())
     }
 
-    /// First unused file id (for pre-assigning ids before a bulk load).
+    /// `MAX(id) + 1` of the rows written so far. Use [`Self::file_ids`]
+    /// to allocate ids.
     pub fn next_file_id(&self) -> Result<i64> {
         self.read(|c| {
             Ok(
@@ -756,6 +763,7 @@ fn artifact_exists(c: &Connection, a: &NewArtifact, key: &[i64]) -> Result<bool>
 pub struct Bulk<'c> {
     conn: &'c Connection,
     pending: usize,
+    ids: &'c FileIds,
 }
 
 impl Bulk<'_> {
@@ -807,7 +815,17 @@ impl Bulk<'_> {
         Ok(self.conn.last_insert_rowid())
     }
 
+    /// Inserts a file row. Without an explicit id it takes the next one
+    /// from the shared allocator ([`CaseDb::file_ids`]); never let SQLite
+    /// choose, or it could take an id another writer has reserved.
     pub fn add_file(&mut self, f: &NewFile) -> Result<i64> {
+        let id = match f.id {
+            Some(id) => {
+                self.ids.observe(id);
+                id
+            }
+            None => self.ids.next(),
+        };
         let mut st = self.conn.prepare_cached(INSERT_FILE)?;
         let split = |x: Option<(i64, u32)>| (x.map(|v| v.0), x.map(|v| v.1));
         let (mtime, mtime_ns) = split(f.times[0]);
@@ -845,9 +863,8 @@ impl Bulk<'_> {
             f.derived_from,
             f.local_path,
             f.layout,
-            f.id,
+            id,
         ])?;
-        let id = self.conn.last_insert_rowid();
         self.tick()?;
         Ok(id)
     }

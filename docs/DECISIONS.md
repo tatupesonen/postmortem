@@ -195,3 +195,45 @@ the machinery:
 **Consequences.** Modules are plain Rust structs that can be unit-tested
 against an in-memory case. The same contract is exposed to WebAssembly
 plugins (ADR-013) through a thin adapter.
+
+## ADR-016 — Derived files: storage, encoding, ids and re-injection
+
+**Status:** accepted (2026-10-15, derived-and-carving track)
+
+**Context.** Archive members, embedded images and carved files become case
+files that are analysed like any other (inventory 03 §1.9, §2.4, PhotoRec
+§3). Autopsy stores extracted bytes XOR1-encoded under
+`<case>/ModuleOutput/<module>/<parent id>/…`, records the encoding in
+`tsk_files_path`, and re-queues new files as high-priority tasks
+(`addFilesToJob`).
+
+**Decision.**
+* **No schema change.** Derived files are `files` rows with `origin`
+  derived/carved/local, `derived_from` = source file, `local_path`
+  (relative to the case folder, `/`-separated, resolved without `..` or
+  absolute components) or `layout` (image byte ranges for carved files).
+* **XOR1 on disk, like Autopsy.** Written files carry TSK's 32-byte header
+  `TSK_CONTAINER_XOR1_xxxxxxxxxxxxx` followed by every byte XOR 0xCA, so
+  antivirus software does not quarantine malware extracted into case
+  folders, and Autopsy-written module output reads the same way. The
+  encoding is recognised from the header when content is opened (TSK
+  `EncodedFileUtil.getEncoding`), so no column is needed; unencoded files
+  read as they are. Local files with absolute paths are never decoded.
+* **One file-id allocator per open database** (`CaseDb::file_ids`, atomic,
+  initialised from `MAX(id) + 1`). The loader, the ingest writer and
+  modules reserving ids for derived trees all use it; `Bulk::add_file`
+  never lets SQLite pick an id, so reserved ids cannot be taken.
+* **Insertion through the job's single writer, synchronously.**
+  `JobContext::add_derived_files` sends the rows to the writer, which
+  commits immediately and replies with the records; the files are then
+  pushed to the front of the job's high-priority queue. A worker only
+  stops when both queues are empty, no task is running and no producer or
+  stage-1 data-source module holds the job open, so the job ends only
+  after all derived work is done. The producer streams only ids below the
+  allocator value at job start, so new files are never processed twice.
+  Files added by a later data-source stage get an extra file phase
+  (Autopsy drops them with an error).
+
+**Consequences.** Re-ingest sees derived files as ordinary (`Last` class)
+files. Modules that re-extract (Embedded File Extractor) must not re-add
+files that already exist, or they would be analysed twice.

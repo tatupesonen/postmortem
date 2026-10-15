@@ -5,7 +5,8 @@
 //! * Directories are listed in parallel on a dedicated thread pool
 //!   (work-stealing, depth-first per worker, so the pending frontier stays
 //!   small) while **one** writer thread inserts rows in large transactions.
-//! * File ids are pre-assigned from an atomic counter, so a directory's
+//! * File ids are pre-assigned from the case database's shared allocator
+//!   (`CaseDb::file_ids`, also used for derived files), so a directory's
 //!   children can be produced before its row reaches the database. A
 //!   directory's rows are sent *before* its subdirectories are scheduled,
 //!   which keeps parents ahead of children in the writer's queue.
@@ -18,12 +19,13 @@
 use std::collections::HashMap;
 use std::path::Path;
 use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, AtomicI64, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 
 use crossbeam_channel::{Sender, bounded};
 use parking_lot::Mutex;
 use pm_casedb::{
-    CaseDb, DataSourceKind, FileKindCode, NewDataSource, NewFile, NewFileSystem, NewVolume, Origin,
+    CaseDb, DataSourceKind, FileIds, FileKindCode, NewDataSource, NewFile, NewFileSystem,
+    NewVolume, Origin,
 };
 use pm_evidence::Evidence;
 use pm_fs::walk::{Ancestors, MAX_LISTINGS_PER_DIR};
@@ -299,7 +301,7 @@ struct Walk<'a> {
     fs: &'a dyn FileSystem,
     ds_id: i64,
     fs_id: i64,
-    next_id: &'a AtomicI64,
+    next_id: &'a FileIds,
     tx: Sender<Vec<NewFile>>,
     progress: &'a LoadProgress,
     /// Times each directory has been listed (capped, see
@@ -314,7 +316,7 @@ struct Walk<'a> {
 
 impl Walk<'_> {
     fn id(&self) -> i64 {
-        self.next_id.fetch_add(1, Ordering::Relaxed)
+        self.next_id.next()
     }
 
     fn stopped(&self) -> bool {
@@ -553,7 +555,6 @@ fn load_files(
         .thread_name(|i| format!("pm-load-{i}"))
         .build()
         .map_err(|e| CaseError::NotFound(format!("thread pool: {e}")))?;
-    let next_id = AtomicI64::new(db.next_file_id()?);
     let (tx, rx) = bounded::<Vec<NewFile>>(QUEUE_BATCHES);
     let mut warnings = Vec::new();
 
@@ -583,7 +584,7 @@ fn load_files(
                 fs,
                 ds_id,
                 fs_id,
-                next_id: &next_id,
+                next_id: db.file_ids(),
                 tx: tx.clone(),
                 progress,
                 listings: (0..VISITED_SHARDS)
