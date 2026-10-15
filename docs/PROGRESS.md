@@ -1,6 +1,27 @@
 # Progress
 
-## Now — state at end of 2026-10-14 (resume here)
+## Now — 2026-10-15: parallel parity push (goal: all Autopsy features, tested)
+
+- Gate green on master (346 tests) after fmt/clippy fixes (`433a508`).
+- **Parallel agent tracks** (each in its own git worktree, rules in
+  `docs/agents/RULES.md`, status files `docs/agents/<track>.md`; the
+  coordinator merges finished branches into master and runs the gate):
+  `core-file-modules` (pm-filetype/File Type ID, Extension Mismatch,
+  Encryption Detection, Interesting Files + FilesSet engine, Data Source
+  Integrity), `derived-and-carving` (derived files + pm-ingest
+  re-injection, Embedded File Extractor, PhotoRec-like carving),
+  `browsers` (tests owed for IE/Chromium, Firefox, Safari, Edge ESE,
+  Chrome cache/extensions, PSL), `windows-artifacts` (pm-registry +
+  RegRipper analyses, LNK, jump lists, prefetch, recycle bin, SRUM),
+  `search` (pm-text, Tantivy content + file-name search, Keyword Search
+  module, credit cards), `email-mobile` (MBOX/EML/PST/vCard, accounts,
+  Android analyzers, GPX, DJI, YARA, VM extractor), plus a read-only
+  parity audit → `docs/PARITY.md`.
+- Wave 2 (after audit/merges): Central Repository, Reports, other data
+  source processors / image formats / file systems, UI integration of
+  all new modules (pm-ui is coordinator-owned), remaining UI parity.
+
+## Previous state (end of 2026-10-14)
 
 ### What works (all on `master`)
 - **Evidence & file systems:** raw/split/EWF images, MBR/GPT, NTFS (TSK-exact,
