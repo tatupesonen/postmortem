@@ -689,11 +689,13 @@ impl TimelineWindow {
         });
         let mut clicked = None;
         egui::ScrollArea::horizontal()
+            .id_salt("tl-events-h")
             .auto_shrink(false)
             .show(ui, |ui| {
                 ui.style_mut().interaction.selectable_labels = false;
                 let row_h = egui::TextStyle::Body.resolve(ui.style()).size + 6.0;
                 TableBuilder::new(ui)
+                    .id_salt("tl-events")
                     .striped(true)
                     .resizable(true)
                     .sense(Sense::click())
@@ -862,5 +864,10 @@ mod tests {
         assert!(h.query_all_by_label_contains("setup.exe").count() >= 1);
         assert!(h.query_all_by_label_contains("_").count() > 1);
         shot(&mut h, "timeline_list");
+        // Details view: clustered stripes above the event table.
+        h.state_mut().mode = Mode::Details;
+        h.run_steps(4);
+        assert!(h.query_all_by_label_contains("Description detail").count() >= 1);
+        shot(&mut h, "timeline_details");
     }
 }

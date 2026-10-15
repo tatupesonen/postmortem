@@ -179,6 +179,7 @@ pub(crate) fn view(
     }
     let content_h = AXIS_H + row_ends.len() as f32 * ROW_H + 8.0;
     egui::ScrollArea::vertical()
+        .id_salt("tl-details-stripes")
         .max_height(height)
         .auto_shrink([false, false])
         .show(ui, |ui| {
@@ -199,13 +200,21 @@ pub(crate) fn view(
                 Color32::from_gray(225)
             };
             painter.rect_filled(rect, 0.0, bg);
-            // Time axis with vertical grid lines.
+            // Time axis: ticks at the unit for the visible span; labels (and
+            // their grid lines) are thinned so they never overlap.
             let unit = TimeUnit::for_range(range.0, range.1);
             let mut t = unit.floor(range.0, tz);
             let mut guard = 0;
-            while t < range.1 && guard < 200 {
+            let mut next_free = f32::MIN;
+            while t < range.1 && guard < 2_000 {
                 let x = rect.left() + x_of(t);
-                if x >= rect.left() {
+                if x >= rect.left() && x >= next_free {
+                    let galley = painter.layout_no_wrap(
+                        unit.label(t, tz),
+                        FontId::proportional(11.0),
+                        v.weak_text_color(),
+                    );
+                    let label_w = galley.size().x;
                     painter.line_segment(
                         [
                             Pos2::new(x, rect.top() + AXIS_H - 4.0),
@@ -213,13 +222,12 @@ pub(crate) fn view(
                         ],
                         Stroke::new(1.0, grid),
                     );
-                    painter.text(
+                    painter.galley(
                         Pos2::new(x + 3.0, rect.top() + 4.0),
-                        Align2::LEFT_TOP,
-                        unit.label(t, tz),
-                        FontId::proportional(11.0),
+                        galley,
                         v.weak_text_color(),
                     );
+                    next_free = x + label_w + 16.0;
                 }
                 t = unit.next(t, tz);
                 guard += 1;
