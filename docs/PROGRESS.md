@@ -19,8 +19,16 @@
      Parser, Android Analyzer (22 apps). Its Android browser code calls
      `crate::recent_activity::extract_domain` — keep that name/path when
      merging the browsers rewrite. GPX/DJI/YARA/VM extractor not started.
-   - core-file-modules, search: told to make WIP commits without the
-     gate and stop; check each branch's `docs/agents/*.md`.
+   - `worktree-agent-a88eb7301e06e903b` (core-file-modules, WIP
+     `804510b`): pm-filetype (Tika 3.0.0 parity, 99.96 % on a 20 517-file
+     corpus) + File Type Identification. Items 2–5 (Extension Mismatch,
+     Encryption Detection, Interesting Files/pm-rules, DS Integrity) not
+     started. It reports clippy errors in `pm-ui/src/timeline_chart.rs`
+     on master — fix during step 1. It also touched
+     `recent_activity/{ie,mod}.rs` (clippy + fmt) → merge conflicts likely.
+   - search: told to make a WIP commit without the gate and stop.
+   - hashing (single agent, started after the pause): hash parity audit +
+     MD5/SHA-256 in the file table and File Metadata viewer.
    - derived-and-carving: infrastructure merged; `pm-archive` +
      extractor + carving are parked in that worktree's `.wip-derived/`.
 3. Then resume each track for its remaining items (see the track docs),
