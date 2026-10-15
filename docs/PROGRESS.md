@@ -1,6 +1,29 @@
 # Progress
 
-## Now — 2026-10-15: parallel parity push (goal: all Autopsy features, tested)
+## Now — RESUME HERE (end of 2026-10-15, user paused; gates stopped on request)
+
+1. **Run the gate once on master** — not verified since these merges:
+   `081170b` merge windows-artifacts (its branch was green at 408 tests),
+   `fb8ab99` timeline Details fix (only its UI test run). Last green
+   master gate: `9b482d5` (381 tests).
+2. **Merge the paused agent branches** (worktrees under
+   `.claude/worktrees/`, status in `docs/agents/<track>.md`), one at a
+   time with a gate after each:
+   - `worktree-agent-a7b6ec3a36039f4b0` (browsers, WIP `59d0936`, gate
+     NOT run; only its own crates checked). Expect conflicts in
+     `crates/pm-modules/src/recent_activity/mod.rs` with the merged
+     windows step list (keep both: browser rewrite + `windows::steps()`).
+   - core-file-modules, search, email-mobile: told to make WIP commits
+     without the gate and stop; check each branch's `docs/agents/*.md`.
+   - derived-and-carving: infrastructure merged; `pm-archive` +
+     extractor + carving are parked in that worktree's `.wip-derived/`.
+3. Then resume each track for its remaining items (see the track docs),
+   and wave 2 from `docs/PARITY.md` (WP-0 schema v2 first).
+4. Known: Recent Activity writes artifacts directly to the DB (needs
+   artifact ids) so ingest progress does not count them — add a
+   `JobContext` API that returns ids / flushes the writer.
+
+## 2026-10-15: parallel parity push (goal: all Autopsy features, tested)
 
 - Gate green on master (346 tests) after fmt/clippy fixes (`433a508`).
 - **Parallel agent tracks** (each in its own git worktree, rules in
