@@ -103,7 +103,7 @@ pub(crate) fn open_hive(ctx: &JobContext, f: &FileRecord) -> Option<Hive> {
             if let Ok(Some(l)) = ctx
                 .case
                 .db()
-                .child_named(parent, &format!("{}{suffix}", f.name))
+                .child_named_nocase(parent, &format!("{}{suffix}", f.name))
                 && let Some(bytes) = read_small(ctx, &l)
             {
                 logs.push(Arc::new(MemSource::new(bytes)));

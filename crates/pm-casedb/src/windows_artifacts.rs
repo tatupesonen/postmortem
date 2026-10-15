@@ -8,7 +8,7 @@ use crate::{CaseDb, FILE_COLS, FileRecord, Result};
 impl CaseDb {
     /// The child of `parent_id` named `name` (ASCII case-insensitive), using
     /// the `(parent_id, name)` index.
-    pub fn child_named(&self, parent_id: i64, name: &str) -> Result<Option<FileRecord>> {
+    pub fn child_named_nocase(&self, parent_id: i64, name: &str) -> Result<Option<FileRecord>> {
         self.read(|c| {
             let mut st = c.prepare_cached(&format!(
                 "SELECT {FILE_COLS} FROM files WHERE parent_id = ?1 AND name = ?2 COLLATE NOCASE ORDER BY id LIMIT 1"
@@ -38,7 +38,7 @@ impl CaseDb {
             };
             let mut found = true;
             for p in &parts {
-                if let Some(c) = self.child_named(cur.id, p)? {
+                if let Some(c) = self.child_named_nocase(cur.id, p)? {
                     cur = c;
                 } else {
                     found = false;
