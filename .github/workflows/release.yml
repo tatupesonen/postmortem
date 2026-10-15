@@ -1,0 +1,165 @@
+name: Release
+
+# Push a tag matching the workspace version (`v0.1.0`) to build every
+# platform and publish a GitHub release. Tags with a suffix (`v0.2.0-rc.1`)
+# become pre-releases. "Run workflow" builds the same artifacts without
+# publishing, to try the packaging.
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  build:
+    name: build (${{ matrix.name }})
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: linux-x86_64
+            os: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - name: linux-arm64
+            os: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - name: windows-x86_64
+            os: windows-latest
+            target: x86_64-pc-windows-msvc
+          # One universal (Apple silicon + Intel) app, built on Apple silicon.
+          - name: macos-universal
+            os: macos-latest
+            target: aarch64-apple-darwin
+            extra_target: x86_64-apple-darwin
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install toolchain
+        shell: bash
+        run: |
+          rustup toolchain install
+          rustup target add ${{ matrix.target }} ${{ matrix.extra_target }}
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: ${{ matrix.target }}
+
+      - name: Version
+        id: version
+        shell: bash
+        run: |
+          version=$(sed -n '/^\[workspace.package\]/,/^\[/s/^version = "\(.*\)"/\1/p' Cargo.toml)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if [[ "$GITHUB_REF_TYPE" == tag && "$GITHUB_REF_NAME" != "v$version" ]]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match the workspace version v$version"
+            exit 1
+          fi
+
+      - name: Build
+        shell: bash
+        run: |
+          for t in ${{ matrix.target }} ${{ matrix.extra_target }}; do
+            cargo build --release --locked -p postmortem --target "$t"
+          done
+
+      - name: Package (Linux)
+        if: runner.os == 'Linux'
+        shell: bash
+        run: |
+          dir="postmortem-${{ steps.version.outputs.version }}-${{ matrix.name }}"
+          mkdir -p "dist/$dir"
+          cp target/${{ matrix.target }}/release/postmortem "dist/$dir/"
+          cp assets/brand/postmortem-icon-256.png "dist/$dir/postmortem.png"
+          tar -C dist -czf "dist/$dir.tar.gz" "$dir"
+          rm -r "dist/$dir"
+
+      - name: Package (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $dir = "postmortem-${{ steps.version.outputs.version }}-${{ matrix.name }}"
+          New-Item -ItemType Directory -Force "dist/$dir" | Out-Null
+          Copy-Item "target/${{ matrix.target }}/release/postmortem.exe" "dist/$dir/"
+          Compress-Archive -Path "dist/$dir" -DestinationPath "dist/$dir.zip"
+          Remove-Item -Recurse "dist/$dir"
+
+      - name: Package (macOS app bundle)
+        if: runner.os == 'macOS'
+        shell: bash
+        run: |
+          version=${{ steps.version.outputs.version }}
+          app=dist/postmortem.app
+          mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
+          lipo -create -output "$app/Contents/MacOS/postmortem" \
+            target/${{ matrix.target }}/release/postmortem \
+            target/${{ matrix.extra_target }}/release/postmortem
+          # Icon: an iconset rendered from the 1024 px brand icon.
+          iconset=$(mktemp -d)/postmortem.iconset
+          mkdir -p "$iconset"
+          for s in 16 32 128 256 512; do
+            sips -z $s $s assets/brand/postmortem-icon-1024.png --out "$iconset/icon_${s}x${s}.png" >/dev/null
+            d=$((s * 2))
+            sips -z $d $d assets/brand/postmortem-icon-1024.png --out "$iconset/icon_${s}x${s}@2x.png" >/dev/null
+          done
+          iconutil -c icns "$iconset" -o "$app/Contents/Resources/postmortem.icns"
+          cat > "$app/Contents/Info.plist" <<EOF
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleName</key><string>postmortem</string>
+            <key>CFBundleDisplayName</key><string>postmortem</string>
+            <key>CFBundleIdentifier</key><string>io.github.tatupesonen.postmortem</string>
+            <key>CFBundleExecutable</key><string>postmortem</string>
+            <key>CFBundleIconFile</key><string>postmortem</string>
+            <key>CFBundlePackageType</key><string>APPL</string>
+            <key>CFBundleShortVersionString</key><string>$version</string>
+            <key>CFBundleVersion</key><string>$version</string>
+            <key>LSMinimumSystemVersion</key><string>11.0</string>
+            <key>NSHighResolutionCapable</key><true/>
+          </dict>
+          </plist>
+          EOF
+          # Ad-hoc signature: required on Apple silicon. The app is not
+          # notarized, so Gatekeeper asks before the first launch.
+          codesign --force --deep --sign - "$app"
+          ditto -c -k --keepParent "$app" "dist/postmortem-$version-${{ matrix.name }}.zip"
+          rm -r "$app"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.name }}
+          path: dist/*
+          if-no-files-found: error
+
+  publish:
+    name: publish release
+    needs: build
+    if: github.ref_type == 'tag'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist
+          merge-multiple: true
+      - name: Checksums
+        run: cd dist && sha256sum * > SHA256SUMS
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          flags=()
+          [[ "$GITHUB_REF_NAME" == *-* ]] && flags+=(--prerelease)
+          gh release create "$GITHUB_REF_NAME" dist/* \
+            --title "postmortem $GITHUB_REF_NAME" --generate-notes --verify-tag "${flags[@]}"

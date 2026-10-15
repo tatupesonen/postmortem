@@ -5,6 +5,9 @@
 //! to that case as data sources (first segment of split/E01 sets). As in
 //! Autopsy, images can only be added to an open case.
 
+// Release builds are GUI apps on Windows: no console window.
+#![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
+
 use std::path::PathBuf;
 
 fn main() -> std::process::ExitCode {

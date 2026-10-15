@@ -1,0 +1,9 @@
+# Keep LF everywhere (also on Windows checkouts): sources embed text with
+# include_str! and tests compare against it.
+* text=auto eol=lf
+# Binary test inputs must never be converted.
+fixtures/** binary
+*.evtx binary
+*.png binary
+*.ico binary
+*.icns binary
