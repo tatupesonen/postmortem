@@ -9,7 +9,6 @@
 use std::collections::{HashMap, HashSet};
 use std::ops::ControlFlow;
 use std::path::{Path, PathBuf};
-use std::sync::OnceLock;
 
 use pm_case::load::{DEFAULT_UNALLOC_CHUNK, chunk_ranges, should_defer_indexes};
 use pm_case::{
@@ -35,16 +34,9 @@ fn details() -> CaseDetails {
     }
 }
 
-/// The demo disk image (NTFS + FAT32 on MBR), written once per test run.
+/// The demo disk image (NTFS + FAT32 on MBR), shared by all test runs.
 fn demo_image() -> &'static Path {
-    static IMG: OnceLock<(tempfile::TempDir, PathBuf)> = OnceLock::new();
-    let (_, p) = IMG.get_or_init(|| {
-        let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("demo.dd");
-        std::fs::write(&p, pm_testkit::demo::demo_disk()).unwrap();
-        (dir, p)
-    });
-    p
+    pm_testkit::demo::demo_disk_file()
 }
 
 fn loaded_case() -> (tempfile::TempDir, Case, pm_case::LoadSummary) {

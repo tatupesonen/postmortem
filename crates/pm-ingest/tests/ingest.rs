@@ -18,14 +18,8 @@ use pm_casedb::{FileKindCode, FileQuery, NewArtifact, Origin, Value};
 use pm_ingest::*;
 
 fn demo_image() -> &'static PathBuf {
-    static IMG: OnceLock<(tempfile::TempDir, PathBuf)> = OnceLock::new();
-    &IMG.get_or_init(|| {
-        let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("demo.dd");
-        std::fs::write(&p, pm_testkit::demo::demo_disk()).unwrap();
-        (dir, p)
-    })
-    .1
+    static IMG: OnceLock<PathBuf> = OnceLock::new();
+    IMG.get_or_init(|| pm_testkit::demo::demo_disk_file().to_path_buf())
 }
 
 fn case() -> (tempfile::TempDir, Arc<Case>, i64) {

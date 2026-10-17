@@ -15,14 +15,8 @@ use pm_core::ReadAt;
 use pm_ingest::{Inbox, IngestProgress, JobSettings, JobSummary, ModuleFactory, run_job};
 
 fn demo_image() -> &'static PathBuf {
-    static IMG: OnceLock<(tempfile::TempDir, PathBuf)> = OnceLock::new();
-    &IMG.get_or_init(|| {
-        let dir = tempfile::tempdir().unwrap();
-        let p = dir.path().join("demo.dd");
-        std::fs::write(&p, pm_testkit::demo::demo_disk()).unwrap();
-        (dir, p)
-    })
-    .1
+    static IMG: OnceLock<PathBuf> = OnceLock::new();
+    IMG.get_or_init(|| pm_testkit::demo::demo_disk_file().to_path_buf())
 }
 
 /// The demo disk image file the demo cases are built from.

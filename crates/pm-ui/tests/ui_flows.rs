@@ -16,15 +16,41 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use pm_ui::{Persisted, PostmortemApp};
 
-static DEMO: LazyLock<(tempfile::TempDir, PathBuf)> = LazyLock::new(|| {
-    let dir = tempfile::tempdir().unwrap();
-    let path = dir.path().join("demo.dd");
-    std::fs::write(&path, pm_testkit::demo::demo_disk()).unwrap();
-    (dir, path)
-});
+/// The demo disk image (shared by all test runs).
+fn demo() -> PathBuf {
+    pm_testkit::demo::demo_disk_file().to_path_buf()
+}
 
 /// Cases created by the app during tests.
-static CASES: LazyLock<tempfile::TempDir> = LazyLock::new(|| tempfile::tempdir().unwrap());
+/// One folder per test process under the target's temp folder (statics
+/// are never dropped, so a `TempDir` here would leak); folders of earlier
+/// runs are removed after an hour.
+static CASES: LazyLock<Cases> = LazyLock::new(|| {
+    let root = PathBuf::from(env!("CARGO_TARGET_TMPDIR")).join("ui_flows");
+    let hour = Duration::from_hours(1);
+    for e in std::fs::read_dir(&root).into_iter().flatten().flatten() {
+        let old = e
+            .metadata()
+            .and_then(|m| m.modified())
+            .ok()
+            .and_then(|t| t.elapsed().ok())
+            .is_some_and(|age| age > hour);
+        if old {
+            let _ = std::fs::remove_dir_all(e.path());
+        }
+    }
+    let dir = root.join(format!("cases-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    Cases(dir)
+});
+
+struct Cases(PathBuf);
+
+impl Cases {
+    fn path(&self) -> &std::path::Path {
+        &self.0
+    }
+}
 
 fn harness_with(open: Vec<PathBuf>, case: bool) -> Harness<'static, PostmortemApp> {
     harness_full(open, case, pm_ui::IngestPrefs::default())
@@ -202,7 +228,7 @@ fn new_case_wizard_creates_the_case() {
 
 #[test]
 fn browse_demo_disk_and_view_picture() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| {
         !h.state().data_sources().is_empty() && !h.state().is_loading()
@@ -247,7 +273,7 @@ fn browse_demo_disk_and_view_picture() {
 
 #[test]
 fn deleted_files_and_metadata_tab() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| !h.state().data_sources().is_empty());
     click_exact(&mut h, "🖴 demo.dd");
@@ -276,7 +302,7 @@ fn deleted_files_and_metadata_tab() {
 
 #[test]
 fn data_source_summary_tabs() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| !h.state().data_sources().is_empty());
     settle(&mut h, |h| {
@@ -307,7 +333,7 @@ fn welcome_screen_screenshot() {
 
 #[test]
 fn adding_an_image_loads_and_analyses_it() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     // The status bar reports the finished analysis.
     settle(&mut h, |h| {
         h.query_by_label_contains("Analysed demo.dd").is_some()
@@ -324,7 +350,7 @@ fn adding_an_image_loads_and_analyses_it() {
 #[test]
 fn reopening_a_case_restores_its_data_sources_without_reanalysis() {
     let dir = {
-        let mut h = harness(vec![DEMO.1.clone()]);
+        let mut h = harness(vec![demo()]);
         settle(&mut h, |h| {
             h.query_by_label_contains("Analysed demo.dd").is_some()
         });
@@ -350,7 +376,7 @@ fn analysis_results_are_listed_and_open_the_source_file() {
         let case = pm_case::Case::create(&dir, pm_case::CaseDetails::default()).unwrap();
         let s = pm_case::add_image(
             &case,
-            &DEMO.1,
+            pm_testkit::demo::demo_disk_file(),
             &pm_case::LoadOptions::default(),
             &pm_case::LoadProgress::default(),
         )
@@ -410,7 +436,7 @@ fn setup_exe_md5() -> String {
         pm_case::Case::create(tmp.path().join("c"), pm_case::CaseDetails::default()).unwrap();
     pm_case::add_image(
         &case,
-        &DEMO.1,
+        pm_testkit::demo::demo_disk_file(),
         &pm_case::LoadOptions::default(),
         &pm_case::LoadProgress::default(),
     )
@@ -460,7 +486,7 @@ fn add_data_source_wizard_runs_configured_hash_lookup() {
     h.get_all_by_role(egui::accesskit::Role::TextInput)
         .next()
         .unwrap()
-        .type_text(&DEMO.1.display().to_string());
+        .type_text(&pm_testkit::demo::demo_disk_file().display().to_string());
     h.run_steps(2);
     click_exact(&mut h, "Next ›");
     h.get_by_label_contains("Step 2 of 2");
@@ -477,7 +503,7 @@ fn add_data_source_wizard_runs_configured_hash_lookup() {
 
 #[test]
 fn views_list_files_by_type_from_the_case_database() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     // Counts refresh in the background; wait for the loaded value.
     settle(&mut h, |h| {
@@ -514,7 +540,7 @@ fn views_list_files_by_type_from_the_case_database() {
 
 #[test]
 fn file_metadata_shows_hashes_after_analysis() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| {
         !h.state().data_sources().is_empty() && !h.state().is_loading()
@@ -566,7 +592,7 @@ fn fully_visible(h: &Harness<'_, PostmortemApp>, label: &str) -> bool {
 
 #[test]
 fn file_listing_scrolls_to_last_column() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| !h.state().data_sources().is_empty());
     click_exact(&mut h, "🖴 demo.dd");
@@ -592,7 +618,7 @@ fn case_with_history(name: &str) -> PathBuf {
     let case = pm_case::Case::create(&dir, pm_case::CaseDetails::default()).unwrap();
     let s = pm_case::add_image(
         &case,
-        &DEMO.1,
+        pm_testkit::demo::demo_disk_file(),
         &pm_case::LoadOptions::default(),
         &pm_case::LoadProgress::default(),
     )
@@ -714,7 +740,7 @@ fn result_table_scrolls_to_last_column() {
 /// applies a notable tag; the Tags and Score nodes list the results.
 #[test]
 fn tagging_files_feeds_tags_and_score_nodes() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     // Room for the Tags and Score nodes below the expanded tree.
     h.set_size(egui::vec2(1400.0, 1500.0));
     wait_analysed(&mut h);
@@ -770,7 +796,7 @@ fn tagging_files_feeds_tags_and_score_nodes() {
 /// artifact; the Tags tree lists it under Result Tags.
 #[test]
 fn tagging_results_from_the_result_table() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     h.set_size(egui::vec2(1400.0, 1500.0));
     wait_analysed(&mut h);
     click(&mut h, "Web Downloads (1)");
@@ -798,7 +824,7 @@ fn tagging_results_from_the_result_table() {
 /// File Search by Attributes: a name search lists the matching file.
 #[test]
 fn file_search_by_name() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     click(&mut h, "Tools");
     click(&mut h, "File Search by Attributes");
@@ -823,7 +849,7 @@ fn file_search_by_name() {
 /// The data source menu runs ingest again and removes the data source.
 #[test]
 fn data_source_menu_runs_ingest_and_removes() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| {
         h.query_all_by_label("🖴 demo.dd").next().is_some()
@@ -866,7 +892,7 @@ fn data_source_menu_runs_ingest_and_removes() {
 /// folder from the archive's row and tree node.
 #[test]
 fn archives_open_like_folders() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| !h.state().data_sources().is_empty());
     click_exact(&mut h, "🖴 demo.dd");
@@ -894,7 +920,7 @@ fn archives_open_like_folders() {
 /// the host menu associates the host with a new person.
 #[test]
 fn hosts_and_persons() {
-    let mut h = harness(vec![DEMO.1.clone()]);
+    let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| {
         h.query_all_by_label("🖥 demo.dd Host").next().is_some()
@@ -1037,7 +1063,7 @@ fn user_tags_are_added_to_new_cases() {
 #[test]
 fn keyword_search_from_the_toolbar() {
     let mut h = harness_full(
-        vec![DEMO.1.clone()],
+        vec![demo()],
         true,
         pm_ui::IngestPrefs {
             enabled: vec!["keyword_search".into()],

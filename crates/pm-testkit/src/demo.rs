@@ -301,3 +301,10 @@ pub fn demo_disk() -> Vec<u8> {
     d.write(fat_start as usize * 512, &fat);
     d.build()
 }
+
+/// [`demo_disk`] as a file shared by all test processes (see
+/// [`crate::shared_file`]); read it, never write it.
+pub fn demo_disk_file() -> &'static std::path::Path {
+    static PATH: std::sync::OnceLock<std::path::PathBuf> = std::sync::OnceLock::new();
+    PATH.get_or_init(|| crate::shared_file("demo", "dd", &demo_disk()))
+}
