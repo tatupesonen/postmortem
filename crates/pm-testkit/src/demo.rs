@@ -127,6 +127,20 @@ fn ntfs_volume() -> Vec<u8> {
             ..Default::default()
         },
     );
+    // An archive: the Embedded File Extractor turns its members into
+    // derived files (a picture and a text file in a sub-folder).
+    b.file_with(
+        "Users/alice/Downloads/holiday.zip",
+        &crate::archives::zip(&[
+            ("beach.bmp", &gradient_bmp(48, 32)),
+            ("notes/readme.txt", b"Wish you were here.\n"),
+        ]),
+        opts(times(
+            ft(2021, 5, 30, 18, 0),
+            ft(2021, 5, 30, 18, 0),
+            ft(2021, 5, 31, 9, 0),
+        )),
+    );
     b.file_with(
         "Users/alice/Downloads/secret_plan.docx",
         b"PK\x03\x04 this would be a docx; deleted but recoverable",

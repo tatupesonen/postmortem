@@ -1729,15 +1729,20 @@ impl PostmortemApp {
                 ui.colored_label(ui.visuals().error_fg_color, e);
             }
             Some(Ok(rows)) => {
-                let mut dirs: Vec<&FileRow> = rows.iter().filter(|r| r.is_dir()).collect();
+                let mut dirs: Vec<&FileRow> = rows.iter().filter(|r| r.can_open()).collect();
                 dirs.sort_by_key(|r| r.name.to_lowercase());
                 for r in dirs {
                     let Some(file) = r.file_id() else { continue };
                     let child = NodeId::Dir { ds, file };
-                    let label = if r.deleted() {
-                        format!("{} {} ✖", icons::FOLDER, r.name)
+                    let icon = if r.is_dir() {
+                        icons::FOLDER
                     } else {
-                        format!("{} {}", icons::FOLDER, r.name)
+                        icons::ARCHIVE
+                    };
+                    let label = if r.deleted() {
+                        format!("{icon} {} ✖", r.name)
+                    } else {
+                        format!("{icon} {}", r.name)
                     };
                     self.tree_node(ui, &child, &label, true, |app, ui| {
                         app.dir_children(ui, &child);
@@ -1915,7 +1920,7 @@ impl PostmortemApp {
             self.viewer.set_content(Some(content(r)));
         }
         if let Some(r) = ev.activated.and_then(|i| rows.get(i)) {
-            if r.is_dir() {
+            if r.can_open() {
                 if let Some(file) = r.file_id() {
                     self.navigate(NodeId::Dir { ds, file });
                 }

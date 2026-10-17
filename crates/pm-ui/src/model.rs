@@ -99,6 +99,9 @@ pub struct FileRow {
     pub file: Option<Arc<FileRecord>>,
     /// Score and tags (Autopsy's S and C columns), for case rows.
     pub annotations: Option<Arc<Annotations>>,
+    /// A non-directory with children (an archive with extracted members,
+    /// a file with derived files): it opens like a folder.
+    pub has_children: bool,
 }
 
 /// A tag on a listed item.
@@ -160,6 +163,7 @@ impl FileRow {
             path: path.to_owned(),
             file: None,
             annotations: None,
+            has_children: false,
         }
     }
 
@@ -170,6 +174,12 @@ impl FileRow {
 
     pub fn is_dir(&self) -> bool {
         self.kind == FileKind::Directory && self.stream.is_none()
+    }
+
+    /// Whether the row opens as a folder (directories, and files with
+    /// derived children as in Autopsy's tree).
+    pub fn can_open(&self) -> bool {
+        self.is_dir() || self.has_children
     }
 
     /// Autopsy "Flags(Meta)": allocated metadata.

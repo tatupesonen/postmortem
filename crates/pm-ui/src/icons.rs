@@ -10,6 +10,8 @@ pub(crate) const DATA_SOURCE: &str = "🖴";
 pub(crate) const VOLUME: &str = "🗄";
 pub(crate) const UNALLOCATED: &str = "⛶";
 pub(crate) const FOLDER: &str = "🗀";
+/// A file with derived children (archive members, extracted files).
+pub(crate) const ARCHIVE: &str = "📦";
 pub(crate) const VIEWS: &str = "👁";
 pub(crate) const FILE_TYPES: &str = "🗐";
 pub(crate) const BY_EXTENSION: &str = "🔤";
@@ -138,6 +140,7 @@ mod tests {
             VOLUME,
             UNALLOCATED,
             FOLDER,
+            ARCHIVE,
             VIEWS,
             FILE_TYPES,
             BY_EXTENSION,

@@ -860,3 +860,30 @@ fn data_source_menu_runs_ingest_and_removes() {
         h.query_all_by_label("🖴 demo.dd").next().is_none()
     });
 }
+
+/// Archive members extracted by the Embedded File Extractor open like a
+/// folder from the archive's row and tree node.
+#[test]
+fn archives_open_like_folders() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
+    settle(&mut h, |h| !h.state().data_sources().is_empty());
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    // The tree shows the archive as an expandable node.
+    click_exact(&mut h, "📦 holiday.zip");
+    settle(&mut h, |h| h.query_by_label_contains("beach.bmp").is_some());
+    assert!(
+        h.query_all_by_label("🗀 notes").next().is_some(),
+        "member folder"
+    );
+    click(&mut h, "beach.bmp");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("48 × 32 px").is_some()
+    });
+}

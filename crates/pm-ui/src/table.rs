@@ -291,6 +291,8 @@ impl TableState {
                         row.col(|ui| {
                             let icon = if r.is_dir() {
                                 "🗀"
+                            } else if r.has_children {
+                                icons::ARCHIVE
                             } else if r.stream.is_some() {
                                 "⧉"
                             } else {
@@ -434,6 +436,7 @@ mod tests {
             path: format!("/{name}"),
             file: None,
             annotations: None,
+            has_children: false,
         }
     }
 
