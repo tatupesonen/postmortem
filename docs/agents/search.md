@@ -310,7 +310,7 @@ building at the same time), recorded in `docs/PERF.md`:
 | Content index add | 14.9 MB/s per index (4 writer threads), index 1.7× text |
 | Ad-hoc search (8 456 chunks, first 100 verified objects) | exact common word 426 ms, rare word 39 ms, substring 4.5 ms, regex 5.4 ms |
 | Inline matcher (built-ins + 101 keywords) | 38.9 MB/s per thread |
-| Chunker | 32.5 MB/s per thread (the slowest stage; follow-up below) |
+| Chunker | 132 MB/s per thread (NFKC quick check; was 32.5 MB/s) |
 | String extraction | English-only 346 MB/s, international 31 MB/s |
 
 Fuzz smoke runs (`cargo +nightly fuzz run -O <target> -- -max_total_time=60
@@ -319,8 +319,8 @@ text_strings 227 k runs, text_html 353 k, text_rtf 1.34 M, text_email
 1.65 M, text_office 604 k, text_ole 4.58 M, text_pdf 3.91 M,
 keyword_lists 843 k.
 
-Follow-ups: the chunker's `VecDeque<char>` queue (a byte buffer with
-block slices would roughly double throughput); per-file timeouts for PDF.
+Follow-ups: per-file timeouts for PDF; the content-index writer (about
+15 MB/s per index) is now the slowest ingest stage after extraction.
 
 ## Decisions and deviations from Autopsy
 Recorded in ADR-020 (`docs/DECISIONS.md`). In short: Tantivy indexes in

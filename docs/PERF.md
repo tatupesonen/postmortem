@@ -24,5 +24,5 @@ builds. Re-measure when touching the paths below. Each benchmark is an
 | Content index add (31 KB chunks, words + trigrams + stored text), 256 MB | — | 14.9 MB/s, index 1.7× text | `cargo test -p pm-search --release --test bench -- --ignored content_index_throughput --nocapture` | 2026-10-17 |
 | Ad-hoc search, 8 456 chunks: exact common / rare word, substring, regex (first 100 objects, verified) | < 1 s | 426 / 39 / 4.5 / 5.4 ms | same | 2026-10-17 |
 | Inline matcher (5 built-in lists + 101 keywords), one thread | — | 38.9 MB/s | `cargo test -p pm-search --release --test bench -- --ignored matcher_throughput --nocapture` | 2026-10-17 |
-| Chunker (NFKC, lower-casing, Autopsy size rules), one thread | — | 32.5 MB/s (follow-up: byte-buffer queue instead of `VecDeque<char>`) | `cargo test -p pm-text --release --test bench -- --ignored --nocapture` | 2026-10-17 |
+| Chunker (NFKC, lower-casing, Autopsy size rules), one thread | — | 132 MB/s (was 32.5 before the NFKC quick check and byte-buffer queue) | `cargo test -p pm-text --release --test bench -- --ignored --nocapture` | 2026-10-17 |
 | String extraction, 64 MiB binary: English-only / international (LATIN_2 + CYRILLIC) | — | 346 / 31 MB/s | same | 2026-10-17 |
