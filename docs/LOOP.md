@@ -38,9 +38,9 @@ Never modify it.
    test counts), add an ADR for any non-obvious decision.
 8. **Commit**: `scripts/gate.sh && git add -A && git commit` in `postmortem/` with a conventional
    message (`feat(fs-ntfs): …`) ending with the Co-Authored-By trailer. Then
-   push to the work branch: `git push origin HEAD:parity-wip` (user decision
-   2026-10-17, after unpushed worktree branches were lost). Never push to
-   `master`, never add remotes.
+   push: `git push origin master master:parity-wip` (user decision
+   2026-10-17: finished work, including merged agent branches, goes straight
+   to `master`). Never add remotes.
 9. **Continue**: if there is remaining work and context budget, go back to 3.
    Otherwise end the turn; the loop wakeup re-enters at step 1.
 
