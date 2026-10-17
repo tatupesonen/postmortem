@@ -783,3 +783,23 @@ fn data_sources_get_tsks_default_host_or_the_chosen_one() {
     assert_eq!(host2.name, "Suspect laptop");
     assert_eq!(case.db().data_sources_of_host(host.id).unwrap(), [s.ds_id]);
 }
+
+/// Reopens a real case (`PM_CASE_DIR`) and reads a few files' content.
+#[test]
+#[ignore = "needs a real case"]
+fn reopened_real_case_reads_content() {
+    let Some(dir) = std::env::var_os("PM_CASE_DIR") else {
+        return;
+    };
+    let case = Case::open(PathBuf::from(dir)).unwrap();
+    let db = case.db();
+    for ds in db.data_sources().unwrap() {
+        for fs in db.file_systems(ds.id).unwrap() {
+            eprintln!("ds {} fs {} at {}", ds.id, fs.id, fs.byte_offset);
+            match case.filesystem(fs.id) {
+                Ok(_) => eprintln!("  opened"),
+                Err(e) => eprintln!("  error: {e}"),
+            }
+        }
+    }
+}

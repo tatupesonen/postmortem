@@ -118,7 +118,7 @@ pub struct PostmortemApp {
     result_rows:
         HashMap<crate::results::ResultKey, Task<Result<Arc<crate::results::ResultRows>, String>>>,
     /// Keyword Hits groups, and the hit count they were loaded for.
-    keyword_groups: crate::task::Cached<Vec<pm_casedb::keyword_hits::KeywordHitGroup>>,
+    keyword_groups: crate::task::Cached<crate::keyword_search_ui::HitTree>,
     keyword_groups_for: u64,
     result_selected: Option<usize>,
     result_table: crate::results::ResultTable,
@@ -1510,7 +1510,8 @@ impl PostmortemApp {
         case: Option<&Arc<pm_case::Case>>,
         total: u64,
     ) {
-        use pm_casedb::keyword_hits::{KeywordHitFilter, SINGLE_LITERAL, SINGLE_REGEX};
+        use crate::keyword_search_ui::MAX_TREE_CHILDREN;
+        use pm_casedb::keyword_hits::KeywordHitFilter;
         let Some(case) = case else {
             return;
         };
@@ -1521,58 +1522,47 @@ impl PostmortemApp {
                 .retain(|k, _| !matches!(k, crate::results::ResultKey::Keyword(_)));
         }
         let loader = Arc::clone(case);
-        let groups = self
+        let tree = self
             .keyword_groups
             .get(ui.ctx(), move || {
-                loader.db().keyword_hit_groups().map_err(|e| e.to_string())
+                let groups = loader
+                    .db()
+                    .keyword_hit_groups()
+                    .map_err(|e| e.to_string())?;
+                Ok(crate::keyword_search_ui::HitTree::build(&groups))
             })
             .unwrap_or_default();
-        self.tree_node(ui, node, label, true, |app, ui| {
-            // The two ad-hoc groups are always listed first.
-            let mut lists: Vec<&str> = vec![SINGLE_LITERAL, SINGLE_REGEX];
-            for g in groups.iter() {
-                if !lists.contains(&g.list.as_str()) {
-                    lists.push(&g.list);
-                }
+        let filter = |list: &str, term: Option<&str>, inst: Option<&str>| {
+            NodeId::KeywordHits(KeywordHitFilter {
+                list: list.to_owned(),
+                term: term.map(str::to_owned),
+                instance: inst.map(str::to_owned),
+            })
+        };
+        let more = |ui: &mut egui::Ui, n: usize| {
+            if n > MAX_TREE_CHILDREN {
+                ui.weak(format!(
+                    "… {} more (listed in the parent's results)",
+                    crate::format::grouped((n - MAX_TREE_CHILDREN) as u64)
+                ));
             }
-            for list in lists {
-                let of_list: Vec<_> = groups.iter().filter(|g| g.list == list).collect();
-                let n: u64 = of_list.iter().map(|g| g.count).sum();
-                let list_node = NodeId::KeywordHits(KeywordHitFilter {
-                    list: list.to_owned(),
-                    ..KeywordHitFilter::default()
-                });
-                let label = format!("{list} ({})", crate::format::grouped(n));
-                app.tree_node(ui, &list_node, &label, !of_list.is_empty(), |app, ui| {
-                    let mut terms: Vec<&str> = Vec::new();
-                    for g in &of_list {
-                        if !terms.contains(&g.term.as_str()) {
-                            terms.push(&g.term);
-                        }
-                    }
-                    for term in terms {
-                        let of_term: Vec<_> = of_list.iter().filter(|g| g.term == term).collect();
-                        let n: u64 = of_term.iter().map(|g| g.count).sum();
-                        let term_node = NodeId::KeywordHits(KeywordHitFilter {
-                            list: list.to_owned(),
-                            term: Some(term.to_owned()),
-                            instance: None,
-                        });
-                        let label = format!("{term} ({})", crate::format::grouped(n));
-                        let regex = of_term.iter().any(|g| g.instance.is_some());
-                        app.tree_node(ui, &term_node, &label, regex, |app, ui| {
-                            for g in &of_term {
-                                let Some(inst) = &g.instance else { continue };
-                                let node = NodeId::KeywordHits(KeywordHitFilter {
-                                    list: list.to_owned(),
-                                    term: Some(term.to_owned()),
-                                    instance: Some(inst.clone()),
-                                });
-                                let label = format!("{inst} ({})", crate::format::grouped(g.count));
-                                app.tree_node(ui, &node, &label, false, |_, _| {});
+        };
+        self.tree_node(ui, node, label, true, |app, ui| {
+            for l in &tree.lists {
+                let node = filter(&l.name, None, None);
+                app.tree_node(ui, &node, &l.label, !l.terms.is_empty(), |app, ui| {
+                    for t in l.terms.iter().take(MAX_TREE_CHILDREN) {
+                        let node = filter(&l.name, Some(&t.term), None);
+                        let regex = !t.instances.is_empty();
+                        app.tree_node(ui, &node, &t.label, regex, |app, ui| {
+                            for (inst, label) in t.instances.iter().take(MAX_TREE_CHILDREN) {
+                                let node = filter(&l.name, Some(&t.term), Some(inst));
+                                app.tree_node(ui, &node, label, false, |_, _| {});
                             }
+                            more(ui, t.instances.len());
                         });
                     }
+                    more(ui, l.terms.len());
                 });
             }
         });

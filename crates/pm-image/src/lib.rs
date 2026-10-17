@@ -165,6 +165,18 @@ pub fn open(first: impl AsRef<Path>) -> Result<Image, ImageError> {
     }
 }
 
+/// Opens an image from an explicit, ordered list of segments (as a case
+/// records them), detecting the format from the first one: EWF segments
+/// are decoded, anything else is concatenated as a raw split image.
+pub fn open_segments(paths: &[PathBuf]) -> Result<Image, ImageError> {
+    let first = paths.first().ok_or(ImageError::NoPaths)?;
+    match sniff(&open_file(first)?) {
+        ImageFormat::Raw => open_paths(paths),
+        ImageFormat::Ewf => open_ewf(paths),
+        format => Err(ImageError::Unsupported { format }),
+    }
+}
+
 /// Opens an EWF (E01/s01) image from an explicit list of segments.
 pub fn open_ewf(paths: &[PathBuf]) -> Result<Image, ImageError> {
     if paths.is_empty() {

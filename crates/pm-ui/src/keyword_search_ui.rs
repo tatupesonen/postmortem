@@ -367,3 +367,129 @@ mod tests {
         assert_eq!(validate("abc\\$", SearchType::Regex), Ok(None));
     }
 }
+
+/// Children drawn per Keyword Hits tree node; the rest are summarised
+/// (the node's result list still shows every hit).
+pub(crate) const MAX_TREE_CHILDREN: usize = 200;
+
+/// The Keyword Hits tree, built once per load (not per frame).
+#[derive(Debug, Default)]
+pub(crate) struct HitTree {
+    pub(crate) lists: Vec<HitList>,
+}
+
+#[derive(Debug)]
+pub(crate) struct HitList {
+    pub(crate) name: String,
+    pub(crate) count: u64,
+    pub(crate) label: String,
+    pub(crate) terms: Vec<HitTerm>,
+}
+
+#[derive(Debug)]
+pub(crate) struct HitTerm {
+    pub(crate) term: String,
+    pub(crate) count: u64,
+    pub(crate) label: String,
+    /// Matched texts with labels (regular expressions only).
+    pub(crate) instances: Vec<(String, String)>,
+}
+
+fn count_label(name: &str, n: u64) -> String {
+    format!("{name} ({})", crate::format::grouped(n))
+}
+
+impl HitTree {
+    /// Groups ordered by list, term and instance (as
+    /// `CaseDb::keyword_hit_groups` returns them); the two ad-hoc lists are
+    /// always present and first, the rest follow by name.
+    pub(crate) fn build(groups: &[pm_casedb::keyword_hits::KeywordHitGroup]) -> Self {
+        use pm_casedb::keyword_hits::{SINGLE_LITERAL, SINGLE_REGEX};
+        let list = |name: &str| HitList {
+            name: name.to_owned(),
+            count: 0,
+            label: String::new(),
+            terms: Vec::new(),
+        };
+        let mut lists = vec![list(SINGLE_LITERAL), list(SINGLE_REGEX)];
+        for g in groups {
+            // Groups arrive ordered by list, so the list is usually the last.
+            let i = if lists.last().is_some_and(|l| l.name == g.list) {
+                lists.len() - 1
+            } else if let Some(i) = lists.iter().position(|l| l.name == g.list) {
+                i
+            } else {
+                lists.push(list(&g.list));
+                lists.len() - 1
+            };
+            let Some(l) = lists.get_mut(i) else { continue };
+            l.count += g.count;
+            if l.terms.last().is_none_or(|t| t.term != g.term) {
+                l.terms.push(HitTerm {
+                    term: g.term.clone(),
+                    count: 0,
+                    label: String::new(),
+                    instances: Vec::new(),
+                });
+            }
+            let Some(t) = l.terms.last_mut() else {
+                continue;
+            };
+            t.count += g.count;
+            if let Some(inst) = &g.instance {
+                t.instances.push((inst.clone(), count_label(inst, g.count)));
+            }
+        }
+        for l in &mut lists {
+            l.label = count_label(&l.name, l.count);
+            for t in &mut l.terms {
+                t.label = count_label(&t.term, t.count);
+            }
+        }
+        if let Some(rest) = lists.get_mut(2..) {
+            rest.sort_by(|a, b| a.name.cmp(&b.name));
+        }
+        Self { lists }
+    }
+}
+
+#[cfg(test)]
+mod tree_tests {
+    use super::*;
+    use pm_casedb::keyword_hits::{KeywordHitGroup, SINGLE_LITERAL, SINGLE_REGEX};
+
+    fn g(list: &str, term: &str, inst: Option<&str>, count: u64) -> KeywordHitGroup {
+        KeywordHitGroup {
+            list: list.into(),
+            term: term.into(),
+            instance: inst.map(Into::into),
+            count,
+        }
+    }
+
+    #[test]
+    fn builds_lists_terms_and_instances_once() {
+        let t = HitTree::build(&[
+            g(SINGLE_LITERAL, "budget", None, 1),
+            g("Email Addresses", "re", Some("a@b.c"), 2),
+            g("Email Addresses", "re", Some("d@e.f"), 3),
+            g("Phone Numbers", "re2", Some("123"), 1),
+        ]);
+        let names: Vec<&str> = t.lists.iter().map(|l| l.label.as_str()).collect();
+        assert_eq!(
+            names,
+            [
+                format!("{SINGLE_LITERAL} (1)").as_str(),
+                format!("{SINGLE_REGEX} (0)").as_str(),
+                "Email Addresses (5)",
+                "Phone Numbers (1)"
+            ]
+        );
+        let email = &t.lists[2].terms[0];
+        assert_eq!(email.label, "re (5)");
+        assert_eq!(
+            email.instances[1],
+            ("d@e.f".to_owned(), "d@e.f (3)".to_owned())
+        );
+    }
+}

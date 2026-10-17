@@ -13,7 +13,7 @@ use std::process::Command;
 
 use md5::{Digest, Md5};
 use pm_core::ReadAt;
-use pm_image::{HashAlgo, ImageFormat, open};
+use pm_image::{HashAlgo, ImageFormat, open, open_segments};
 use rstest::rstest;
 
 fn fixture(name: &str) -> PathBuf {
@@ -33,6 +33,14 @@ fn md5_of(src: &dyn ReadAt) -> String {
         off += n as u64;
     }
     pm_core::decode::to_hex(&h.finalize())
+}
+
+#[test]
+fn segment_list_of_an_e01_opens_as_ewf() {
+    let first = fixture("ewf/small.E01");
+    let img = open_segments(std::slice::from_ref(&first)).unwrap();
+    assert_eq!(img.info.format, ImageFormat::Ewf);
+    assert_eq!(img.info.size, open(&first).unwrap().info.size);
 }
 
 #[test]
@@ -203,6 +211,12 @@ fn matches_ewfacquire_output(#[case] format: &str, #[case] compression: &str, #[
             img.info.paths
         );
     }
+    // Reopening from the recorded segment list (a case does this) reads the
+    // same media, not the concatenated segment files.
+    let again = open_segments(&img.info.paths).unwrap();
+    assert_eq!(again.info.format, ImageFormat::Ewf);
+    assert_eq!(again.info.size, img.info.size);
+    assert_eq!(again.source().read_vec_at(0, size).unwrap(), got);
     // ewfacquire 20140817 hashes the whole source, including the partial
     // sector it does not store.
     if let Some(md5) = img.info.stored_hashes.iter().find(|h| h.0 == HashAlgo::Md5) {

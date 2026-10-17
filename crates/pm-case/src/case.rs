@@ -304,7 +304,9 @@ impl Case {
                 path: first,
             });
         }
-        let image = pm_image::open_paths(&paths).map_err(pm_evidence::EvidenceError::from)?;
+        // The recorded segments, in the image's own format (E01/E02/… are
+        // EWF segments, not a raw split image).
+        let image = pm_image::open_segments(&paths).map_err(pm_evidence::EvidenceError::from)?;
         let evidence = pm_evidence::analyze(image, &open_options(&rec.timezone))?;
         let mut filesystems = HashMap::new();
         for fs in self.db.file_systems(rec.id)? {

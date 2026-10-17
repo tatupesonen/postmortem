@@ -590,3 +590,41 @@ fn keyword_hits_group_like_autopsy() {
     assert_eq!(in_list("Email Addresses", None), 2);
     assert_eq!(in_list("Nope", None), 0);
 }
+
+/// Times the Keyword Hits queries on a real case (`PM_CASE_DB=…/case.db`).
+#[test]
+#[ignore = "needs a real case database"]
+fn keyword_hit_groups_on_a_real_case() {
+    let Some(path) = std::env::var_os("PM_CASE_DB") else {
+        return;
+    };
+    let db = CaseDb::open(path).unwrap();
+    let t = std::time::Instant::now();
+    let g = db.keyword_hit_groups().unwrap();
+    let lists: std::collections::BTreeSet<&str> = g.iter().map(|g| g.list.as_str()).collect();
+    eprintln!(
+        "{} groups in {} lists in {:?}",
+        g.len(),
+        lists.len(),
+        t.elapsed()
+    );
+    for l in &lists {
+        let t = std::time::Instant::now();
+        let n = db
+            .keyword_hits_in(
+                &pm_casedb::keyword_hits::KeywordHitFilter {
+                    list: (*l).to_owned(),
+                    ..Default::default()
+                },
+                0,
+                20_000,
+            )
+            .unwrap()
+            .len();
+        let groups = g.iter().filter(|x| x.list == *l).count();
+        eprintln!(
+            "  {l}: {n} hits, {groups} groups, listed in {:?}",
+            t.elapsed()
+        );
+    }
+}
