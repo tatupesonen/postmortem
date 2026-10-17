@@ -21,6 +21,7 @@ pm-registry = { path = "../crates/pm-registry" }
 pm-lnk = { path = "../crates/pm-lnk" }
 pm-prefetch = { path = "../crates/pm-prefetch" }
 pm-archive = { path = "../crates/pm-archive" }
+pm-carve = { path = "../crates/pm-carve" }
 
 [workspace]
 members = ["."]
@@ -105,6 +106,13 @@ bench = false
 [[bin]]
 name = "archive_detect"
 path = "fuzz_targets/archive_detect.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "carve_scan"
+path = "fuzz_targets/carve_scan.rs"
 test = false
 doc = false
 bench = false

@@ -16,6 +16,7 @@ pub mod disk;
 pub mod evt;
 pub mod ext;
 pub mod lznt1;
+pub mod media;
 pub mod ntfs;
 pub mod synth;
 pub mod tsk;

@@ -3580,6 +3580,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-carve"
+version = "0.1.0"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "memchr",
+ "pm-archive",
+ "pm-core",
+ "pm-testkit",
+ "proptest",
+ "rusqlite",
+ "tempfile",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "pm-case"
 version = "0.1.0"
 dependencies = [
@@ -3833,6 +3849,7 @@ dependencies = [
  "md-5",
  "parking_lot",
  "pm-archive",
+ "pm-carve",
  "pm-case",
  "pm-casedb",
  "pm-core",

@@ -928,6 +928,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-carve"
+version = "0.1.0"
+dependencies = [
+ "crc32fast",
+ "flate2",
+ "memchr",
+ "pm-archive",
+ "pm-core",
+ "thiserror 2.0.21",
+]
+
+[[package]]
 name = "pm-core"
 version = "0.1.0"
 dependencies = [
@@ -1000,6 +1012,7 @@ version = "0.0.0"
 dependencies = [
  "libfuzzer-sys",
  "pm-archive",
+ "pm-carve",
  "pm-core",
  "pm-evtlog",
  "pm-fs",

@@ -6,6 +6,7 @@ pub mod embedded;
 pub mod event_logs;
 mod exif;
 pub mod hash_lookup;
+pub mod photorec;
 pub mod picture_analyzer;
 pub mod recent_activity;
 mod util;
@@ -25,5 +26,6 @@ pub fn core_modules() -> Vec<Arc<dyn ModuleFactory>> {
         Arc::new(hash_lookup::HashLookupFactory),
         Arc::new(embedded::EmbeddedFileExtractorFactory),
         Arc::new(picture_analyzer::PictureAnalyzerFactory),
+        Arc::new(photorec::PhotoRecCarverFactory),
     ]
 }
