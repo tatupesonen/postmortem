@@ -14,6 +14,7 @@ pm-hashdb.workspace = true
 pm-evtlog.workspace = true
 pm-filetype.workspace = true
 pm-encryption.workspace = true
+pm-rules.workspace = true
 roxmltree.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

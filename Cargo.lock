@@ -4111,6 +4111,7 @@ dependencies = [
  "pm-lnk",
  "pm-prefetch",
  "pm-registry",
+ "pm-rules",
  "pm-testkit",
  "pm-winartifacts",
  "proptest",
@@ -4145,6 +4146,18 @@ dependencies = [
  "pm-core",
  "pm-registry",
  "proptest",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
+name = "pm-rules"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "regex",
+ "roxmltree 0.21.1",
+ "serde",
  "thiserror 2.0.21",
  "tracing",
 ]

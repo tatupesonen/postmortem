@@ -9,7 +9,7 @@ merged from `wip/filetype`, reviewed, fixed and completed).
 | 1 | `pm-filetype` + File Type Identification module | done |
 | 2 | Extension Mismatch Detector | done |
 | 3 | Encryption Detection (+ `pm-encryption`) | done |
-| 4 | Interesting Files Identifier + reusable FilesSet engine (`pm-rules`) | not started |
+| 4 | Interesting Files Identifier + reusable FilesSet engine (`pm-rules`) | done |
 | 5 | Data Source Integrity (+ `pm-casedb/src/integrity.rs`) | not started |
 
 Pipeline order in `core_modules()` follows Autopsy's effective order
@@ -228,4 +228,47 @@ database with a password but a corrupt catalog is flagged (Jackcess
 fails to open it); the PDF check does not parse the document beyond the
 trailer and encryption dictionary (PDFBox may reject a broken PDF
 first); APFS (FileVault on APFS) volumes are not recognised.
+
+## 4. Interesting Files Identifier and `pm-rules`
+
+### `crates/pm-rules` (new)
+
+Autopsy's `FilesSet` language, independent of the case database:
+`FilesSet` / `Rule` (serde) with meta-type (files, directories, files and
+directories, all), full-name or extension (exact ignoring case, list,
+regex), parent path (substring ignoring ASCII case on `parent + "/"`, or
+regex), MIME type, size (5 comparators × 4 units), "modified or created
+within N days", exclusive rules, ignore-known and ignore-unallocated flags;
+`CompiledSet::member_rule` = `fileIsMemberOf` (incl. "Not Excluded" for
+sets with only exclusive rules). `xml` reads and writes Autopsy's
+`INTERESTING_FILE_SETS` documents with every validation and error message
+of `InterestingItemsFilesSetSettings` (and, unlike Autopsy's export, keeps
+"ignore unallocated space"). `standard` embeds Autopsy's five standard
+sets verbatim and ports `StandardInterestingFilesSetsLoader`'s merge
+(newer versions win; a user set with a standard name becomes "(Custom)").
+`java_regex` translates Java regex syntax (escaped punctuation/space,
+`\Q…\E`, octal/Unicode escapes, back-references to missing groups, which
+Java accepts and never match) so every standard set loads.
+
+Deterministic where Autopsy is not: Autopsy iterates rules in hash order,
+so the rule name reported for a file matching several inclusive rules is
+arbitrary; here it is the first in definition order.
+
+### `crates/pm-modules/src/interesting_files.rs`
+
+Module `interesting_files` ("Interesting Files Identifier"). Settings
+`{ sets: [FilesSet] | null (standard sets), disabled_sets: [name] }`;
+an invalid set fails start-up ("Error getting interesting files sets from
+file."). Slack files are skipped. Each matching set posts
+`TSK_INTERESTING_ITEM` (Likely Notable, configuration and `TSK_SET_NAME` =
+set, `TSK_CATEGORY` = rule) and an "Interesting File Match: <set>(<name>)"
+data message, once per file and set.
+
+Tests: `pm-rules` unit + integration tests (IngestFileFiltersTest rule
+semantics, meta types, size/MIME/date/regex/known, exclusive rules, text
+matching details, XML import/export round trip and every error message,
+standard sets and merge, Java regex translation, proptest on the XML
+reader); end-to-end: user sets with every condition kind, messages,
+re-ingest, disabled sets via XML, standard sets by default, start-up
+failure.
 

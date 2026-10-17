@@ -1,0 +1,20 @@
+[package]
+name = "pm-rules"
+description = "Autopsy's files-set rule language (interesting files, ingest filters): matching, XML import/export, standard sets"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+thiserror.workspace = true
+tracing.workspace = true
+regex.workspace = true
+roxmltree.workspace = true
+serde.workspace = true
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

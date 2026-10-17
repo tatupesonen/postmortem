@@ -225,7 +225,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [x] Embedded File Extractor (zip, 7z, tar, gz/bz2/xz/zstd, rar if feasible, ISO, Office OLE/OOXML, PDF images; zip-bomb limits; password detection)
 - [ ] Picture Analyzer (EXIF → metadata + GPS artifacts, HEIC handling)
 - [x] Encryption Detection (entropy, BitLocker/LUKS/FileVault/VeraCrypt signatures, password-protected Office/PDF/zip)
-- [ ] Interesting Files Identifier (full rule language, rule sets import/export)
+- [x] Interesting Files Identifier (full rule language, rule sets import/export)
 - [ ] Data Source Integrity (verify stored hashes, compute hashes)
 - [ ] Ingest UI: module config panels, progress panel, inbox, snapshot/diagnostics
 
