@@ -20,5 +20,6 @@ pub mod media;
 pub mod ntfs;
 pub mod synth;
 pub mod tsk;
+pub mod vdisk;
 
 pub use disk::{DiskBuilder, GptPart, MbrPart};
