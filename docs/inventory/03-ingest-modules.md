@@ -1,6 +1,6 @@
 # 03 — Ingest framework & ingest modules (feature inventory)
 
-Source of truth: Autopsy 4.x Java tree at `/home/tatu/slop/autopsy` (read-only). This document describes
+Source of truth: Autopsy 4.x Java tree at `../autopsy` (read-only). This document describes
 *behaviour*, so the Java does not have to be re-read. Class names are given only so that a reader can find
 the original if needed.
 

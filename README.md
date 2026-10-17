@@ -1,7 +1,7 @@
 <p align="center">
   <picture>
     <source media="(prefers-color-scheme: dark)" srcset="assets/brand/postmortem-wordmark-on-dark.png">
-    <img alt="postmortem" src="assets/brand/postmortem-wordmark-on-light.svg" width="360">
+    <img alt="postmortem" src="assets/brand/postmortem-wordmark-on-light.png" width="360">
   </picture>
 </p>
 
@@ -36,4 +36,6 @@ Early, under active development. [`docs/PARITY.md`](docs/PARITY.md) tracks progr
 
 ## License
 
-[Apache-2.0](https://www.apache.org/licenses/LICENSE-2.0)
+[AGPL-3.0-or-later](LICENSE). The plugin API and SDK (`pm-plugin-api`, `pm-plugin-sdk`) are [Apache-2.0](LICENSE-APACHE), so plugins can use any licence. See [`NOTICE`](NOTICE) for Autopsy and third-party attributions.
+
+postmortem is not affiliated with or endorsed by the Autopsy project.

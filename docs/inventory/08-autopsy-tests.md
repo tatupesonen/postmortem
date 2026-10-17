@@ -1,10 +1,10 @@
 # 08 — Autopsy's own tests: parity inventory (Autopsy → postmortem)
 
-This is the test-parity reference. It lists every automated test, test harness and test fixture in the Autopsy source tree (`/home/tatu/slop/autopsy`, read-only), what each one checks with concrete inputs and expected outputs, which fixtures it needs and whether they can be reused, and which postmortem area it maps to. It also describes Autopsy's golden-DB-dump regression harness and proposes a Rust equivalent. It ends with a tickable parity checklist.
+This is the test-parity reference. It lists every automated test, test harness and test fixture in the Autopsy source tree (`../autopsy`, read-only), what each one checks with concrete inputs and expected outputs, which fixtures it needs and whether they can be reused, and which postmortem area it maps to. It also describes Autopsy's golden-DB-dump regression harness and proposes a Rust equivalent. It ends with a tickable parity checklist.
 
 Per `docs/LOOP.md` ("Testing rules"): before a feature is finished, port the cases listed here for its area and tick the matching checklist line.
 
-Unless stated otherwise, paths are relative to `/home/tatu/slop/autopsy/`. Crate names in parentheses are suggestions. `docs/PLAN.md` is authoritative once it exists.
+Unless stated otherwise, paths are relative to `../autopsy/`. Crate names in parentheses are suggestions. `docs/PLAN.md` is authoritative once it exists.
 
 ## Contents
 

@@ -1,0 +1,68 @@
+postmortem
+Copyright (C) 2026 Tatu Pesonen and postmortem contributors
+
+postmortem is licensed under the GNU Affero General Public License,
+version 3 or (at your option) any later version. See LICENSE.
+
+The plugin interface crates (crates/pm-plugin-api, including its WIT
+definitions, and crates/pm-plugin-sdk) and the example and test plugins
+under plugins/ are licensed under the Apache License, Version 2.0 (see
+LICENSE-APACHE), so that plugins may be distributed under any licence.
+
+-----------------------------------------------------------------------
+
+postmortem is a Rust port of Autopsy (https://www.autopsy.com).
+Autopsy is Copyright Basis Technology Corp. and contributors and is
+licensed under the Apache License, Version 2.0 (see LICENSE-APACHE).
+Parts of postmortem are derived from Autopsy's source code and data
+files; they have been rewritten in Rust and modified.
+
+Autopsy is a trademark of its owner. postmortem is not affiliated
+with, or endorsed by, Basis Technology Corp. or Sleuth Kit Labs.
+
+-----------------------------------------------------------------------
+
+Parts of postmortem follow or are ported from Eric Zimmerman's tools
+(https://github.com/EricZimmerman), Copyright (c) 2015-2021 Eric
+Zimmerman, MIT licence (full text below):
+
+* crates/pm-evtlog: EvtxECmd map semantics (evtx/EventRecord.cs) and
+  the bundled maps (crates/pm-evtlog/maps/evtxecmd.yaml).
+* crates/pm-winartifacts/src/registry/amcache.rs: AmcacheParser.
+* crates/pm-winartifacts/src/recycle.rs: RBCmd.
+* crates/pm-winartifacts/src/recentfilecache.rs: RecentFileCacheParser.
+* fixtures/recyclebin/: RBCmd test files.
+
+  Permission is hereby granted, free of charge, to any person obtaining
+  a copy of this software and associated documentation files (the
+  "Software"), to deal in the Software without restriction, including
+  without limitation the rights to use, copy, modify, merge, publish,
+  distribute, sublicense, and/or sell copies of the Software, and to
+  permit persons to whom the Software is furnished to do so, subject to
+  the following conditions:
+
+  The above copyright notice and this permission notice shall be
+  included in all copies or substantial portions of the Software.
+
+  THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND,
+  EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF
+  MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT.
+  IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY
+  CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT,
+  TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
+  SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+-----------------------------------------------------------------------
+
+Bundled data files and test fixtures carry their own licences:
+
+* crates/pm-browser/data/SEUQAMappings.xml and
+  default_domain_categories.csv.gz: from Autopsy, Apache-2.0.
+* crates/pm-browser/data/malicious_chrome_extensions.csv:
+  https://github.com/randomaccess3/detections, Detection Rule
+  License 1.1 (see the file header).
+* crates/pm-browser/data/public_suffix_list.dat: Mozilla Public
+  Suffix List, MPL-2.0, unmodified.
+* crates/pm-filetype/data/tika-mimetypes.xml: Apache Tika,
+  Apache-2.0 (see crates/pm-filetype/data/TIKA-NOTICE.txt).
+* fixtures/: see fixtures/README.md for each file's origin and licence.

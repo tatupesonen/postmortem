@@ -2,7 +2,7 @@
 
 ## Now — RESUME HERE (2026-10-17, Linux machine, autonomous)
 
-Context: the project moved to a Linux VM (`/home/tatu/slop`). The paused
+Context: the project moved to a Linux VM. The paused
 agent worktrees from the Mac (search, core-file-modules, email-mobile,
 browsers, carving `.wip-derived/`) were **lost** (never pushed). The user
 chose to **reimplement** them here; `docs/agents/<track>.md` are the specs.
@@ -37,7 +37,7 @@ Machine notes: `apt` installed sleuthkit 4.12.1 + ewf-tools (TSK
 differentials now run; TSK 4.12 vs the 4.15 the project used on the Mac
 may differ). The GUI in this VMware VM needs `LIBGL_ALWAYS_SOFTWARE=1`
 or `WGPU_BACKEND=vulkan` (SVGA3D GL renders blank). References in
-`/home/tatu/slop/reference/` (sleuthkit 4.12.1 source, Tika
+`../reference/` (sleuthkit 4.12.1 source, Tika
 mimetypes, Eric Zimmerman tools).
 
 ## 2026-10-15: parallel parity push (goal: all Autopsy features, tested)

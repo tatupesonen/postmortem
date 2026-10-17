@@ -9,14 +9,15 @@
 # pm-filetype (examples/tika_oracle.rs) over it and prints the agreement
 # for Tika's two passes and for Autopsy's combined answer (compare.py).
 #
-# TIKA_JAR defaults to /home/tatu/slop/reference/tika-app/tika-app-3.0.0.jar
+# TIKA_JAR defaults to ../reference/tika-app/tika-app-3.0.0.jar beside the
+# repository
 # (Maven Central: org/apache/tika/tika-app/3.0.0/tika-app-3.0.0.jar).
 set -euo pipefail
 here="$(cd "$(dirname "$0")" && pwd)"
 root="$(cd "$here/../../.." && pwd)"
 out="$1"
 shift
-jar="${TIKA_JAR:-/home/tatu/slop/reference/tika-app/tika-app-3.0.0.jar}"
+jar="${TIKA_JAR:-$root/../reference/tika-app/tika-app-3.0.0.jar}"
 mkdir -p "$out"
 python3 -I "$here/corpus.py" "$@" > "$out/paths.txt"
 (cd "$root" && cargo build --release -p pm-filetype --example tika_oracle)

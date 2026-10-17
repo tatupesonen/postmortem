@@ -14,14 +14,14 @@ in this repository. This document is the contract each iteration follows.
 | `docs/DECISIONS.md` | Architecture decision records (ADR-NNN). Append; never silently rewrite. |
 | `docs/inventory/*.md` | Feature inventory of Autopsy, by area. The parity reference. |
 
-The Autopsy source at `/home/tatu/slop/autopsy` is **read-only reference**.
+The Autopsy source at `../autopsy` is **read-only reference**.
 Never modify it.
 
 ## One iteration
 
 1. **Orient** (keep it cheap): read `PROGRESS.md` `## Now` and `## Blockers`,
    then only the `PLAN.md` milestone that holds the current task. Run
-   `git -C /home/tatu/slop/postmortem log --oneline -5` to confirm where we are.
+   `git log --oneline -5` to confirm where we are.
 2. **Baseline**: run the quality gate (below). If it is red, fixing it *is* the
    task for this iteration.
 3. **Pick work**: the current task in `## Now`, or else the first unchecked
@@ -46,7 +46,7 @@ Never modify it.
 
 ## Quality gate
 
-Run `scripts/gate.sh` from `/home/tatu/slop/postmortem` (fmt check, clippy
+Run `scripts/gate.sh` from the repository root (fmt check, clippy
 with `-D warnings`, all tests). **Commit only as `scripts/gate.sh && git commit …`**
 so that a red gate can never be committed. **Never pipe the gate** (`gate.sh | tail` returns tail's exit
 status and lets a red gate through).

@@ -9,7 +9,7 @@ merges are clean and the result is shippable.
 (`## Now`), `docs/DECISIONS.md` (ADR-009 prefer existing crates, ADR-013
 analysers in Rust, ADR-014 scale, ADR-015 ingest framework), the
 `docs/inventory/*.md` sections for your track, and `docs/inventory/08-autopsy-tests.md`.
-Autopsy's Java source at `/home/tatu/slop/autopsy` is the parity reference —
+Autopsy's Java source at `../autopsy` is the parity reference —
 read-only, never modify it. Port behaviour (artifact types, attribute names,
 scores, messages, skip rules, defaults), not Java structure.
 

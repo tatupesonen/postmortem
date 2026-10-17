@@ -4,7 +4,7 @@ description = "The postmortem module API shared by built-in parsers and WebAssem
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+license = "Apache-2.0"
 
 [dependencies]
 serde.workspace = true

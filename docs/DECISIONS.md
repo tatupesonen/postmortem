@@ -85,8 +85,14 @@ Evaluations:
   `hayro`, `calamine`. These are expected to be adopted (inventory 07 §20).
 
 ## ADR-010 — Licence policy
-The product is Apache-2.0. GPL/AGPL/LGPL crates are banned from shipped
-binaries (watch-list in inventory 07 §0.5); MPL-2.0 is allowed unmodified.
+The product is AGPL-3.0-or-later (changed from Apache-2.0 on 2026-10-18,
+to keep hosted and multi-user forks open). Autopsy-derived code stays
+attributed in `NOTICE`; Apache-2.0 code may be included in (A)GPLv3 work.
+`pm-plugin-api` and `pm-plugin-sdk` stay Apache-2.0 and must depend only
+on permissively licensed crates, so plugins can use any licence.
+Dependencies must be AGPLv3-compatible: no GPL-2.0-only, no proprietary;
+MPL-2.0 is allowed unmodified. Release archives ship third-party licence
+texts.
 Enforce with `cargo-deny` (`deny.toml`) when it lands in the gate.
 
 ## ADR-011 — wasmtime pinned to yara-x's major

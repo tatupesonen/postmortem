@@ -2,7 +2,7 @@
 
 Audit date: 2026-10-15. Master is at `bbc96d8`. The 6 running track worktrees have no commits or changes yet, so every "In progress" row below is scope only, not code.
 
-Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autopsy`, including `@OptionsPanelController`, `IngestModuleFactory`, `DataSourceProcessor`, `DataContentViewer`/`DataResultViewer` and report-module registrations. I cross-checked against `docs/inventory/01–08`, then read the postmortem crates (`crates/*`), `PLAN.md`, `PROGRESS.md` and `agents/RULES.md`.
+Method: I enumerated every NetBeans module and package in `../autopsy`, including `@OptionsPanelController`, `IngestModuleFactory`, `DataSourceProcessor`, `DataContentViewer`/`DataResultViewer` and report-module registrations. I cross-checked against `docs/inventory/01–08`, then read the postmortem crates (`crates/*`), `PLAN.md`, `PROGRESS.md` and `agents/RULES.md`.
 
 **Status legend**
 - **Done**: implemented and tested on master.

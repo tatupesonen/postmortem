@@ -1,5 +1,5 @@
 import re, sys
-base = '/home/tatu/slop/autopsy/Core/src/org/sleuthkit/autopsy/report/infrastructure/'
+base = (sys.argv[1] if len(sys.argv) > 1 else '../autopsy') + '/Core/src/org/sleuthkit/autopsy/report/infrastructure/'
 src = open(base + 'TableReportGenerator.java').read().split('\n')
 bundle = {}
 for line in open(base + 'Bundle.properties-MERGED', encoding='latin-1'):

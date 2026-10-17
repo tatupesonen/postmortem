@@ -4,7 +4,7 @@ description = "Write postmortem plugins in Rust: implement pm-plugin-api's trait
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
-license.workspace = true
+license = "Apache-2.0"
 
 [dependencies]
 pm-plugin-api.workspace = true
