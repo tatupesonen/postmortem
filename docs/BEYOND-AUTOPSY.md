@@ -133,7 +133,76 @@ macOS (KnowledgeC, FSEvents, unified log, quarantine events, Biome),
 Linux (bash/zsh history, auth.log, wtmp/btmp, journald, cron, systemd
 units), iOS beyond iLEAPP-equivalents.
 
-## 8. MCP server for AI assistants — **[next]**
+## 8. Analyst workflow (speed features) — **[approved 2026-10-18, next]**
+
+What makes an examiner faster day to day, beyond Autopsy's feature set.
+Approved by the user; implement in this order unless field tests say
+otherwise.
+
+1. **Multi-select in every table**: Ctrl+click toggles, Shift+click
+   extends, Ctrl+A selects all; every row action (tag, bookmark, extract,
+   add to hash set, export CSV of selection, open in timeline) works on
+   the whole selection. **[next]**
+2. **Keyboard-first**: Ctrl+B bookmark (done), Ctrl+E external viewer,
+   Ctrl+F find in the current view, Alt+←/→ back/forward, Ctrl+1–9 result
+   tabs, J/K row stepping with the viewer following, number keys for the
+   user's own tags; a **command palette** (Ctrl+K) that jumps to any
+   node, file, artifact type, tool or action by name.
+3. **Global quick search**: one box over file names, paths, hashes,
+   artifact values, the keyword index and accounts, results grouped by
+   kind.
+4. **Pivot page "everything about X"**: from a file, user, domain, USB
+   serial, IP or e-mail address to every artifact, event and file that
+   mentions it.
+5. **Notes and findings**: a per-case notebook; tagged items, screenshots
+   and comments become a findings list that feeds the report.
+6. **Triage dashboard** on case open: OS and users, programs, USB
+   devices, top domains, notable hits, encryption, timeline density,
+   time-zone warnings.
+7. **Saved filters and views** per case and globally.
+8. **Review state**: seen/reviewed marks and unseen counts per node, so a
+   case can be worked to zero.
+9. **Timeline context**: ±N minutes around any item across all sources;
+   collapse repeated identical events (dozens of WMI 5858 entries in one
+   second); exclude by type or text.
+10. **IOC import**: paste hashes, domains, IPs or names; one result list.
+11. **Results while ingest runs** (partly there).
+
+### Field test: DFIR Madness "Stolen Szechuan Sauce", DESKTOP-SDN1RPT (2026-10-18)
+
+15 GB E01, 139 k files. Headless ingest (`postmortem ingest`, all
+default modules plus Keyword Search): 4 min 0 s wall clock, 4.5 cores
+average, peak resident 3.25 GB (being broken down into heap and mapped
+pages).
+
+Answered from postmortem alone (MCP), all matching the published key:
+RDP logon (type 10) as C137\Administrator from the DC 10.42.85.10 at
+03:36:24 UTC; `coreupdater.exe` dropped in System32 at 03:40:00, run at
+03:40:59 (prefetch), installed as an auto-start service at 03:42:42;
+Meterpreter `getsystem` named-pipe service `nehgye` at 03:43:14; C2
+`tcp://203.78.103.109:443` in pagefile.sys; the intruder opened
+mortysmith's "My Social Security Number.txt", Plans.txt, Portal_gun.png,
+loot.zip and Desktop\Thoughts.txt at 03:45–03:47 (LNK files); FTK
+Imager (E:) at 05:09; Windows 10 Enterprise Eval 2004, Pacific Standard
+Time, 10.42.85.115.
+
+Gaps found and fixed: the DB timeline held only file times (artifact
+events were built in UI memory only); Windows 10 jump-list times decoded
+to years 5649–8959.
+
+Gaps open:
+- The Timeline window and Discovery still use the in-memory file index;
+  move them to the database (user directive: everything uses the DB).
+- Event-log queries need structured filters (logon type, IP) instead of
+  substring text ("10" matches everything).
+- MCP artifact listings are too verbose for assistants; add a compact
+  mode (selected attributes, one line per row).
+- Timeline noise: collapse repeats, exclude types/text (item 9).
+- Data-source time zone (Helsinki, from the wizard default) differed from
+  the system's (Pacific); warn after Recent Activity reads the registry.
+- Peak memory 3 GB during the file phase; find out how much is heap.
+
+## 9. MCP server for AI assistants — **[next]**
 
 Autopsy 4.23 has an MCP server: 17 read-only query tools served over HTTP
 on localhost with a token, plus a stdio bridge. That set is a parity item
