@@ -794,3 +794,28 @@ fn tagging_results_from_the_result_table() {
     assert!(h.query_all_by_label("Web Downloads").count() >= 1);
     shot(&mut h, "result_tags");
 }
+
+/// File Search by Attributes: a name search lists the matching file.
+#[test]
+fn file_search_by_name() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
+    click(&mut h, "Tools");
+    click(&mut h, "File Search by Attributes");
+    click_exact(&mut h, "Name:");
+    // The name field is the first text edit in the window.
+    let field = h
+        .query_all(egui_kittest::kittest::by().role(egui::accesskit::Role::TextInput))
+        .next()
+        .expect("name field");
+    field.focus();
+    field.type_text("SUNSET");
+    h.run_steps(2);
+    click_exact(&mut h, "Search");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("File Search Results 1").is_some()
+    });
+    settle(&mut h, |h| h.query_by_label_contains("1 matches").is_some());
+    h.get_by_label_contains("sunset.bmp");
+    shot(&mut h, "file_search");
+}

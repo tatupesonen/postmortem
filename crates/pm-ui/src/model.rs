@@ -61,6 +61,8 @@ pub enum NodeId {
         bad: bool,
     },
     OsAccounts,
+    /// The results of file search number `n` (File Search by Attributes).
+    FileSearch(usize),
 }
 
 impl NodeId {
@@ -73,7 +75,8 @@ impl NodeId {
             | Self::TagFiles(_)
             | Self::TagResults(_)
             | Self::Score { .. }
-            | Self::OsAccounts => None,
+            | Self::OsAccounts
+            | Self::FileSearch(_) => None,
         }
     }
 }

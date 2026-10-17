@@ -15,6 +15,7 @@ pub mod catalog;
 pub mod communications;
 mod derived;
 pub mod events;
+pub mod file_search;
 mod hosts;
 mod model;
 pub mod os_accounts;

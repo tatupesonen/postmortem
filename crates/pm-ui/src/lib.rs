@@ -11,6 +11,7 @@ mod case_nodes;
 mod case_tree;
 mod case_ui;
 mod discovery;
+mod file_search_ui;
 mod format;
 mod gallery;
 mod grid;

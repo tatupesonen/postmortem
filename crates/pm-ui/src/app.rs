@@ -122,6 +122,9 @@ pub struct PostmortemApp {
     node_grid: crate::grid::Grid,
     /// Details of the selected OS account.
     account_details: Option<(i64, crate::task::Cached<crate::case_nodes::Details>)>,
+    file_search: Option<crate::file_search_ui::FileSearchWindow>,
+    mime_types: crate::task::Cached<Vec<String>>,
+    searches: Vec<crate::file_search_ui::SearchResults>,
 }
 
 impl PostmortemApp {
@@ -181,6 +184,9 @@ impl PostmortemApp {
             node_views: HashMap::new(),
             node_grid: crate::grid::Grid::default(),
             account_details: None,
+            file_search: None,
+            mime_types: crate::task::Cached::default(),
+            searches: Vec::new(),
         };
         app.apply_time_pref();
         // Command line: a case (folder or case.pmcase) is opened; images are
@@ -370,6 +376,9 @@ impl PostmortemApp {
         self.node_views.clear();
         self.account_details = None;
         self.tagging = crate::tags_ui::Tagging::default();
+        self.file_search = None;
+        self.mime_types.clear();
+        self.searches.clear();
         ctx.send_viewport_cmd(egui::ViewportCommand::Title("postmortem".into()));
     }
 
@@ -816,6 +825,18 @@ impl PostmortemApp {
             ui.menu_button("Tools", |ui| {
                 if ui.button("⚙ Ingest Progress").clicked() {
                     self.progress_open = true;
+                    ui.close();
+                }
+                if ui
+                    .add_enabled(
+                        self.has_case(),
+                        egui::Button::new("🔎 File Search by Attributes"),
+                    )
+                    .clicked()
+                {
+                    self.file_search
+                        .get_or_insert_with(crate::file_search_ui::FileSearchWindow::default);
+                    self.mime_types.refresh();
                     ui.close();
                 }
                 ui.separator();
@@ -1727,6 +1748,7 @@ impl PostmortemApp {
             | NodeId::TagResults(_)
             | NodeId::Score { .. }
             | NodeId::OsAccounts => self.node_view(ui, &node),
+            NodeId::FileSearch(n) => self.search_view(ui, *n),
             NodeId::View(v) => self.view_table(ui, v),
         }
     }
@@ -2040,7 +2062,106 @@ impl PostmortemApp {
         }
     }
 
+    /// The File Search by Attributes window.
+    fn file_search_window(&mut self, ctx: &egui::Context) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            self.file_search = None;
+            return;
+        };
+        if self.file_search.is_none() {
+            return;
+        }
+        let sources: Vec<(i64, String, String)> = self
+            .case_sources
+            .get(ctx, Some(&case), false)
+            .iter()
+            .map(|t| (t.ds.id, t.ds.name.clone(), t.ds.timezone.clone()))
+            .collect();
+        let loader = Arc::clone(&case);
+        let mimes = self
+            .mime_types
+            .get(ctx, move || {
+                loader.db().mime_types().map_err(|e| e.to_string())
+            })
+            .unwrap_or_default();
+        let Some(w) = self.file_search.as_mut() else {
+            return;
+        };
+        match w.ui(ctx, &sources, &mimes) {
+            crate::file_search_ui::SearchAction::None => {}
+            crate::file_search_ui::SearchAction::Close => self.file_search = None,
+            crate::file_search_ui::SearchAction::Search(search) => {
+                let number = self.searches.len() + 1;
+                self.searches.push(crate::file_search_ui::SearchResults {
+                    number,
+                    rows: crate::task::Cached::default(),
+                    search: Arc::from(search),
+                });
+                self.navigate(NodeId::FileSearch(number));
+            }
+        }
+    }
+
+    /// "File Search Results {n}".
+    fn search_view(&mut self, ui: &mut egui::Ui, number: usize) {
+        let ctx = ui.ctx().clone();
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        let Some(s) = self.searches.iter_mut().find(|s| s.number == number) else {
+            return;
+        };
+        ui.heading(format!("File Search Results {number}"));
+        let (loader, search) = (Arc::clone(&case), Arc::clone(&s.search));
+        let Some(data) = s
+            .rows
+            .get(&ctx, move || crate::file_search_ui::run(&loader, &search))
+        else {
+            if let Some(e) = s.rows.error() {
+                ui.colored_label(ui.visuals().error_fg_color, e.to_owned());
+            } else {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Performing file search by attributes. Please wait.");
+                });
+            }
+            return;
+        };
+        let (rows, more) = (&data.0, data.1);
+        if rows.is_empty() {
+            ui.weak("No results found.");
+            return;
+        }
+        ui.weak(if more {
+            format!(
+                "{} matches shown; there are more. Narrow the search.",
+                crate::format::grouped(rows.len() as u64)
+            )
+        } else {
+            format!("{} matches", crate::format::grouped(rows.len() as u64))
+        });
+        let tags = self.tagging.catalog.get(&ctx, Some(&case));
+        let ev = self.table.ui(ui, rows, &self.prefs, Some(&tags));
+        if let Some((i, req)) = ev.tag
+            && let Some(id) = rows.get(i).and_then(FileRow::file_id)
+        {
+            self.tagging
+                .request(&ctx, &case, crate::tags_ui::TagTarget::Files(vec![id]), req);
+        }
+        let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
+        if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {
+            self.viewer.set_content(Some(content(r)));
+        }
+        if let Some(r) = ev.activated.or(ev.popout).and_then(|i| rows.get(i)) {
+            self.open_popout(content(r));
+        }
+        if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
+            self.export(&ctx, content(r));
+        }
+    }
+
     fn dialogs(&mut self, ctx: &egui::Context) {
+        self.file_search_window(ctx);
         if let Some(w) = self.add_wizard.as_mut() {
             match w.ui(ctx) {
                 crate::add_source::AddAction::None => {}
@@ -2199,6 +2320,9 @@ impl PostmortemApp {
             self.result_rows.clear();
             self.case_summary.refresh();
             self.node_views.clear();
+            for s in &mut self.searches {
+                s.rows.refresh();
+            }
         }
         egui::Panel::top("menu").show(ui, |ui| {
             self.menu_bar(ui);
