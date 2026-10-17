@@ -14,7 +14,7 @@ use std::sync::Arc;
 
 use egui::{Sense, Vec2};
 use pm_case::Case;
-use pm_casedb::gallery::GalleryFile;
+use pm_casedb::gallery::TypedFile;
 
 use crate::format::DisplayPrefs;
 use crate::model::Content;
@@ -36,7 +36,7 @@ struct Group {
 /// The loaded picture list with both groupings.
 #[derive(Debug, Default)]
 pub(crate) struct Gallery {
-    files: Vec<GalleryFile>,
+    files: Vec<TypedFile>,
     /// Every picture.
     all: Vec<Group>,
     /// Each distinct picture once.
@@ -59,7 +59,7 @@ impl Gallery {
         Ok(Self::build(files, &names))
     }
 
-    fn build(files: Vec<GalleryFile>, ds_names: &HashMap<i64, String>) -> Self {
+    fn build(files: Vec<TypedFile>, ds_names: &HashMap<i64, String>) -> Self {
         let mut map: HashMap<(i64, Option<i64>, &str), Group> = HashMap::new();
         for (i, f) in files.iter().enumerate() {
             let g = map
@@ -363,7 +363,7 @@ impl GalleryWindow {
     fn cell(
         &mut self,
         ui: &egui::Ui,
-        f: &GalleryFile,
+        f: &TypedFile,
         copies: usize,
         rect: egui::Rect,
         resp: &egui::Response,
@@ -429,8 +429,8 @@ impl GalleryWindow {
 mod tests {
     use super::*;
 
-    fn file(id: i64, dir: &str, name: &str, md5: Option<u8>) -> GalleryFile {
-        GalleryFile {
+    fn file(id: i64, dir: &str, name: &str, md5: Option<u8>) -> TypedFile {
+        TypedFile {
             id,
             ds_id: 1,
             volume: None,
@@ -439,6 +439,7 @@ mod tests {
             size: 10,
             deleted: false,
             md5: md5.map(|b| [b; 16]),
+            modified: None,
         }
     }
 
@@ -450,7 +451,7 @@ mod tests {
             file(3, "/a/", "z.jpg", None),
             file(4, "/c/", "w.jpg", Some(1)),
             file(5, "/c/", "v.jpg", None),
-            GalleryFile {
+            TypedFile {
                 deleted: true,
                 ..file(6, "/a/", "a-deleted.jpg", Some(2))
             },

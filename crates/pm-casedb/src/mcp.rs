@@ -892,6 +892,8 @@ pub struct EventFilter {
     /// `exclude_extensions`).
     pub extensions: Vec<String>,
     pub exclude_extensions: bool,
+    /// File events only: regular files (no directories or other kinds).
+    pub regular_only: bool,
 }
 
 impl CaseDb {
@@ -1029,6 +1031,9 @@ impl CaseDb {
         }
         if f.artifact_id.is_some() {
             w.push("0", []);
+        }
+        if f.regular_only {
+            w.push("kind = 1", []);
         }
         match f.deleted {
             Some(true) => w.push("(name_alloc = 0 OR meta_alloc = 0)", []),

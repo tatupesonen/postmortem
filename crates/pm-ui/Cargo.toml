@@ -18,7 +18,6 @@ pm-image.workspace = true
 pm-volume.workspace = true
 pm-evidence.workspace = true
 pm-timeline.workspace = true
-pm-index.workspace = true
 pm-discovery.workspace = true
 pm-case.workspace = true
 pm-casedb.workspace = true

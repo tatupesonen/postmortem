@@ -14,7 +14,7 @@ use pm_case::Case;
 use pm_timeline::db::{DbTimeline, Listing};
 use pm_timeline::{
     Bin, Category, CountsQuery, DeletedFilter, EventType, FileCategory, Filter, ListRow, TimeUnit,
-    Timeline, TypeZoom,
+    TypeZoom,
 };
 
 use crate::format::DisplayPrefs;
@@ -615,7 +615,7 @@ impl TimelineWindow {
     fn chart(&mut self, ui: &mut egui::Ui, height: f32) {
         let tz = self.tz().clone();
         let unit = self.unit();
-        let series = Timeline::series(self.zoom);
+        let series = pm_timeline::series(self.zoom);
         let bins = self.bins(ui.ctx());
         let events = crate::timeline_chart::stacked_bars(
             ui,

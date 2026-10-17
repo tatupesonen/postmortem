@@ -8,6 +8,7 @@
 //! * [`cache`] — sharded, thread-safe LRU cache for decoded structures.
 
 pub mod cache;
+pub mod category;
 pub mod decode;
 pub mod io;
 pub mod time;

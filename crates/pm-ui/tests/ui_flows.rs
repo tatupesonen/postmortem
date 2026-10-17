@@ -233,7 +233,7 @@ fn browse_demo_disk_and_view_picture() {
     let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| {
-        !h.state().data_sources().is_empty() && !h.state().is_loading()
+        h.state().data_source_count() > 0 && !h.state().is_loading()
     });
 
     // Data-source summary is shown first.
@@ -277,7 +277,7 @@ fn browse_demo_disk_and_view_picture() {
 fn deleted_files_and_metadata_tab() {
     let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
-    settle(&mut h, |h| !h.state().data_sources().is_empty());
+    settle(&mut h, |h| h.state().data_source_count() > 0);
     click_exact(&mut h, "🖴 demo.dd");
     for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
         click(&mut h, label);
@@ -306,7 +306,7 @@ fn deleted_files_and_metadata_tab() {
 fn data_source_summary_tabs() {
     let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
-    settle(&mut h, |h| !h.state().data_sources().is_empty());
+    settle(&mut h, |h| h.state().data_source_count() > 0);
     settle(&mut h, |h| {
         h.query_by_label_contains("Allocated files").is_some()
     });
@@ -360,10 +360,10 @@ fn reopening_a_case_restores_its_data_sources_without_reanalysis() {
     };
     let mut h = harness_with(vec![dir.join("case.pmcase")], false);
     settle(&mut h, |h| {
-        !h.state().data_sources().is_empty() && !h.state().is_loading()
+        h.state().data_source_count() > 0 && !h.state().is_loading()
     });
     assert!(h.state().has_case());
-    assert_eq!(h.state().data_sources().len(), 1);
+    assert_eq!(h.state().data_source_count(), 1);
     // Results from the first session are still there; nothing re-ran.
     assert!(h.state().analysis_hashed_files() > 20);
     assert!(h.query_by_label_contains("Analysed demo.dd").is_none());
@@ -415,7 +415,7 @@ fn analysis_results_are_listed_and_open_the_source_file() {
     }
     let mut h = harness_with(vec![dir.join("case.pmcase")], false);
     settle(&mut h, |h| {
-        !h.state().data_sources().is_empty() && !h.state().is_loading()
+        h.state().data_source_count() > 0 && !h.state().is_loading()
     });
     click_exact(&mut h, "# Hashset Hits (1)");
     settle(&mut h, |h| h.query_by_label_contains("Notable").is_some());
@@ -545,7 +545,7 @@ fn file_metadata_shows_hashes_after_analysis() {
     let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| {
-        !h.state().data_sources().is_empty() && !h.state().is_loading()
+        h.state().data_source_count() > 0 && !h.state().is_loading()
     });
     click_exact(&mut h, "🖴 demo.dd");
     for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
@@ -598,7 +598,7 @@ fn fully_visible(h: &Harness<'_, PostmortemApp>, label: &str) -> bool {
 fn file_listing_scrolls_to_last_column() {
     let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
-    settle(&mut h, |h| !h.state().data_sources().is_empty());
+    settle(&mut h, |h| h.state().data_source_count() > 0);
     click_exact(&mut h, "🖴 demo.dd");
     for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
         click(&mut h, label);
@@ -679,7 +679,7 @@ fn top(h: &Harness<'_, PostmortemApp>, label: &str) -> f64 {
 fn result_table_sorts_by_column() {
     let mut h = harness_with(vec![case_with_history("sort-results")], false);
     settle(&mut h, |h| {
-        !h.state().data_sources().is_empty() && !h.state().is_loading()
+        h.state().data_source_count() > 0 && !h.state().is_loading()
     });
     click(&mut h, "Web History (3)");
     settle(&mut h, |h| h.query_by_label("https://c.example/").is_some());
@@ -727,7 +727,7 @@ fn result_table_sorts_by_column() {
 fn result_table_scrolls_to_last_column() {
     let mut h = harness_with(vec![case_with_history("wide-results")], false);
     settle(&mut h, |h| {
-        !h.state().data_sources().is_empty() && !h.state().is_loading()
+        h.state().data_source_count() > 0 && !h.state().is_loading()
     });
     click(&mut h, "Web History (3)");
     settle(&mut h, |h| h.query_by_label("https://c.example/").is_some());
@@ -748,7 +748,7 @@ fn tagging_files_feeds_tags_and_score_nodes() {
     // Room for the Tags and Score nodes below the expanded tree.
     h.set_size(egui::vec2(1400.0, 1500.0));
     wait_analysed(&mut h);
-    settle(&mut h, |h| !h.state().data_sources().is_empty());
+    settle(&mut h, |h| h.state().data_source_count() > 0);
     click_exact(&mut h, "🖴 demo.dd");
     for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Pictures"] {
         click(&mut h, label);
@@ -898,7 +898,7 @@ fn data_source_menu_runs_ingest_and_removes() {
 fn archives_open_like_folders() {
     let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
-    settle(&mut h, |h| !h.state().data_sources().is_empty());
+    settle(&mut h, |h| h.state().data_source_count() > 0);
     click_exact(&mut h, "🖴 demo.dd");
     for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
         click(&mut h, label);

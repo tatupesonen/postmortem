@@ -1,25 +1,35 @@
-//! Discovery window (Autopsy's Discovery tool for files).
+//! Discovery window (Autopsy's Discovery tool for files). Searches run in
+//! the background over the case database (files of the result type, then
+//! Autopsy's filters, grouping and ordering in `pm-discovery`).
 
+use std::collections::HashMap;
 use std::sync::Arc;
 
 use egui::{Sense, Vec2};
+use pm_case::Case;
+use pm_casedb::gallery::TypedFile;
 use pm_discovery::{
     Criteria, FolderTerm, Group, GroupBy, GroupOrder, ItemOrder, ResultType, SizeBucket, search,
 };
-use pm_index::FileIndex;
 
 use crate::format::{DisplayPrefs, grouped};
-use crate::index::SharedIndex;
-use crate::model::{Content, DataSource, FileRow};
+use crate::model::Content;
 use crate::sortable::{Order, Sort, cmp_text};
+use crate::task::{Cached, Task};
 use crate::thumbs::ThumbCache;
 use crate::viewers::ViewerPanel;
+
+/// The files searched and the groups found.
+type Results = (Arc<Vec<TypedFile>>, Vec<Group>);
 
 const PAGE_SIZES: [usize; 8] = [25, 50, 75, 100, 125, 150, 175, 200];
 
 pub(crate) struct DiscoveryWindow {
-    index: SharedIndex,
-    sources: Vec<DataSource>,
+    case: Arc<Case>,
+    /// `(id, name)` of the case's data sources.
+    data_sources: Cached<Vec<(i64, String)>>,
+    searching: Option<Task<Result<Results, String>>>,
+    error: Option<String>,
     criteria: Criteria,
     group_by: GroupBy,
     group_order: GroupOrder,
@@ -27,7 +37,7 @@ pub(crate) struct DiscoveryWindow {
     folder_text: String,
     folder_substring: bool,
     folder_include: bool,
-    results: Option<(Arc<FileIndex>, Vec<Group>)>,
+    results: Option<Results>,
     group: usize,
     page: usize,
     page_size: usize,
@@ -36,7 +46,7 @@ pub(crate) struct DiscoveryWindow {
     /// choice); applies to the whole group, not just the page.
     list_sort: Option<Sort>,
     list_order: Order,
-    thumbs: ThumbCache<usize>,
+    thumbs: ThumbCache<i64>,
     viewer: ViewerPanel,
     prefs: DisplayPrefs,
     pub(crate) popout: Option<Content>,
@@ -50,22 +60,27 @@ impl std::fmt::Debug for DiscoveryWindow {
     }
 }
 
-/// Content for index entry `i`.
-fn self_content(sources: &[DataSource], idx: &FileIndex, i: usize) -> Option<Content> {
-    let f = idx.files.get(i)?;
-    let ds = sources.iter().find(|d| d.id as u32 == f.ds)?;
-    let fs = ds.fs(f.fs as usize)?;
-    Some(Content::from_fs(
-        Arc::clone(fs),
-        FileRow::from_fs(&**fs, f.inode, &f.path, f.name_allocated),
+/// Content of a case file, read from the database.
+fn content_of(case: &Arc<Case>, id: i64) -> Option<Content> {
+    let rec = case.db().file(id).ok()??;
+    Some(Content::from_case(
+        Arc::clone(case),
+        crate::views::row_of(&rec),
     ))
 }
 
+/// Path of a typed file.
+fn path_of(f: &TypedFile) -> String {
+    format!("{}{}", f.parent_path, f.name)
+}
+
 impl DiscoveryWindow {
-    pub(crate) fn new(index: SharedIndex, sources: Vec<DataSource>, prefs: DisplayPrefs) -> Self {
+    pub(crate) fn new(case: Arc<Case>, prefs: DisplayPrefs) -> Self {
         Self {
-            index,
-            sources,
+            case,
+            data_sources: Cached::default(),
+            searching: None,
+            error: None,
             criteria: Criteria::new(ResultType::Images),
             group_by: GroupBy::ParentFolder,
             group_order: GroupOrder::GroupSize,
@@ -95,26 +110,69 @@ impl DiscoveryWindow {
         None
     }
 
-    fn run(&mut self, idx: Arc<FileIndex>) {
-        let groups = search(
-            &idx,
-            &self.criteria,
+    /// Starts a search in the background.
+    fn run(&mut self, ctx: &egui::Context) {
+        let case = Arc::clone(&self.case);
+        let (criteria, group_by, group_order, item_order) = (
+            self.criteria.clone(),
             self.group_by,
             self.group_order,
             self.item_order,
         );
-        self.results = Some((idx, groups));
-        self.group = 0;
-        self.page = 0;
-        self.selected = None;
-        self.list_order.clear();
-        self.thumbs.clear();
+        self.error = None;
+        self.searching = Some(Task::spawn(ctx, move || {
+            let db = case.db();
+            let (mime, exts) = criteria.result_type.query();
+            let files = db
+                .files_of_type(mime, exts, true)
+                .map_err(|e| e.to_string())?;
+            let names: HashMap<i64, String> = db
+                .data_sources()
+                .map_err(|e| e.to_string())?
+                .into_iter()
+                .map(|d| (d.id, d.name))
+                .collect();
+            let groups = search(&files, &names, &criteria, group_by, group_order, item_order);
+            Ok((Arc::new(files), groups))
+        }));
+    }
+
+    fn poll_search(&mut self) {
+        let Some(t) = &mut self.searching else {
+            return;
+        };
+        let Some(r) = t.poll() else {
+            return;
+        };
+        match r {
+            Ok(r) => {
+                self.results = Some(r.clone());
+                self.group = 0;
+                self.page = 0;
+                self.selected = None;
+                self.list_order.clear();
+                self.thumbs.clear();
+            }
+            Err(e) => self.error = Some(e.clone()),
+        }
+        self.searching = None;
     }
 
     pub(crate) fn ui(&mut self, ui: &mut egui::Ui) {
-        let Some(idx) = self.index.ready_or_progress(ui) else {
-            return;
-        };
+        self.poll_search();
+        let case = Arc::clone(&self.case);
+        let sources = self
+            .data_sources
+            .get(ui.ctx(), move || {
+                Ok(case
+                    .db()
+                    .data_sources()
+                    .map_err(|e| e.to_string())?
+                    .into_iter()
+                    .map(|d| (d.id, d.name))
+                    .collect())
+            })
+            .unwrap_or_default();
         egui::Panel::left("disc-wizard")
             .resizable(true)
             .default_size(330.0)
@@ -122,7 +180,7 @@ impl DiscoveryWindow {
                 ui.set_min_size(ui.available_size());
                 egui::ScrollArea::vertical()
                     .auto_shrink(false)
-                    .show(ui, |ui| self.wizard(ui, &idx));
+                    .show(ui, |ui| self.wizard(ui, &sources));
             });
         egui::Panel::bottom("disc-viewer")
             .resizable(true)
@@ -135,7 +193,7 @@ impl DiscoveryWindow {
         egui::CentralPanel::default().show(ui, |ui| self.results_ui(ui));
     }
 
-    fn wizard(&mut self, ui: &mut egui::Ui, idx: &Arc<FileIndex>) {
+    fn wizard(&mut self, ui: &mut egui::Ui, sources: &[(i64, String)]) {
         ui.heading("1. Choose result type");
         ui.horizontal(|ui| {
             for t in ResultType::ALL {
@@ -172,14 +230,13 @@ impl DiscoveryWindow {
         ui.add_space(6.0);
         ui.strong("Data Source:");
         ui.weak("none selected = all");
-        for (i, name) in idx.data_sources.iter().enumerate() {
-            let id = i as u32;
-            let mut on = self.criteria.data_sources.contains(&id);
-            if ui.checkbox(&mut on, format!("{name} (ID: {i})")).changed() {
+        for (id, name) in sources {
+            let mut on = self.criteria.data_sources.contains(id);
+            if ui.checkbox(&mut on, format!("{name} (ID: {id})")).changed() {
                 if on {
-                    self.criteria.data_sources.insert(id);
+                    self.criteria.data_sources.insert(*id);
                 } else {
-                    self.criteria.data_sources.remove(&id);
+                    self.criteria.data_sources.remove(id);
                 }
             }
         }
@@ -285,11 +342,20 @@ impl DiscoveryWindow {
         if let Some(e) = err {
             ui.colored_label(ui.visuals().error_fg_color, e);
         }
-        if ui
-            .add_enabled(err.is_none(), egui::Button::new("🔍 Search"))
-            .clicked()
-        {
-            self.run(Arc::clone(idx));
+        let busy = self.searching.is_some();
+        ui.horizontal(|ui| {
+            if ui
+                .add_enabled(err.is_none() && !busy, egui::Button::new("🔍 Search"))
+                .clicked()
+            {
+                self.run(ui.ctx());
+            }
+            if busy {
+                ui.spinner();
+            }
+        });
+        if let Some(e) = &self.error {
+            ui.colored_label(ui.visuals().error_fg_color, e.clone());
         }
     }
 
@@ -370,15 +436,15 @@ impl DiscoveryWindow {
             g.files.len(),
             self.list_sort.filter(|_| list),
             |a, b, col| {
-                let file = |i: usize| g.files.get(i).and_then(|&fi| idx.files.get(fi));
+                let file = |i: usize| g.files.get(i).and_then(|&fi| idx.get(fi));
                 let (Some(a), Some(b)) = (file(a), file(b)) else {
                     return std::cmp::Ordering::Equal;
                 };
                 match col {
-                    0 => cmp_text(a.name(), b.name()),
+                    0 => cmp_text(&a.name, &b.name),
                     1 => a.size.cmp(&b.size),
-                    2 => a.times.modified.cmp(&b.times.modified),
-                    _ => cmp_text(a.parent(), b.parent()),
+                    2 => a.modified.cmp(&b.modified),
+                    _ => cmp_text(&a.parent_path, &b.parent_path),
                 }
             },
         );
@@ -395,9 +461,9 @@ impl DiscoveryWindow {
         }
     }
 
-    fn select(&mut self, idx: &FileIndex, fi: usize, open: bool) {
+    fn select(&mut self, idx: &[TypedFile], fi: usize, open: bool) {
         self.selected = Some(fi);
-        let c = self_content(&self.sources, idx, fi);
+        let c = idx.get(fi).and_then(|f| content_of(&self.case, f.id));
         if open {
             self.popout = c;
         } else {
@@ -405,7 +471,7 @@ impl DiscoveryWindow {
         }
     }
 
-    fn thumb_grid(&mut self, ui: &mut egui::Ui, idx: &Arc<FileIndex>, page: &[usize]) {
+    fn thumb_grid(&mut self, ui: &mut egui::Ui, idx: &Arc<Vec<TypedFile>>, page: &[usize]) {
         let size = 150.0;
         let cell = Vec2::new(size + 12.0, size + 34.0);
         let per_row = ((ui.available_width() / cell.x).floor() as usize).max(1);
@@ -430,11 +496,11 @@ impl DiscoveryWindow {
                                 rect.min + Vec2::new(6.0, 6.0),
                                 Vec2::splat(size),
                             );
-                            let sources = self.sources.clone();
-                            self.thumbs
-                                .paint(ui, img, &fi, || self_content(&sources, idx, fi));
-                            if let Some(f) = idx.files.get(fi) {
-                                let col = if f.deleted() {
+                            if let Some(f) = idx.get(fi) {
+                                let (case, id) = (Arc::clone(&self.case), f.id);
+                                self.thumbs
+                                    .paint_with(ui, img, &f.id, move || content_of(&case, id));
+                                let col = if f.deleted {
                                     ui.visuals().error_fg_color
                                 } else {
                                     ui.visuals().text_color()
@@ -442,13 +508,13 @@ impl DiscoveryWindow {
                                 ui.painter().text(
                                     egui::pos2(rect.center().x, rect.bottom() - 16.0),
                                     egui::Align2::CENTER_CENTER,
-                                    f.name(),
+                                    &f.name,
                                     egui::FontId::proportional(12.0),
                                     col,
                                 );
                                 resp.clone().on_hover_text(format!(
                                     "{}\n{}",
-                                    f.path,
+                                    path_of(f),
                                     pm_core::units::format_size(f.size)
                                 ));
                             }
@@ -467,7 +533,7 @@ impl DiscoveryWindow {
         }
     }
 
-    fn list(&mut self, ui: &mut egui::Ui, idx: &Arc<FileIndex>, page: &[usize]) {
+    fn list(&mut self, ui: &mut egui::Ui, idx: &Arc<Vec<TypedFile>>, page: &[usize]) {
         use egui_extras::{Column, TableBuilder};
         let mut action = None;
         let mut sort = self.list_sort;
@@ -499,11 +565,11 @@ impl DiscoveryWindow {
                         let Some(&fi) = page.get(row.index()) else {
                             return;
                         };
-                        let Some(f) = idx.files.get(fi) else { return };
+                        let Some(f) = idx.get(fi) else { return };
                         row.set_selected(self.selected == Some(fi));
                         row.col(|ui| {
-                            let text = egui::RichText::new(f.name());
-                            ui.label(if f.deleted() {
+                            let text = egui::RichText::new(&f.name);
+                            ui.label(if f.deleted {
                                 text.color(ui.visuals().error_fg_color)
                             } else {
                                 text
@@ -518,10 +584,15 @@ impl DiscoveryWindow {
                             );
                         });
                         row.col(|ui| {
-                            ui.label(self.prefs.time(f.times.modified));
+                            ui.label(
+                                self.prefs.time(
+                                    f.modified
+                                        .and_then(|t| jiff::Timestamp::from_second(t).ok()),
+                                ),
+                            );
                         });
                         row.col(|ui| {
-                            ui.weak(f.parent());
+                            ui.weak(&f.parent_path);
                         });
                         let r = row.response();
                         if r.double_clicked() {
@@ -551,42 +622,44 @@ mod tests {
     #[test]
     fn discovery_search_shows_groups() {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("demo.dd");
-        std::fs::write(&path, pm_testkit::demo::demo_disk()).unwrap();
-        let evidence = pm_evidence::open(&path, &pm_evidence::OpenOptions::default()).unwrap();
-        let sources = vec![DataSource {
-            id: 0,
-            name: "demo.dd".into(),
-            evidence,
-        }];
-        let ctx = egui::Context::default();
-        let index = SharedIndex::build(&ctx, &sources);
-        let mut win = DiscoveryWindow::new(index, sources, DisplayPrefs::default());
+        let case = Case::create(dir.path().join("c"), pm_case::CaseDetails::default()).unwrap();
+        pm_case::add_image(
+            &case,
+            pm_testkit::demo::demo_disk_file(),
+            &pm_case::LoadOptions::default(),
+            &pm_case::LoadProgress::default(),
+        )
+        .unwrap();
+        let mut win = DiscoveryWindow::new(Arc::new(case), DisplayPrefs::default());
         // Demo pictures are small: widen the size filter like a user would.
         win.criteria.sizes = SizeBucket::ALL.into_iter().collect();
         let mut h = Harness::builder()
             .with_size(egui::vec2(1300.0, 850.0))
             .build_ui_state(|ui, w: &mut DiscoveryWindow| w.ui(ui), win);
+        h.run_steps(2);
+        h.get_by_label("🔍 Search").click();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-        while h.query_by_label_contains("🔍 Search").is_none() {
-            assert!(std::time::Instant::now() < deadline, "index did not build");
+        while h.query_by_label_contains("results in").is_none() {
+            assert!(
+                std::time::Instant::now() < deadline,
+                "search did not finish"
+            );
             h.step();
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        h.get_by_label("🔍 Search").click();
         h.run_steps(3);
-        h.get_by_label_contains("results in");
         assert!(h.query_all_by_label_contains("Pictures").count() >= 1);
         let start = std::time::Instant::now();
         while !h.state().thumbs.any_ready() && start.elapsed().as_secs() < 20 {
             h.step();
             std::thread::sleep(std::time::Duration::from_millis(10));
         }
-        h.run_steps(3);
-        if let Ok(d) = std::env::var("PM_UI_SCREENSHOT_DIR") {
+        assert!(h.state().thumbs.any_ready(), "thumbnails decode");
+        if let Ok(dir) = std::env::var("PM_UI_SCREENSHOT_DIR") {
+            h.run_steps(2);
             h.render()
                 .unwrap()
-                .save(std::path::PathBuf::from(d).join("discovery.png"))
+                .save(std::path::PathBuf::from(dir).join("discovery.png"))
                 .unwrap();
         }
     }

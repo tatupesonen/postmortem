@@ -73,25 +73,9 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug> ThumbCache<K> {
         self.map.values().any(|(t, _)| matches!(t, Thumb::Ready(_)))
     }
 
-    /// Paints the thumbnail for `key` into `rect`, starting a decode on first
-    /// use. `content` is only called when a decode must start.
-    pub(crate) fn paint(
-        &mut self,
-        ui: &egui::Ui,
-        rect: Rect,
-        key: &K,
-        content: impl FnOnce() -> Option<Content>,
-    ) {
-        if self.map.contains_key(key) {
-            self.paint_with(ui, rect, key, || None);
-        } else {
-            let c = content();
-            self.paint_with(ui, rect, key, move || c);
-        }
-    }
-
-    /// [`Self::paint`] with `load` run on the decode thread (for content
-    /// that needs a database lookup).
+    /// Paints the thumbnail for `key` into `rect`, starting a decode on
+    /// first use; `load` (which may read the database) runs on the decode
+    /// thread.
     pub(crate) fn paint_with(
         &mut self,
         ui: &egui::Ui,

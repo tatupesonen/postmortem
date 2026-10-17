@@ -5133,8 +5133,8 @@ dependencies = [
 name = "pm-discovery"
 version = "0.1.1"
 dependencies = [
- "pm-fs",
- "pm-index",
+ "pm-casedb",
+ "pm-core",
  "rstest",
 ]
 
@@ -5332,20 +5332,6 @@ dependencies = [
  "sha1 0.11.0",
  "tempfile",
  "thiserror 2.0.21",
- "tracing",
-]
-
-[[package]]
-name = "pm-index"
-version = "0.1.1"
-dependencies = [
- "jiff",
- "pm-core",
- "pm-fs",
- "pm-fs-ntfs",
- "pm-testkit",
- "rayon",
- "rstest",
  "tracing",
 ]
 
@@ -5624,15 +5610,9 @@ dependencies = [
  "pm-case",
  "pm-casedb",
  "pm-core",
- "pm-fs",
- "pm-fs-ntfs",
- "pm-index",
  "pm-testkit",
- "proptest",
- "rayon",
  "rstest",
  "tempfile",
- "tracing",
 ]
 
 [[package]]
@@ -5657,7 +5637,6 @@ dependencies = [
  "pm-geo",
  "pm-hashdb",
  "pm-image",
- "pm-index",
  "pm-ingest",
  "pm-modules",
  "pm-report",

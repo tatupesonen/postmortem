@@ -7,7 +7,6 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::Mutex;
-use pm_evidence::OpenOptions;
 
 use crate::analysis::Analysis;
 use crate::case_ui::{NewCaseWizard, WelcomeAction, WizardAction};
@@ -15,8 +14,7 @@ use crate::discovery::DiscoveryWindow;
 use crate::format::{DisplayPrefs, size_long};
 use crate::gallery::GalleryWindow;
 use crate::icons;
-use crate::index::SharedIndex;
-use crate::model::{Content, DataSource, FileRow, NodeId};
+use crate::model::{Content, FileRow, NodeId};
 use crate::summary::{self, SummaryState};
 use crate::table::{RowMenus, TableState};
 use crate::task::{self, Task};
@@ -89,8 +87,6 @@ struct Popout {
 pub struct PostmortemApp {
     persisted: Persisted,
     prefs: DisplayPrefs,
-    sources: Vec<DataSource>,
-    loading: Vec<(PathBuf, Task<Result<DataSource, String>>)>,
     listings: HashMap<NodeId, Task<Listing>>,
     selected: Option<NodeId>,
     back: Vec<NodeId>,
@@ -111,7 +107,6 @@ pub struct PostmortemApp {
     discovery: Option<Arc<Mutex<DiscoveryWindow>>>,
     discovery_closed: Arc<AtomicBool>,
     /// File catalogue of all data sources (rebuilt when sources change).
-    index: Option<SharedIndex>,
     summary: SummaryState,
     /// The case, and adding/analysing data sources in the background.
     analysis: Arc<Mutex<Analysis>>,
@@ -131,7 +126,7 @@ pub struct PostmortemApp {
     was_analysing_views: bool,
     add_wizard: Option<crate::add_source::AddSourceWizard>,
     /// Case folder and data-source count the hash resolver was built for.
-    resolver_key: Option<(PathBuf, usize)>,
+    resolver_key: Option<PathBuf>,
     view_counts: crate::views::Counts,
     view_rows: HashMap<crate::views::View, Task<Result<Arc<crate::views::ViewRows>, String>>>,
     /// The Data Sources tree structure from the case database.
@@ -193,8 +188,6 @@ impl PostmortemApp {
             prefs: DisplayPrefs::default(),
             table: persisted.table.clone(),
             persisted,
-            sources: Vec::new(),
-            loading: Vec::new(),
             listings: HashMap::new(),
             selected: None,
             back: Vec::new(),
@@ -212,7 +205,6 @@ impl PostmortemApp {
             gallery_closed: Arc::new(AtomicBool::new(false)),
             discovery: None,
             discovery_closed: Arc::new(AtomicBool::new(false)),
-            index: None,
             summary: SummaryState::default(),
             analysis: Arc::new(Mutex::new(Analysis::default())),
             progress_open: false,
@@ -272,8 +264,10 @@ impl PostmortemApp {
         app
     }
 
-    pub fn data_sources(&self) -> &[DataSource] {
-        &self.sources
+    /// Number of data sources in the open case (as the tree last read
+    /// them).
+    pub fn data_source_count(&self) -> usize {
+        self.case_sources.count()
     }
 
     /// Folder of the open case, once one exists.
@@ -297,8 +291,14 @@ impl PostmortemApp {
             .map_or(0, |n| u64::try_from(n).unwrap_or(0))
     }
 
+    /// Whether a data source is still being added (before analysis).
     pub fn is_loading(&self) -> bool {
-        !self.loading.is_empty()
+        self.analysis.lock().any_adding()
+    }
+
+    /// Whether the open case has data sources (enables the analysis tools).
+    fn has_data_sources(&self) -> bool {
+        self.case_sources.count() > 0
     }
 
     fn apply_time_pref(&mut self) {
@@ -347,27 +347,8 @@ impl PostmortemApp {
             return;
         }
         self.persisted.recent.retain(|r| r != &path);
-        self.persisted.recent.insert(0, path.clone());
+        self.persisted.recent.insert(0, path);
         self.persisted.recent.truncate(10);
-        self.browse_image(ctx, path);
-    }
-
-    /// Opens a disk image for browsing (no analysis).
-    fn browse_image(&mut self, ctx: &egui::Context, path: PathBuf) {
-        let id = self.sources.len() + self.loading.len();
-        let opts = OpenOptions {
-            timezone: self.prefs.timezone.clone(),
-        };
-        let p = path.clone();
-        let task = Task::spawn(ctx, move || {
-            let evidence = pm_evidence::open(&p, &opts).map_err(|e| e.to_string())?;
-            let name = p.file_name().map_or_else(
-                || p.display().to_string(),
-                |n| n.to_string_lossy().into_owned(),
-            );
-            Ok(DataSource { id, name, evidence })
-        });
-        self.loading.push((path, task));
     }
 
     /// Whether a case is open.
@@ -397,9 +378,7 @@ impl PostmortemApp {
         self.set_case(ctx, case);
         for ds in sources {
             match ds.paths.first() {
-                Some(p) if std::path::Path::new(p).is_file() => {
-                    self.browse_image(ctx, PathBuf::from(p));
-                }
+                Some(p) if std::path::Path::new(p).is_file() => {}
                 _ => self.errors.push(format!(
                     "Data source {} was not found at {}. It may have been moved.",
                     ds.name,
@@ -427,14 +406,11 @@ impl PostmortemApp {
     /// Closes the case and everything shown from it.
     pub fn close_case(&mut self, ctx: &egui::Context) {
         self.analysis.lock().close();
-        self.sources.clear();
-        self.loading.clear();
         self.listings.clear();
         self.selected = None;
         self.back.clear();
         self.forward.clear();
         self.viewer.set_content(None);
-        self.index = None;
         self.timeline = None;
         self.gallery = None;
         self.discovery = None;
@@ -481,27 +457,6 @@ impl PostmortemApp {
     }
 
     fn poll_loading(&mut self) {
-        let mut still = Vec::new();
-        for (path, mut t) in std::mem::take(&mut self.loading) {
-            match t.poll() {
-                Some(Ok(ds)) => {
-                    let mut ds = ds.clone();
-                    ds.id = self.sources.len();
-                    let id = ds.id;
-                    self.sources.push(ds);
-                    self.index = None;
-                    if let Some(tl) = self.timeline.take() {
-                        drop(tl); // rebuilt with the new source on next open
-                    }
-                    let _ = id;
-                }
-                Some(Err(e)) => self
-                    .errors
-                    .push(format!("Cannot open {}: {e}", path.display())),
-                None => still.push((path, t)),
-            }
-        }
-        self.loading = still;
         self.exports.retain_mut(|t| match t.poll() {
             Some(Ok(_)) => false,
             Some(Err(e)) => {
@@ -700,18 +655,6 @@ impl PostmortemApp {
         }));
     }
 
-    /// The shared file index, (re)built when the set of data sources changes.
-    fn shared_index(&mut self, ctx: &egui::Context) -> SharedIndex {
-        if let Some(i) = &self.index
-            && i.covers() == self.sources.len()
-        {
-            return i.clone();
-        }
-        let i = SharedIndex::build(ctx, &self.sources);
-        self.index = Some(i.clone());
-        i
-    }
-
     fn open_gallery(&mut self, ctx: &egui::Context) {
         let Some(case) = self.analysis.lock().case().cloned() else {
             return;
@@ -727,17 +670,11 @@ impl PostmortemApp {
     }
 
     fn open_discovery(&mut self, ctx: &egui::Context) {
-        if self.sources.is_empty() {
-            self.errors
-                .push("Add a data source before opening Discovery.".into());
+        let Some(case) = self.analysis.lock().case().cloned() else {
             return;
-        }
+        };
         if self.discovery.is_none() || self.discovery_closed.swap(false, Ordering::Relaxed) {
-            let w = DiscoveryWindow::new(
-                self.shared_index(ctx),
-                self.sources.clone(),
-                self.prefs.clone(),
-            );
+            let w = DiscoveryWindow::new(case, self.prefs.clone());
             self.discovery = Some(Arc::new(Mutex::new(w)));
         }
         ctx.send_viewport_cmd_to(
@@ -1010,7 +947,7 @@ impl PostmortemApp {
                 }
                 ui.separator();
                 if ui
-                    .add_enabled(!self.sources.is_empty(), egui::Button::new("⏱ Timeline"))
+                    .add_enabled(self.has_data_sources(), egui::Button::new("⏱ Timeline"))
                     .clicked()
                 {
                     self.open_timeline(ui.ctx());
@@ -1018,7 +955,7 @@ impl PostmortemApp {
                 }
                 if ui
                     .add_enabled(
-                        !self.sources.is_empty(),
+                        self.has_data_sources(),
                         egui::Button::new("🖼 Image Gallery"),
                     )
                     .clicked()
@@ -1027,7 +964,7 @@ impl PostmortemApp {
                     ui.close();
                 }
                 if ui
-                    .add_enabled(!self.sources.is_empty(), egui::Button::new("🔍 Discovery"))
+                    .add_enabled(self.has_data_sources(), egui::Button::new("🔍 Discovery"))
                     .clicked()
                 {
                     self.open_discovery(ui.ctx());
@@ -1149,21 +1086,21 @@ impl PostmortemApp {
             }
             ui.separator();
             if ui
-                .add_enabled(!self.sources.is_empty(), egui::Button::new("⏱ Timeline"))
+                .add_enabled(self.has_data_sources(), egui::Button::new("⏱ Timeline"))
                 .on_hover_text("Open the Timeline (Tools › Timeline)")
                 .clicked()
             {
                 self.open_timeline(ui.ctx());
             }
             if ui
-                .add_enabled(!self.sources.is_empty(), egui::Button::new("🖼 Gallery"))
+                .add_enabled(self.has_data_sources(), egui::Button::new("🖼 Gallery"))
                 .on_hover_text("Open the Image Gallery (Tools › Image Gallery)")
                 .clicked()
             {
                 self.open_gallery(ui.ctx());
             }
             if ui
-                .add_enabled(!self.sources.is_empty(), egui::Button::new("🔍 Discovery"))
+                .add_enabled(self.has_data_sources(), egui::Button::new("🔍 Discovery"))
                 .on_hover_text("Find files by type, size and location (Tools › Discovery)")
                 .clicked()
             {
@@ -1224,7 +1161,7 @@ impl PostmortemApp {
     fn status_bar(&mut self, ui: &mut egui::Ui) {
         let mut open_progress = false;
         ui.horizontal(|ui| {
-            ui.label(format!("{} data source(s)", self.sources.len()));
+            ui.label(format!("{} data source(s)", self.case_sources.count()));
             {
                 let analysis = self.analysis.lock();
                 for job in analysis.jobs.iter().filter(|j| j.is_active()) {
@@ -1262,11 +1199,6 @@ impl PostmortemApp {
                         .on_hover_text("Show ingest progress and messages")
                         .clicked();
                 }
-            }
-            if let Some(n) = self.index.as_ref().and_then(SharedIndex::building_count) {
-                ui.separator();
-                ui.spinner();
-                ui.label(format!("Indexing: {} files", crate::format::grouped(n)));
             }
             let running = task::running();
             if running > 0 {
@@ -1327,21 +1259,11 @@ impl PostmortemApp {
     fn tree(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
             ui.heading(format!("{} Data Sources", icons::DATA_SOURCES));
-            if self.sources.is_empty() && self.loading.is_empty() {
+            if !self.has_data_sources() {
                 ui.weak(if self.has_case() {
                     "No data sources. Use Case › Add Data Source."
                 } else {
                     "No case open. Use Case › New Case or Open Case."
-                });
-            }
-            for (path, _) in &self.loading {
-                ui.horizontal(|ui| {
-                    ui.spinner();
-                    ui.label(format!(
-                        "Opening {}…",
-                        path.file_name()
-                            .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
-                    ));
                 });
             }
             let (case, live) = {
@@ -1405,7 +1327,7 @@ impl PostmortemApp {
             let a = self.analysis.lock();
             (a.case().cloned(), a.any_active())
         };
-        if case.is_none() || (self.sources.is_empty() && self.loading.is_empty()) {
+        if case.is_none() || !self.has_data_sources() {
             return;
         }
         let hide = self.persisted.hide_known_in_views;
@@ -2485,29 +2407,16 @@ impl PostmortemApp {
         }
     }
 
-    /// The opened evidence of a case data source (matched by image path),
-    /// for the tools still on the in-memory index.
-    fn evidence_index(&self, ds_id: i64) -> Option<usize> {
-        let first = self.case_sources.find(ds_id)?.ds.paths.first()?;
-        let first = std::path::Path::new(first);
-        self.sources
-            .iter()
-            .position(|s| s.evidence.image.info.paths.first().map(PathBuf::as_path) == Some(first))
-    }
-
     fn data_source_summary(&mut self, ui: &mut egui::Ui, ds_id: i64) {
-        let Some(d) = self
-            .evidence_index(ds_id)
-            .and_then(|i| self.sources.get(i).cloned())
-        else {
-            ui.horizontal(|ui| {
-                ui.spinner();
-                ui.weak("Opening the data source…");
-            });
+        let Some(case) = self.analysis.lock().case().cloned() else {
             return;
         };
-        let index = self.shared_index(ui.ctx());
-        match self.summary.ui(ui, &d, &index, &self.prefs) {
+        let Some(ds) = self.case_sources.find(ds_id).map(|t| t.ds.clone()) else {
+            ui.spinner();
+            return;
+        };
+        let live = self.analysis.lock().any_active();
+        match self.summary.ui(ui, &case, &ds, live, &self.prefs) {
             Some(summary::Action::ShowFile(c)) => self.viewer.set_content(Some(*c)),
             Some(summary::Action::ViewInTimeline { range }) => {
                 if let Some(tl) = self.open_timeline(ui.ctx())
@@ -3107,14 +3016,11 @@ impl PostmortemApp {
         }
     }
 
-    /// Lets the content viewer show hashes from the case database: maps a
-    /// browsed file system to its case file system (same image, same byte
-    /// offset) and looks the file up by inode/stream (indexed).
+    /// Lets the content viewer show hashes, MIME and known status of case
+    /// files, re-read from the database (they change during ingest).
     fn update_hash_resolver(&mut self) {
         let case = self.analysis.lock().case().cloned();
-        let key = case
-            .as_ref()
-            .map(|c| (c.dir().to_path_buf(), self.sources.len()));
+        let key = case.as_ref().map(|c| c.dir().to_path_buf());
         if key == self.resolver_key {
             return;
         }
@@ -3124,47 +3030,13 @@ impl PostmortemApp {
             self.viewer.refresh_hashes();
             return;
         };
-        let fss: Vec<(Arc<dyn pm_fs::FileSystem>, PathBuf, u64)> = self
-            .sources
-            .iter()
-            .flat_map(|s| {
-                let path = s
-                    .evidence
-                    .image
-                    .info
-                    .paths
-                    .first()
-                    .cloned()
-                    .unwrap_or_default();
-                s.evidence
-                    .filesystems
-                    .iter()
-                    .map(move |f| (Arc::clone(&f.fs), path.clone(), f.offset))
-            })
-            .collect();
         let resolver = move |c: &Content| -> Option<crate::viewers::CaseFileInfo> {
             let db = case.db();
             let f = match &c.origin {
                 // Re-read the row: hashes may have been computed since it
                 // was listed.
                 crate::model::ContentOrigin::Case(_) => db.file(c.row.file_id()?).ok()??,
-                crate::model::ContentOrigin::Fs(open) => {
-                    let same = |a: &Arc<dyn pm_fs::FileSystem>| {
-                        std::ptr::addr_eq(Arc::as_ptr(a), Arc::as_ptr(open))
-                    };
-                    let (_, path, offset) = fss.iter().find(|(fs, ..)| same(fs))?;
-                    let ds = db
-                        .data_sources()
-                        .ok()?
-                        .into_iter()
-                        .find(|d| d.paths.first().map(PathBuf::from).as_ref() == Some(path))?;
-                    let fs = db
-                        .file_systems(ds.id)
-                        .ok()?
-                        .into_iter()
-                        .find(|f| f.byte_offset == *offset)?;
-                    db.file_by_inode(fs.id, c.row.inode, c.row.stream).ok()??
-                }
+                crate::model::ContentOrigin::Fs(_) => return None,
             };
             let hex = |v: Option<Vec<u8>>| v.map(|b| pm_core::decode::to_hex(&b));
             Some(crate::viewers::CaseFileInfo {
@@ -3250,10 +3122,6 @@ impl PostmortemApp {
         let ctx = ui.ctx().clone();
         self.poll_loading();
         self.update_hash_resolver();
-        if !self.sources.is_empty() {
-            // Index eagerly so analysis tools open instantly.
-            self.shared_index(&ctx);
-        }
         self.shortcuts(&ctx);
         let case = self.analysis.lock().case().cloned();
         let errors = self.tagging.ui(&ctx, case.as_ref());

@@ -223,6 +223,11 @@ impl Sources {
     }
 
     /// The data source with `id` in the last loaded structure.
+    /// Data sources in the last loaded tree.
+    pub(crate) fn count(&self) -> usize {
+        self.current.sources.len()
+    }
+
     pub(crate) fn find(&self, id: i64) -> Option<&DsTree> {
         self.current.sources.iter().find(|d| d.ds.id == id)
     }

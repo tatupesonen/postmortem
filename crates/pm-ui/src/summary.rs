@@ -1,15 +1,20 @@
 //! Data Source Summary (Autopsy's per-data-source dashboard), shown in the
-//! result pane when a data source is selected.
+//! result pane when a data source is selected. Everything comes from the
+//! case database (ADR-023), loaded once per data source in the background.
 
 use std::sync::Arc;
 
 use egui::{Color32, Pos2, Sense, Shape, Stroke, Vec2};
-use pm_index::{FileCategory, FileIndex, IndexedFile};
+use pm_case::Case;
+use pm_casedb::mcp::{EventFilter, EventKeyset, TimeColumn, VolumeSystemRow};
+use pm_casedb::summary::DataSourceCounts;
+use pm_casedb::{DataSourceRecord, FileRecord, FileSystemRecord};
+use pm_timeline::FileCategory;
 
 use crate::format::{DisplayPrefs, grouped, size_long};
-use crate::index::SharedIndex;
-use crate::model::{Content, DataSource, FileRow};
+use crate::model::Content;
 use crate::sortable::{Sort, cmp_text};
+use crate::task::Keyed;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum Tab {
@@ -49,9 +54,96 @@ pub(crate) enum Action {
     ShowFile(Box<Content>),
 }
 
+const DAY: i64 = 86_400;
+
+/// Everything the tabs show, for one data source.
+#[derive(Debug, Default)]
+pub(crate) struct SummaryData {
+    counts: DataSourceCounts,
+    /// Regular files per [`FileCategory::ALL`] entry.
+    categories: [u64; 6],
+    /// Most recently modified / accessed / created regular files.
+    recent: [Vec<FileRecord>; 3],
+    /// Earliest and latest activity, and counts per day of the last 30.
+    activity: Option<(i64, i64, [u64; 31])>,
+    file_systems: Vec<FileSystemRecord>,
+    volume_systems: Vec<VolumeSystemRow>,
+}
+
+impl SummaryData {
+    fn load(case: &Case, ds_id: i64) -> Result<Self, String> {
+        let db = case.db();
+        let e = |e: pm_casedb::DbError| e.to_string();
+        let counts = db.data_source_counts(ds_id).map_err(e)?;
+        let mut categories = [0u64; 6];
+        for (ext, n) in &counts.by_extension {
+            let cat = FileCategory::from_name(&format!("x.{ext}"));
+            if let Some(i) = FileCategory::ALL.iter().position(|c| *c == cat)
+                && let Some(c) = categories.get_mut(i)
+            {
+                *c += n;
+            }
+        }
+        let recent_of = |col: TimeColumn| {
+            let f = EventFilter {
+                ds_id: Some(ds_id),
+                start: Some(1),
+                regular_only: true,
+                ..EventFilter::default()
+            };
+            db.mcp_file_events(col, &f, EventKeyset::Start, true, 10)
+        };
+        let recent = [
+            recent_of(TimeColumn::Modified).map_err(e)?,
+            recent_of(TimeColumn::Accessed).map_err(e)?,
+            recent_of(TimeColumn::Created).map_err(e)?,
+        ];
+        let activity = match db.data_source_activity_span(ds_id).map_err(e)? {
+            None => None,
+            Some((first, last)) => {
+                // Autopsy: the 30 days ending at the latest activity, by day.
+                let start = last - 30 * DAY;
+                let f = EventFilter {
+                    ds_id: Some(ds_id),
+                    start: Some(start.max(1)),
+                    end: Some(last + 1),
+                    ..EventFilter::default()
+                };
+                let mut days = [0u64; 31];
+                for col in [
+                    TimeColumn::Modified,
+                    TimeColumn::Accessed,
+                    TimeColumn::Created,
+                ] {
+                    for (b, n) in db
+                        .mcp_file_event_histogram(col, &f, start, DAY)
+                        .map_err(e)?
+                    {
+                        if let Some(d) = usize::try_from(b).ok().and_then(|b| days.get_mut(b)) {
+                            *d += n;
+                        }
+                    }
+                }
+                Some((first, last, days))
+            }
+        };
+        Ok(Self {
+            counts,
+            categories,
+            recent,
+            activity,
+            file_systems: db.file_systems(ds_id).map_err(e)?,
+            volume_systems: db.mcp_volume_systems(ds_id).map_err(e)?,
+        })
+    }
+}
+
 #[derive(Debug, Default)]
 pub(crate) struct SummaryState {
     tab: Tab,
+    /// Keyed by data source and whether analysis was running, so the
+    /// summary reloads when ingest finishes (until the case change bus).
+    data: Keyed<(i64, bool), SummaryData>,
 }
 
 fn rgb(c: [u8; 3]) -> Color32 {
@@ -62,8 +154,9 @@ impl SummaryState {
     pub(crate) fn ui(
         &mut self,
         ui: &mut egui::Ui,
-        ds: &DataSource,
-        index: &SharedIndex,
+        case: &Arc<Case>,
+        ds: &DataSourceRecord,
+        live: bool,
         prefs: &DisplayPrefs,
     ) -> Option<Action> {
         ui.heading(&ds.name);
@@ -73,20 +166,29 @@ impl SummaryState {
             }
         });
         ui.separator();
-        if self.tab == Tab::Container {
-            container(ui, ds);
+        let loader = Arc::clone(case);
+        let ds_id = ds.id;
+        let Some(data) = self.data.get(ui.ctx(), &(ds_id, live), move || {
+            SummaryData::load(&loader, ds_id)
+        }) else {
+            if let Some(e) = self.data.error() {
+                ui.colored_label(ui.visuals().error_fg_color, e.to_owned());
+            } else {
+                ui.spinner();
+            }
             return None;
-        }
-        let idx = index.ready_or_progress(ui)?;
-        let ds_id = ds.id as u32;
+        };
         match self.tab {
             Tab::Types => {
-                types(ui, &idx, ds);
+                types(ui, &data, ds);
                 None
             }
-            Tab::RecentFiles => recent(ui, &idx, ds, prefs),
-            Tab::Timeline => activity(ui, &idx, ds_id, prefs),
-            Tab::Container => None,
+            Tab::RecentFiles => recent(ui, &data, case, prefs),
+            Tab::Timeline => activity(ui, &data, prefs),
+            Tab::Container => {
+                container(ui, ds, &data);
+                None
+            }
         }
     }
 }
@@ -97,25 +199,17 @@ fn kv(ui: &mut egui::Ui, k: &str, v: impl Into<egui::WidgetText>) {
     ui.end_row();
 }
 
-fn types(ui: &mut egui::Ui, idx: &FileIndex, ds: &DataSource) {
-    let s = idx.type_summary(ds.id as u32);
+fn types(ui: &mut egui::Ui, data: &SummaryData, ds: &DataSourceRecord) {
+    let s = &data.counts;
     ui.horizontal_top(|ui| {
         ui.vertical(|ui| {
             egui::Grid::new("types-grid")
                 .num_columns(2)
                 .spacing([24.0, 6.0])
                 .show(ui, |ui| {
-                    kv(
-                        ui,
-                        "Size",
-                        pm_core::units::format_size(ds.evidence.image.info.size),
-                    );
-                    let fs: Vec<String> = ds
-                        .evidence
-                        .filesystems
-                        .iter()
-                        .map(|f| f.fs.info().kind.to_string())
-                        .collect();
+                    kv(ui, "Size", pm_core::units::format_size(ds.size));
+                    let fs: Vec<String> =
+                        data.file_systems.iter().map(|f| f.kind.clone()).collect();
                     kv(
                         ui,
                         "File systems",
@@ -128,14 +222,14 @@ fn types(ui: &mut egui::Ui, idx: &FileIndex, ds: &DataSource) {
                     kv(ui, "Allocated files", grouped(s.allocated_files));
                     kv(ui, "Unallocated files", grouped(s.unallocated_files));
                     kv(ui, "Directories", grouped(s.directories));
-                    kv(ui, "Bytes in allocated files", size_long(s.total_bytes));
+                    kv(ui, "Bytes in allocated files", size_long(s.allocated_bytes));
                 });
         });
         ui.add_space(32.0);
         ui.vertical(|ui| {
             ui.strong("File Types");
             ui.weak("by extension until type detection runs");
-            pie(ui, &s.categories);
+            pie(ui, &data.categories);
         });
     });
 }
@@ -196,18 +290,10 @@ fn pie(ui: &mut egui::Ui, counts: &[u64; 6]) {
     });
 }
 
-fn content(ds: &DataSource, f: &IndexedFile) -> Option<Content> {
-    let fs = ds.fs(f.fs as usize)?;
-    Some(Content::from_fs(
-        Arc::clone(fs),
-        FileRow::from_fs(&**fs, f.inode, &f.path, f.name_allocated),
-    ))
-}
-
 fn recent(
     ui: &mut egui::Ui,
-    idx: &FileIndex,
-    ds: &DataSource,
+    data: &SummaryData,
+    case: &Arc<Case>,
     prefs: &DisplayPrefs,
 ) -> Option<Action> {
     let mut action = None;
@@ -215,26 +301,37 @@ fn recent(
     egui::ScrollArea::vertical()
         .auto_shrink(false)
         .show(ui, |ui| {
-            for (title, pick) in [
-                (
-                    "Recently Modified Files",
-                    (|t: &pm_fs::Times| t.modified) as fn(&pm_fs::Times) -> Option<jiff::Timestamp>,
-                ),
-                ("Recently Accessed Files", |t: &pm_fs::Times| t.accessed),
-                ("Recently Created Files", |t: &pm_fs::Times| t.created),
-            ] {
+            for (k, (title, col)) in [
+                ("Recently Modified Files", TimeColumn::Modified),
+                ("Recently Accessed Files", TimeColumn::Accessed),
+                ("Recently Created Files", TimeColumn::Created),
+            ]
+            .into_iter()
+            .enumerate()
+            {
+                let pick = |f: &FileRecord| {
+                    f.times
+                        .get(col.index())
+                        .copied()
+                        .flatten()
+                        .and_then(|(s, _)| jiff::Timestamp::from_second(s).ok())
+                };
                 ui.add_space(8.0);
                 ui.strong(title);
-                let mut files = idx.most_recent(ds.id as u32, 10, pick);
+                let mut files: Vec<&FileRecord> = data
+                    .recent
+                    .get(k)
+                    .map(|v| v.iter().collect())
+                    .unwrap_or_default();
                 // The sort lives in egui memory (these lists are tiny).
                 let sort_id = ui.id().with(("recent-sort", title));
                 let mut sort: Option<Sort> = ui.data(|d| d.get_temp(sort_id)).flatten();
                 if let Some(s) = sort {
                     files.sort_by(|a, b| {
                         let o = if s.col == 0 {
-                            pick(&a.times).cmp(&pick(&b.times))
+                            pick(a).cmp(&pick(b))
                         } else {
-                            cmp_text(&a.path, &b.path)
+                            cmp_text(&a.path(), &b.path())
                         };
                         if s.ascending { o } else { o.reverse() }
                     });
@@ -258,11 +355,11 @@ fn recent(
                             for f in &files {
                                 body.row(row_h, |mut row| {
                                     row.col(|ui| {
-                                        ui.label(prefs.time(pick(&f.times)));
+                                        ui.label(prefs.time(pick(f)));
                                     });
                                     row.col(|ui| {
-                                        let text = egui::RichText::new(&*f.path);
-                                        let text = if f.deleted() {
+                                        let text = egui::RichText::new(f.path());
+                                        let text = if !f.name_alloc || !f.meta_alloc {
                                             text.color(ui.visuals().error_fg_color)
                                         } else {
                                             text
@@ -272,8 +369,12 @@ fn recent(
                                             .on_hover_text("Show this file in the content viewer")
                                             .clicked()
                                         {
-                                            action = content(ds, f)
-                                                .map(|c| Action::ShowFile(Box::new(c)));
+                                            action = Some(Action::ShowFile(Box::new(
+                                                Content::from_case(
+                                                    Arc::clone(case),
+                                                    crate::views::row_of(f),
+                                                ),
+                                            )));
                                         }
                                     });
                                 });
@@ -286,16 +387,8 @@ fn recent(
     action
 }
 
-fn activity(ui: &mut egui::Ui, idx: &FileIndex, ds: u32, prefs: &DisplayPrefs) -> Option<Action> {
-    const DAY: i64 = 86_400;
-    let times: Vec<i64> = idx
-        .of_data_source(ds)
-        .flat_map(|f| [f.times.modified, f.times.accessed, f.times.created])
-        .flatten()
-        .map(jiff::Timestamp::as_second)
-        .filter(|&s| s > 0)
-        .collect();
-    let (Some(&first), Some(&last)) = (times.iter().min(), times.iter().max()) else {
+fn activity(ui: &mut egui::Ui, data: &SummaryData, prefs: &DisplayPrefs) -> Option<Action> {
+    let Some((first, last, days)) = data.activity else {
         ui.weak("No data exists.");
         return None;
     };
@@ -307,14 +400,7 @@ fn activity(ui: &mut egui::Ui, idx: &FileIndex, ds: u32, prefs: &DisplayPrefs) -
             kv(ui, "Earliest", prefs.time(to_ts(first)));
             kv(ui, "Latest", prefs.time(to_ts(last)));
         });
-    // Autopsy: the 30 days ending at the latest activity, by day.
     let start = last - 30 * DAY;
-    let mut days = [0u32; 31];
-    for t in times.iter().filter(|&&t| t >= start) {
-        if let Some(d) = days.get_mut(((t - start) / DAY) as usize) {
-            *d += 1;
-        }
-    }
     ui.add_space(8.0);
     ui.strong("Activity in the last 30 days of this data source");
     let (rect, _) = ui.allocate_exact_size(
@@ -323,8 +409,7 @@ fn activity(ui: &mut egui::Ui, idx: &FileIndex, ds: u32, prefs: &DisplayPrefs) -
     );
     let painter = ui.painter_at(rect);
     painter.rect_filled(rect, 4.0, ui.visuals().extreme_bg_color);
-    let max =
-        f32::from(u16::try_from(*days.iter().max().unwrap_or(&1)).unwrap_or(u16::MAX)).max(1.0);
+    let max = (*days.iter().max().unwrap_or(&1)).max(1) as f32;
     let w = rect.width() / days.len() as f32;
     for (i, &n) in days.iter().enumerate() {
         if n == 0 {
@@ -368,8 +453,7 @@ fn activity(ui: &mut egui::Ui, idx: &FileIndex, ds: u32, prefs: &DisplayPrefs) -
         })
 }
 
-fn container(ui: &mut egui::Ui, d: &DataSource) {
-    let info = &d.evidence.image.info;
+fn container(ui: &mut egui::Ui, ds: &DataSourceRecord, data: &SummaryData) {
     egui::ScrollArea::vertical()
         .auto_shrink(false)
         .show(ui, |ui| {
@@ -378,49 +462,56 @@ fn container(ui: &mut egui::Ui, d: &DataSource) {
                 .striped(true)
                 .spacing([24.0, 4.0])
                 .show(ui, |ui| {
-                    kv(ui, "Image format", info.format.to_string());
-                    kv(ui, "Size", size_long(info.size));
-                    kv(ui, "Sector size", info.sector_size.to_string());
-                    for (i, p) in info.paths.iter().enumerate() {
-                        kv(
-                            ui,
-                            if i == 0 { "Segments" } else { "" },
-                            p.display().to_string(),
-                        );
-                    }
-                    for (algo, h) in &info.stored_hashes {
-                        kv(ui, &format!("Stored {algo:?}"), h.clone());
-                    }
-                    for (k, v) in &info.metadata {
-                        kv(ui, k, v.clone());
-                    }
                     kv(
                         ui,
-                        "Volume system",
-                        d.evidence.volume_system.as_ref().map_or_else(
-                            || "None (single volume)".to_owned(),
-                            |v| format!("{} ({} partitions)", v.kind, v.allocated().count()),
-                        ),
+                        "Image format",
+                        ds.image_format.clone().unwrap_or_else(|| "—".into()),
                     );
-                    for f in &d.evidence.filesystems {
-                        let i = f.fs.info();
+                    kv(ui, "Size", size_long(ds.size));
+                    kv(ui, "Sector size", ds.sector_size.to_string());
+                    kv(ui, "Time zone", ds.timezone.clone());
+                    for (i, p) in ds.paths.iter().enumerate() {
+                        kv(ui, if i == 0 { "Segments" } else { "" }, p.clone());
+                    }
+                    for (name, h) in [
+                        ("MD5", &ds.md5),
+                        ("SHA-1", &ds.sha1),
+                        ("SHA-256", &ds.sha256),
+                    ] {
+                        if let Some(h) = h {
+                            kv(ui, name, h.clone());
+                        }
+                    }
+                    for (k, v) in &ds.acquisition {
+                        kv(ui, k, v.clone());
+                    }
+                    if data.volume_systems.is_empty() {
+                        kv(ui, "Volume system", "None (single volume)");
+                    }
+                    for vs in &data.volume_systems {
+                        kv(
+                            ui,
+                            "Volume system",
+                            format!(
+                                "{} ({} volumes)",
+                                if vs.kind == 1 { "GPT" } else { "DOS (MBR)" },
+                                vs.volumes.len()
+                            ),
+                        );
+                    }
+                    for f in &data.file_systems {
                         kv(
                             ui,
                             "File system",
                             format!(
                                 "{} at offset {} — label {:?}, serial {}",
-                                i.kind,
-                                f.offset,
-                                i.label.as_deref().unwrap_or(""),
-                                i.serial.as_deref().unwrap_or("")
+                                f.kind,
+                                f.byte_offset,
+                                f.label.as_deref().unwrap_or(""),
+                                f.serial.as_deref().unwrap_or("")
                             ),
                         );
                     }
                 });
-            if let Some(vs) = &d.evidence.volume_system {
-                for w in &vs.warnings {
-                    ui.colored_label(ui.visuals().warn_fg_color, w);
-                }
-            }
         });
 }

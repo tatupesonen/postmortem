@@ -68,6 +68,11 @@ impl Analysis {
         self.jobs.iter().any(|j| j.is_active())
     }
 
+    /// Whether a data source is still being added to the case.
+    pub(crate) fn any_adding(&self) -> bool {
+        self.jobs.iter().any(|j| matches!(j.stage(), Stage::Adding))
+    }
+
     /// Makes `case` the open case (any previous jobs are forgotten).
     pub(crate) fn set_case(&mut self, case: Arc<Case>) {
         self.close();

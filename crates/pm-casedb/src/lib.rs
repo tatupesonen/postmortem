@@ -26,6 +26,7 @@ pub mod mcp;
 mod model;
 pub mod os_accounts;
 mod reports;
+pub mod summary;
 pub use reports::Report;
 mod scores;
 mod search;

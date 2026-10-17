@@ -8,19 +8,12 @@ license.workspace = true
 
 [dependencies]
 pm-core.workspace = true
-pm-fs.workspace = true
-pm-index.workspace = true
 pm-casedb.workspace = true
 jiff.workspace = true
-rayon.workspace = true
-tracing.workspace = true
 
 [dev-dependencies]
-pm-core.workspace = true
 pm-testkit.workspace = true
-proptest.workspace = true
 rstest.workspace = true
-pm-fs-ntfs.workspace = true
 pm-case.workspace = true
 tempfile.workspace = true
 

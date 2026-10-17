@@ -145,31 +145,6 @@ pub enum CommentStatus {
 }
 
 impl FileRow {
-    /// Builds a row for a known inode (used when navigating from results
-    /// such as the timeline rather than a directory listing).
-    pub(crate) fn from_fs(
-        fs: &dyn FileSystem,
-        inode: InodeId,
-        path: &str,
-        name_allocated: bool,
-    ) -> Self {
-        let meta = fs.metadata(inode).ok();
-        let name = path.rsplit('/').next().unwrap_or(path).to_owned();
-        Self {
-            name,
-            inode,
-            stream: None,
-            kind: meta.as_ref().map_or(FileKind::Unknown, |m| m.kind),
-            name_allocated,
-            size: meta.as_ref().map_or(0, |m| m.size),
-            meta,
-            path: path.to_owned(),
-            file: None,
-            annotations: None,
-            has_children: false,
-        }
-    }
-
     /// Case-database file id of the row, if it came from the case.
     pub fn file_id(&self) -> Option<i64> {
         self.file.as_ref().map(|f| f.id)
@@ -205,8 +180,8 @@ impl FileRow {
 /// Where a viewed file's content comes from.
 #[derive(Debug, Clone)]
 pub enum ContentOrigin {
-    /// A file of an opened file system (tools still on the in-memory
-    /// index).
+    /// A file of an opened file system (viewer tests on synthetic file
+    /// systems; every UI path reads case files).
     Fs(Arc<dyn FileSystem>),
     /// A file of the case database (any origin: file system, carved,
     /// derived, unallocated space).

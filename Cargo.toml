@@ -25,7 +25,6 @@ pm-fs-exfat = { path = "crates/pm-fs-exfat" }
 pm-fs-ext = { path = "crates/pm-fs-ext" }
 pm-evidence = { path = "crates/pm-evidence" }
 pm-timeline = { path = "crates/pm-timeline" }
-pm-index = { path = "crates/pm-index" }
 pm-discovery = { path = "crates/pm-discovery" }
 pm-casedb = { path = "crates/pm-casedb" }
 pm-case = { path = "crates/pm-case" }
