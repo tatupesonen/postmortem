@@ -3531,6 +3531,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-filetype"
+version = "0.1.0"
+dependencies = [
+ "flate2",
+ "pm-core",
+ "proptest",
+ "regex",
+ "serde",
+ "serde_json",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
 name = "pm-fs"
 version = "0.1.0"
 dependencies = [
