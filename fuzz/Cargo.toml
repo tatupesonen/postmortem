@@ -23,6 +23,8 @@ pm-prefetch = { path = "../crates/pm-prefetch" }
 pm-filetype = { path = "../crates/pm-filetype" }
 pm-archive = { path = "../crates/pm-archive" }
 pm-carve = { path = "../crates/pm-carve" }
+pm-text = { path = "../crates/pm-text" }
+pm-search = { path = "../crates/pm-search" }
 
 [workspace]
 members = ["."]
@@ -135,6 +137,62 @@ bench = false
 [[bin]]
 name = "cfb_open"
 path = "fuzz_targets/cfb_open.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "text_ole"
+path = "fuzz_targets/text_ole.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "text_pdf"
+path = "fuzz_targets/text_pdf.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "text_rtf"
+path = "fuzz_targets/text_rtf.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "text_html"
+path = "fuzz_targets/text_html.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "text_email"
+path = "fuzz_targets/text_email.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "text_office"
+path = "fuzz_targets/text_office.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "text_strings"
+path = "fuzz_targets/text_strings.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "keyword_lists"
+path = "fuzz_targets/keyword_lists.rs"
 test = false
 doc = false
 bench = false

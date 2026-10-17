@@ -33,6 +33,8 @@ pub(crate) fn extract(
         OpenFlags::SQLITE_OPEN_READ_WRITE | OpenFlags::SQLITE_OPEN_NO_MUTEX,
     )
     .map_err(|e| TextError::malformed("SQLite", e))?;
+    // The schema is hostile input: no functions from views or triggers.
+    let _ = conn.pragma_update(None, "trusted_schema", "OFF");
     dump(&conn, sink)?;
     Ok(Metadata::new())
 }

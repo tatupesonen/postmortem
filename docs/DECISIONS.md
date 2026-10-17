@@ -316,3 +316,65 @@ non-regular objects (FAT/exFAT virtual files, symlinks, devices) as
 
 **Consequences.** No useless writes for millions of directories; MIME
 views, filters and rules (which only match files) are unaffected.
+
+## ADR-020 — Keyword search on Tantivy: index layout and parity decisions
+
+**Status:** accepted (2026-10-17, search track)
+
+**Context.** Autopsy's Keyword Search stores every 32 KB chunk three times
+in an out-of-process Solr core (`text` with term vectors, a lower-cased
+`content_str` single term for regex/substring, `content_ja`), runs
+substring and regex queries as `/.*x.*/` scans over those terms, and
+keeps inline-search hits in memory until the ingest job ends (inventory
+05 §1.6–1.8, §4.1). Some of its behaviour is buggy.
+
+**Decision.**
+* **Two Tantivy indexes per case** in `<case>/Index/` (pure Rust; the
+  `columnar-zstd-compression` default feature is off to avoid a C
+  dependency): `content` (chunk documents with word tokens + positions,
+  distinct lower-cased trigrams and the stored text; one summary
+  document per object with its name/label and chunk count) and `names`
+  (positional trigrams of each file's name and path). An `Index/VERSION`
+  file wipes indexes of another layout.
+* **Candidates, then exact verification.** Exact queries are phrase
+  queries on words; substring and regex queries use trigram formulas
+  derived from the regex HIR (Cox's trigram index), or a scan when no
+  trigram is required. Every candidate is verified with the same
+  `Matcher` the ingest module uses, so ad-hoc and ingest hits agree. The
+  name index answers substrings exactly with positional phrase queries.
+* **One regex engine** (Rust `regex`, Unicode classes, case-insensitive)
+  for ingest and ad hoc; Java syntax differences used by keyword lists
+  (`\<`, `\>`, `\Q…\E`) are translated; look-around and back-references
+  are reported as invalid instead of being silently skipped.
+* **Results are posted per file**, not at job end (bounded memory;
+  cancelled jobs keep what was found). Re-runs are idempotent (keyword
+  hit identities read once per file; accounts de-duplicated by the
+  communications manager; objects re-indexed in place).
+* **Kept for parity:** the IIN length set `{16, 17, 18, 29}` (Autopsy's
+  typo; its own vectors pass either way because of the range override
+  order), the credit-card regex's lazy separator (a spaced number only
+  matches its first twelve digits), the built-in regexes verbatim
+  (e-mail TLDs 2–4 letters, URL quirks), metadata-only entries for known
+  files without a name search, `.txt` and carved-`.txt` special cases,
+  Autopsy's metadata block and key priorities.
+* **Fixed:** exact matches re-examine tokens after a partial multi-word
+  match; snippets may show a chunk's last character; BIN ranges pad a
+  blank end from the raw start with 9s; metadata dates are UTC (Autopsy
+  uses the JVM time zone); lower-casing is locale-independent; no
+  English stop words (Autopsy's index cannot find "the"); literal
+  keywords such as `C++` are never rejected as invalid regexes; user
+  keywords may be any length; per-hit inbox messages honour the list's
+  "send messages" flag again (first 20 per term, as Autopsy's
+  `QueryResults` did).
+* **Page numbering:** the name is page 0 and chunks are 1…N in both hit
+  bookkeeping and the index (Autopsy mixes 0-based inline chunk ids with
+  1-based Solr ids). `TSK_KEYWORD_SEARCH_DOCUMENT_ID` uses Autopsy's
+  `<objId>_<chunk>` form; artifacts are `ObjRef::Artifact` with key
+  −id, as TSK numbers them below zero in Solr.
+
+**Consequences.** No JVM or Solr process, no network, smaller indexes
+(text stored once, no term vectors), substring/regex queries that touch
+only candidate chunks. Japanese morphological analysis (`content_ja`),
+language detection, OCR and the "Extract Unique Words" report are not
+ported yet. Multi-user cases need an index service (inventory 05 §1.14);
+a second process opens the indexes read-only.

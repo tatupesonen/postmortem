@@ -1,0 +1,33 @@
+[package]
+name = "pm-search"
+description = "Keyword and file-name search: Tantivy content and name indexes, Autopsy keyword lists, the inline matcher and credit-card validation"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-casedb.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+rayon.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+jiff.workspace = true
+encoding_rs = "=0.8.35"
+quick-xml = "=0.41.0"
+regex = "=1.13.1"
+regex-syntax = "=0.8.11"
+aho-corasick = "=1.1.5"
+unicode-segmentation = "=1.13.3"
+unicode-normalization = "=0.1.25"
+csv = "=1.4.0"
+tantivy = { version = "=0.26.2", default-features = false, features = ["mmap", "lz4-compression"] }
+
+[dev-dependencies]
+proptest.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

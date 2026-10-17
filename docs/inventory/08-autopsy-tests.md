@@ -1397,7 +1397,7 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 
 ### Hash lookup and keyword-list inputs
 - [ ] port (derive): parse `test/input/NSRL.txt-md5.idx` and `notablehashes.txt-md5.idx` — headers, 4 entries each, case-insensitive lookup, miss
-- [ ] port (derive): import `test/input/notablekeywords.xml` — BOM, list name/flags/timestamps, 10 literal terms incl. Arabic; export round-trip
+- [x] port (derive): import `test/input/notablekeywords.xml` — BOM, list name/flags/timestamps, 10 literal terms incl. Arabic; export round-trip
 
 ### Central repository
 - [ ] port: CorrelationAttributeNormalizerTest.testValidateMd5 — 5 cases
@@ -1448,12 +1448,12 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [ ] port: CommonAttributeSearchInterCaseTest.testTwo — USB thresholds (100 → 13, 20 → 0, 90 → 2; only if the synthetic fixture reproduces them)
 
 ### Keyword search
-- [ ] port: CreditCardValidatorTest.testLengthMatchesBin — IIN length table (Amex, Verve, Visa, Visa Electron vectors)
-- [ ] port: CreditCardValidatorTest.testIsValidCCN12..19 (8 methods) — grouping, separators, Luhn vectors
-- [ ] port: CCN IIN range-map "last insert wins" semantics; decide on the `29` typo (ADR)
-- [ ] port: MiniChunkHelperTest.isMiniChunkID / getBaseChunkID — if the chunk-ID scheme is kept
-- [ ] port: LanguageSpecificContentQueryHelperTest.makeQueryString / findNthIndexOf / buildTermfreqQuery — semantics we keep (multi-field OR; n-th occurrence)
-- [ ] port (derive): built-in regex lists (phone, IP, email, URL, CCN) positive and negative strings
+- [x] port: CreditCardValidatorTest.testLengthMatchesBin — IIN length table (Amex, Verve, Visa, Visa Electron vectors)
+- [x] port: CreditCardValidatorTest.testIsValidCCN12..19 (8 methods) — grouping, separators, Luhn vectors
+- [x] port: CCN IIN range-map "last insert wins" semantics; decide on the `29` typo (ADR) — kept the typo for parity (ADR-020)
+- [x] port: MiniChunkHelperTest.isMiniChunkID / getBaseChunkID — if the chunk-ID scheme is kept
+- [ ] port: LanguageSpecificContentQueryHelperTest.makeQueryString / findNthIndexOf / buildTermfreqQuery — semantics we keep (multi-field OR; n-th occurrence) — n/a for now: no language-specific fields (Japanese analysis is a documented gap)
+- [x] port (derive): built-in regex lists (phone, IP, email, URL, CCN) positive and negative strings
 - [ ] port (derive): literal/substring/regex matching and case options
 
 ### Data source summary
