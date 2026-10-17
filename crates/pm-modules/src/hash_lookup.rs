@@ -55,6 +55,24 @@ pub struct HashSetConfig {
     pub send_ingest_messages: Option<bool>,
 }
 
+impl HashSetConfig {
+    /// The display name, else the file stem.
+    pub fn display_name(&self) -> String {
+        self.name.clone().unwrap_or_else(|| {
+            self.path
+                .file_stem()
+                .map_or_else(String::new, |n| n.to_string_lossy().into_owned())
+        })
+    }
+
+    /// Whether hashes can be added: a TSK `.kdb` set.
+    pub fn updateable(&self) -> bool {
+        self.path
+            .extension()
+            .is_some_and(|e| e.eq_ignore_ascii_case("kdb"))
+    }
+}
+
 fn yes() -> bool {
     true
 }

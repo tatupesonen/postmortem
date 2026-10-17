@@ -22,6 +22,7 @@ mod icons;
 mod index;
 mod keyword_search_ui;
 mod model;
+mod options_hashsets;
 mod options_ui;
 mod platform;
 mod plugins;

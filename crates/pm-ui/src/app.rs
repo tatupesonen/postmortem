@@ -18,7 +18,7 @@ use crate::icons;
 use crate::index::SharedIndex;
 use crate::model::{Content, DataSource, FileRow, NodeId};
 use crate::summary::{self, SummaryState};
-use crate::table::TableState;
+use crate::table::{RowMenus, TableState};
 use crate::task::{self, Task};
 use crate::timeline::TimelineWindow;
 use crate::viewers::ViewerPanel;
@@ -168,6 +168,8 @@ pub struct PostmortemApp {
     cvt: Option<crate::cvt_ui::CvtWindow>,
     /// A data source awaiting removal confirmation `(id, name)`.
     confirm_remove: Option<(i64, String)>,
+    /// Case › Delete Case awaiting confirmation: (folder, display name).
+    confirm_delete_case: Option<(PathBuf, String)>,
     removing: Option<Task<Result<(), String>>>,
     mime_types: crate::task::Cached<Vec<String>>,
     searches: Vec<crate::file_search_ui::SearchResults>,
@@ -250,6 +252,7 @@ impl PostmortemApp {
             cvt_choices: None,
             cvt: None,
             confirm_remove: None,
+            confirm_delete_case: None,
             removing: None,
             mime_types: crate::task::Cached::default(),
             searches: Vec::new(),
@@ -605,19 +608,94 @@ impl PostmortemApp {
         };
         self.exports.push(Task::spawn(ctx, move || {
             let src = content.source()?;
-            let mut out =
-                std::fs::File::create(&dest).map_err(|e| format!("{}: {e}", dest.display()))?;
-            let mut buf = vec![0u8; 1 << 20];
-            let mut off = 0;
-            while off < src.size() {
-                let n = src.read_at(off, &mut buf).map_err(|e| e.to_string())?;
-                if n == 0 {
-                    break;
-                }
-                std::io::Write::write_all(&mut out, buf.get(..n).unwrap_or_default())
-                    .map_err(|e| e.to_string())?;
-                off += n as u64;
+            copy_out(src.as_ref(), &dest)?;
+            Ok(dest.display().to_string())
+        }));
+    }
+
+    /// Row actions every file table shares: tags, pop-out, extract,
+    /// external viewer, Add File to Hash Set and CSV export (`csv`, built
+    /// by the caller from its table).
+    fn file_table_actions(
+        &mut self,
+        ctx: &egui::Context,
+        case: &Arc<pm_case::Case>,
+        rows: &[FileRow],
+        ev: &crate::table::TableEvents,
+        csv: Option<String>,
+    ) {
+        if let Some((i, req)) = ev.tag
+            && let Some(id) = rows.get(i).and_then(FileRow::file_id)
+        {
+            self.tagging
+                .request(ctx, case, crate::tags_ui::TagTarget::Files(vec![id]), req);
+        }
+        let content = |r: &FileRow| Content::from_case(Arc::clone(case), r.clone());
+        if let Some(r) = ev.popout.and_then(|i| rows.get(i)) {
+            self.open_popout(content(r));
+        }
+        if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
+            self.export(ctx, content(r));
+        }
+        if let Some(r) = ev.external.and_then(|i| rows.get(i)) {
+            self.open_external(ctx, case, content(r));
+        }
+        if let Some((r, set)) = ev
+            .add_hash
+            .as_ref()
+            .and_then(|(i, set)| Some((rows.get(*i)?, set.clone())))
+        {
+            let c = content(r);
+            self.exports
+                .push(Task::spawn(ctx, move || add_to_hash_set(&c, &set)));
+        }
+        if let Some(csv) = csv {
+            self.save_csv(ctx, csv);
+        }
+    }
+
+    /// Save Table as CSV.
+    fn save_csv(&mut self, ctx: &egui::Context, csv: String) {
+        let Some(dest) = rfd::FileDialog::new()
+            .set_title("Export Table to CSV")
+            .add_filter("CSV", &["csv"])
+            .set_file_name("table.csv")
+            .save_file()
+        else {
+            return;
+        };
+        self.exports.push(Task::spawn(ctx, move || {
+            std::fs::write(&dest, csv).map_err(|e| format!("{}: {e}", dest.display()))?;
+            Ok(dest.display().to_string())
+        }));
+    }
+
+    /// Open in External Viewer (Autopsy `ExternalViewerAction`): the file
+    /// is extracted to the case's `Temp/external` folder and handed to the
+    /// operating system's default application for its type.
+    fn open_external(&mut self, ctx: &egui::Context, case: &Arc<pm_case::Case>, content: Content) {
+        let dir = case.dir().join("Temp").join("external");
+        self.exports.push(Task::spawn(ctx, move || {
+            let id = content.row.file_id().unwrap_or_default();
+            let name: String = content
+                .row
+                .name
+                .chars()
+                .map(|c| {
+                    if matches!(c, '/' | '\\' | ':') {
+                        '_'
+                    } else {
+                        c
+                    }
+                })
+                .collect();
+            let dest = dir.join(format!("{id}-{name}"));
+            std::fs::create_dir_all(&dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+            if !dest.exists() {
+                let src = content.source()?;
+                copy_out(src.as_ref(), &dest)?;
             }
+            crate::platform::open(&dest);
             Ok(dest.display().to_string())
         }));
     }
@@ -823,6 +901,27 @@ impl PostmortemApp {
                     ui.close();
                     self.close_case(ui.ctx());
                 }
+                let case = self.analysis.lock().case().cloned();
+                if ui
+                    .add_enabled(has_case, egui::Button::new("Open Case Folder"))
+                    .clicked()
+                {
+                    if let Some(c) = &case {
+                        crate::platform::open(c.dir());
+                    }
+                    ui.close();
+                }
+                let busy = self.analysis.lock().any_active();
+                if ui
+                    .add_enabled(has_case && !busy, egui::Button::new("Delete Case"))
+                    .on_disabled_hover_text("Cannot delete a case while ingest is running")
+                    .clicked()
+                {
+                    if let Some(c) = &case {
+                        self.confirm_delete_case = Some((c.dir().to_path_buf(), c.details().name));
+                    }
+                    ui.close();
+                }
                 ui.separator();
                 if ui
                     .add_enabled(has_case, egui::Button::new("Add Data Source…"))
@@ -1003,6 +1102,16 @@ impl PostmortemApp {
                 }
             });
             ui.menu_button("Help", |ui| {
+                let case = self.analysis.lock().case().cloned();
+                if ui
+                    .add_enabled(case.is_some(), egui::Button::new("Open Log Folder"))
+                    .clicked()
+                {
+                    if let Some(c) = &case {
+                        crate::platform::open(&c.log_dir());
+                    }
+                    ui.close();
+                }
                 if ui.button("About postmortem").clicked() {
                     self.about_open = true;
                     ui.close();
@@ -1459,16 +1568,16 @@ impl PostmortemApp {
         });
         let case = self.analysis.lock().case().cloned();
         let tags = self.tagging.catalog.get(ui.ctx(), case.as_ref());
-        let ev = self.table.ui(ui, &data.rows, &self.prefs, Some(&tags));
-        if let (Some((i, req)), Some(case)) = (ev.tag, case.as_ref())
-            && let Some(id) = data.rows.get(i).and_then(FileRow::file_id)
-        {
-            self.tagging.request(
-                ui.ctx(),
-                case,
-                crate::tags_ui::TagTarget::Files(vec![id]),
-                req,
-            );
+        let menus = RowMenus {
+            tags: Some(&tags),
+            hash_sets: &self.persisted.ingest.hash_lookup.sets,
+        };
+        let ev = self.table.ui(ui, &data.rows, &self.prefs, menus);
+        let csv = ev
+            .csv
+            .then(|| self.table.csv(&data.rows, &self.prefs, None));
+        if let Some(case) = &case {
+            self.file_table_actions(ui.ctx(), case, &data.rows, &ev, csv);
         }
         if let Some(rec) = ev.selected.and_then(|i| data.records.get(i)) {
             let content = self.content_for(rec);
@@ -2356,13 +2465,13 @@ impl PostmortemApp {
         }
         ui.weak(format!("{} items", rows.len()));
         let tags = self.tagging.catalog.get(&ctx, Some(&case));
-        let ev = self.table.ui(ui, &rows, &self.prefs, Some(&tags));
-        if let Some((r, req)) = ev.tag.as_ref().and_then(|(i, q)| Some((rows.get(*i)?, *q)))
-            && let Some(id) = r.file_id()
-        {
-            self.tagging
-                .request(&ctx, &case, crate::tags_ui::TagTarget::Files(vec![id]), req);
-        }
+        let menus = RowMenus {
+            tags: Some(&tags),
+            hash_sets: &self.persisted.ingest.hash_lookup.sets,
+        };
+        let ev = self.table.ui(ui, &rows, &self.prefs, menus);
+        let csv = ev.csv.then(|| self.table.csv(&rows, &self.prefs, None));
+        self.file_table_actions(&ctx, &case, &rows, &ev, csv);
         let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
         if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {
             self.viewer.set_content(Some(content(r)));
@@ -2376,9 +2485,6 @@ impl PostmortemApp {
                 self.open_popout(content(r));
             }
         }
-        if let Some(r) = ev.popout.and_then(|i| rows.get(i)) {
-            self.open_popout(content(r));
-        }
         if let Some(r) = ev.timeline.and_then(|i| rows.get(i)) {
             let t = r
                 .meta
@@ -2388,9 +2494,6 @@ impl PostmortemApp {
             if let (Some(t), Some(tl)) = (t, self.open_timeline(&ctx)) {
                 tl.lock().focus(t, 60);
             }
-        }
-        if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
-            self.export(&ctx, content(r));
         }
     }
 
@@ -2654,6 +2757,40 @@ impl PostmortemApp {
         }
     }
 
+    /// Autopsy's "Delete Case" confirmation: closes the case, then
+    /// removes its folder in the background.
+    fn delete_case_dialog(&mut self, ctx: &egui::Context) {
+        let Some((dir, name)) = self.confirm_delete_case.clone() else {
+            return;
+        };
+        let mut close = false;
+        egui::Modal::new(egui::Id::new("delete-case")).show(ctx, |ui| {
+            ui.heading("Delete Case");
+            ui.label(format!(
+                "Are you sure you want to close and delete the case {name}?\nThe case database, index, reports and exported files in\n{}\nwill be deleted. Evidence images are not deleted.",
+                dir.display()
+            ));
+            ui.horizontal(|ui| {
+                if ui.button("Delete").clicked() {
+                    self.close_case(ctx);
+                    self.persisted.recent_cases.retain(|p| p != &dir && p.parent() != Some(dir.as_path()));
+                    let dir = dir.clone();
+                    self.exports.push(Task::spawn(ctx, move || {
+                        pm_case::delete_case_folder(&dir).map_err(|e| e.to_string())?;
+                        Ok(dir.display().to_string())
+                    }));
+                    close = true;
+                }
+                if ui.button("Cancel").clicked() {
+                    close = true;
+                }
+            });
+        });
+        if close {
+            self.confirm_delete_case = None;
+        }
+    }
+
     /// The toolbar's Keyword Search panel.
     fn keyword_panel(&mut self, ctx: &egui::Context) {
         use crate::keyword_search_ui::PanelAction;
@@ -2810,28 +2947,28 @@ impl PostmortemApp {
         let query = s.request.query.clone();
         let rows = &data.rows;
         let tags = self.tagging.catalog.get(&ctx, Some(&case));
+        let menus = RowMenus {
+            tags: Some(&tags),
+            hash_sets: &self.persisted.ingest.hash_lookup.sets,
+        };
         let ev = s.table.ui_with(
             ui,
             rows,
             &self.prefs,
-            Some(&tags),
+            menus,
             Some(("Keyword Preview", &data.previews)),
         );
-        if let Some((i, req)) = ev.tag
-            && let Some(id) = rows.get(i).and_then(FileRow::file_id)
-        {
-            self.tagging
-                .request(&ctx, &case, crate::tags_ui::TagTarget::Files(vec![id]), req);
-        }
+        let csv = ev.csv.then(|| {
+            s.table
+                .csv(rows, &self.prefs, Some(("Keyword Preview", &data.previews)))
+        });
+        self.file_table_actions(&ctx, &case, rows, &ev, csv);
         let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
         if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {
             self.viewer.show(Some(content(r)), Some(query));
         }
-        if let Some(r) = ev.activated.or(ev.popout).and_then(|i| rows.get(i)) {
+        if let Some(r) = ev.activated.and_then(|i| rows.get(i)) {
             self.open_popout(content(r));
-        }
-        if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
-            self.export(&ctx, content(r));
         }
     }
 
@@ -2873,22 +3010,19 @@ impl PostmortemApp {
             format!("{} matches", crate::format::grouped(rows.len() as u64))
         });
         let tags = self.tagging.catalog.get(&ctx, Some(&case));
-        let ev = s.table.ui(ui, rows, &self.prefs, Some(&tags));
-        if let Some((i, req)) = ev.tag
-            && let Some(id) = rows.get(i).and_then(FileRow::file_id)
-        {
-            self.tagging
-                .request(&ctx, &case, crate::tags_ui::TagTarget::Files(vec![id]), req);
-        }
+        let menus = RowMenus {
+            tags: Some(&tags),
+            hash_sets: &self.persisted.ingest.hash_lookup.sets,
+        };
+        let ev = s.table.ui(ui, rows, &self.prefs, menus);
+        let csv = ev.csv.then(|| s.table.csv(rows, &self.prefs, None));
+        self.file_table_actions(&ctx, &case, rows, &ev, csv);
         let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
         if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {
             self.viewer.set_content(Some(content(r)));
         }
-        if let Some(r) = ev.activated.or(ev.popout).and_then(|i| rows.get(i)) {
+        if let Some(r) = ev.activated.and_then(|i| rows.get(i)) {
             self.open_popout(content(r));
-        }
-        if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
-            self.export(&ctx, content(r));
         }
     }
 
@@ -2918,6 +3052,7 @@ impl PostmortemApp {
             }
         }
         self.remove_data_source_dialog(ctx);
+        self.delete_case_dialog(ctx);
         if let Some(w) = self.add_wizard.as_mut() {
             match w.ui(ctx) {
                 crate::add_source::AddAction::None => {}
@@ -3063,12 +3198,22 @@ impl PostmortemApp {
     /// Tools › Options.
     pub fn open_options(&mut self) {
         let p = &self.persisted;
+        let case_root = p
+            .case_root
+            .clone()
+            .unwrap_or_else(crate::analysis::default_case_root);
         self.options = Some(crate::options_ui::OptionsWindow::new(
             crate::options_ui::Settings {
                 local_time: p.local_time,
                 hide_known_in_views: p.hide_known_in_views,
                 custom_tags: p.custom_tags.clone(),
+                hash_lookup: p.ingest.hash_lookup.clone(),
             },
+            // `~/postmortem/HashSets`, beside the cases folder.
+            case_root
+                .parent()
+                .map_or_else(|| case_root.clone(), std::path::Path::to_path_buf)
+                .join("HashSets"),
         ));
     }
 
@@ -3107,6 +3252,7 @@ impl PostmortemApp {
             }
             self.persisted.custom_tags = s.custom_tags;
         }
+        self.persisted.ingest.hash_lookup = s.hash_lookup;
     }
 
     /// Draws one frame (shared by eframe and UI tests).
@@ -3188,4 +3334,58 @@ impl eframe::App for PostmortemApp {
     fn save(&mut self, storage: &mut dyn eframe::Storage) {
         eframe::set_value(storage, eframe::APP_KEY, &self.persisted);
     }
+}
+
+/// Copies a file's content to `dest`.
+fn copy_out(src: &dyn pm_core::io::ReadAt, dest: &std::path::Path) -> Result<(), String> {
+    let mut out = std::fs::File::create(dest).map_err(|e| format!("{}: {e}", dest.display()))?;
+    let mut buf = vec![0u8; 1 << 20];
+    let mut off = 0;
+    while off < src.size() {
+        let n = src.read_at(off, &mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        std::io::Write::write_all(&mut out, buf.get(..n).unwrap_or_default())
+            .map_err(|e| e.to_string())?;
+        off += n as u64;
+    }
+    Ok(())
+}
+
+/// Add File to Hash Set (Autopsy `AddContentToHashDbAction`): the file's
+/// MD5 (computed now if ingest has not) and SHA-256, with its name.
+fn add_to_hash_set(content: &Content, set: &std::path::Path) -> Result<String, String> {
+    use md5::Digest as _;
+    let rec = content.row.file.as_deref();
+    let known = rec
+        .and_then(|f| f.md5.as_deref())
+        .and_then(|m| <[u8; 16]>::try_from(m).ok());
+    let md5 = if let Some(m) = known {
+        m
+    } else {
+        let src = content.source()?;
+        let mut h = md5::Md5::new();
+        let mut buf = vec![0u8; 1 << 20];
+        let mut off = 0;
+        while off < src.size() {
+            let n = src.read_at(off, &mut buf).map_err(|e| e.to_string())?;
+            if n == 0 {
+                break;
+            }
+            h.update(buf.get(..n).unwrap_or_default());
+            off += n as u64;
+        }
+        h.finalize().into()
+    };
+    let db = pm_hashdb::HashDb::open(set, false).map_err(|e| e.to_string())?;
+    db.add(
+        &md5,
+        None,
+        rec.and_then(|f| f.sha256.as_deref()),
+        Some(&content.row.name),
+        None,
+    )
+    .map_err(|e| format!("{}: {e}", set.display()))?;
+    Ok(set.display().to_string())
 }

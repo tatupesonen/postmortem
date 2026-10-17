@@ -1253,3 +1253,75 @@ fn communications_window_browses_accounts_and_messages() {
     click_exact(&mut h, "Visualize");
     shot(&mut h, "communications_graph");
 }
+
+#[test]
+fn delete_case_from_the_case_menu() {
+    let mut h = harness(vec![demo()]);
+    wait_analysed(&mut h);
+    let dir = h.state().analysis_case_dir().expect("case folder");
+    assert!(dir.join("case.pmcase").is_file());
+    click_exact(&mut h, "Case");
+    click_exact(&mut h, "Delete Case");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("close and delete the case")
+            .is_some()
+    });
+    shot(&mut h, "delete_case");
+    click_exact(&mut h, "Delete");
+    settle(&mut h, |h| !h.state().has_case() && !dir.exists());
+}
+
+/// Options › Hash Sets creates an updateable set; the file table's Add
+/// File to Hash Set stores a file's MD5 in it.
+#[test]
+fn new_hash_set_receives_files_from_the_table() {
+    let mut h = harness(vec![demo()]);
+    wait_analysed(&mut h);
+    let name = format!("ui-set-{}", std::process::id());
+    let kdb = CASES
+        .path()
+        .parent()
+        .unwrap()
+        .join("HashSets")
+        .join(format!("{name}.kdb"));
+    let _ = std::fs::remove_file(&kdb);
+    click(&mut h, "Tools");
+    click(&mut h, "Options");
+    click_exact(&mut h, "Hash Sets");
+    click_exact(&mut h, "New Hash Set…");
+    let field = h
+        .query_all(egui_kittest::kittest::by().role(egui::accesskit::Role::TextInput))
+        .next()
+        .expect("hash set name field");
+    field.focus();
+    field.type_text(&name);
+    h.run_steps(2);
+    h.query_all_by_label("OK").last().unwrap().click();
+    h.run_steps(2);
+    settle(&mut h, |h| h.query_by_label("Updateable:").is_some());
+    h.get_by_label("Yes");
+    shot(&mut h, "options_hash_sets");
+    click_exact(&mut h, "OK");
+    assert!(kdb.is_file());
+
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    settle(&mut h, |h| h.query_by_label("🗋 setup.exe").is_some());
+    h.get_by_label("🗋 setup.exe").click_secondary();
+    h.run_steps(2);
+    click(&mut h, "Add File to Hash Set");
+    shot(&mut h, "add_to_hash_set");
+    click_exact(&mut h, &name);
+    let md5 = pm_hashdb::parse_md5_hex(&setup_exe_md5()).unwrap();
+    settle(&mut h, |_| {
+        pm_hashdb::HashDb::open(&kdb, true)
+            .and_then(|db| db.lookup(&md5))
+            .is_ok_and(|hit| hit.is_some())
+    });
+    let _ = std::fs::remove_file(&kdb);
+}

@@ -1,8 +1,8 @@
 //! Tools › Options (Autopsy's options dialog): one page per
 //! category, edited on a draft that OK or Apply commits and Cancel drops.
 //!
-//! Pages so far: View (`ViewPreferencesPanel`) and Tags
-//! (`TagOptionsPanel` with its `TagNameDialog`).
+//! Pages so far: View (`ViewPreferencesPanel`), Tags (`TagOptionsPanel`
+//! with its `TagNameDialog`) and Hash Sets (`HashLookupSettingsPanel`).
 
 use crate::tags_ui::{STANDARD_TAGS, TagDefinition, upsert_definition};
 
@@ -11,15 +11,17 @@ use crate::tags_ui::{STANDARD_TAGS, TagDefinition, upsert_definition};
 pub(crate) enum Page {
     View,
     Tags,
+    HashSets,
 }
 
 impl Page {
-    const ALL: [Self; 2] = [Self::View, Self::Tags];
+    const ALL: [Self; 3] = [Self::View, Self::Tags, Self::HashSets];
 
     fn title(self) -> &'static str {
         match self {
             Self::View => "View",
             Self::Tags => "Tags",
+            Self::HashSets => "Hash Sets",
         }
     }
 }
@@ -31,6 +33,8 @@ pub(crate) struct Settings {
     pub(crate) hide_known_in_views: bool,
     /// User tag definitions, sorted by name.
     pub(crate) custom_tags: Vec<TagDefinition>,
+    /// The hash sets new ingest jobs start with.
+    pub(crate) hash_lookup: pm_modules::hash_lookup::HashLookupSettings,
 }
 
 /// What the dialog asks the app to do after a frame.
@@ -51,15 +55,18 @@ pub(crate) struct OptionsWindow {
     saved: Settings,
     draft: Settings,
     tags: TagsPage,
+    hash_sets: crate::options_hashsets::HashSetsPage,
 }
 
 impl OptionsWindow {
-    pub(crate) fn new(current: Settings) -> Self {
+    /// `hash_set_dir`: where New Hash Set creates sets by default.
+    pub(crate) fn new(current: Settings, hash_set_dir: std::path::PathBuf) -> Self {
         Self {
             page: Page::View,
             saved: current.clone(),
             draft: current,
             tags: TagsPage::default(),
+            hash_sets: crate::options_hashsets::HashSetsPage::new(hash_set_dir),
         }
     }
 
@@ -105,6 +112,7 @@ impl OptionsWindow {
                     Page::Tags => self
                         .tags
                         .ui(ui, &mut self.draft.custom_tags, ingest_running),
+                    Page::HashSets => self.hash_sets.ui(ui, &mut self.draft.hash_lookup),
                 });
             });
         self.tags.dialog_ui(ctx, &mut self.draft.custom_tags);

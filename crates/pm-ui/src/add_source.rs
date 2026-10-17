@@ -382,13 +382,7 @@ impl RunIngestDialog {
     }
 }
 
-fn kind_name(k: SetKind) -> &'static str {
-    match k {
-        SetKind::Known => "Known",
-        SetKind::Notable => "Notable",
-        SetKind::NoChange => "No Change",
-    }
-}
+use crate::options_hashsets::kind_name;
 
 /// Hash Lookup's per-run settings: the hash sets and "calculate MD5".
 fn hash_sets_ui(ui: &mut egui::Ui, s: &mut HashLookupSettings) {

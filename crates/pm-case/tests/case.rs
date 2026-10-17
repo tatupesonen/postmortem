@@ -803,3 +803,30 @@ fn reopened_real_case_reads_content() {
         }
     }
 }
+
+#[test]
+fn delete_removes_the_case_but_keeps_foreign_files() {
+    let (tmp, case, _) = loaded_case();
+    let dir = case.dir().to_path_buf();
+    case.index().unwrap();
+    case.delete().unwrap();
+    assert!(!dir.exists(), "an all-postmortem folder is removed");
+
+    let dir = tmp.path().join("kept");
+    let case = Case::create(&dir, details()).unwrap();
+    std::fs::write(dir.join("notes.txt"), "mine").unwrap();
+    case.delete().unwrap();
+    let left: Vec<_> = std::fs::read_dir(&dir)
+        .unwrap()
+        .map(|e| e.unwrap().file_name())
+        .collect();
+    assert_eq!(left, ["notes.txt"]);
+
+    assert!(
+        Case::create(tmp.path().join("x"), details()).is_ok_and(|c| {
+            std::fs::remove_file(c.case_file()).unwrap();
+            c.delete().is_err()
+        }),
+        "a folder without case.pmcase is refused"
+    );
+}

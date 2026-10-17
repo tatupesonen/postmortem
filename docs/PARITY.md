@@ -53,12 +53,12 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Open Recent Case (menu + welcome list) | `RecentCases`, `OpenRecentCasePanel` | Partial | Present in the menu and the welcome screen. Not done: removing missing cases from the list, and the 2-column dialog. No test. |
 | Welcome / startup window | `StartupWindowProvider`, `StartupWindow`, `CueBannerPanel` | Done | `case_ui::welcome`, with screenshot test. |
 | Close Case (with ingest-running check) | `CaseCloseAction`, `actions/IngestRunningCheck` | Partial | Close exists. No confirmation when closing while ingest is running. |
-| Delete Case | `CaseDeleteAction`, `Case.deleteCurrentCase` | Missing | No API in `pm-case` and no UI. |
+| Delete Case | `CaseDeleteAction`, `Case.deleteCurrentCase` | Done | Case › Delete Case: confirmation, closes the case, `pm_case::delete_case_folder` removes what postmortem created (the folder only if nothing foreign is left). |
 | Case Details dialog (view/edit properties, data source list) | `CaseDetailsAction`, `CaseInformationPanel`, `CaseDetailsPanel`, `EditOptionalCasePropertiesPanel` | Partial | `Case::set_details` exists with a test. No dialog after creation. |
 | Remove data source | `DeleteDataSourceAction`, `Case.deleteDataSourceFromCurrentCase` | Partial | `Case::delete_data_source` exists with a test. No UI action. |
 | Missing image relocation on open | `MissingImageDialog` | Partial | `relocate_data_source` exists and is tested (`moved_evidence_is_reported_and_can_be_relocated`). No UI prompt. |
 | Unpack and Open Portable Case | `UnpackagePortableCaseAction/Dialog` | Missing | Depends on the Portable Case report (§26). |
-| Open Case Folder / Open Output Folder / Open Log Folder | `A/actions/OpenOutputFolderAction`, `OpenLogFolderAction`, Tools › Open Case Folder | Missing | — |
+| Open Case Folder / Open Output Folder / Open Log Folder | `A/actions/OpenOutputFolderAction`, `OpenLogFolderAction`, Tools › Open Case Folder | Partial | Case › Open Case Folder and Help › Open Log Folder (case `Log`). The app log still goes to stderr only. |
 | Case events bus (`Case.Events`: DATA_SOURCE_ADDED, tags, reports, CR comment, hosts…) | `A/casemodule/events/*`, `A/events/*` | Missing | No event bus in `pm-case`. The UI polls and refreshes instead. |
 | Examiner recording | `Case`/TSK `examiners` | Partial | There is a table and the examiner is typed into the wizard. The OS-login examiner is not used for tags (there are no tag writes from the UI). |
 | AutopsyService case-open hooks | `A/appservices/AutopsyService` | Missing | Plugin lifecycle hooks; relevant to WP-24. |
@@ -196,7 +196,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Artifact row columns (Source Name, Score/Conclusion/Justification, per-attribute columns, Data Source, File Path…) | `BlackboardArtifactNode.createSheet` | Partial | Attribute columns plus source file. No score columns, Data Source column, or the email/mismatch special cases. |
 | S / C / O columns (async) | `GetSCOTask`, `SCOData` | Partial | S and C done; O needs the Central Repository. |
 | Paging (page size pref, go-to page) | `BaseChildFactory` paging | Missing | Virtualisation replaces it for files; results have a hard cap. |
-| Save Table as CSV / Export Selected Rows to CSV | `ExportCSVAction` | Missing | — |
+| Save Table as CSV / Export Selected Rows to CSV | `ExportCSVAction` | Partial | "Export Table to CSV…" on every file table (shown order, all columns, RFC 4180 quoting). Not yet on result/artifact tables; no selected-rows export. |
 | Thumbnail tab (S/M/L, 200/page, sort chooser) | `DataResultViewerThumbnail`, `SortChooser` | Missing | Thumbnails exist only in the Gallery/Discovery windows. |
 | Summary tab (Data Source Summary in result pane) | `resultviewers/summary` | Partial | See §23. |
 | Review status: Approve / Reject accounts and results | `datamodel/accounts` actions | Missing | The column exists in the DB. |
@@ -209,16 +209,16 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | View in New Window | `NewWindowViewAction` | Done | "Open in New Window" plus pop-out viewports. |
 | Extract File(s) / folders (recursive, with name collision handling) | `ExtractAction`, `actionhelpers/ExtractActionHelper` | Partial | Single file only. No folders, multi-select or progress. |
 | Extract Unallocated Space to Single File(s) | `ExtractUnallocAction` | Missing | — |
-| Open in External Viewer (Ctrl+E) + External Viewer rules | `ExternalViewerAction`, `ExternalViewerShortcutAction`, `ExternalViewerRulesManager` | Missing | 18 Autopsy UI tests to port (08 §12). |
+| Open in External Viewer (Ctrl+E) + External Viewer rules | `ExternalViewerAction`, `ExternalViewerShortcutAction`, `ExternalViewerRulesManager` | Partial | Extracts to `Temp/external` and opens with the OS default app. No Ctrl+E shortcut or per-MIME rules. |
 | View File in Timeline / View Result in Timeline | `ViewFileInTimelineAction`, timeline actions | Partial | Done for files. Not done for artifacts. |
 | View in Directory (from result rows / tags) | `ViewContextAction` | Partial | Result rows open the source file in the viewer. They do not navigate the tree. |
 | View Source Result / View Associated Content / View Artifact / View OS Account | `ViewSourceArtifactAction`, `ViewAssociatedContentAction`, `actions/ViewArtifactAction`, `ViewOsAccountAction` | Missing | — |
 | Copy Path | (NetBeans copy) | Done | — |
 | Add File Tag / Add Result Tag / Replace / Remove (with comment), Bookmark Ctrl+B | `A/actions/*Tag*`, `GetTagNameAndCommentDialog` | Done | Includes Ctrl+B Bookmark and Tag and Comment. |
-| Add File(s) to Hash Set | `hashdatabase/AddContentToHashDbAction` | Missing | `pm-hashdb` can write kdb (`add`). |
+| Add File(s) to Hash Set | `hashdatabase/AddContentToHashDbAction` | Done | File table submenu lists updateable (.kdb) sets; MD5 computed if ingest has not, SHA-256 added when known. |
 | Image Details / Volume Details / File System Details | `ImageDetailsPanel`, `VolumeDetailsPanel`, `FileSystemDetailsPanel` | Missing | — |
-| Run Ingest Modules (on a data source) | `ingest/runIngestModuleWizard/*`, `RunIngestModulesAction` | Missing | The `pm-ingest` API supports it; no UI. |
-| Remove Data Source | `DeleteDataSourceAction` | Missing (UI) | API done. |
+| Run Ingest Modules (on a data source) | `ingest/runIngestModuleWizard/*`, `RunIngestModulesAction` | Done | Data source context menu › Run Ingest Modules (module/filter dialog). |
+| Remove Data Source | `DeleteDataSourceAction` | Done | Data source context menu, with confirmation; disabled while ingest runs. |
 | Open File Search by Attributes (on a data source) | `FileSearchTreeAction` | Done | — |
 | View Summary Information (on a data source) | `ViewSummaryInformationAction` | Partial | Selecting a DS shows the summary. |
 | Drag-and-drop image to add | — | Done | Postmortem extra. |
@@ -273,7 +273,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Custom file ingest filters (FilesSet rules) | `FilesSetsManager`, `IngestOptionsPanel` › File Filters | Partial | The FilesSet engine is in progress (core-file-modules). Wiring into `pm-ingest`, the UI and 7 `IngestFileFiltersTest` ports are untracked. |
 | Ingest profiles | `ingest/profile/IngestProfiles`, `ProfileSettingsPanel` | Missing | — |
 | Ingest options (threads, process timeout) | `IngestOptionsPanel` › Settings | Partial | `JobSettings.threads` exists; no UI. |
-| Run Ingest Modules wizard on existing data source | `runIngestModuleWizard/*` | Missing | — |
+| Run Ingest Modules wizard on existing data source | `runIngestModuleWizard/*` | Done | See "Run Ingest Modules (on a data source)". |
 | Per-module settings panels (job + global) | `IngestModuleIngestJobSettingsPanel`, `IngestModuleGlobalSettingsPanel` | Partial | Hash Lookup only. |
 | Ingest inbox (messages, unique-key grouping, details) | `IngestMessageTopComponent`, `IngestMessagePanel` | Partial | Inbox exists (capped errors) and is shown in the progress window. No toolbar inbox with unread count, no grouping and no "view content" link. |
 | Ingest progress snapshot (per-thread activity, module times) | `IngestProgressSnapshotPanel` | Done | `analysis.rs` `snapshot_ui`. |
@@ -288,7 +288,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 |---|---|---|---|
 | Hash Lookup (known/notable sets, calculate MD5 w/o sets, inbox per hit, TSK_HASHSET_HIT) | `modules/hashdatabase/HashDbIngestModule` | Done | `pm-modules/src/hash_lookup.rs`, with 4 end-to-end tests. |
 | Hash set formats: kdb, NSRL RDS v2/v3, md5sum, HashKeeper, EnCase, idx | `hashdatabase/*Parser`, TSK | Done | `pm-hashdb`, with tests. Port of the 08 `test/input` idx fixtures still owed. |
-| Hash Sets options panel (create, import, index, delete, add hashes dialog, import into CR) | `HashLookupSettingsPanel`, `HashDbCreateDatabaseDialog`, `HashDbImportDatabaseDialog`, `AddHashValuesToDatabaseDialog` | Partial | "Add Hash Set…" exists in the wizard only. No global manager, create, add-hashes or CR import. |
+| Hash Sets options panel (create, import, index, delete, add hashes dialog, import into CR) | `HashLookupSettingsPanel`, `HashDbCreateDatabaseDialog`, `HashDbImportDatabaseDialog`, `AddHashValuesToDatabaseDialog` | Partial | Options › Hash Sets: create .kdb, import any format, details (type, hashes, index state, updateable), index/re-index in the background, kind, search/inbox flags, remove. No add-hashes dialog or CR import. |
 | File Type Identification (Tika-equivalent) | `modules/filetypeid` | Done | Matches Tika 3.0.0 on 10 861 test files; ~23× faster. |
 | User-defined file types (Options › File Types) | `filetypeid/FileTypeIdGlobalSettingsPanel`, `AddFileTypeSignatureDialog` | Partial | Engine done; Options › File Types UI missing. |
 | Extension Mismatch Detector (+ options panel table) | `modules/fileextmismatch` | Partial | Module done; options table UI missing. |
@@ -505,7 +505,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Auto Ingest / Case Import | `EXP/configuration`, `EXP/autoingest/CaseImportPanel` | Missing | — |
 | Keyword Search | KWS panels | Missing (UI) | — |
 | Machine Translation | `texttranslation` | Missing | — |
-| Hash Sets | `HashLookupSettingsPanel` | Partial | Wizard only. |
+| Hash Sets | `HashLookupSettingsPanel` | Partial | Options › Hash Sets page (see the Hash Sets options panel row). |
 | File Extension Mismatch | `FileExtMismatchSettingsPanel` | Missing (UI) | Engine is in progress. |
 | File Types | `FileTypeIdGlobalSettingsPanel` | Missing (UI) | — |
 | Interesting Files | `InterestingItemsDefsPanel` | Missing (UI) | — |

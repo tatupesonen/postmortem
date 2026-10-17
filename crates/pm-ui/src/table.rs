@@ -142,8 +142,24 @@ pub(crate) struct TableEvents {
     pub(crate) popout: Option<usize>,
     pub(crate) export: Option<usize>,
     pub(crate) timeline: Option<usize>,
+    /// Open in External Viewer.
+    pub(crate) external: Option<usize>,
+    /// Export Table to CSV.
+    pub(crate) csv: bool,
+    /// Add File to Hash Set: the row and the set's path.
+    pub(crate) add_hash: Option<(usize, std::path::PathBuf)>,
     /// A tag menu choice for a row.
     pub(crate) tag: Option<(usize, TagRequest)>,
+}
+
+/// What the row context menu offers beyond the built-in actions.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct RowMenus<'a> {
+    /// Enables Add/Remove File Tag.
+    pub(crate) tags: Option<&'a TagCatalog>,
+    /// The configured hash sets; updateable (`.kdb`) ones are offered by
+    /// Add File to Hash Set.
+    pub(crate) hash_sets: &'a [pm_modules::hash_lookup::HashSetConfig],
 }
 
 /// Persistent table state.
@@ -175,15 +191,15 @@ impl TableState {
         self.order = None;
     }
 
-    /// Draws the table; `tags` enables the Add/Remove File Tag menus.
+    /// Draws the table.
     pub(crate) fn ui(
         &mut self,
         ui: &mut egui::Ui,
         rows: &[FileRow],
         prefs: &DisplayPrefs,
-        tags: Option<&TagCatalog>,
+        menus: RowMenus<'_>,
     ) -> TableEvents {
-        self.ui_with(ui, rows, prefs, tags, None)
+        self.ui_with(ui, rows, prefs, menus, None)
     }
 
     /// [`Self::ui`] with an extra text column after Name (e.g. Autopsy's
@@ -193,9 +209,10 @@ impl TableState {
         ui: &mut egui::Ui,
         rows: &[FileRow],
         prefs: &DisplayPrefs,
-        tags: Option<&TagCatalog>,
+        menus: RowMenus<'_>,
         extra: Option<(&str, &[String])>,
     ) -> TableEvents {
+        let tags = menus.tags;
         let mut ev = TableEvents::default();
         let key = rows.as_ptr() as usize;
         let stale = !matches!(&self.order, Some((k, c, a, _)) if *k == key && *c == self.sort && *a == self.ascending);
@@ -412,9 +429,29 @@ impl TableState {
                                 ev.timeline = Some(i);
                                 ui.close();
                             }
+                            if ui
+                                .add_enabled(
+                                    !r.is_dir(),
+                                    egui::Button::new("Open in External Viewer"),
+                                )
+                                .clicked()
+                            {
+                                ev.external = Some(i);
+                                ui.close();
+                            }
                             if ui.button("Copy Path").clicked() {
                                 ui.ctx().copy_text(r.path.clone());
                                 ui.close();
+                            }
+                            if ui.button("Export Table to CSV…").clicked() {
+                                ev.csv = true;
+                                ui.close();
+                            }
+                            if !r.is_dir()
+                                && r.file_id().is_some()
+                                && let Some(path) = hash_set_menu(ui, menus.hash_sets)
+                            {
+                                ev.add_hash = Some((i, path));
                             }
                             if let Some(cat) = tags.filter(|_| r.file_id().is_some()) {
                                 ui.separator();
@@ -438,6 +475,90 @@ impl TableState {
         });
         ev
     }
+}
+
+/// Autopsy's "Add File to Hash Set" submenu: the updateable sets.
+fn hash_set_menu(
+    ui: &mut egui::Ui,
+    sets: &[pm_modules::hash_lookup::HashSetConfig],
+) -> Option<std::path::PathBuf> {
+    let mut chosen = None;
+    ui.menu_button("Add File to Hash Set", |ui| {
+        let mut any = false;
+        for set in sets.iter().filter(|s| s.updateable()) {
+            any = true;
+            if ui.button(set.display_name()).clicked() {
+                chosen = Some(set.path.clone());
+                ui.close();
+            }
+        }
+        if !any {
+            ui.weak("No updateable hash sets.\nCreate one in Tools › Options › Hash Sets.");
+        }
+    });
+    chosen
+}
+
+impl TableState {
+    /// The listing as CSV in the shown order (Autopsy's "Save Table as
+    /// CSV"): every column, `extra` after Name.
+    pub(crate) fn csv(
+        &self,
+        rows: &[FileRow],
+        prefs: &DisplayPrefs,
+        extra: Option<(&str, &[String])>,
+    ) -> String {
+        let order = match &self.order {
+            Some((k, ..)) if *k == rows.as_ptr() as usize => {
+                self.order.as_ref().map(|o| o.3.clone())
+            }
+            _ => None,
+        }
+        .unwrap_or_else(|| sorted_indices(rows, self.sort, self.ascending));
+        let mut out = String::new();
+        let mut line = |cells: &mut dyn Iterator<Item = String>| {
+            let quoted: Vec<String> = cells.map(|c| csv_field(&c)).collect();
+            out.push_str(&quoted.join(","));
+            out.push_str("\r\n");
+        };
+        let mut head = vec!["Name".to_owned()];
+        head.extend(extra.map(|(t, _)| t.to_owned()));
+        head.extend(Col::ALL.iter().skip(1).map(|c| c.title().to_owned()));
+        line(&mut head.into_iter());
+        for i in order {
+            let Some(r) = rows.get(i) else { continue };
+            let times = r.meta.as_ref().map(|m| m.times).unwrap_or_default();
+            let alloc = |a: bool| if a { "Allocated" } else { "Unallocated" }.to_owned();
+            let mut cells = vec![r.name.clone()];
+            if let Some((_, e)) = extra {
+                cells.push(e.get(i).cloned().unwrap_or_default());
+            }
+            cells.push(score(r).map(|s| s.name().to_owned()).unwrap_or_default());
+            cells.push(match comment(r) {
+                Some(CommentStatus::TagComment) => "Tag with comment".into(),
+                Some(CommentStatus::TagNoComment) => "Tag".into(),
+                _ => String::new(),
+            });
+            for t in [times.modified, times.changed, times.accessed, times.created] {
+                cells.push(prefs.time(t));
+            }
+            cells.push(r.size.to_string());
+            cells.push(alloc(r.name_allocated));
+            cells.push(alloc(r.meta_allocated()));
+            cells.push(r.extension().to_owned());
+            cells.push(match r.stream {
+                Some(s) => format!("{}:{s}", r.inode),
+                None => r.inode.to_string(),
+            });
+            line(&mut cells.into_iter());
+        }
+        out
+    }
+}
+
+/// A CSV field, quoted as RFC 4180 requires.
+pub(crate) fn csv_field(s: &str) -> String {
+    format!("\"{}\"", s.replace('"', "\"\""))
 }
 
 #[cfg(test)]
@@ -498,6 +619,22 @@ mod tests {
             names(sorted_indices(&rows, Col::Size, true)),
             ["Zdir", "adir", "b.txt", "a.txt"]
         );
+    }
+
+    #[test]
+    fn csv_follows_sort_and_quotes() {
+        let rows = vec![row("b \"x\".txt", false, 5), row("a,b.txt", false, 9)];
+        let t = TableState {
+            sort: Col::Size,
+            ascending: false,
+            ..TableState::default()
+        };
+        let csv = t.csv(&rows, &DisplayPrefs::default(), None);
+        let lines: Vec<&str> = csv.lines().collect();
+        assert!(lines[0].starts_with("\"Name\",\"S\",\"C\",\"Modified Time\""));
+        assert!(lines[1].starts_with("\"a,b.txt\""));
+        assert!(lines[2].starts_with("\"b \"\"x\"\".txt\""));
+        assert_eq!(lines.len(), 3);
     }
 
     #[test]

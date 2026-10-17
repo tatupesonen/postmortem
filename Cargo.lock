@@ -5651,6 +5651,7 @@ dependencies = [
  "pm-evidence",
  "pm-fs",
  "pm-geo",
+ "pm-hashdb",
  "pm-image",
  "pm-index",
  "pm-ingest",

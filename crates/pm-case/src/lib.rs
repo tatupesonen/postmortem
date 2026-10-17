@@ -18,7 +18,9 @@ mod content;
 pub mod derived;
 pub mod load;
 
-pub use case::{CASE_FILE, Case, CaseDetails, CaseKind, DB_FILE, Examiner, SUBDIRS};
+pub use case::{
+    CASE_FILE, Case, CaseDetails, CaseKind, DB_FILE, Examiner, SUBDIRS, delete_case_folder,
+};
 pub use content::{layout_json, parse_layout};
 pub use load::{LoadOptions, LoadProgress, LoadSummary, add_evidence, add_image};
 

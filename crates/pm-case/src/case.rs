@@ -22,6 +22,41 @@ pub const SUBDIRS: &[&str] = &["Export", "Reports", "ModuleOutput", "Temp", "Log
 
 mod read_only;
 
+/// Removes a case folder's postmortem contents (see [`Case::delete`]); for
+/// a case that is already closed.
+pub fn delete_case_folder(dir: &Path) -> Result<()> {
+    let marker = dir.join(CASE_FILE);
+    if !marker.is_file() {
+        return Err(CaseError::BadCaseFile {
+            path: marker,
+            reason: "not a case folder".into(),
+        });
+    }
+    let files = [
+        DB_FILE.to_owned(),
+        format!("{DB_FILE}-wal"),
+        format!("{DB_FILE}-shm"),
+        format!("{DB_FILE}-journal"),
+    ];
+    for f in &files {
+        let p = dir.join(f);
+        match std::fs::remove_file(&p) {
+            Err(e) if e.kind() != std::io::ErrorKind::NotFound => return Err(io_err(&p)(e)),
+            _ => {}
+        }
+    }
+    for sub in SUBDIRS.iter().chain(&[pm_search::INDEX_DIR]) {
+        let p = dir.join(sub);
+        if p.is_dir() {
+            std::fs::remove_dir_all(&p).map_err(io_err(&p))?;
+        }
+    }
+    std::fs::remove_file(&marker).map_err(io_err(&marker))?;
+    // Leaves a folder that holds files postmortem did not create.
+    let _ = std::fs::remove_dir(dir);
+    Ok(())
+}
+
 const FORMAT: &str = "postmortem-case";
 const FORMAT_VERSION: u32 = 1;
 
@@ -172,6 +207,16 @@ impl Case {
 
     pub fn dir(&self) -> &Path {
         &self.dir
+    }
+
+    /// Deletes a case (Autopsy `Case.deleteCurrentCase`): consumes the
+    /// handle so the database is closed first, then removes what
+    /// postmortem created in the case folder. The folder itself goes only
+    /// if nothing else is left in it.
+    pub fn delete(self) -> Result<()> {
+        let dir = self.dir.clone();
+        drop(self);
+        delete_case_folder(&dir)
     }
 
     /// Path of `case.pmcase`.
