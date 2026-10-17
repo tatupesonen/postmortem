@@ -8,6 +8,7 @@
 //! Artifacts are written in one batch per extractor with duplicate checks
 //! on identifying attributes, so re-running ingest adds nothing new.
 
+mod accounts;
 mod art;
 mod execution;
 mod lnk;
