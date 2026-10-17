@@ -359,6 +359,17 @@ impl CaseDb {
         out
     }
 
+    /// Sets the size of a data source (e.g. a logical file set's total).
+    pub fn set_data_source_size(&self, ds_id: i64, size: u64) -> Result<()> {
+        self.write(|tx| {
+            tx.execute(
+                "UPDATE data_sources SET size = ?2 WHERE id = ?1",
+                params![ds_id, i64::try_from(size).unwrap_or(i64::MAX)],
+            )?;
+            Ok(())
+        })
+    }
+
     /// Updates the image paths of a data source (evidence moved).
     pub fn set_data_source_paths(&self, ds_id: i64, paths: &[String]) -> Result<()> {
         let json = serde_json::to_string(paths).map_err(|e| DbError::Invalid(e.to_string()))?;

@@ -151,14 +151,22 @@ pub struct FileSource {
 
 impl FileSource {
     pub fn open(path: impl AsRef<Path>) -> io::Result<Self> {
-        let file = File::open(path)?;
-        let size = file.metadata()?.len();
-        Ok(Self { file, size })
+        Self::from_file(File::open(path)?)
     }
 
     /// Wraps an already-open file. The size is sampled once.
-    pub fn from_file(file: File) -> io::Result<Self> {
-        let size = file.metadata()?.len();
+    pub fn from_file(mut file: File) -> io::Result<Self> {
+        let md = file.metadata()?;
+        let size = if md.is_file() {
+            md.len()
+        } else {
+            // Block devices (a local disk) report no length; their end
+            // does.
+            use std::io::Seek;
+            let end = file.seek(io::SeekFrom::End(0)).unwrap_or(0);
+            file.seek(io::SeekFrom::Start(0))?;
+            end
+        };
         Ok(Self { file, size })
     }
 }

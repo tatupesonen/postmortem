@@ -498,7 +498,10 @@ fn add_data_source_wizard_runs_configured_hash_lookup() {
     let mut h = harness_full(Vec::new(), true, ingest);
     h.run_steps(2);
     click_exact(&mut h, "➕ Add Data Source");
-    h.get_by_label_contains("Step 1 of 2");
+    h.get_by_label_contains("Step 1 of 3");
+    shot(&mut h, "add-source-type");
+    click_exact(&mut h, "Next ›");
+    h.get_by_label_contains("Step 2 of 3");
     h.get_all_by_role(egui::accesskit::Role::TextInput)
         .next()
         .unwrap()
@@ -510,7 +513,7 @@ fn add_data_source_wizard_runs_configured_hash_lookup() {
         .type_text(&pm_testkit::demo::demo_disk_file().display().to_string());
     h.run_steps(2);
     click_exact(&mut h, "Next ›");
-    h.get_by_label_contains("Step 2 of 2");
+    h.get_by_label_contains("Step 3 of 3");
     h.get_by_label("Hash Lookup");
     h.get_by_label("Bad stuff");
     shot(&mut h, "add-source-ingest");
@@ -867,6 +870,47 @@ fn file_search_by_name() {
     settle(&mut h, |h| h.query_by_label_contains("1 matches").is_some());
     h.get_by_label_contains("sunset.bmp");
     shot(&mut h, "file_search");
+}
+
+/// Logical files are added through the wizard and appear as a file set.
+#[test]
+fn add_logical_files_from_the_wizard() {
+    let dir = tempfile::tempdir().unwrap();
+    std::fs::create_dir(dir.path().join("docs")).unwrap();
+    std::fs::write(dir.path().join("docs/notes.txt"), "meet at the pier").unwrap();
+    std::fs::write(dir.path().join("loose.txt"), "loose file").unwrap();
+    let mut h = harness_with(Vec::new(), true);
+    h.run_steps(2);
+    click_exact(&mut h, "➕ Add Data Source");
+    click_exact(&mut h, "Logical Files");
+    click_exact(&mut h, "Next ›");
+    for p in ["docs", "loose.txt"] {
+        h.get_all_by_role(egui::accesskit::Role::TextInput)
+            .next()
+            .unwrap()
+            .click();
+        h.run_steps(1);
+        h.get_all_by_role(egui::accesskit::Role::TextInput)
+            .next()
+            .unwrap()
+            .type_text(&dir.path().join(p).display().to_string());
+        h.run_steps(1);
+        click_exact(&mut h, "Add Path");
+    }
+    shot(&mut h, "add-source-logical");
+    click_exact(&mut h, "Next ›");
+    h.get_by_label_contains("Step 3 of 3");
+    click_exact(&mut h, "Finish");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Analysed 2 logical files")
+            .is_some()
+    });
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("LogicalFileSet1")
+            .next()
+            .is_some()
+    });
+    shot(&mut h, "logical-files-added");
 }
 
 /// The data source menu runs ingest again and removes the data source.

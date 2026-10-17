@@ -17,12 +17,20 @@ mod case;
 mod content;
 pub mod derived;
 pub mod load;
+pub mod logical;
+pub mod raw_sources;
+pub mod spec;
 
 pub use case::{
     CASE_FILE, Case, CaseDetails, CaseKind, DB_FILE, Examiner, SUBDIRS, delete_case_folder,
 };
 pub use content::{layout_json, parse_layout};
 pub use load::{LoadOptions, LoadProgress, LoadSummary, add_evidence, add_image};
+pub use logical::{LogicalOptions, add_logical_files};
+pub use raw_sources::{
+    LocalDisk, RAW_CHUNK, RawOptions, add_local_disk, add_unallocated_image, local_disks,
+};
+pub use spec::{DataSourceSpec, add_data_source};
 
 use std::path::PathBuf;
 

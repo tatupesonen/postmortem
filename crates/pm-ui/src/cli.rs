@@ -15,18 +15,23 @@ use pm_ingest::{Inbox, IngestProgress};
 
 pub const USAGE: &str = "\
 usage: postmortem ingest --case <CASE DIR> [--enable ID,..] [--disable ID,..]
-                         [--threads N] [IMAGE ...]
+                         [--threads N] [SOURCE ...]
 
-Creates the case if the folder does not exist, adds each image (first
-segment of split or E01 sets) and runs the ingest modules on it. Without
-images the case is only opened, which upgrades a case made by an older
-postmortem.
+Creates the case if the folder does not exist, adds each data source and
+runs the ingest modules on it. Sources:
+  IMAGE               disk image or VM file (first segment of split or E01 sets)
+  --disk DEVICE       local disk or partition, read in place
+  --logical PATH,..   logical file set: files and folders, read in place
+                      (--times records their modified/created/accessed times)
+  --unalloc FILE      unallocated space image file, in 2 GB chunks
+Without sources the case is only opened.
 Module ids: postmortem ingest --list-modules";
 
 #[derive(Debug, Default)]
 struct Args {
     case: Option<PathBuf>,
-    images: Vec<PathBuf>,
+    sources: Vec<pm_case::DataSourceSpec>,
+    times: bool,
     enable: Vec<String>,
     disable: Vec<String>,
     threads: usize,
@@ -52,9 +57,41 @@ fn parse(args: &[OsString]) -> Result<Args, String> {
                     .ok_or("--threads needs a number")?;
             }
             Some("--list-modules") => a.list = true,
+            Some("--times") => a.times = true,
+            Some("--disk") => a.sources.push(pm_case::DataSourceSpec::LocalDisk(
+                it.next().ok_or("--disk needs a device")?.into(),
+            )),
+            Some("--unalloc") => a.sources.push(pm_case::DataSourceSpec::UnallocatedImage {
+                path: it.next().ok_or("--unalloc needs a file")?.into(),
+                chunk: Some(pm_case::RAW_CHUNK),
+            }),
+            Some("--logical") => {
+                let v = it.next().ok_or("--logical needs paths")?;
+                a.sources.push(pm_case::DataSourceSpec::LogicalFiles {
+                    paths: std::env::split_paths(v).collect(),
+                    modified: false,
+                    created: false,
+                    accessed: false,
+                });
+            }
             Some("-h" | "--help") => return Err(String::new()),
             Some(s) if s.starts_with("--") => return Err(format!("unknown option {s}")),
-            _ => a.images.push(arg.into()),
+            _ => a
+                .sources
+                .push(pm_case::DataSourceSpec::DiskImage(arg.into())),
+        }
+    }
+    if a.times {
+        for s in &mut a.sources {
+            if let pm_case::DataSourceSpec::LogicalFiles {
+                modified,
+                created,
+                accessed,
+                ..
+            } = s
+            {
+                (*modified, *created, *accessed) = (true, true, true);
+            }
         }
     }
     Ok(a)
@@ -166,8 +203,8 @@ pub fn ingest(args: &[OsString]) -> ExitCode {
     let mut settings = prefs.job_settings_for(&modules);
     settings.threads = a.threads;
     let mut failed = false;
-    for image in &a.images {
-        failed |= !ingest_one(&case, image, &settings, &modules);
+    for source in &a.sources {
+        failed |= !ingest_one(&case, source, &settings, &modules);
     }
     let now = sample();
     eprintln!(
@@ -184,7 +221,7 @@ pub fn ingest(args: &[OsString]) -> ExitCode {
 
 fn ingest_one(
     case: &Arc<Case>,
-    image: &std::path::Path,
+    source: &pm_case::DataSourceSpec,
     settings: &pm_ingest::JobSettings,
     modules: &[Arc<dyn pm_ingest::ModuleFactory>],
 ) -> bool {
@@ -192,9 +229,9 @@ fn ingest_one(
     let load = Arc::new(LoadProgress::default());
     let loaded = {
         let l = Arc::clone(&load);
-        let (case, image) = (Arc::clone(case), image.to_path_buf());
+        let (case, source) = (Arc::clone(case), source.clone());
         let h = std::thread::spawn(move || {
-            pm_case::add_image(&case, &image, &LoadOptions::default(), &l)
+            pm_case::add_data_source(&case, &source, &LoadOptions::default(), &l)
         });
         while !h.is_finished() {
             std::thread::sleep(Duration::from_secs(2));
@@ -215,14 +252,14 @@ fn ingest_one(
     let loaded = match loaded {
         Ok(l) => l,
         Err(e) => {
-            eprintln!("{}: {e}", image.display());
+            eprintln!("{}: {e}", source.label());
             return false;
         }
     };
     eprintln!(
         "[{}] {}: {} rows added, {} warnings",
         clock(t.elapsed()),
-        image.display(),
+        source.label(),
         loaded.files,
         loaded.warnings.len()
     );
@@ -299,7 +336,22 @@ mod tests {
         assert_eq!(a.case, Some(PathBuf::from("c")));
         assert_eq!(a.disable, ["a", "b"]);
         assert_eq!(a.threads, 3);
-        assert_eq!(a.images, [PathBuf::from("x.E01")]);
+        assert_eq!(
+            a.sources,
+            [pm_case::DataSourceSpec::DiskImage(PathBuf::from("x.E01"))]
+        );
+        let args: Vec<OsString> = ["--logical", "a", "--times", "--unalloc", "u.bin"]
+            .iter()
+            .map(OsString::from)
+            .collect();
+        let a = parse(&args).unwrap();
+        assert!(matches!(
+            a.sources.as_slice(),
+            [
+                pm_case::DataSourceSpec::LogicalFiles { modified: true, .. },
+                pm_case::DataSourceSpec::UnallocatedImage { .. }
+            ]
+        ));
         assert!(parse(&[OsString::from("--bogus")]).is_err());
     }
 }

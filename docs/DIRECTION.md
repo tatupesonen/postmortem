@@ -54,6 +54,13 @@ memory use, good design and a sane architecture in mind.
 
 ## Working rules
 
+* **Releases and versions** (owner, 2026-10-18): semantic versioning;
+  every finished feature is tagged and pushed (`vX.Y.Z`), which makes the
+  release workflow publish binaries. While on 0.x (Cargo's convention):
+  a breaking change (old cases refused, plugin API break, removed CLI
+  option) bumps the minor version; features and fixes bump the patch.
+  Bump `[workspace.package] version`, commit, tag, push the tag.
+
 * **Commit and push** finished work straight to `master` and keep
   `parity-wip` in sync: `git push origin master master:parity-wip`. Work
   that is not pushed can be lost (it happened once).

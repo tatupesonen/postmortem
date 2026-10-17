@@ -202,6 +202,19 @@ fn dir_path(rec: &FileRecord) -> String {
     if p.ends_with('/') { p } else { format!("{p}/") }
 }
 
+/// `$CarvedFiles` at the top of a data source without file systems (an
+/// unallocated space image: Autopsy adds it under the image).
+fn top_level_dir(ds_id: i64, name: &str) -> NewFile {
+    NewFile::new(
+        ds_id,
+        None,
+        "/",
+        name,
+        Origin::VirtualDir,
+        FileKindCode::Directory,
+    )
+}
+
 fn virtual_dir(rec_parent: &FileRecord, name: &str) -> NewFile {
     let mut f = NewFile::new(
         rec_parent.ds_id,
@@ -217,19 +230,23 @@ fn virtual_dir(rec_parent: &FileRecord, name: &str) -> NewFile {
 
 impl Job {
     /// Hands out `n` slots in `$CarvedFiles/<k>/` folders of the file
-    /// system `root`, creating folders as they fill up: returns
-    /// `(folder id, folder path, count)` runs.
+    /// system `root` (`None`: the top of data source `ds_id`), creating
+    /// folders as they fill up: returns `(folder id, folder path, count)`
+    /// runs.
     fn slots(
         &self,
         ctx: &JobContext,
-        root: &FileRecord,
+        ds_id: i64,
+        root: Option<&FileRecord>,
         mut n: u64,
     ) -> Result<Vec<(i64, String, u64)>, ModuleError> {
         let mut map = self.folders.lock();
-        let f = match map.entry(root.id) {
+        // Roots are keyed by id; data-source tops by the negated ds id.
+        let key = root.map_or(-ds_id, |r| r.id);
+        let f = match map.entry(key) {
             std::collections::hash_map::Entry::Occupied(e) => e.into_mut(),
             std::collections::hash_map::Entry::Vacant(e) => {
-                e.insert(Self::open_folders(ctx, root)?)
+                e.insert(Self::open_folders(ctx, ds_id, root)?)
             }
         };
         let mut out = Vec::new();
@@ -259,12 +276,24 @@ impl Job {
 
     /// Finds or creates `$CarvedFiles` and its most recent numbered
     /// sub-folder (Autopsy `addCarvedFiles`).
-    fn open_folders(ctx: &JobContext, root: &FileRecord) -> Result<Folders, ModuleError> {
+    fn open_folders(
+        ctx: &JobContext,
+        ds_id: i64,
+        root: Option<&FileRecord>,
+    ) -> Result<Folders, ModuleError> {
         let db = ctx.case.db();
-        let base = if let Some(b) = db.child_named(root.id, CARVED_DIR)? {
+        let existing = match root {
+            Some(r) => db.child_named(r.id, CARVED_DIR)?,
+            None => db.top_level_named(ds_id, CARVED_DIR)?,
+        };
+        let base = if let Some(b) = existing {
             b
         } else {
-            let mut recs = ctx.insert_derived_files(vec![virtual_dir(root, CARVED_DIR)])?;
+            let dir = match root {
+                Some(r) => virtual_dir(r, CARVED_DIR),
+                None => top_level_dir(ds_id, CARVED_DIR),
+            };
+            let mut recs = ctx.insert_derived_files(vec![dir])?;
             recs.pop()
                 .ok_or_else(|| ModuleError::new("carved files folder"))?
         };
@@ -294,8 +323,9 @@ impl Job {
 }
 
 /// The root directory of the file system an unallocated-space file
-/// belongs to (`/$Unalloc/Unalloc_…` → `/`), else its parent.
-fn fs_root(ctx: &JobContext, unalloc: &FileRecord) -> Result<FileRecord, ModuleError> {
+/// belongs to (`/$Unalloc/Unalloc_…` → `/`), else its parent; `None` for
+/// a top-level piece of an unallocated space image.
+fn fs_root(ctx: &JobContext, unalloc: &FileRecord) -> Result<Option<FileRecord>, ModuleError> {
     let db = ctx.case.db();
     let mut cur = unalloc.parent_id;
     let mut last = None;
@@ -309,7 +339,7 @@ fn fs_root(ctx: &JobContext, unalloc: &FileRecord) -> Result<FileRecord, ModuleE
             break;
         }
     }
-    last.ok_or_else(|| ModuleError::new("unallocated space file without a parent"))
+    Ok(last)
 }
 
 impl FileModule for Worker {
@@ -364,7 +394,10 @@ impl FileModule for Worker {
             .collect();
         let root = fs_root(ctx, &file.rec)?;
         let mut rows = rows.into_iter();
-        for (folder, path, n) in self.job.slots(ctx, &root, rows.len() as u64)? {
+        for (folder, path, n) in
+            self.job
+                .slots(ctx, file.rec.ds_id, root.as_ref(), rows.len() as u64)?
+        {
             let mut batch = Vec::with_capacity(BATCH);
             for (c, layout) in rows.by_ref().take(n as usize) {
                 let mut f = NewFile::new(

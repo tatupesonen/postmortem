@@ -235,6 +235,31 @@ impl CaseDb {
         })
     }
 
+    /// Top-level files outside any file system (logical file sets,
+    /// unallocated space image pieces, a data-source `$CarvedFiles`).
+    pub fn top_level_files(&self, ds_id: i64) -> Result<Vec<FileRecord>> {
+        self.read(|c| {
+            let mut st = c.prepare_cached(&format!(
+                "SELECT {FILE_COLS} FROM files WHERE ds_id = ?1 AND parent_id IS NULL AND fs_id IS NULL ORDER BY name, id"
+            ))?;
+            let rows = st
+                .query_map(params![ds_id], FileRecord::from_row)?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+    }
+
+    /// The top-level file (no parent) of a data source named `name`.
+    pub fn top_level_named(&self, ds_id: i64, name: &str) -> Result<Option<FileRecord>> {
+        self.read(|c| {
+            Ok(c.prepare_cached(&format!(
+                "SELECT {FILE_COLS} FROM files WHERE ds_id = ?1 AND parent_id IS NULL AND name = ?2 ORDER BY id LIMIT 1"
+            ))?
+            .query_row(params![ds_id, name], FileRecord::from_row)
+            .optional()?)
+        })
+    }
+
     /// Updates a re-extracted derived file.
     pub fn update_derived_file(&self, file_id: i64, u: &DerivedUpdate) -> Result<()> {
         let split = |x: Option<(i64, u32)>| (x.map(|v| v.0), x.map(|v| v.1));

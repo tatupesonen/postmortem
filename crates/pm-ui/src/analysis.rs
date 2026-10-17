@@ -2,7 +2,7 @@
 //! ingest modules. Progress is shown in the status bar and, in detail, in
 //! the "Ingest Progress" window (Autopsy's progress snapshot + inbox).
 
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
@@ -89,11 +89,11 @@ impl Analysis {
         self.case = None;
     }
 
-    /// Adds `image` to the case and analyses it with the built-in modules.
+    /// Adds `spec` to the case and analyses it with the ingest modules.
     pub(crate) fn start(
         &mut self,
         ctx: &egui::Context,
-        image: PathBuf,
+        spec: pm_case::DataSourceSpec,
         load: LoadOptions,
         settings: JobSettings,
     ) -> Result<(), String> {
@@ -101,10 +101,7 @@ impl Analysis {
             .case
             .clone()
             .ok_or("Create or open a case before adding a data source.")?;
-        let name = image.file_name().map_or_else(
-            || image.display().to_string(),
-            |n| n.to_string_lossy().into_owned(),
-        );
+        let name = spec.label();
         let job = Arc::new(AnalysisJob {
             name,
             load: Arc::new(LoadProgress::default()),
@@ -117,7 +114,7 @@ impl Analysis {
         let spawned = std::thread::Builder::new()
             .name("pm-analysis".into())
             .spawn(move || {
-                let stage = run(&case, &image, &load, &settings, &job, &inbox);
+                let stage = run(&case, &spec, &load, &settings, &job, &inbox);
                 *job.stage.lock() = stage;
                 ctx.request_repaint();
             });
@@ -177,13 +174,13 @@ impl Analysis {
 
 fn run(
     case: &Arc<Case>,
-    image: &Path,
+    spec: &pm_case::DataSourceSpec,
     load: &LoadOptions,
     settings: &JobSettings,
     job: &AnalysisJob,
     inbox: &Arc<Inbox>,
 ) -> Stage {
-    let loaded = match pm_case::add_image(case, image, load, &job.load) {
+    let loaded = match pm_case::add_data_source(case, spec, load, &job.load) {
         Ok(s) => s,
         Err(pm_case::CaseError::Cancelled) => {
             return Stage::Done {

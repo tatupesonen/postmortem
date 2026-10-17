@@ -320,7 +320,12 @@ impl PostmortemApp {
             ..pm_case::LoadOptions::default()
         };
         let settings = ingest.job_settings();
-        self.add_data_source_with(ctx, path, load, settings);
+        self.add_data_source_with(
+            ctx,
+            pm_case::DataSourceSpec::DiskImage(path),
+            load,
+            settings,
+        );
     }
 
     fn default_timezone() -> String {
@@ -333,21 +338,23 @@ impl PostmortemApp {
     fn add_data_source_with(
         &mut self,
         ctx: &egui::Context,
-        path: PathBuf,
+        spec: pm_case::DataSourceSpec,
         load: pm_case::LoadOptions,
         settings: pm_ingest::JobSettings,
     ) {
-        if let Err(e) = self
-            .analysis
-            .lock()
-            .start(ctx, path.clone(), load, settings)
-        {
+        let recent = match &spec {
+            pm_case::DataSourceSpec::DiskImage(p) => Some(p.clone()),
+            _ => None,
+        };
+        if let Err(e) = self.analysis.lock().start(ctx, spec, load, settings) {
             self.errors.push(e);
             return;
         }
-        self.persisted.recent.retain(|r| r != &path);
-        self.persisted.recent.insert(0, path);
-        self.persisted.recent.truncate(10);
+        if let Some(path) = recent {
+            self.persisted.recent.retain(|r| r != &path);
+            self.persisted.recent.insert(0, path);
+            self.persisted.recent.truncate(10);
+        }
     }
 
     /// Whether a case is open.
@@ -471,15 +478,24 @@ impl PostmortemApp {
     /// case database.
     fn listing(&mut self, ctx: &egui::Context, node: &NodeId) -> Option<&Listing> {
         if !self.listings.contains_key(node) {
-            let NodeId::Dir { file, .. } = node else {
-                return None;
-            };
             let case = self.analysis.lock().case().cloned()?;
-            let dir = *file;
+            let source = match node {
+                NodeId::Dir { file, .. } => Ok(*file),
+                NodeId::TopFiles(ds) => Err(*ds),
+                _ => return None,
+            };
             let task = Task::spawn(ctx, move || {
-                let mut rows: Vec<FileRow> = case
-                    .db()
-                    .children(dir)
+                let db = case.db();
+                let records = match source {
+                    Ok(dir) => db.children(dir),
+                    // Folders are in the tree; the table lists the files.
+                    Err(ds) => db.top_level_files(ds).map(|v| {
+                        v.into_iter()
+                            .filter(|f| f.kind != pm_casedb::FileKindCode::Directory)
+                            .collect()
+                    }),
+                };
+                let mut rows: Vec<FileRow> = records
                     .map_err(|e| e.to_string())?
                     .iter()
                     .map(crate::views::row_of)
@@ -2112,11 +2128,27 @@ impl PostmortemApp {
                 }
             });
         }
-        if t.volumes.is_empty() && t.loose.is_empty() {
+        if t.volumes.is_empty() && t.loose.is_empty() && t.top_dirs.is_empty() && t.top_files == 0 {
             ui.weak("No file system found");
         }
         for r in &t.loose {
             self.fs_root_children(ui, r);
+        }
+        // Logical file sets and unallocated space images.
+        for d in &t.top_dirs {
+            let node = NodeId::Dir {
+                ds: t.ds.id,
+                file: d.id,
+            };
+            let label = format!("{} {}", icons::FOLDER, d.name);
+            self.tree_node(ui, &node, &label, true, |app, ui| {
+                app.dir_children(ui, &node);
+            });
+        }
+        if t.top_files > 0 {
+            let node = NodeId::TopFiles(t.ds.id);
+            let label = format!("{} Files ({})", icons::FOLDER, t.top_files);
+            self.tree_node(ui, &node, &label, false, |_, _| {});
         }
     }
 
@@ -2221,7 +2253,7 @@ impl PostmortemApp {
             NodeId::DataSource(ds) => self.data_source_summary(ui, *ds),
             NodeId::Host(h) => self.host_view(ui, *h),
             NodeId::Volume { ds, volume } => self.volume_summary(ui, *ds, *volume),
-            NodeId::Dir { .. } => self.file_table(ui, &node),
+            NodeId::Dir { .. } | NodeId::TopFiles(_) => self.file_table(ui, &node),
             NodeId::Results { type_id } => {
                 self.results_view(ui, &crate::results::ResultKey::Type(*type_id));
             }
@@ -2322,7 +2354,7 @@ impl PostmortemApp {
 
     fn file_table(&mut self, ui: &mut egui::Ui, node: &NodeId) {
         let ctx = ui.ctx().clone();
-        let NodeId::Dir { ds, .. } = *node else {
+        let Some(ds) = node.ds() else {
             return;
         };
         let rows = match self.listing(&ctx, node).cloned() {
@@ -2914,14 +2946,14 @@ impl PostmortemApp {
                 crate::add_source::AddAction::Cancel => self.add_wizard = None,
                 crate::add_source::AddAction::Start(req) => {
                     let crate::add_source::StartRequest {
-                        image,
+                        spec,
                         load,
                         settings,
                         prefs,
                     } = *req;
                     self.add_wizard = None;
                     self.persisted.ingest = prefs;
-                    self.add_data_source_with(ctx, image, load, settings);
+                    self.add_data_source_with(ctx, spec, load, settings);
                 }
             }
         }

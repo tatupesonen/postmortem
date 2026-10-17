@@ -99,21 +99,74 @@ pub(crate) enum AddAction {
 /// What the wizard collected for adding a data source.
 #[derive(Debug, Clone)]
 pub(crate) struct StartRequest {
-    pub(crate) image: PathBuf,
+    pub(crate) spec: pm_case::DataSourceSpec,
     pub(crate) load: LoadOptions,
     pub(crate) settings: JobSettings,
     pub(crate) prefs: IngestPrefs,
 }
 
-/// The two-step Add Data Source wizard.
-#[derive(Debug, Clone)]
+/// Autopsy's data source types (processors), in its order.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SourceKind {
+    DiskImage,
+    LocalDisk,
+    LogicalFiles,
+    Unallocated,
+}
+
+impl SourceKind {
+    const ALL: [Self; 4] = [
+        Self::DiskImage,
+        Self::LocalDisk,
+        Self::LogicalFiles,
+        Self::Unallocated,
+    ];
+
+    fn name(self) -> &'static str {
+        match self {
+            Self::DiskImage => "Disk Image or VM File",
+            Self::LocalDisk => "Local Disk",
+            Self::LogicalFiles => "Logical Files",
+            Self::Unallocated => "Unallocated Space Image File",
+        }
+    }
+
+    fn description(self) -> &'static str {
+        match self {
+            Self::DiskImage => "Raw (dd), split raw, E01, VMDK, VHD, VHDX or QCOW2 image.",
+            Self::LocalDisk => {
+                "A disk or partition of this computer, read in place (needs administrator rights)."
+            }
+            Self::LogicalFiles => "Files and folders of this computer, read in place.",
+            Self::Unallocated => {
+                "A raw file of unallocated space, carved and searched without file-system analysis."
+            }
+        }
+    }
+}
+
+/// The Add Data Source wizard: type, its panel, then ingest modules.
+#[derive(Debug)]
 pub(crate) struct AddSourceWizard {
     step: u8,
+    pub(crate) kind: SourceKind,
+    /// Disk image or unallocated space image file.
     pub(crate) path: String,
     pub(crate) timezone: String,
     pub(crate) prefs: IngestPrefs,
     pub(crate) error: Option<String>,
     zones: Vec<String>,
+    /// Local disks found (loaded in the background).
+    disks: Option<crate::task::Task<Vec<pm_case::LocalDisk>>>,
+    disk: Option<PathBuf>,
+    /// Logical files: the selection, set name and timestamps.
+    pub(crate) logical: Vec<PathBuf>,
+    set_name: String,
+    /// A path typed instead of browsed for.
+    typed: String,
+    times: [bool; 3],
+    /// Unallocated space image: split into 2 GB chunks.
+    chunked: bool,
 }
 
 impl AddSourceWizard {
@@ -124,24 +177,59 @@ impl AddSourceWizard {
             .collect();
         zones.sort();
         Self {
-            step: 1,
+            step: 0,
+            kind: SourceKind::DiskImage,
             path: String::new(),
             timezone,
             prefs,
             error: None,
             zones,
+            disks: None,
+            disk: None,
+            logical: Vec::new(),
+            set_name: String::new(),
+            typed: String::new(),
+            times: [false; 3],
+            chunked: true,
         }
     }
 
-    fn check_image(&self) -> Result<PathBuf, String> {
+    fn check_file(&self, what: &str) -> Result<PathBuf, String> {
         let p = PathBuf::from(self.path.trim());
         if self.path.trim().is_empty() {
-            return Err("Choose a disk image.".into());
+            return Err(format!("Choose {what}."));
         }
         if !p.is_file() {
             return Err(format!("{} is not a file.", p.display()));
         }
         Ok(p)
+    }
+
+    /// The data source the panel describes, or why it is incomplete.
+    fn spec(&self) -> Result<pm_case::DataSourceSpec, String> {
+        use pm_case::DataSourceSpec as S;
+        Ok(match self.kind {
+            SourceKind::DiskImage => S::DiskImage(self.check_file("a disk image")?),
+            SourceKind::LocalDisk => S::LocalDisk(self.disk.clone().ok_or("Select a local disk.")?),
+            SourceKind::LogicalFiles => {
+                if self.logical.is_empty() {
+                    return Err("Add at least one file or folder.".into());
+                }
+                if let Some(p) = self.logical.iter().find(|p| !p.exists()) {
+                    return Err(format!("{} does not exist or cannot be read.", p.display()));
+                }
+                S::LogicalFiles {
+                    paths: self.logical.clone(),
+                    modified: self.times[0],
+                    created: self.times[1],
+                    accessed: self.times[2],
+                }
+            }
+            SourceKind::Unallocated => S::UnallocatedImage {
+                path: self.check_file("an unallocated space image file")?,
+                chunk: self.chunked.then_some(pm_case::RAW_CHUNK),
+            },
+        })
     }
 
     pub(crate) fn ui(&mut self, ctx: &egui::Context) -> AddAction {
@@ -150,14 +238,15 @@ impl AddSourceWizard {
             ui.set_width(640.0);
             ui.heading("Add Data Source");
             ui.label(match self.step {
-                1 => "Step 1 of 2 — Select Disk Image",
-                _ => "Step 2 of 2 — Configure Ingest Modules",
+                0 => "Step 1 of 3 — Select Data Source Type",
+                1 => "Step 2 of 3 — Select Data Source",
+                _ => "Step 3 of 3 — Configure Ingest Modules",
             });
             ui.separator();
-            if self.step == 1 {
-                self.step_one(ui);
-            } else {
-                self.step_two(ui);
+            match self.step {
+                0 => self.type_page(ui),
+                1 => self.source_page(ui),
+                _ => self.step_two(ui),
             }
             if let Some(e) = &self.error {
                 ui.colored_label(ui.visuals().error_fg_color, e);
@@ -167,44 +256,61 @@ impl AddSourceWizard {
                 if ui.button("Cancel").clicked() {
                     action = AddAction::Cancel;
                 }
-                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
-                    if self.step == 1 {
-                        if ui.button("Next ›").clicked() {
-                            match self.check_image() {
-                                Ok(_) => {
-                                    self.error = None;
-                                    self.step = 2;
-                                }
-                                Err(e) => self.error = Some(e),
+                ui.with_layout(
+                    egui::Layout::right_to_left(egui::Align::Center),
+                    |ui| match self.step {
+                        0 => {
+                            if ui.button("Next ›").clicked() {
+                                self.error = None;
+                                self.step = 1;
                             }
                         }
-                    } else {
-                        if ui.button("Finish").clicked() {
-                            match self.check_image() {
-                                Ok(image) => {
-                                    action = AddAction::Start(Box::new(StartRequest {
-                                        image,
-                                        load: LoadOptions {
-                                            timezone: self.timezone.clone(),
-                                            fat_orphans: !self.prefs.ignore_fat_orphans,
-                                            process_unallocated: !self.prefs.ignore_unallocated,
-                                            ..LoadOptions::default()
-                                        },
-                                        settings: self.prefs.job_settings(),
-                                        prefs: self.prefs.clone(),
-                                    }));
-                                }
-                                Err(e) => {
-                                    self.error = Some(e);
-                                    self.step = 1;
+                        1 => {
+                            if ui.button("Next ›").clicked() {
+                                match self.spec() {
+                                    Ok(_) => {
+                                        self.error = None;
+                                        self.step = 2;
+                                    }
+                                    Err(e) => self.error = Some(e),
                                 }
                             }
+                            if ui.button("‹ Back").clicked() {
+                                self.step = 0;
+                            }
                         }
-                        if ui.button("‹ Back").clicked() {
-                            self.step = 1;
+                        _ => {
+                            if ui.button("Finish").clicked() {
+                                match self.spec() {
+                                    Ok(spec) => {
+                                        let name = (self.kind == SourceKind::LogicalFiles
+                                            && !self.set_name.trim().is_empty())
+                                        .then(|| self.set_name.trim().to_owned());
+                                        action = AddAction::Start(Box::new(StartRequest {
+                                            spec,
+                                            load: LoadOptions {
+                                                name,
+                                                timezone: self.timezone.clone(),
+                                                fat_orphans: !self.prefs.ignore_fat_orphans,
+                                                process_unallocated: !self.prefs.ignore_unallocated,
+                                                ..LoadOptions::default()
+                                            },
+                                            settings: self.prefs.job_settings(),
+                                            prefs: self.prefs.clone(),
+                                        }));
+                                    }
+                                    Err(e) => {
+                                        self.error = Some(e);
+                                        self.step = 1;
+                                    }
+                                }
+                            }
+                            if ui.button("‹ Back").clicked() {
+                                self.step = 1;
+                            }
                         }
-                    }
-                });
+                    },
+                );
             });
         });
         if modal.should_close() && matches!(action, AddAction::None) {
@@ -213,48 +319,73 @@ impl AddSourceWizard {
         action
     }
 
-    fn step_one(&mut self, ui: &mut egui::Ui) {
+    fn type_page(&mut self, ui: &mut egui::Ui) {
+        for k in SourceKind::ALL {
+            ui.radio_value(&mut self.kind, k, egui::RichText::new(k.name()).strong());
+            ui.indent(k.name(), |ui| {
+                ui.weak(k.description());
+            });
+            ui.add_space(4.0);
+        }
+    }
+
+    fn source_page(&mut self, ui: &mut egui::Ui) {
+        match self.kind {
+            SourceKind::DiskImage => self.image_page(ui),
+            SourceKind::LocalDisk => self.disk_page(ui),
+            SourceKind::LogicalFiles => self.logical_page(ui),
+            SourceKind::Unallocated => self.unalloc_page(ui),
+        }
+    }
+
+    fn file_row(&mut self, ui: &mut egui::Ui, label: &str, hint: &str, title: &str) {
+        ui.label(label);
+        ui.horizontal(|ui| {
+            if ui
+                .add(
+                    egui::TextEdit::singleline(&mut self.path)
+                        .hint_text(hint)
+                        .desired_width(400.0),
+                )
+                .changed()
+            {
+                self.error = None;
+            }
+            if ui.button("Browse…").clicked()
+                && let Some(p) = rfd::FileDialog::new().set_title(title).pick_file()
+            {
+                self.path = p.display().to_string();
+                self.error = None;
+            }
+        });
+        ui.end_row();
+    }
+
+    fn timezone_row(&mut self, ui: &mut egui::Ui) {
+        ui.label("Time zone:");
+        egui::ComboBox::from_id_salt("tz")
+            .selected_text(&self.timezone)
+            .width(300.0)
+            .show_ui(ui, |ui| {
+                for z in &self.zones {
+                    ui.selectable_value(&mut self.timezone, z.clone(), z);
+                }
+            });
+        ui.end_row();
+    }
+
+    fn image_page(&mut self, ui: &mut egui::Ui) {
         egui::Grid::new("add-image")
             .num_columns(2)
             .spacing([12.0, 8.0])
             .show(ui, |ui| {
-                ui.label("Disk image:");
-                ui.horizontal(|ui| {
-                    if ui
-                        .add(
-                            egui::TextEdit::singleline(&mut self.path)
-                                .hint_text("Raw (dd), split raw or E01 — first segment")
-                                .desired_width(400.0),
-                        )
-                        .changed()
-                    {
-                        self.error = None;
-                    }
-                    if ui.button("Browse…").clicked()
-                        && let Some(p) = rfd::FileDialog::new()
-                            .set_title("Add Data Source — Disk Image")
-                            .add_filter(
-                                "Disk images",
-                                &["dd", "raw", "img", "bin", "001", "000", "aa", "e01", "E01", "s01"],
-                            )
-                            .add_filter("All files", &["*"])
-                            .pick_file()
-                    {
-                        self.path = p.display().to_string();
-                        self.error = None;
-                    }
-                });
-                ui.end_row();
-                ui.label("Time zone:");
-                egui::ComboBox::from_id_salt("tz")
-                    .selected_text(&self.timezone)
-                    .width(300.0)
-                    .show_ui(ui, |ui| {
-                        for z in &self.zones {
-                            ui.selectable_value(&mut self.timezone, z.clone(), z);
-                        }
-                    });
-                ui.end_row();
+                self.file_row(
+                    ui,
+                    "Disk image:",
+                    "Raw, split raw, E01, VMDK, VHD(X) or QCOW2 — first segment",
+                    "Add Data Source — Disk Image",
+                );
+                self.timezone_row(ui);
                 ui.label("");
                 ui.checkbox(
                     &mut self.prefs.ignore_fat_orphans,
@@ -264,6 +395,176 @@ impl AddSourceWizard {
                 ui.end_row();
             });
         ui.weak("The time zone is used for file systems that store local times (FAT).");
+    }
+
+    fn disk_page(&mut self, ui: &mut egui::Ui) {
+        let ctx = ui.ctx().clone();
+        if self.disks.is_none() {
+            self.disks = Some(crate::task::Task::spawn(&ctx, pm_case::local_disks));
+        }
+        ui.horizontal(|ui| {
+            ui.strong("Local Disk:");
+            if ui.button("Refresh Local Disks").clicked() {
+                self.disks = None;
+                self.disk = None;
+            }
+        });
+        match self.disks.as_mut().and_then(crate::task::Task::poll) {
+            None => {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Loading local disks...");
+                });
+            }
+            Some(disks) if disks.is_empty() => {
+                ui.colored_label(
+                    ui.visuals().warn_fg_color,
+                    "Disks were not detected. On some systems it requires admin privileges (or root).",
+                );
+            }
+            Some(disks) => {
+                let disks = disks.clone();
+                egui::Grid::new("local-disks").striped(true).show(ui, |ui| {
+                    ui.strong("Disk Name");
+                    ui.strong("Disk Size");
+                    ui.end_row();
+                    for d in &disks {
+                        let on = self.disk.as_ref() == Some(&d.path);
+                        if ui
+                            .selectable_label(on, d.path.display().to_string())
+                            .clicked()
+                        {
+                            self.disk = Some(d.path.clone());
+                            self.error = None;
+                        }
+                        ui.label(
+                            d.size
+                                .map_or_else(|| "—".into(), pm_core::units::format_size),
+                        );
+                        ui.end_row();
+                    }
+                });
+            }
+        }
+        egui::Grid::new("disk-opts").num_columns(2).show(ui, |ui| {
+            self.timezone_row(ui);
+            ui.label("");
+            ui.checkbox(
+                &mut self.prefs.ignore_fat_orphans,
+                "Ignore orphan files in FAT file systems",
+            );
+            ui.end_row();
+        });
+        ui.weak("The disk is only read. Nothing is written to it.");
+    }
+
+    fn logical_page(&mut self, ui: &mut egui::Ui) {
+        ui.horizontal(|ui| {
+            if ui.button("Add Files…").clicked()
+                && let Some(ps) = rfd::FileDialog::new()
+                    .set_title("Select Local Files or Folders")
+                    .pick_files()
+            {
+                self.logical.extend(ps);
+                self.error = None;
+            }
+            if ui.button("Add Folder…").clicked()
+                && let Some(ps) = rfd::FileDialog::new()
+                    .set_title("Select Local Files or Folders")
+                    .pick_folders()
+            {
+                self.logical.extend(ps);
+                self.error = None;
+            }
+            if ui
+                .add_enabled(!self.logical.is_empty(), egui::Button::new("Clear"))
+                .clicked()
+            {
+                self.logical.clear();
+            }
+        });
+        ui.horizontal(|ui| {
+            let edit = ui.add(
+                egui::TextEdit::singleline(&mut self.typed)
+                    .hint_text("Or type a path")
+                    .desired_width(400.0),
+            );
+            let enter = edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
+            if (ui
+                .add_enabled(!self.typed.trim().is_empty(), egui::Button::new("Add Path"))
+                .clicked()
+                || enter)
+                && !self.typed.trim().is_empty()
+            {
+                self.logical.push(PathBuf::from(self.typed.trim()));
+                self.typed.clear();
+                self.error = None;
+            }
+        });
+        let mut remove = None;
+        egui::ScrollArea::vertical()
+            .max_height(160.0)
+            .show(ui, |ui| {
+                if self.logical.is_empty() {
+                    ui.weak("No files or folders selected.");
+                }
+                for (i, p) in self.logical.iter().enumerate() {
+                    ui.horizontal(|ui| {
+                        if ui.small_button("✖").on_hover_text("Delete").clicked() {
+                            remove = Some(i);
+                        }
+                        ui.label(p.display().to_string());
+                    });
+                }
+            });
+        if let Some(i) = remove {
+            self.logical.remove(i);
+        }
+        ui.horizontal(|ui| {
+            ui.label("Logical File Set Display Name:");
+            ui.add(
+                egui::TextEdit::singleline(&mut self.set_name)
+                    .hint_text("Default (LogicalFileSet<N>)")
+                    .desired_width(260.0),
+            );
+        });
+        ui.label("Timestamps To Include:");
+        ui.indent("times", |ui| {
+            ui.checkbox(
+                &mut self.times[0],
+                "Modified Time - Often not changed when a file is copied",
+            );
+            ui.checkbox(
+                &mut self.times[1],
+                "Creation Time - Often changed when a file is copied",
+            );
+            ui.checkbox(
+                &mut self.times[2],
+                "Access Time - Can be changed when the file is opened",
+            );
+        });
+        ui.weak("NOTE: Time stamps may have changed when the files were copied to the current location.");
+    }
+
+    fn unalloc_page(&mut self, ui: &mut egui::Ui) {
+        egui::Grid::new("add-unalloc")
+            .num_columns(2)
+            .spacing([12.0, 8.0])
+            .show(ui, |ui| {
+                self.file_row(
+                    ui,
+                    "Unallocated space image file:",
+                    "A raw file",
+                    "Browse for an unallocated space image file",
+                );
+                self.timezone_row(ui);
+                ui.label("Break image up into:");
+                ui.horizontal(|ui| {
+                    ui.radio_value(&mut self.chunked, false, "Do not break up");
+                    ui.radio_value(&mut self.chunked, true, "2GB chunks");
+                });
+                ui.end_row();
+            });
     }
 
     fn step_two(&mut self, ui: &mut egui::Ui) {
@@ -493,14 +794,31 @@ mod tests {
     }
 
     #[test]
-    fn image_must_exist() {
+    fn sources_must_exist() {
         let mut w = AddSourceWizard::new(IngestPrefs::default(), "UTC".into());
-        assert!(w.check_image().is_err());
+        assert!(w.spec().is_err());
         w.path = "/definitely/not/here.E01".into();
-        assert!(w.check_image().is_err());
+        assert!(w.spec().is_err());
         let f = tempfile::NamedTempFile::new().unwrap();
         w.path = f.path().display().to_string();
-        assert!(w.check_image().is_ok());
+        assert!(matches!(
+            w.spec(),
+            Ok(pm_case::DataSourceSpec::DiskImage(_))
+        ));
         assert!(w.zones.iter().any(|z| z == "Europe/Helsinki"));
+        w.kind = SourceKind::LogicalFiles;
+        assert!(w.spec().is_err(), "nothing selected");
+        w.logical.push(f.path().to_path_buf());
+        assert!(matches!(
+            w.spec(),
+            Ok(pm_case::DataSourceSpec::LogicalFiles { .. })
+        ));
+        w.kind = SourceKind::LocalDisk;
+        assert!(w.spec().is_err(), "no disk selected");
+        w.kind = SourceKind::Unallocated;
+        assert!(matches!(
+            w.spec(),
+            Ok(pm_case::DataSourceSpec::UnallocatedImage { chunk: Some(_), .. })
+        ));
     }
 }

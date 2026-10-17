@@ -62,6 +62,8 @@ pub struct LoadOptions {
     /// Host (device) the data source belongs to; `None` creates (or
     /// reuses) Autopsy's default host, `"<first image file> Host"`.
     pub host: Option<String>,
+    /// What the evidence is: a disk image (default) or a local disk.
+    pub kind: DataSourceKind,
 }
 
 impl Default for LoadOptions {
@@ -74,6 +76,7 @@ impl Default for LoadOptions {
             fat_orphans: true,
             threads: 0,
             host: None,
+            kind: DataSourceKind::DiskImage,
         }
     }
 }
@@ -103,7 +106,7 @@ impl LoadProgress {
         self.stage.lock().clone()
     }
 
-    fn set_stage(&self, s: impl Into<String>) {
+    pub(crate) fn set_stage(&self, s: impl Into<String>) {
         *self.stage.lock() = s.into();
     }
 }
@@ -220,7 +223,7 @@ fn add_structure(db: &CaseDb, ev: &Evidence, opts: &LoadOptions) -> Result<(i64,
     });
     let ds = NewDataSource {
         name,
-        kind: DataSourceKind::DiskImage,
+        kind: opts.kind,
         paths: info.paths.iter().map(|p| p.display().to_string()).collect(),
         size: info.size,
         sector_size: info.sector_size,

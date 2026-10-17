@@ -48,6 +48,9 @@ pub enum NodeId {
         ds: i64,
         file: i64,
     },
+    /// The top-level files of a data source outside any file system
+    /// (logical files, unallocated space image pieces).
+    TopFiles(i64),
     /// Results of one artifact type in the case database.
     Results {
         type_id: i64,
@@ -71,7 +74,10 @@ impl NodeId {
     /// The data source this node belongs to (`None` for case-wide nodes).
     pub fn ds(&self) -> Option<i64> {
         match self {
-            Self::DataSource(ds) | Self::Volume { ds, .. } | Self::Dir { ds, .. } => Some(*ds),
+            Self::DataSource(ds)
+            | Self::TopFiles(ds)
+            | Self::Volume { ds, .. }
+            | Self::Dir { ds, .. } => Some(*ds),
             Self::Host(_)
             | Self::Results { .. }
             | Self::View(_)

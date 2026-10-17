@@ -57,6 +57,11 @@ pub(crate) struct DsTree {
     pub(crate) volumes: Vec<VolumeNode>,
     /// File systems not inside a volume (no volume system).
     pub(crate) loose: Vec<FsRoot>,
+    /// Top-level folders outside file systems (logical file sets).
+    pub(crate) top_dirs: Vec<FileRecord>,
+    /// Top-level files outside file systems (loose logical files,
+    /// unallocated space image pieces).
+    pub(crate) top_files: usize,
 }
 
 /// The case's data sources, hosts and persons.
@@ -141,11 +146,22 @@ pub(crate) fn load(case: &Case) -> Result<CaseTree, String> {
                 None => loose.push(r),
             }
         }
+        let top = db.top_level_files(ds.id).map_err(err)?;
+        let top_files = top
+            .iter()
+            .filter(|f| f.kind != pm_casedb::FileKindCode::Directory)
+            .count();
+        let top_dirs = top
+            .into_iter()
+            .filter(|f| f.kind == pm_casedb::FileKindCode::Directory)
+            .collect();
         out.push(DsTree {
             ds,
             host,
             volumes,
             loose,
+            top_dirs,
+            top_files,
         });
     }
     out.sort_by_key(|t| t.ds.name.to_lowercase());
