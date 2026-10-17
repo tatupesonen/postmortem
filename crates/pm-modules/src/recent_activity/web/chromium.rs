@@ -152,7 +152,7 @@ pub(crate) fn extract(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleE
     Ok(())
 }
 
-/// `Local State` files → `TSK_LOCAL_STATE` artifacts and the user map.
+/// `Local State` files → `KAAMOS_LOCAL_STATE` artifacts and the user map.
 fn profiles(
     ctx: &JobContext,
     web: &mut Web<'_>,
@@ -160,7 +160,7 @@ fn profiles(
     sink: &mut Sink,
 ) -> Result<Users, ModuleError> {
     let mut users = Users::new();
-    let ty = custom_type(ctx, "TSK_LOCAL_STATE", "Chromium Profiles");
+    let ty = custom_type(ctx, "KAAMOS_LOCAL_STATE", "Chromium Profiles");
     for (f, p) in files.iter().filter(|(f, p)| is_store(f, p, "Local State")) {
         // Autopsy: allocated files only; name filters.
         if !f.meta_alloc || skipped(f, &["-slack", "cache", "media", "index"]) {
@@ -192,13 +192,13 @@ fn profiles(
                 sink.push(
                     ctx,
                     WebArt::of_type(ctx, ty, f.id)
-                        .text("TSK_PATH", &pr.dir)
-                        .text("TSK_USER_ID", pr.gaia_id)
-                        .text("TSK_DOMAIN", pr.hosted_domain)
-                        .text("TSK_SHORTCUT", pr.shortcut_name)
-                        .text("TSK_NAME", pr.name)
-                        .text("TSK_USER_NAME", pr.user_name)
-                        .text("TSK_PROG_NAME", p.browser),
+                        .text("KAAMOS_PATH", &pr.dir)
+                        .text("KAAMOS_USER_ID", pr.gaia_id)
+                        .text("KAAMOS_DOMAIN", pr.hosted_domain)
+                        .text("KAAMOS_SHORTCUT", pr.shortcut_name)
+                        .text("KAAMOS_NAME", pr.name)
+                        .text("KAAMOS_USER_NAME", pr.user_name)
+                        .text("KAAMOS_PROG_NAME", p.browser),
                 )?;
             }
         }
@@ -217,7 +217,7 @@ fn extensions(
     if !f.meta_alloc || skipped(f, &["-slack", "cache", "media", "index"]) {
         return Ok(());
     }
-    let ty = custom_type(ctx, "TSK_CHROME_EXTENSIONS", "Chromium Extensions");
+    let ty = custom_type(ctx, "KAAMOS_CHROME_EXTENSIONS", "Chromium Extensions");
     if done(ctx, f, ty) {
         return Ok(());
     }
@@ -229,19 +229,19 @@ fn extensions(
     };
     let malicious = chr::malicious_extensions();
     for e in exts {
-        let mut a = WebArt::of_type(ctx, ty, f.id).text("TSK_ID", &e.id);
+        let mut a = WebArt::of_type(ctx, ty, f.id).text("KAAMOS_ID", &e.id);
         if let Some(r) = malicious.get(&e.id) {
-            a = a.text("TSK_COMMENT", format!("Malicious Extension Found - {r}"));
+            a = a.text("KAAMOS_COMMENT", format!("Malicious Extension Found - {r}"));
         }
         sink.push(
             ctx,
-            a.text("TSK_NAME", e.name)
-                .text("TSK_DESCRIPTION", e.description)
-                .text("TSK_VERSION", e.version)
-                .text("TSK_FLAG", e.flag)
-                .text("TSK_PERMISSIONS", e.permissions)
-                .text("TSK_USER_NAME", user)
-                .text("TSK_PROG_NAME", p.browser),
+            a.text("KAAMOS_NAME", e.name)
+                .text("KAAMOS_DESCRIPTION", e.description)
+                .text("KAAMOS_VERSION", e.version)
+                .text("KAAMOS_FLAG", e.flag)
+                .text("KAAMOS_PERMISSIONS", e.permissions)
+                .text("KAAMOS_USER_NAME", user)
+                .text("KAAMOS_PROG_NAME", p.browser),
         )?;
     }
     Ok(())
@@ -257,7 +257,7 @@ fn history(
 ) -> Result<(), ModuleError> {
     if !f.meta_alloc
         || skipped(f, &["-slack", "cache", "media", "index"])
-        || done_std(ctx, f, "TSK_WEB_HISTORY")
+        || done_std(ctx, f, "KAAMOS_WEB_HISTORY")
     {
         return Ok(());
     }
@@ -298,7 +298,7 @@ fn bookmarks(
         f,
         &["-slack", "extras", "log", "backup", "visualized", "bak"],
     ) || f.parent_path.to_lowercase().contains("backup");
-    if bad || done_std(ctx, f, "TSK_WEB_BOOKMARK") {
+    if bad || done_std(ctx, f, "KAAMOS_WEB_BOOKMARK") {
         return Ok(());
     }
     let Some(data) = read_small(ctx, f) else {
@@ -309,16 +309,16 @@ fn bookmarks(
     };
     for b in list {
         let domain = extract_domain(&b.url);
-        let mut a = WebArt::new(ctx, "TSK_WEB_BOOKMARK", f.id)
-            .text("TSK_URL", &b.url)
-            .text("TSK_TITLE", b.name);
-        a = a.time("TSK_DATETIME_CREATED", b.date_added);
+        let mut a = WebArt::new(ctx, "KAAMOS_WEB_BOOKMARK", f.id)
+            .text("KAAMOS_URL", &b.url)
+            .text("KAAMOS_TITLE", b.name);
+        a = a.time("KAAMOS_DATETIME_CREATED", b.date_added);
         sink.push(
             ctx,
-            a.text("TSK_PROG_NAME", p.browser)
-                .text("TSK_DOMAIN", domain)
-                .text("TSK_USER_NAME", user)
-                .text("TSK_COMMENT", b.root),
+            a.text("KAAMOS_PROG_NAME", p.browser)
+                .text("KAAMOS_DOMAIN", domain)
+                .text("KAAMOS_USER_NAME", user)
+                .text("KAAMOS_COMMENT", b.root),
         )?;
     }
     Ok(())
@@ -332,7 +332,7 @@ fn cookies(
     user: &str,
     sink: &mut Sink,
 ) -> Result<(), ModuleError> {
-    if skipped(f, &["-slack"]) || done_std(ctx, f, "TSK_WEB_COOKIE") {
+    if skipped(f, &["-slack"]) || done_std(ctx, f, "KAAMOS_WEB_COOKIE") {
         return Ok(());
     }
     with_db(ctx, web, WHO, f, |conn| {
@@ -343,15 +343,15 @@ fn cookies(
             |cb| chr::cookies(conn, cb),
             |c: chr::Cookie| {
                 Some(
-                    WebArt::new(ctx, "TSK_WEB_COOKIE", f.id)
-                        .text("TSK_URL", &c.host_key)
-                        .time("TSK_DATETIME_ACCESSED", c.last_access)
-                        .time("TSK_DATETIME_CREATED", c.creation)
-                        .text("TSK_NAME", c.name)
-                        .text("TSK_VALUE", c.value)
-                        .text("TSK_PROG_NAME", p.browser)
-                        .text("TSK_DOMAIN", strip_leading_dots(&c.host_key))
-                        .text("TSK_USER_NAME", user),
+                    WebArt::new(ctx, "KAAMOS_WEB_COOKIE", f.id)
+                        .text("KAAMOS_URL", &c.host_key)
+                        .time("KAAMOS_DATETIME_ACCESSED", c.last_access)
+                        .time("KAAMOS_DATETIME_CREATED", c.creation)
+                        .text("KAAMOS_NAME", c.name)
+                        .text("KAAMOS_VALUE", c.value)
+                        .text("KAAMOS_PROG_NAME", p.browser)
+                        .text("KAAMOS_DOMAIN", strip_leading_dots(&c.host_key))
+                        .text("KAAMOS_USER_NAME", user),
                 )
             },
         )
@@ -366,7 +366,7 @@ fn logins(
     user: &str,
     sink: &mut Sink,
 ) -> Result<(), ModuleError> {
-    if skipped(f, &["-slack"]) || done_std(ctx, f, "TSK_SERVICE_ACCOUNT") {
+    if skipped(f, &["-slack"]) || done_std(ctx, f, "KAAMOS_SERVICE_ACCOUNT") {
         return Ok(());
     }
     with_db(ctx, web, WHO, f, |conn| {
@@ -377,14 +377,14 @@ fn logins(
             |cb| chr::logins(conn, cb),
             |l: chr::Login| {
                 Some(
-                    WebArt::new(ctx, "TSK_SERVICE_ACCOUNT", f.id)
-                        .text("TSK_URL", &l.origin_url)
-                        .time("TSK_DATETIME_CREATED", l.date_created)
-                        .text("TSK_USER_ID", l.username)
-                        .text("TSK_REALM", &l.signon_realm)
-                        .text("TSK_DOMAIN", extract_domain(&l.signon_realm))
-                        .text("TSK_PROG_NAME", p.browser)
-                        .text("TSK_USER_NAME", user),
+                    WebArt::new(ctx, "KAAMOS_SERVICE_ACCOUNT", f.id)
+                        .text("KAAMOS_URL", &l.origin_url)
+                        .time("KAAMOS_DATETIME_CREATED", l.date_created)
+                        .text("KAAMOS_USER_ID", l.username)
+                        .text("KAAMOS_REALM", &l.signon_realm)
+                        .text("KAAMOS_DOMAIN", extract_domain(&l.signon_realm))
+                        .text("KAAMOS_PROG_NAME", p.browser)
+                        .text("KAAMOS_USER_NAME", user),
                 )
             },
         )
@@ -399,7 +399,7 @@ fn autofill(
     user: &str,
     sink: &mut Sink,
 ) -> Result<(), ModuleError> {
-    if skipped(f, &["-slack"]) || done_std(ctx, f, "TSK_WEB_FORM_AUTOFILL") {
+    if skipped(f, &["-slack"]) || done_std(ctx, f, "KAAMOS_WEB_FORM_AUTOFILL") {
         return Ok(());
     }
     let browser = p.browser;
@@ -414,19 +414,22 @@ fn autofill(
             |cb| chr::autofill(conn, cb),
             |a: chr::Autofill| {
                 encrypted |= a.encrypted;
-                let mut art = WebArt::new(ctx, "TSK_WEB_FORM_AUTOFILL", f.id)
-                    .text("TSK_NAME", a.name)
-                    .text("TSK_VALUE", a.value)
-                    .int("TSK_COUNT", a.count)
-                    .time("TSK_DATETIME_CREATED", Some(a.date_created.unwrap_or(0)));
+                let mut art = WebArt::new(ctx, "KAAMOS_WEB_FORM_AUTOFILL", f.id)
+                    .text("KAAMOS_NAME", a.name)
+                    .text("KAAMOS_VALUE", a.value)
+                    .int("KAAMOS_COUNT", a.count)
+                    .time("KAAMOS_DATETIME_CREATED", Some(a.date_created.unwrap_or(0)));
                 if v8x {
-                    art = art.time("TSK_DATETIME_ACCESSED", Some(a.date_last_used.unwrap_or(0)));
+                    art = art.time(
+                        "KAAMOS_DATETIME_ACCESSED",
+                        Some(a.date_last_used.unwrap_or(0)),
+                    );
                 }
                 art = art
-                    .text("TSK_USER_NAME", user)
-                    .text("TSK_PROG_NAME", browser);
+                    .text("KAAMOS_USER_NAME", user)
+                    .text("KAAMOS_PROG_NAME", browser);
                 if a.encrypted {
-                    art = art.text("TSK_COMMENT", ENCRYPTED_FIELD_MESSAGE);
+                    art = art.text("KAAMOS_COMMENT", ENCRYPTED_FIELD_MESSAGE);
                 }
                 Some(art)
             },
@@ -455,9 +458,9 @@ fn autofill(
             a.use_count,
         );
         if a.date_modified > 0 {
-            art = art.time("TSK_DATETIME_MODIFIED", Some(a.date_modified));
+            art = art.time("KAAMOS_DATETIME_MODIFIED", Some(a.date_modified));
             if a.encrypted {
-                art = art.text("TSK_COMMENT", ENCRYPTED_FIELD_MESSAGE);
+                art = art.text("KAAMOS_COMMENT", ENCRYPTED_FIELD_MESSAGE);
             }
         }
         sink.push(ctx, art)?;
@@ -468,21 +471,21 @@ fn autofill(
             ctx,
             WebArt::result(
                 ctx,
-                "TSK_ENCRYPTION_DETECTED",
+                "KAAMOS_ENCRYPTION_DETECTED",
                 f.id,
                 Significance::Notable,
                 comment.clone(),
             )
-            .text("TSK_COMMENT", comment),
+            .text("KAAMOS_COMMENT", comment),
         )?;
     }
     Ok(())
 }
 
-/// TSK `WebBrowserArtifactsHelper.addWebFormAddress`: the
-/// `TSK_WEB_FORM_ADDRESS` artifact plus EMAIL / PHONE account instances
+/// Autopsy `WebBrowserArtifactsHelper.addWebFormAddress`: the
+/// `KAAMOS_WEB_FORM_ADDRESS` artifact plus EMAIL / PHONE account instances
 /// on the store.
-#[allow(clippy::too_many_arguments, reason = "mirrors the TSK helper")]
+#[allow(clippy::too_many_arguments, reason = "mirrors the Autopsy helper")]
 pub(crate) fn form_address(
     ctx: &JobContext,
     f: &FileRecord,
@@ -510,19 +513,19 @@ pub(crate) fn form_address(
             tracing::warn!(%e, id, "invalid account identifier");
         }
     }
-    let mut a = WebArt::new(ctx, "TSK_WEB_FORM_ADDRESS", f.id)
-        .text("TSK_NAME", name)
-        .text_nonempty("TSK_EMAIL", email)
-        .text_nonempty("TSK_PHONE_NUMBER", phone)
-        .text_nonempty("TSK_LOCATION", location);
+    let mut a = WebArt::new(ctx, "KAAMOS_WEB_FORM_ADDRESS", f.id)
+        .text("KAAMOS_NAME", name)
+        .text_nonempty("KAAMOS_EMAIL", email)
+        .text_nonempty("KAAMOS_PHONE_NUMBER", phone)
+        .text_nonempty("KAAMOS_LOCATION", location);
     if created > 0 {
-        a = a.time("TSK_DATETIME_CREATED", Some(created));
+        a = a.time("KAAMOS_DATETIME_CREATED", Some(created));
     }
     if accessed > 0 {
-        a = a.time("TSK_DATETIME_ACCESSED", Some(accessed));
+        a = a.time("KAAMOS_DATETIME_ACCESSED", Some(accessed));
     }
     if count > 0 {
-        a = a.int("TSK_COUNT", count);
+        a = a.int("KAAMOS_COUNT", count);
     }
     a
 }
@@ -535,7 +538,7 @@ fn downloads(
     user: &str,
     sink: &mut Sink,
 ) -> Result<(), ModuleError> {
-    if skipped(f, &["-slack", "cache", "index"]) || done_std(ctx, f, "TSK_WEB_DOWNLOAD") {
+    if skipped(f, &["-slack", "cache", "index"]) || done_std(ctx, f, "KAAMOS_WEB_DOWNLOAD") {
         return Ok(());
     }
     let mut list = Vec::new();
@@ -554,17 +557,17 @@ fn downloads(
             break;
         }
         let path_id = web.find_path(ctx, &d.full_path);
-        let mut a = WebArt::new(ctx, "TSK_WEB_DOWNLOAD", f.id).text("TSK_PATH", &d.full_path);
+        let mut a = WebArt::new(ctx, "KAAMOS_WEB_DOWNLOAD", f.id).text("KAAMOS_PATH", &d.full_path);
         if let Some(id) = path_id {
-            a = a.int("TSK_PATH_ID", id);
+            a = a.int("KAAMOS_PATH_ID", id);
         }
         sink.push(
             ctx,
-            a.text("TSK_URL", &d.url)
-                .time("TSK_DATETIME_ACCESSED", d.start_time)
-                .text("TSK_DOMAIN", extract_domain(&d.url))
-                .text("TSK_USER_NAME", user)
-                .text("TSK_PROG_NAME", p.browser)
+            a.text("KAAMOS_URL", &d.url)
+                .time("KAAMOS_DATETIME_ACCESSED", d.start_time)
+                .text("KAAMOS_DOMAIN", extract_domain(&d.url))
+                .text("KAAMOS_USER_NAME", user)
+                .text("KAAMOS_PROG_NAME", p.browser)
                 .associate(path_id),
         )?;
     }
@@ -582,7 +585,7 @@ fn favicons(
     if skipped(f, &["-slack", "cache", "index"]) {
         return Ok(());
     }
-    let ty = custom_type(ctx, "TSK_FAVICON", "Favicon");
+    let ty = custom_type(ctx, "KAAMOS_FAVICON", "Favicon");
     if done(ctx, f, ty) {
         return Ok(());
     }
@@ -595,12 +598,12 @@ fn favicons(
             |i: chr::Favicon| {
                 Some(
                     WebArt::of_type(ctx, ty, f.id)
-                        .text("TSK_URL", &i.page_url)
-                        .time("TSK_DATETIME_MODIFIED", i.last_updated)
-                        .time("TSK_DATETIME_ACCESSED", i.last_requested)
-                        .text("TSK_DOMAIN", extract_domain(&i.page_url))
-                        .text("TSK_USER_NAME", user)
-                        .text("TSK_PROG_NAME", p.browser),
+                        .text("KAAMOS_URL", &i.page_url)
+                        .time("KAAMOS_DATETIME_MODIFIED", i.last_updated)
+                        .time("KAAMOS_DATETIME_ACCESSED", i.last_requested)
+                        .text("KAAMOS_DOMAIN", extract_domain(&i.page_url))
+                        .text("KAAMOS_USER_NAME", user)
+                        .text("KAAMOS_PROG_NAME", p.browser),
                 )
             },
         )

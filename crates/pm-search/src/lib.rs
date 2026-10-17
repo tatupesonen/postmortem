@@ -75,7 +75,7 @@ pub enum ObjRef {
 }
 
 impl ObjRef {
-    /// Index key: file id, or the negated artifact id (as TSK numbers
+    /// Index key: file id, or the negated artifact id (as Autopsy numbers
     /// artifacts below zero in Solr).
     pub fn key(self) -> i64 {
         match self {

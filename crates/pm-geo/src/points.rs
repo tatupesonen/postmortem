@@ -1,10 +1,10 @@
-//! TSK's JSON attribute formats for point lists (`GeoTrackPoints`,
+//! Autopsy's JSON attribute formats for point lists (`GeoTrackPoints`,
 //! `GeoWaypoints`, `GeoAreaPoints`, serialised by `BlackboardJsonAttrUtil`):
 //! `{"pointList":[{...}, ...]}`.
 
 use serde::{Deserialize, Serialize};
 
-/// A track point (`TSK_GEO_TRACKPOINTS`).
+/// A track point (`KAAMOS_GEO_TRACKPOINTS`).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct TrackPoint {
@@ -25,8 +25,8 @@ pub struct TrackPoint {
     pub timestamp: Option<i64>,
 }
 
-/// A route waypoint (`TSK_GEO_WAYPOINTS`) or area point
-/// (`TSK_GEO_AREAPOINTS`, latitude/longitude only).
+/// A route waypoint (`KAAMOS_GEO_WAYPOINTS`) or area point
+/// (`KAAMOS_GEO_AREAPOINTS`, latitude/longitude only).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct WayPoint {
@@ -51,7 +51,7 @@ pub fn parse<T: for<'de> Deserialize<'de>>(json: &str) -> Option<Vec<T>> {
         .map(|p| p.point_list)
 }
 
-/// Serialises a point list as TSK does.
+/// Serialises a point list as Autopsy does.
 pub fn to_json<T: Serialize + Clone>(points: &[T]) -> String {
     serde_json::to_string(&PointList {
         point_list: points.to_vec(),
@@ -64,7 +64,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn round_trips_tsk_json() {
+    fn round_trips_point_list_json() {
         let json = r#"{"pointList":[{"latitude":60.1,"longitude":24.9,"altitude":5.0,"timestamp":1600000000,"distanceTraveled":3.5}]}"#;
         let pts: Vec<TrackPoint> = parse(json).unwrap();
         assert_eq!(pts[0].timestamp, Some(1_600_000_000));

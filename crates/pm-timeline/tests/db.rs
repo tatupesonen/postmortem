@@ -29,7 +29,7 @@ fn demo_case() -> (tempfile::TempDir, pm_case::Case) {
     let attr = |n: &str| catalog::attribute_type_id(n).unwrap();
     case.db()
         .add_artifact(&NewArtifact {
-            type_id: catalog::artifact_type_id("TSK_PROG_RUN").unwrap(),
+            type_id: catalog::artifact_type_id("KAAMOS_PROG_RUN").unwrap(),
             ds_id: s.ds_id,
             file_id: None,
             source_artifact_id: None,
@@ -40,12 +40,12 @@ fn demo_case() -> (tempfile::TempDir, pm_case::Case) {
             created_at: 0,
             attributes: vec![
                 (
-                    attr("TSK_PROG_NAME"),
+                    attr("KAAMOS_PROG_NAME"),
                     Value::Text("SETUP.EXE".into()),
                     "t".into(),
                 ),
                 (
-                    attr("TSK_DATETIME"),
+                    attr("KAAMOS_DATETIME"),
                     Value::DateTime(1_622_505_490),
                     "t".into(),
                 ),

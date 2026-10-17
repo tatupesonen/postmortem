@@ -12,20 +12,20 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 - **N/A?**: an Autopsy platform artefact that probably should not be ported. The coordinator should confirm each one.
 
 **Path abbreviations**
-- `A/` = `Core/src/org/sleuthkit/autopsy/`
+- `A/` = `Core/src/org/the reference tools/autopsy/`
 - `CT/` = `Core/src/com/basistech/df/cybertriage/autopsy/`
-- `RA/` = `RecentActivity/src/org/sleuthkit/autopsy/recentactivity/`
-- `KWS/` = `KeywordSearch/src/org/sleuthkit/autopsy/keywordsearch/`
-- `IG/` = `ImageGallery/src/org/sleuthkit/autopsy/imagegallery/`
-- `EXP/` = `Experimental/src/org/sleuthkit/autopsy/experimental/`
-- `TB/` = `thunderbirdparser/src/org/sleuthkit/autopsy/thunderbirdparser/`
+- `RA/` = `RecentActivity/src/org/the reference tools/autopsy/recentactivity/`
+- `KWS/` = `KeywordSearch/src/org/the reference tools/autopsy/keywordsearch/`
+- `IG/` = `ImageGallery/src/org/the reference tools/autopsy/imagegallery/`
+- `EXP/` = `Experimental/src/org/the reference tools/autopsy/experimental/`
+- `TB/` = `thunderbirdparser/src/org/the reference tools/autopsy/thunderbirdparser/`
 - `IPM/` = `InternalPythonModules/`
 - `pm-x/…` = `crates/pm-x/…`
 
 ## 0. Headline findings (2026-10-18)
 
 1. **Solid (Done):** evidence (raw/split/E01, VMDK/VHD/VHDX/QCOW2,
-   MBR/GPT, NTFS/FAT/exFAT/ext with TSK differential tests); case
+   MBR/GPT, NTFS/FAT/exFAT/ext with reference-tool differential tests); case
    create/open/load/delete; schema v3 (OS accounts, communications,
    timeline events, scores, tag sets); the ingest framework with Autopsy's
    core modules (Hash Lookup, File Type, Extension Mismatch, Embedded
@@ -69,7 +69,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Unpack and Open Portable Case | `UnpackagePortableCaseAction/Dialog` | Missing | Depends on the Portable Case report (§26). |
 | Open Case Folder / Open Output Folder / Open Log Folder | `A/actions/OpenOutputFolderAction`, `OpenLogFolderAction`, Tools › Open Case Folder | Partial | Case › Open Case Folder and Help › Open Log Folder (case `Log`). The app log still goes to stderr only. |
 | Case events bus (`Case.Events`: DATA_SOURCE_ADDED, tags, reports, CR comment, hosts…) | `A/casemodule/events/*`, `A/events/*` | Missing | No event bus in `pm-case`. The UI polls and refreshes instead. |
-| Examiner recording | `Case`/TSK `examiners` | Partial | There is a table and the examiner is typed into the wizard. The OS-login examiner is not used for tags (there are no tag writes from the UI). |
+| Examiner recording | `Case`/Autopsy `examiners` | Partial | There is a table and the examiner is typed into the wizard. The OS-login examiner is not used for tags (there are no tag writes from the UI). |
 | AutopsyService case-open hooks | `A/appservices/AutopsyService` | Missing | Plugin lifecycle hooks; relevant to WP-24. |
 | Multi-data-source "group by data source?" prompt (>5 sources) | `directorytree/GroupDataSourcesDialog` | Missing | Depends on person/host grouping (§7). |
 
@@ -90,80 +90,80 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Autopsy Logical Imager Results DSP | `A/logicalimager/dsp/*` | Missing | — |
 | Memory Image DSP (Volatility) | `EXP/volatilityDSP/*` | Missing | External-tool runner (§17). |
 | Auto-ingest DSP confidence ordering (`AutoIngestDataSourceProcessor.canProcess`) | `A/datasourceprocessors/DataSourceProcessorUtility` | Missing | Needed for the CLI and auto-ingest. |
-| Unallocated-space virtual files (`$Unalloc`, chunked) | TSK + `AddImageTask` | Done | `pm-case/src/load.rs` (`chunk_ranges`), with tests. |
-| `$OrphanFiles` virtual dirs | TSK | Done | Tested for FAT/NTFS/exFAT. |
-| `$CarvedFiles` virtual dir | TSK/PhotoRec | Done | — |
-| Slack files (`-slack`) | TSK `SlackFile` | Missing | `PLAN.md` M1 item unchecked. Schema has `origin 6 slack`. |
+| Unallocated-space virtual files (`$Unalloc`, chunked) | Autopsy + `AddImageTask` | Done | `pm-case/src/load.rs` (`chunk_ranges`), with tests. |
+| `$OrphanFiles` virtual dirs | Autopsy | Done | Tested for FAT/NTFS/exFAT. |
+| `$CarvedFiles` virtual dir | Autopsy/PhotoRec | Done | — |
+| Slack files (`-slack`) | Autopsy `SlackFile` | Missing | `PLAN.md` M1 item unchecked. Schema has `origin 6 slack`. |
 | Data-source time zone (FAT local times) | `ImageFilePanel` | Done | — |
 
 ## 3. Image formats (`pm-image`)
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Raw / split raw (.dd .img .raw .bin .001 .aa) | `GeneralFilter.RAW_IMAGE_EXTS`, TSK | Done | Tests in `pm-image/tests/open.rs`. |
-| EWF v1 E01/s01 (multi-segment, stored hashes, header metadata) | `GeneralFilter.ENCASE_IMAGE_EXTS`, TSK/libewf | Done | Verified against ewfacquire, with a fuzz target (`fuzz_targets/ewf_read.rs`). |
-| EWF2 Ex01 / Lx01 | TSK/libewf | Missing | Sniffed only; returns `Unsupported`. |
+| Raw / split raw (.dd .img .raw .bin .001 .aa) | `GeneralFilter.RAW_IMAGE_EXTS`, Autopsy | Done | Tests in `pm-image/tests/open.rs`. |
+| EWF v1 E01/s01 (multi-segment, stored hashes, header metadata) | `GeneralFilter.ENCASE_IMAGE_EXTS`, libewf | Done | Verified against ewfacquire, with a fuzz target (`fuzz_targets/ewf_read.rs`). |
+| EWF2 Ex01 / Lx01 | libewf | Missing | Sniffed only; returns `Unsupported`. |
 | L01 logical evidence | `LogicalEvidenceFilePanel` | Missing | See §2. |
-| VMDK (sparse, flat, descriptor, split) | `GeneralFilter.VIRTUAL_MACHINE_EXTS`, TSK/libvmdk | Done | In-house reader (pm-image), with parents; differential tests against qemu-img. |
+| VMDK (sparse, flat, descriptor, split) | `GeneralFilter.VIRTUAL_MACHINE_EXTS`, libvmdk | Done | In-house reader (pm-image), with parents; differential tests against qemu-img. |
 | VHD (fixed/dynamic/differencing) | same | Done | In-house reader with parent chains. |
 | VHDX | same | Done | In-house reader with parent chains. |
-| QCOW2 | TSK (libqcow), not in Autopsy's file filter | Done | In-house reader with backing files. |
+| QCOW2 | Autopsy (libqcow), not in Autopsy's file filter | Done | In-house reader with backing files. |
 | DMG (UDIF) | Not in Autopsy | Missing | In the postmortem `PLAN.md` only. |
-| AFF / AFF4 | TSK optional; not in Autopsy's file filter | Missing | Low priority. |
-| Image metadata (acquisition details, device id, image hashes) | TSK `tsk_image_info` | Partial | EWF header metadata is parsed. The `data_sources` columns exist. No Image Details panel (§9). |
+| AFF / AFF4 | Autopsy optional; not in Autopsy's file filter | Missing | Low priority. |
+| Image metadata (acquisition details, device id, image hashes) | Autopsy  | Partial | EWF header metadata is parsed. The `data_sources` columns exist. No Image Details panel (§9). |
 
 ## 4. Volume systems, pools, encryption (`pm-volume`)
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| DOS/MBR + EBR | TSK | Done | Matches `mmls`. Tests and fuzz. |
-| GPT (incl. backup header) | TSK | Done | Same as above. |
-| Apple Partition Map | TSK | Missing | — |
-| BSD disklabel | TSK | Missing | — |
-| Sun VTOC | TSK | Missing | — |
-| Pools: APFS container | TSK pools, `PoolNode` | Missing | Needs `pm-fs-apfs`. |
-| Pools: LVM | TSK pools | Missing | — |
-| BitLocker decryption (password / recovery key) | TSK, `ImageFilePanel` password, CLI `--key` | Missing | Encryption detection is done (Encryption Detection module); unlocking is not. |
-| LUKS / FileVault / Core Storage detection | TSK (detect) | Done | Detection only (pm-encryption); unlock is not planned. |
+| DOS/MBR + EBR | Autopsy | Done | Matches `mmls`. Tests and fuzz. |
+| GPT (incl. backup header) | Autopsy | Done | Same as above. |
+| Apple Partition Map | Autopsy | Missing | — |
+| BSD disklabel | Autopsy | Missing | — |
+| Sun VTOC | Autopsy | Missing | — |
+| Pools: APFS container | Autopsy pools, `PoolNode` | Missing | Needs `pm-fs-apfs`. |
+| Pools: LVM | Autopsy pools | Missing | — |
+| BitLocker decryption (password / recovery key) | Autopsy, `ImageFilePanel` password, CLI `--key` | Missing | Encryption detection is done (Encryption Detection module); unlocking is not. |
+| LUKS / FileVault / Core Storage detection | Autopsy (detect) | Done | Detection only (pm-encryption); unlock is not planned. |
 
 ## 5. File systems (`pm-fs-*`)
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| NTFS (MFT, ADS, compression, deleted, orphans, $I30 slack) | TSK | Done | TSK-exact against the NIST image. Differential tests and fuzz. |
-| NTFS extras: owner SIDs ($Secure), reparse points, EFS flag, WOF compression, hard links, $UsnJrnl/$LogFile | TSK (partly) | Missing | `PLAN.md` M1 item unchecked. |
-| FAT12/16/32 (incl. deleted LFN, orphans) | TSK | Done | Differential tests and fuzz. |
-| exFAT | TSK | Done | Matches fls; fuzz. |
-| ext2/3/4 | TSK | Done | fls parity. **No fuzz target** (`fuzz/fuzz_targets` has none for ext). |
-| HFS+/HFSX (resource forks, compression, hard links) | TSK | Missing | — |
-| APFS (incl. snapshots, encryption) | TSK | Missing | — |
-| ISO9660 (+Joliet/Rock Ridge) | TSK | Missing | — |
-| UDF | TSK | Missing | — |
-| UFS1/2 (FFS) | TSK | Missing | Not in `PLAN.md`; TSK supports it. |
-| XFS | TSK | Missing | Low priority in `PLAN.md`. |
-| Btrfs | TSK | Missing | Low priority. |
-| YAFFS2 | TSK | Missing | Low priority. |
-| Unsupported content node | TSK `UnsupportedContent` | Partial | Partitions without a known FS are listed as volumes. No explicit node. |
+| NTFS (MFT, ADS, compression, deleted, orphans, $I30 slack) | Autopsy | Done | reference-exact against the NIST image. Differential tests and fuzz. |
+| NTFS extras: owner SIDs ($Secure), reparse points, EFS flag, WOF compression, hard links, $UsnJrnl/$LogFile | Autopsy (partly) | Missing | `PLAN.md` M1 item unchecked. |
+| FAT12/16/32 (incl. deleted LFN, orphans) | Autopsy | Done | Differential tests and fuzz. |
+| exFAT | Autopsy | Done | Matches fls; fuzz. |
+| ext2/3/4 | Autopsy | Done | fls parity. **No fuzz target** (`fuzz/fuzz_targets` has none for ext). |
+| HFS+/HFSX (resource forks, compression, hard links) | Autopsy | Missing | — |
+| APFS (incl. snapshots, encryption) | Autopsy | Missing | — |
+| ISO9660 (+Joliet/Rock Ridge) | Autopsy | Missing | — |
+| UDF | Autopsy | Missing | — |
+| UFS1/2 (FFS) | Autopsy | Missing | Not in `PLAN.md`; Autopsy supports it. |
+| XFS | Autopsy | Missing | Low priority in `PLAN.md`. |
+| Btrfs | Autopsy | Missing | Low priority. |
+| YAFFS2 | Autopsy | Missing | Low priority. |
+| Unsupported content node | Autopsy `UnsupportedContent` | Partial | Partitions without a known FS are listed as volumes. No explicit node. |
 
 ## 6. Case database & data model (`pm-casedb`)
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Objects/files/VS/FS/data sources schema + bulk loader | TSK schema | Done | `migrations/0001_initial.sql`, about 205k rows/s. Tests in `pm-casedb/tests`. |
-| Standard artifact/attribute type catalogue (incl. custom types) | TSK `BlackboardArtifact.Type` | Done | 226 TSK_ entries in `catalog.rs`, plus the `custom_types` test. |
-| Artifacts with score/conclusion/justification/configuration, review status | TSK analysis results | Partial | Scores, conclusion, justification and configuration shown; review-status UI missing. |
-| Aggregate score per object (incl. tags, artifacts as objects) | TSK `tsk_aggregate_score` | Done | Schema v2 `scores` table, TSK ordering, tags included. |
-| Tags (tag names, tag sets, file/artifact tags, byte-range tags) | TSK tags | Partial | Files and results with sets and scores; byte-range tags missing. |
-| Hosts | TSK `HostManager` | Done | Schema v2 + Manage Hosts UI. |
-| Persons | TSK `PersonManager` | Done | Schema v2 + person UI on host nodes. |
-| OS accounts, realms, instances, attributes | TSK `OsAccountManager` | Done | Schema v2 with TSK merge rules; SAM/ProfileList feed it. |
-| Communication accounts + account_relationships | TSK `CommunicationsManager` | Done | Schema v2; written by the Email Parser via post_communication. |
-| Timeline events table (event types, 3 description levels, tagged/hash_hit flags) | TSK `TimelineManager`, `tsk_events` | Done | Artifact events are written with every data artifact (TSK `TimelineEventTypes` mappings, catch-all for the rest; back-filled once for older cases); file-system events are the indexed `files` time columns (schema v3 indexes all four). The Timeline window, MCP and reports all read the database (`pm_timeline::db`). |
-| Ingest job records | TSK `ingest_jobs` | Done | `start/finish_ingest_job`. |
-| Reports table | TSK `reports` | Done | Written by Generate Report; listed under the Reports tree node (open, open folder, delete). |
-| Derived files / file re-injection | TSK `DerivedFile` | Done | ADR-016; `pm_modules::derive`. |
-| PostgreSQL back end | TSK | Missing | Planned through a dialect layer in `pm-casedb` (ADR-024). |
-| Autopsy case importer (TSK DB → pm) | — | Missing | Stretch goal in `PLAN.md`. |
+| Objects/files/VS/FS/data sources schema + bulk loader | Autopsy schema | Done | `migrations/0001_initial.sql`, about 205k rows/s. Tests in `pm-casedb/tests`. |
+| Standard artifact/attribute type catalogue (incl. custom types) | Autopsy `BlackboardArtifact.Type` | Done | 226 TSK_ entries in `catalog.rs`, plus the `custom_types` test. |
+| Artifacts with score/conclusion/justification/configuration, review status | Autopsy analysis results | Partial | Scores, conclusion, justification and configuration shown; review-status UI missing. |
+| Aggregate score per object (incl. tags, artifacts as objects) | Autopsy  | Done | Schema v2 `scores` table, Autopsy ordering, tags included. |
+| Tags (tag names, tag sets, file/artifact tags, byte-range tags) | Autopsy tags | Partial | Files and results with sets and scores; byte-range tags missing. |
+| Hosts | Autopsy `HostManager` | Done | Schema v2 + Manage Hosts UI. |
+| Persons | Autopsy `PersonManager` | Done | Schema v2 + person UI on host nodes. |
+| OS accounts, realms, instances, attributes | Autopsy `OsAccountManager` | Done | Schema v2 with Autopsy merge rules; SAM/ProfileList feed it. |
+| Communication accounts + account_relationships | Autopsy `CommunicationsManager` | Done | Schema v2; written by the Email Parser via post_communication. |
+| Timeline events table (event types, 3 description levels, tagged/hash_hit flags) | Autopsy `TimelineManager`,  | Done | Artifact events are written with every data artifact (Autopsy `TimelineEventTypes` mappings, catch-all for the rest; back-filled once for older cases); file-system events are the indexed `files` time columns (schema v3 indexes all four). The Timeline window, MCP and reports all read the database (`pm_timeline::db`). |
+| Ingest job records | Autopsy `ingest_jobs` | Done | `start/finish_ingest_job`. |
+| Reports table | Autopsy `reports` | Done | Written by Generate Report; listed under the Reports tree node (open, open folder, delete). |
+| Derived files / file re-injection | Autopsy `DerivedFile` | Done | ADR-016; `pm_modules::derive`. |
+| PostgreSQL back end | Autopsy | Missing | Planned through a dialect layer in `pm-casedb` (ADR-024). |
+| Autopsy case importer (Autopsy DB → pm) | — | Missing | Stretch goal in `PLAN.md`. |
 
 ## 7. Directory tree (`A/directorytree`, `A/datamodel`)
 
@@ -183,7 +183,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Interesting Items / Interesting File/Artifact hits by set | `InterestingHits` | Missing | — |
 | E-Mail Messages by account › folder | `EmailExtracted` | Missing | — |
 | Communication Accounts by type; credit cards By File / By BIN (BIN DB) | `datamodel/accounts/Accounts`, `ranges.csv` | Missing | Card validation (Luhn, BIN) is done in `pm-search`; the tree grouping is not. |
-| TSK_MALWARE filtered to notable | `AnalysisResults` | Missing | — |
+| KAAMOS_MALWARE filtered to notable | `AnalysisResults` | Missing | — |
 | OS Accounts node | `OsAccounts.java` | Done | Under Analysis Results (user choice). |
 | Tags node (tag › File Tags / Result Tags; hide other users' tags) | `Tags.java` | Partial | "Hide other users' tags" missing. |
 | Score node (Bad Items / Suspicious Items) | `ScoreContent.java` | Done | — |
@@ -295,18 +295,18 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Hash Lookup (known/notable sets, calculate MD5 w/o sets, inbox per hit, TSK_HASHSET_HIT) | `modules/hashdatabase/HashDbIngestModule` | Done | `pm-modules/src/hash_lookup.rs`, with 4 end-to-end tests. |
-| Hash set formats: kdb, NSRL RDS v2/v3, md5sum, HashKeeper, EnCase, idx | `hashdatabase/*Parser`, TSK | Done | `pm-hashdb`, with tests. Port of the 08 `test/input` idx fixtures still owed. |
+| Hash Lookup (known/notable sets, calculate MD5 w/o sets, inbox per hit, KAAMOS_HASHSET_HIT) | `modules/hashdatabase/HashDbIngestModule` | Done | `pm-modules/src/hash_lookup.rs`, with 4 end-to-end tests. |
+| Hash set formats: kdb, NSRL RDS v2/v3, md5sum, HashKeeper, EnCase, idx | `hashdatabase/*Parser`, Autopsy | Done | `pm-hashdb`, with tests. Port of the 08 `test/input` idx fixtures still owed. |
 | Hash Sets options panel (create, import, index, delete, add hashes dialog, import into CR) | `HashLookupSettingsPanel`, `HashDbCreateDatabaseDialog`, `HashDbImportDatabaseDialog`, `AddHashValuesToDatabaseDialog` | Partial | Options › Hash Sets: create .kdb, import any format, details (type, hashes, index state, updateable), index/re-index in the background, kind, search/inbox flags, remove. No add-hashes dialog or CR import. |
 | File Type Identification (Tika-equivalent) | `modules/filetypeid` | Done | Matches Tika 3.0.0 on 10 861 test files; ~23× faster. |
 | User-defined file types (Options › File Types) | `filetypeid/FileTypeIdGlobalSettingsPanel`, `AddFileTypeSignatureDialog` | Partial | Engine done; Options › File Types UI missing. |
 | Extension Mismatch Detector (+ options panel table) | `modules/fileextmismatch` | Partial | Module done; options table UI missing. |
 | Embedded File Extractor (archives, Office, PDF images, zip bomb, password detection) | `modules/embeddedfileextractor` | Done | Password prompt UI missing. |
-| Picture Analyzer: EXIF → TSK_METADATA_EXIF + USER_CONTENT_SUSPECTED | `modules/pictureanalyzer/impls/EXIFProcessor` | Partial | Done; tests owed (no end-to-end ingest test). |
+| Picture Analyzer: EXIF → KAAMOS_METADATA_EXIF + USER_CONTENT_SUSPECTED | `modules/pictureanalyzer/impls/EXIFProcessor` | Partial | Done; tests owed (no end-to-end ingest test). |
 | Picture Analyzer: HEIC/HEIF → JPEG derived files | `pictureanalyzer/impls/HEICProcessor` | Missing | Needs derived files and a HEIC decoder (external). |
 | Encryption Detection (entropy, BitLocker/VeraCrypt/SQLCipher, protected Office/PDF/Access) | `modules/encryptiondetection` | Done | — |
 | Interesting Files Identifier (+ rule-set editor, import/export XML) | `modules/interestingitems` | Partial | Module and FilesSet engine done; rule-set editor UI missing. |
-| Data Source Integrity (verify/compute image hashes, TSK_VERIFICATION_FAILED) | `modules/dataSourceIntegrity` | Partial | Module done; DSP hash-entry UI missing (§2). |
+| Data Source Integrity (verify/compute image hashes, KAAMOS_VERIFICATION_FAILED) | `modules/dataSourceIntegrity` | Partial | Module done; DSP hash-entry UI missing (§2). |
 | PhotoRec Carver | `modules/photoreccarver` | Done | 17 of PhotoRec's ~300 types (native carver). |
 | Scalpel Carver (disabled in Autopsy) | `ScalpelCarver/` | N/A? | Not registered in Autopsy. |
 | Central Repository ingest module | `centralrepository/ingestmodule` | Missing | §25. |
@@ -345,11 +345,11 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Text extraction: plain/HTML/PDF/Office/RTF/SQLite/strings fallback, artifact text, metadata → TSK_METADATA | `A/textextractors/*`, Tika | Done | pm-text. |
+| Text extraction: plain/HTML/PDF/Office/RTF/SQLite/strings fallback, artifact text, metadata → KAAMOS_METADATA | `A/textextractors/*`, Tika | Done | pm-text. |
 | Indexing (chunking, Tantivy), inline search during ingest | `Chunker`, `Ingester`, `InlineSearcher` | Done | Artifact text is indexed in the data-source stage. |
-| Keyword lists (built-ins: phone, IP, email, URL, credit card), exact/substring/regex, TSK_KEYWORD_HIT | `KeywordSearchList`, `XmlKeywordSearchList` | Done | — |
+| Keyword lists (built-ins: phone, IP, email, URL, credit card), exact/substring/regex, KAAMOS_KEYWORD_HIT | `KeywordSearchList`, `XmlKeywordSearchList` | Done | — |
 | Keyword list import/export (XML, EnCase) | `EnCaseKeywordSearchList` | Partial | Engine done; Options › Keyword Search lists UI missing. |
-| Credit cards (Luhn, IIN/BIN DB, TSK_ACCOUNT) | `CreditCardValidator`, `datamodel/ranges.csv` | Done | BIN tree view (§7) missing. |
+| Credit cards (Luhn, IIN/BIN DB, KAAMOS_ACCOUNT) | `CreditCardValidator`, `datamodel/ranges.csv` | Done | BIN tree view (§7) missing. |
 | Language detection / Japanese (CJK) analysers | `LanguageDetector`, `LanguageSpecificContent*` | Missing | Not implemented. |
 | File-name search index (Tantivy n-gram) | `PLAN.md` scale track | Done | Built by Keyword Search's name index; used by MCP `search_file_names`. Not yet used by File Search by Attributes or a quick-search box. |
 | Ad-hoc search UI: toolbar Keyword Search + Keyword Lists dropdowns, results node | `DropdownToolbar`, `DropdownSingleTermSearchPanel`, `DropdownListSearchPanel`, `AdHocSearch*` | Partial | Single-term panel, result tabs, save results done; Keyword Lists dropdown missing. |
@@ -377,7 +377,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
 | aLEAPP / iLEAPP analyzers (TSV → artifacts + HTML report) | `A/modules/leappanalyzers` | Out of scope | Out of scope as an external-tool runner (owner decision 2026-10-17, DIRECTION.md); valuable parsers are ported natively instead. |
-| Plaso (log2timeline/psort → TSK_TL_EVENT) | `A/modules/plaso` | Out of scope | Out of scope as an external-tool runner (owner decision 2026-10-17, DIRECTION.md); valuable parsers are ported natively instead. |
+| Plaso (log2timeline/psort → KAAMOS_TL_EVENT) | `A/modules/plaso` | Out of scope | Out of scope as an external-tool runner (owner decision 2026-10-17, DIRECTION.md); valuable parsers are ported natively instead. |
 | Object Detection (OpenCV Haar) | `EXP/objectdetection` | Missing | Not planned yet. |
 | Volatility memory DSP | `EXP/volatilityDSP` | Out of scope | Out of scope as an external-tool runner (owner decision 2026-10-17, DIRECTION.md); valuable parsers are ported natively instead. |
 | Malware Scan (Cyber Triage cloud), CT options/licence | `CT/malwarescan/*`, `CT/ctoptions/*`, `CT/ctapi/*` | N/A (decided) | Proprietary cloud service; out of scope (user decision 2026-10-17). |
@@ -393,10 +393,10 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | List view | `ui/listvew/*` | Done | Test `timeline_reads_the_case_database` (`pm-ui/src/timeline.rs`). |
 | Filters: event types, data sources, file types, text | `ui/filtering/*` | Partial | Done. The filter tree lacks Apply/Reset semantics and the "select only/others" menu. |
 | Filters: Tags, Hash Hits | `ui/filtering` | Missing | — |
-| Events from all artifact types (registry, LNK, prefetch, email, messages, GPS, …) | TSK `TimelineManager` event types | Done | Every data artifact type posts events (TSK mappings for web, messages, email, calls, recent docs, programs, devices, EXIF, metadata, GPS, Wi-Fi, Bluetooth, calendar; event-log entries as Log Entry; catch-all for the rest). Analysis results get none, as in TSK. |
+| Events from all artifact types (registry, LNK, prefetch, email, messages, GPS, …) | Autopsy `TimelineManager` event types | Done | Every data artifact type posts events (Autopsy mappings for web, messages, email, calls, recent docs, programs, devices, EXIF, metadata, GPS, Wi-Fi, Bluetooth, calendar; event-log entries as Log Entry; catch-all for the rest). Analysis results get none, as in Autopsy. |
 | Overview range slider | `ui/TimeLineResultView` | Partial | Present; tests owed. |
 | History back/forward, zoom presets | `ViewFrame` | Done | — |
-| Add Event (manual, TSK_TL_EVENT) | `actions/AddManualEvent` | Missing | — |
+| Add Event (manual, KAAMOS_TL_EVENT) | `actions/AddManualEvent` | Missing | — |
 | Snapshot report (HTML + PNG) | `actions/SaveSnapshotAsReport`, `timeline/snapshot` | Missing | — |
 | View in Timeline from files/artifacts and from DSS | `actions/ViewFileInTimelineAction`, `ViewArtifactInTimelineAction` | Partial | Files and DSS: yes. Artifacts: no. |
 
@@ -410,7 +410,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Relationship graph (pin/unpin/reset, lock, layouts, zoom, snapshot report) | `VisualizationPanel`, `CommunicationsGraph`, `PinAccountsAction`, `communications/snapshot` | Partial | Radial graph of the selected account and its correspondents (click to follow); pin/lock/layouts/snapshot missing. |
 | Relationship browser: Summary, Messages (threads), Call Logs, Contacts, Media | `relationships/*` | Partial | Messages, Call Logs, Contacts with details; Summary and Media tabs and message threads missing. |
 | Persona integration in CVT | `CVTPersonaCache`, `PersonaPanel` | Missing | — |
-| Data dependency: accounts/relationships tables | TSK `CommunicationsManager` | Done | — |
+| Data dependency: accounts/relationships tables | Autopsy `CommunicationsManager` | Done | — |
 
 ## 20. Geolocation (`A/geolocation`)
 
@@ -493,7 +493,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | HTML report | `report/modules/html` | Partial | Autopsy's frameset layout, tables and columns; tagged-image thumbnails page missing. |
 | Excel report | `report/modules/excel` | Done | xlsx (rust_xlsxwriter): Summary + one sheet per data type. |
 | Files – Text (TSV/CSV of files) | `report/modules/file` | Done | All 13 columns, delimiter choice, UTF-8 with BOM. |
-| TSK body file | `report/modules/bodyfile` | Done | For mactime; file-system files. |
+| Autopsy body file | `report/modules/bodyfile` | Done | For mactime; file-system files. |
 | Google Earth KML | `report/modules/kml` | Done | ReportKML.kml + style.kml, Autopsy folders and colours. |
 | CASE-UCO JSON-LD | `report/modules/caseuco` | Missing | — |
 | Save Tagged Hashes to hash set | `report/modules/taggedhashes` | Done | Into a new or existing .kdb set. |
@@ -558,7 +558,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| PostgreSQL case DB | TSK | Missing | M11. |
+| PostgreSQL case DB | Autopsy | Missing | M11. |
 | Coordination service (locks) | `A/coordinationservice/*` | Missing | Planned as Postgres advisory locks. |
 | Remote event bus | `A/events/RemoteEventPublisher` | Missing | — |
 | Collaboration monitor (other users' ingest notifications) | `casemodule/CollaborationMonitor` | Missing | — |
@@ -616,7 +616,7 @@ Each package fits one agent. Every UI package touches `pm-ui`, which `RULES.md` 
   - artifact tags API
   
   Also add typed query APIs, and data-artifact + analysis-result ingest pipelines in `pm-ingest`.
-- Key sources: TSK schema notes in inventory 01 §11; `A/datamodel/OsAccounts`, `ScoreContent`; `A/ingest/DataArtifactIngestPipeline`.
+- Key sources: Autopsy schema notes in inventory 01 §11; `A/datamodel/OsAccounts`, `ScoreContent`; `A/ingest/DataArtifactIngestPipeline`.
 - Dependencies: must coordinate with derived-and-carving, which owns migrations and `pm-ingest`. Unblocks windows-artifacts (SAM → OS accounts), email-mobile (relationships), search (artifact indexing), and WP-8/9/10/15.
 
 **WP-1: Tagging end to end.**
@@ -689,7 +689,7 @@ Each package fits one agent. Every UI package touches `pm-ui`, which `RULES.md` 
   - ISO9660 (+Joliet/Rock Ridge) and UDF.
   - APM volume system.
   - Each with fls differentials and fuzz.
-- Key sources: TSK behaviour; `A/datamodel/PoolNode`.
+- Key sources: Autopsy behaviour; `A/datamodel/PoolNode`.
 - Dependencies: none.
 
 **WP-8: Ingest framework parity.**
@@ -756,12 +756,12 @@ Each package fits one agent. Every UI package touches `pm-ui`, which `RULES.md` 
 
 **WP-14: Timeline completion.**
 - Scope:
-  - Persisted events table populated at load and by every module (all TSK event types incl. registry, LNK, prefetch, email, messages, GPS).
+  - Persisted events table populated at load and by every module (all Autopsy event types incl. registry, LNK, prefetch, email, messages, GPS).
   - Tags/hash-hit filters; filter Apply/Reset semantics.
   - Details expand/collapse/pin/hide-descriptions.
   - Add Event, Snapshot report, View Artifact in Timeline.
   - Tests owed for the chart, Details and artifact events.
-- Key sources: `A/timeline/**`, TSK `TimelineManager` event-type list.
+- Key sources: `A/timeline/**`, Autopsy `TimelineManager` event-type list.
 - Dependencies: WP-0 (events table), WP-1 (tags).
 
 **WP-15: Data Source Summary + Discovery + Image Gallery completion.**
@@ -805,7 +805,7 @@ Each package fits one agent. Every UI package touches `pm-ui`, which `RULES.md` 
 
 **WP-19: Remaining volume systems and file systems.**
 - Scope: BSD disklabel, Sun VTOC, LVM pools, BitLocker unlock (password/recovery key, CLI `--key`), NTFS extras (owner SIDs, reparse points, EFS flag, WOF, hard links, $UsnJrnl/$LogFile), UFS, XFS, Btrfs, YAFFS2, ext fuzz target.
-- Key sources: TSK behaviour; `ImageFilePanel` password; `PLAN.md` M1.
+- Key sources: Autopsy behaviour; `ImageFilePanel` password; `PLAN.md` M1.
 - Dependencies: none.
 
 **WP-20: External-tool modules and alternative DSPs.**

@@ -1,4 +1,4 @@
-//! Hosts and persons (TSK `HostManager`, `PersonManager`).
+//! Hosts and persons (Autopsy `HostManager`, `PersonManager`).
 //!
 //! Every data source belongs to a host (a device); hosts can be grouped
 //! under persons. Merging a host moves its data sources and OS account
@@ -36,7 +36,7 @@ fn host_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<Host> {
     })
 }
 
-/// Finds or creates the host `name` (TSK `newHost`: a duplicate name
+/// Finds or creates the host `name` (Autopsy `newHost`: a duplicate name
 /// returns the existing host).
 pub(crate) fn host_named(c: &Connection, name: &str) -> Result<Host> {
     let name = name.trim();
@@ -59,8 +59,8 @@ pub(crate) fn host_named(c: &Connection, name: &str) -> Result<Host> {
     })
 }
 
-/// The host TSK creates for an image added without one: the first image
-/// file's name plus `" Host"` (`SleuthkitJNI.addImageInfo`).
+/// The host Autopsy creates for an image added without one: the first image
+/// file's name plus `" Host"` (`Autopsy.addImageInfo`).
 pub fn default_host_name(first_path: Option<&str>, ds_id: i64) -> String {
     let file = first_path
         .map(|p| p.rsplit(['/', '\\']).next().unwrap_or(p))
@@ -149,7 +149,7 @@ impl CaseDb {
         })
     }
 
-    /// Deletes a host that nothing refers to (TSK `deleteHost`: refused
+    /// Deletes a host that nothing refers to (Autopsy `deleteHost`: refused
     /// while it has data sources, realms, account attributes or address
     /// mappings).
     pub fn delete_host(&self, host_id: i64) -> Result<()> {
@@ -172,7 +172,7 @@ impl CaseDb {
         })
     }
 
-    /// Merges `source` into `dest` (TSK `mergeHosts`): realms are moved or
+    /// Merges `source` into `dest` (Autopsy `mergeHosts`): realms are moved or
     /// merged, data sources, account attributes and address mappings move,
     /// and the source host is marked merged under a unique dummy name.
     pub fn merge_hosts(&self, source: i64, dest: i64) -> Result<()> {
@@ -289,7 +289,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default_host_names_follow_tsk() {
+    fn default_host_names_follow_autopsy() {
         assert_eq!(
             default_host_name(Some("/evidence/disk1.E01"), 7),
             "disk1.E01 Host"

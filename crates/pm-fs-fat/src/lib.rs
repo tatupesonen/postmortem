@@ -2,7 +2,7 @@
 //!
 //! Beyond normal reading this recovers deleted entries (with their long
 //! names when the LFN checksum still matches), recovers deleted file
-//! content using TSK's contiguous-unallocated-cluster heuristic, exposes
+//! content using Autopsy's contiguous-unallocated-cluster heuristic, exposes
 //! virtual system files (`$MBR`, `$FAT1`, `$FAT2`, …) and reports free
 //! clusters as unallocated space.
 //!
@@ -154,7 +154,7 @@ impl FatFs {
 
     /// Clusters holding a file's content.
     ///
-    /// Allocated: the FAT chain. Deleted: TSK's heuristic — starting at the
+    /// Allocated: the FAT chain. Deleted: Autopsy's heuristic — starting at the
     /// first cluster, take consecutive *unallocated* clusters (skipping
     /// allocated ones) until the size is covered; nothing if the first
     /// cluster has been reallocated.
@@ -270,7 +270,7 @@ impl FatFs {
     }
 
     /// Decodes directory entries (skipping `.`/`..`, LFN slots and volume
-    /// labels, like TSK). With `strict`, every entry must pass the
+    /// labels, like Autopsy). With `strict`, every entry must pass the
     /// plausibility check (used for slack and unallocated-space scans);
     /// otherwise only entries after the end marker or deleted ones must.
     fn parse_entries(&self, raw: &[(u64, [u8; 32])], strict: bool) -> Vec<DirEntry> {
@@ -369,7 +369,7 @@ impl FileSystem for FatFs {
             changed: None,
             created: self.local(e.crt_date, e.crt_time, e.crt_tenths),
         };
-        // Synthesise POSIX-like mode bits as TSK does: read-only drops write.
+        // Synthesise POSIX-like mode bits as Autopsy does: read-only drops write.
         let perms = if e.attr & dirent::ATTR_READ_ONLY != 0 {
             0o555
         } else {
@@ -496,7 +496,7 @@ impl FileSystem for FatFs {
                         .collect();
                     for mut e in self.parse_entries(&raw, true) {
                         if !reachable.contains(&e.inode) && seen.insert(e.inode) {
-                            // TSK cannot know an orphan's name type.
+                            // Autopsy cannot know an orphan's name type.
                             e.allocated = false;
                             out.push(e);
                         }

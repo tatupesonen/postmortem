@@ -4,7 +4,7 @@
 //! (+ backup), all system files, B-tree `$I30` indexes (root + INDX blocks),
 //! resident and non-resident data, fragmented and LZNT1-compressed streams,
 //! alternate data streams, and deleted files in three flavours (index slack,
-//! unindexed unallocated record, orphan). Validated against TSK.
+//! unindexed unallocated record, orphan). Validated against the reference tools.
 
 use std::collections::BTreeMap;
 

@@ -252,13 +252,13 @@ fn encrypted_qcow2_is_refused() {
     assert!(err.to_string().contains("encrypted"), "{err}");
 }
 
-/// The Sleuth Kit's `img_cat` (libvmdk / libvhdi) as a second oracle.
+/// Autopsy's `img_cat` (libvmdk / libvhdi) as a second oracle.
 #[rstest]
 #[case("vpc", &["subformat=dynamic", "force_size=on"], "vhd")]
 #[case("vmdk", &["subformat=monolithicSparse"], "vmdk")]
 #[case("vmdk", &["subformat=twoGbMaxExtentSparse"], "vmdk")]
 #[case("vmdk", &["subformat=streamOptimized"], "vmdk")]
-fn agrees_with_tsk_img_cat(#[case] fmt: &str, #[case] opts: &[&str], #[case] ext: &str) {
+fn agrees_with_reference_img_cat(#[case] fmt: &str, #[case] opts: &[&str], #[case] ext: &str) {
     if qemu_img().is_none() {
         return;
     }
@@ -267,7 +267,7 @@ fn agrees_with_tsk_img_cat(#[case] fmt: &str, #[case] opts: &[&str], #[case] ext
         .output()
         .is_err()
     {
-        eprintln!("skipping: img_cat (The Sleuth Kit) is not installed");
+        eprintln!("skipping: img_cat (Autopsy) is not installed");
         return;
     }
     let dir = tempfile::tempdir().unwrap();

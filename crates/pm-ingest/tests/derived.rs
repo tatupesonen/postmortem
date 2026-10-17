@@ -248,10 +248,10 @@ impl FileModule for RecorderFile {
             let src = file.content()?;
             let data = src.read_vec_at(0, usize::try_from(src.size()).unwrap())?;
             self.0.content.lock().insert(file.rec.id, data);
-            let set = attribute_type_id("TSK_SET_NAME").unwrap();
+            let set = attribute_type_id("KAAMOS_SET_NAME").unwrap();
             ctx.post_artifact(
                 NewArtifact {
-                    type_id: artifact_type_id("TSK_INTERESTING_FILE_HIT").unwrap(),
+                    type_id: artifact_type_id("KAAMOS_INTERESTING_FILE_HIT").unwrap(),
                     ds_id: ctx.ds_id,
                     file_id: Some(file.rec.id),
                     source_artifact_id: None,
@@ -358,7 +358,7 @@ fn derived_files_are_reinjected_recursively_exactly_once() {
             .ends_with("/x.d/child.nest1/child.nest2/child.nest3/child.nest4")
     );
 
-    // Content decodes from XOR1; the raw file carries TSK's header.
+    // Content decodes from XOR1; the raw file carries Autopsy's header.
     let content = recorder.content.lock().clone();
     let a_bin = added.iter().find(|f| f.name == "a.bin").unwrap();
     assert_eq!(content[&a_bin.id], b"AAAA");

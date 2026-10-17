@@ -154,7 +154,7 @@ fn source_bytes(len: usize) -> Vec<u8> {
 #[case("smart", "deflate:best", 64)]
 #[case("ewf", "deflate:best", 64)]
 fn matches_ewfacquire_output(#[case] format: &str, #[case] compression: &str, #[case] spc: u32) {
-    if pm_testkit::tsk::tool("ewfacquire").is_none() {
+    if pm_testkit::reftools::tool("ewfacquire").is_none() {
         eprintln!("ewfacquire not available; skipping");
         return;
     }

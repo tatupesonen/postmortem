@@ -69,7 +69,7 @@ pub struct WalkStats {
     pub warnings: Vec<WalkWarning>,
 }
 
-/// How many times one directory may be listed in a single walk. TSK only
+/// How many times one directory may be listed in a single walk. Autopsy only
 /// guards against cycles on the current path, so a directory reachable
 /// through several names is listed under each; the cap keeps crafted
 /// images (a lattice of directories) from exploding.
@@ -113,7 +113,7 @@ impl Ancestors {
 /// Visits every name reachable from the root, depth-first (pre-order),
 /// calling `visit` for each. Returning `ControlFlow::Break` stops the walk.
 ///
-/// Follows TSK's rules: metadata comes from [`crate::entry_metadata`],
+/// Follows Autopsy's rules: metadata comes from [`crate::entry_metadata`],
 /// directories are entered per [`crate::should_descend`], and a directory
 /// already on the current path is a cycle.
 pub fn walk(

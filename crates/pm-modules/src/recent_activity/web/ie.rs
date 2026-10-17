@@ -57,7 +57,7 @@ pub(crate) fn extract(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleE
         if ctx.is_cancelled() {
             break;
         }
-        if done_std(ctx, f, "TSK_WEB_BOOKMARK") {
+        if done_std(ctx, f, "KAAMOS_WEB_BOOKMARK") {
             continue;
         }
         let Some(data) = read_small(ctx, f) else {
@@ -67,12 +67,12 @@ pub(crate) fn extract(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleE
         let url = iex::favorite_url(&data);
         sink.push(
             ctx,
-            WebArt::new(ctx, "TSK_WEB_BOOKMARK", f.id)
-                .text("TSK_URL", &url)
-                .text("TSK_TITLE", &f.name)
-                .time("TSK_DATETIME_CREATED", Some(crtime(f)))
-                .text("TSK_PROG_NAME", PROG)
-                .text("TSK_DOMAIN", domain(&url)),
+            WebArt::new(ctx, "KAAMOS_WEB_BOOKMARK", f.id)
+                .text("KAAMOS_URL", &url)
+                .text("KAAMOS_TITLE", &f.name)
+                .time("KAAMOS_DATETIME_CREATED", Some(crtime(f)))
+                .text("KAAMOS_PROG_NAME", PROG)
+                .text("KAAMOS_DOMAIN", domain(&url)),
         )?;
     }
     sink.flush(ctx)?;
@@ -81,7 +81,7 @@ pub(crate) fn extract(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleE
         if ctx.is_cancelled() {
             break;
         }
-        if done_std(ctx, f, "TSK_WEB_COOKIE") {
+        if done_std(ctx, f, "KAAMOS_WEB_COOKIE") {
             continue;
         }
         let Some(data) = read_small(ctx, f) else {
@@ -95,13 +95,13 @@ pub(crate) fn extract(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleE
         let d = domain(&c.url);
         sink.push(
             ctx,
-            WebArt::new(ctx, "TSK_WEB_COOKIE", f.id)
-                .text("TSK_URL", &c.url)
-                .time("TSK_DATETIME_CREATED", Some(crtime(f)))
-                .text("TSK_NAME", c.name)
-                .text("TSK_VALUE", c.value)
-                .text("TSK_PROG_NAME", PROG)
-                .text_nonempty("TSK_DOMAIN", d),
+            WebArt::new(ctx, "KAAMOS_WEB_COOKIE", f.id)
+                .text("KAAMOS_URL", &c.url)
+                .time("KAAMOS_DATETIME_CREATED", Some(crtime(f)))
+                .text("KAAMOS_NAME", c.name)
+                .text("KAAMOS_VALUE", c.value)
+                .text("KAAMOS_PROG_NAME", PROG)
+                .text_nonempty("KAAMOS_DOMAIN", d),
         )?;
     }
     sink.flush(ctx)?;
@@ -110,7 +110,7 @@ pub(crate) fn extract(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleE
         if ctx.is_cancelled() {
             break;
         }
-        if done_std(ctx, f, "TSK_WEB_HISTORY") {
+        if done_std(ctx, f, "KAAMOS_WEB_HISTORY") {
             continue;
         }
         history(ctx, web, f, &mut sink)?;
@@ -119,7 +119,7 @@ pub(crate) fn extract(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleE
     sink.flush(ctx)
 }
 
-/// URL records of one `index.dat` → `TSK_WEB_HISTORY` (Autopsy reads
+/// URL records of one `index.dat` → `KAAMOS_WEB_HISTORY` (Autopsy reads
 /// pasco2's `URL` lines: location, last-access time).
 fn history(
     ctx: &JobContext,

@@ -94,8 +94,8 @@ ends.
 - Integration-test crates (`tests/*.rs`) start with
   `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::print_stderr, reason = "test code")]`
   because helper functions there are not covered by clippy.toml's test allowances.
-- **Differential tests against TSK** (`pm_testkit::tsk`, needs
-  `apt install sleuthkit` or `brew install sleuthkit`): volume and filesystem output must match
+- **Differential tests against the reference tools** (`pm_testkit::reftools`, needs
+  `installing the reference tools (fls/mmls)` or `the reference tools`): volume and filesystem output must match
   `mmls`/`fls` on generated images, except for documented improvements.
 - Every public behaviour gets a test. Unit tests sit next to code; cross-crate
   behaviour goes in `tests/`.

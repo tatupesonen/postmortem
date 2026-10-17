@@ -98,7 +98,7 @@ pub(super) fn tools() -> Vec<ToolSpec> {
                 ("accountId", "string", "The account identifier"),
                 ("otherAccountType", "string", "Type of the other party"),
                 ("otherAccountId", "string", "The other party's identifier"),
-                ("threadId", "string", "TSK_THREAD_ID of the conversation"),
+                ("threadId", "string", "KAAMOS_THREAD_ID of the conversation"),
                 DS,
                 LIMIT,
                 CURSOR,
@@ -108,7 +108,7 @@ pub(super) fn tools() -> Vec<ToolSpec> {
         ),
         tool(
             "get_contacts",
-            "Contact-book entries (TSK_CONTACT), optionally containing a text.",
+            "Contact-book entries (KAAMOS_CONTACT), optionally containing a text.",
             &[
                 ("text", "string", "Substring of any field"),
                 DS,
@@ -194,7 +194,9 @@ fn get_artifact(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
                    "createdTime": iso_json(Some(t.created_at)), "evidence": {"comment": t.comment}})
         })
         .collect();
-    let assoc_type = ctx.attribute_type("TSK_ASSOCIATED_ARTIFACT")?.map(|t| t.0);
+    let assoc_type = ctx
+        .attribute_type("KAAMOS_ASSOCIATED_ARTIFACT")?
+        .map(|t| t.0);
     let mut linked = Vec::new();
     for at in db.attributes(id)? {
         if Some(at.type_id) == assoc_type
@@ -539,7 +541,7 @@ fn time_window(args: &Args, types: Vec<i64>) -> ToolResult<Option<AttrPredicate>
 }
 
 fn query_event_logs(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
-    let Some((type_id, _, _)) = ctx.db().artifact_type_by_name("PM_EVENT_LOG")? else {
+    let Some((type_id, _, _)) = ctx.db().artifact_type_by_name("KAAMOS_EVENT_LOG")? else {
         return Err(ToolError::Unavailable(
             "no event-log entries: the Windows Event Logs module has not run on this case (see list_ingest_jobs)".into(),
         ));
@@ -551,19 +553,19 @@ fn query_event_logs(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
     };
     if let Some(c) = args.str("channel")? {
         f.attrs.push(AttrPredicate::TextEquals {
-            type_id: attr_id(ctx, "PM_EVENT_CHANNEL")?,
+            type_id: attr_id(ctx, "KAAMOS_EVENT_CHANNEL")?,
             text: c,
         });
     }
     if let Some(e) = args.i64("eventId")? {
         f.attrs.push(AttrPredicate::IntEquals {
-            type_id: attr_id(ctx, "PM_EVENT_ID")?,
+            type_id: attr_id(ctx, "KAAMOS_EVENT_ID")?,
             value: e,
         });
     }
     if let Some(p) = args.str("provider")? {
         f.attrs.push(AttrPredicate::TextContains {
-            type_id: Some(attr_id(ctx, "PM_EVENT_PROVIDER")?),
+            type_id: Some(attr_id(ctx, "KAAMOS_EVENT_PROVIDER")?),
             text: p,
         });
     }
@@ -573,7 +575,7 @@ fn query_event_logs(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
             text: t,
         });
     }
-    if let Some(p) = time_window(args, vec![attr_id(ctx, "TSK_DATETIME")?])? {
+    if let Some(p) = time_window(args, vec![attr_id(ctx, "KAAMOS_DATETIME")?])? {
         f.attrs.push(p);
     }
     Ok(artifact_page(ctx, args, &f)?.into())
@@ -594,10 +596,10 @@ fn get_messages(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
     let limit = args.limit(DEFAULT_LIMIT, MAX_LIMIT)?;
     if let Some(thread) = args.str("threadId")? {
         let f = ArtifactFilter {
-            type_ids: type_ids(ctx, &["TSK_MESSAGE", "TSK_EMAIL_MSG"])?,
+            type_ids: type_ids(ctx, &["KAAMOS_MESSAGE", "KAAMOS_EMAIL_MSG"])?,
             ds_id: args.i64("dataSourceId")?,
             attrs: vec![AttrPredicate::TextEquals {
-                type_id: attr_id(ctx, "TSK_THREAD_ID")?,
+                type_id: attr_id(ctx, "KAAMOS_THREAD_ID")?,
                 text: thread,
             }],
             ..Default::default()
@@ -637,7 +639,7 @@ fn get_messages(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
         .map(Output::from);
     }
     let f = ArtifactFilter {
-        type_ids: type_ids(ctx, &["TSK_MESSAGE", "TSK_EMAIL_MSG"])?,
+        type_ids: type_ids(ctx, &["KAAMOS_MESSAGE", "KAAMOS_EMAIL_MSG"])?,
         ds_id: args.i64("dataSourceId")?,
         ..Default::default()
     };
@@ -646,7 +648,7 @@ fn get_messages(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
 
 fn get_contacts(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
     let mut f = ArtifactFilter {
-        type_ids: type_ids(ctx, &["TSK_CONTACT"])?,
+        type_ids: type_ids(ctx, &["KAAMOS_CONTACT"])?,
         ds_id: args.i64("dataSourceId")?,
         ..Default::default()
     };
@@ -673,19 +675,19 @@ fn float_arg(args: &Args, key: &str) -> ToolResult<Option<f64>> {
 }
 
 fn geolocation_points(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
-    let lat = attr_id(ctx, "TSK_GEO_LATITUDE")?;
-    let lon = attr_id(ctx, "TSK_GEO_LONGITUDE")?;
+    let lat = attr_id(ctx, "KAAMOS_GEO_LATITUDE")?;
+    let lon = attr_id(ctx, "KAAMOS_GEO_LONGITUDE")?;
     let mut f = ArtifactFilter {
         type_ids: type_ids(
             ctx,
             &[
-                "TSK_GPS_TRACKPOINT",
-                "TSK_GPS_BOOKMARK",
-                "TSK_GPS_LAST_KNOWN_LOCATION",
-                "TSK_GPS_SEARCH",
-                "TSK_GPS_ROUTE",
-                "TSK_GPS_TRACK",
-                "TSK_METADATA_EXIF",
+                "KAAMOS_GPS_TRACKPOINT",
+                "KAAMOS_GPS_BOOKMARK",
+                "KAAMOS_GPS_LAST_KNOWN_LOCATION",
+                "KAAMOS_GPS_SEARCH",
+                "KAAMOS_GPS_ROUTE",
+                "KAAMOS_GPS_TRACK",
+                "KAAMOS_METADATA_EXIF",
             ],
         )?,
         ds_id: args.i64("dataSourceId")?,
@@ -714,8 +716,8 @@ fn geolocation_points(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
             to: b,
         });
     }
-    let mut times = vec![attr_id(ctx, "TSK_DATETIME")?];
-    if let Some((id, _)) = ctx.attribute_type("TSK_DATETIME_CREATED")? {
+    let mut times = vec![attr_id(ctx, "KAAMOS_DATETIME")?];
+    if let Some((id, _)) = ctx.attribute_type("KAAMOS_DATETIME_CREATED")? {
         times.push(id);
     }
     if let Some(p) = time_window(args, times)? {
@@ -738,15 +740,15 @@ fn geolocation_points(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
         if let Some(o) = row.value.as_object_mut() {
             o.insert(
                 "latitude".into(),
-                get("TSK_GEO_LATITUDE").unwrap_or(Value::Null),
+                get("KAAMOS_GEO_LATITUDE").unwrap_or(Value::Null),
             );
             o.insert(
                 "longitude".into(),
-                get("TSK_GEO_LONGITUDE").unwrap_or(Value::Null),
+                get("KAAMOS_GEO_LONGITUDE").unwrap_or(Value::Null),
             );
             o.insert(
                 "altitude".into(),
-                get("TSK_GEO_ALTITUDE").unwrap_or(Value::Null),
+                get("KAAMOS_GEO_ALTITUDE").unwrap_or(Value::Null),
             );
         }
     }

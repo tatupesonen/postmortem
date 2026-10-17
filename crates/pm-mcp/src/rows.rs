@@ -14,7 +14,7 @@ use crate::args::{Ref, hex, iso, iso_json};
 use crate::error::ToolResult;
 use crate::server::Ctx;
 
-/// TSK file type name of an origin (`TSK_DB_FILES_TYPE_ENUM`).
+/// Autopsy file type name of an origin (`KAAMOS_DB_FILES_TYPE_ENUM`).
 pub fn origin_name(o: Origin) -> &'static str {
     match o {
         Origin::FileSystem => "FS",
@@ -27,7 +27,7 @@ pub fn origin_name(o: Origin) -> &'static str {
     }
 }
 
-/// TSK's short name-type letters (`getDirTypeAsString`).
+/// Autopsy's short name-type letters (`getDirTypeAsString`).
 pub fn kind_letter(k: FileKindCode) -> &'static str {
     match k {
         FileKindCode::Unknown => "-",

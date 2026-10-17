@@ -37,9 +37,9 @@ fn gpx_files_become_bookmarks_tracks_and_routes() {
     };
     let (summary, inbox) = case.run(&settings, modules);
     assert!(summary.errors.is_empty(), "{:?}", summary.errors);
-    assert_eq!(case.artifacts("TSK_GPS_BOOKMARK").len(), 1);
-    assert_eq!(case.artifacts("TSK_GPS_TRACK").len(), 1);
-    assert_eq!(case.artifacts("TSK_GPS_ROUTE").len(), 1);
+    assert_eq!(case.artifacts("KAAMOS_GPS_BOOKMARK").len(), 1);
+    assert_eq!(case.artifacts("KAAMOS_GPS_TRACK").len(), 1);
+    assert_eq!(case.artifacts("KAAMOS_GPS_ROUTE").len(), 1);
     assert!(inbox.since(0).iter().any(|m| m.subject == "1 files found"));
 
     let geo = pm_geo::load(case.case.db(), &pm_geo::GeoFilter::default()).unwrap();

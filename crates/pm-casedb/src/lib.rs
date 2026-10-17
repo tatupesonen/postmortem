@@ -13,8 +13,8 @@
 
 mod artifact_events;
 mod browsers;
-pub mod changes;
 pub mod catalog;
+pub mod changes;
 pub mod communications;
 mod derived;
 pub mod events;
@@ -53,6 +53,28 @@ pub use tags::{ArtifactTag, NewTagName, PROJECT_VIC, TagSet};
 pub const SCHEMA_VERSION: i64 = 3;
 /// Oldest schema readable without an upgrade: v3 only adds indexes.
 pub const MIN_READABLE_SCHEMA: i64 = 2;
+
+/// Meta key naming the artifact/attribute type namespace of the case.
+const NAMESPACE_KEY: &str = "type_namespace";
+const NAMESPACE: &str = "kaamos";
+
+/// Refuses case databases made before the `KAAMOS_` type namespace.
+fn check_namespace(conn: &Connection) -> Result<()> {
+    let ns: Option<String> = conn
+        .query_row(
+            "SELECT value FROM meta WHERE key = ?1",
+            [NAMESPACE_KEY],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if ns.as_deref() == Some(NAMESPACE) {
+        Ok(())
+    } else {
+        Err(DbError::Invalid(
+            "this case was created by an older version of postmortem and cannot be opened; create the case again".into(),
+        ))
+    }
+}
 const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0001_initial.sql"),
     include_str!("../migrations/0002_schema_v2.sql"),
@@ -118,6 +140,7 @@ impl CaseDb {
         let mut conn = Connection::open(&path)?;
         configure(&conn, true)?;
         migrate(&mut conn)?;
+        check_namespace(&conn)?;
         let file_ids = FileIds::load(&conn)?;
         let changes = Arc::new(changes::Changes::default());
         changes.install(&conn)?;
@@ -699,6 +722,10 @@ fn migrate(conn: &mut Connection) -> Result<()> {
 }
 
 fn seed_catalog(tx: &rusqlite::Transaction<'_>) -> Result<()> {
+    tx.execute(
+        "INSERT INTO meta(key, value) VALUES (?1, ?2) ON CONFLICT(key) DO UPDATE SET value = excluded.value",
+        [NAMESPACE_KEY, NAMESPACE],
+    )?;
     let mut st = tx.prepare(
         "INSERT INTO artifact_types (id, name, display_name, category) VALUES (?1, ?2, ?3, ?4)",
     )?;

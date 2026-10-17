@@ -1,6 +1,6 @@
 [package]
 name = "pm-hashdb"
-description = "Hash sets: TSK .kdb, NSRL RDS v2/v3, md5sum, HashKeeper, EnCase and TSK .idx, with scalable sorted indexes"
+description = "Hash sets: Autopsy .kdb, NSRL RDS v2/v3, md5sum, HashKeeper, EnCase and Autopsy .idx, with scalable sorted indexes"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

@@ -25,7 +25,12 @@ mod filter;
 pub use filter::FileFilter;
 
 /// The API version this crate implements.
-pub const API_VERSION: Version = Version { major: 0, minor: 2 };
+pub const API_VERSION: Version = Version { major: 0, minor: 3 };
+
+/// The oldest API version the host still runs: 0.3 renamed every result
+/// and attribute type to the `KAAMOS_` namespace, so modules built for
+/// older versions post names the host no longer knows.
+pub const OLDEST_SUPPORTED: Version = Version { major: 0, minor: 3 };
 
 /// A `major.minor` API version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -38,7 +43,7 @@ impl Version {
     /// Whether a module built against `self` runs on a host that
     /// implements `host`.
     pub fn runs_on(self, host: Self) -> bool {
-        self.major == host.major && self.minor <= host.minor
+        self.major == host.major && self.minor <= host.minor && self >= OLDEST_SUPPORTED
     }
 }
 
@@ -168,7 +173,7 @@ pub struct FindFiles {
 /// The most files one [`Host::find_files`] call returns.
 pub const MAX_FIND_FILES: u32 = 100_000;
 
-/// An attribute value (TSK's value types).
+/// An attribute value (Autopsy's value types).
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub enum Value {
     Text(String),
@@ -180,7 +185,7 @@ pub enum Value {
     Time(i64),
 }
 
-/// One attribute of a result: a TSK attribute type name (`"TSK_URL"`)
+/// One attribute of a result: a Autopsy attribute type name (`"KAAMOS_URL"`)
 /// and its value.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Attribute {
@@ -209,7 +214,7 @@ impl Attribute {
     }
 }
 
-/// TSK's score significance (analysis results only).
+/// Autopsy's score significance (analysis results only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Significance {
     Unknown,
@@ -223,7 +228,7 @@ pub enum Significance {
 /// result) comes from the type.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct NewResult {
-    /// TSK artifact type name (`"TSK_WEB_HISTORY"`).
+    /// Autopsy artifact type name (`"KAAMOS_WEB_HISTORY"`).
     pub artifact_type: String,
     /// The source file (`None`: the data source itself).
     pub file_id: Option<i64>,
@@ -271,7 +276,7 @@ pub struct DerivedFile {
 /// The most bytes one [`DerivedFile`] may carry.
 pub const MAX_DERIVED_FILE: usize = 256 * 1024 * 1024;
 
-/// An account as a communication names it (TSK `Account.Type` name and
+/// An account as a communication names it (Autopsy `Account.Type` name and
 /// identifier, e.g. `EMAIL` / `bob@example.com`; the host normalises it).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct AccountId {
@@ -288,7 +293,7 @@ impl AccountId {
     }
 }
 
-/// TSK `Relationship.Type`.
+/// Autopsy `Relationship.Type`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum RelationshipKind {
     Message,
@@ -306,7 +311,7 @@ pub struct Communication {
     pub relationship: Option<(Vec<usize>, RelationshipKind, Option<i64>)>,
 }
 
-/// How a custom attribute's value is stored (TSK value types).
+/// How a custom attribute's value is stored (Autopsy value types).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ValueKind {
     String,
@@ -392,7 +397,7 @@ pub trait Host {
     }
 
     /// Registers (or finds) a custom attribute type that results may then
-    /// use by name (TSK `getOrAddAttributeType`; API 0.2).
+    /// use by name (Autopsy `getOrAddAttributeType`; API 0.2).
     fn define_attribute_type(&self, name: &str, display: &str, kind: ValueKind) -> Result<()> {
         let _ = (name, display, kind);
         Err(PluginError::new(
@@ -400,7 +405,7 @@ pub trait Host {
         ))
     }
 
-    /// Registers (or finds) a custom artifact type (TSK
+    /// Registers (or finds) a custom artifact type (Autopsy
     /// `getOrAddArtifactType`; API 0.2).
     fn define_artifact_type(
         &self,
@@ -525,10 +530,11 @@ mod tests {
     #[test]
     fn version_compatibility() {
         let v = |major, minor| Version { major, minor };
-        assert!(v(0, 1).runs_on(v(0, 1)));
-        assert!(v(0, 1).runs_on(v(0, 3)));
-        assert!(!v(0, 2).runs_on(v(0, 1)), "needs newer host calls");
+        assert!(v(0, 3).runs_on(v(0, 3)));
+        assert!(v(0, 3).runs_on(v(0, 4)));
+        assert!(!v(0, 2).runs_on(v(0, 3)), "pre-KAAMOS type names");
+        assert!(!v(0, 4).runs_on(v(0, 3)), "needs newer host calls");
         assert!(!v(1, 0).runs_on(v(0, 9)));
-        assert_eq!(API_VERSION.to_string(), "0.2");
+        assert_eq!(API_VERSION.to_string(), "0.3");
     }
 }

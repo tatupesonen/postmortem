@@ -47,7 +47,7 @@ fn tiny_source_is_not_an_error() {
 }
 
 #[test]
-fn single_primary_partition_layout_matches_tsk() {
+fn single_primary_partition_layout_matches_reference() {
     use SlotKind::{Allocated, Meta, Unallocated};
     let mut d = DiskBuilder::new(512, 8192);
     d.mbr_table(

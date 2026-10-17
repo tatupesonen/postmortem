@@ -304,11 +304,11 @@ impl FilesSet {
 /// How a file is classified for meta-type conditions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum FileMeta {
-    /// TSK meta type REG (`isFile()`).
+    /// Autopsy meta type REG (`isFile()`).
     Regular,
-    /// TSK meta type DIR.
+    /// Autopsy meta type DIR.
     Directory,
-    /// TSK meta type `VIRT_DIR`.
+    /// Autopsy meta type `VIRT_DIR`.
     VirtualDirectory,
     /// Anything else (symlinks, devices, virtual files).
     Other,

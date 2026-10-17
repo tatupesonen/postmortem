@@ -1,5 +1,5 @@
 //! Detection and line parsing of the hash-set formats Autopsy supports
-//! (TSK `tsk/hashdb/*`).
+//! (Autopsy's hash database formats).
 
 use std::io::Read;
 use std::path::Path;
@@ -9,7 +9,7 @@ use crate::{HashDbError, Result};
 /// A hash-set file format.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Format {
-    /// TSK SQLite hash database (`.kdb`), the native, updateable format.
+    /// Autopsy SQLite hash database (`.kdb`), the native, updateable format.
     Kdb,
     /// `md5sum` output (`<md5>  <name>`) or BSD `MD5 (<name>) = <md5>`.
     Md5sum,
@@ -21,20 +21,20 @@ pub enum Format {
     HashKeeper,
     /// EnCase binary `.hash`.
     EnCase,
-    /// A TSK index (`*-md5.idx`) used on its own ("index only").
-    TskIdx,
+    /// A Autopsy index (`*-md5.idx`) used on its own ("index only").
+    HfindIdx,
 }
 
 impl Format {
     pub fn name(self) -> &'static str {
         match self {
-            Self::Kdb => "TSK SQLite (.kdb)",
+            Self::Kdb => "SQLite hash set (.kdb)",
             Self::Md5sum => "md5sum",
             Self::NsrlV2 => "NSRL RDS v2",
             Self::NsrlV3 => "NSRL RDS v3",
             Self::HashKeeper => "HashKeeper",
             Self::EnCase => "EnCase",
-            Self::TskIdx => "TSK index",
+            Self::HfindIdx => "hfind index (.idx)",
         }
     }
 
@@ -46,7 +46,7 @@ impl Format {
             Self::NsrlV3 => 3,
             Self::HashKeeper => 4,
             Self::EnCase => 5,
-            Self::TskIdx => 6,
+            Self::HfindIdx => 6,
         }
     }
 
@@ -57,7 +57,7 @@ impl Format {
 }
 
 pub(crate) const ENCASE_MAGIC: &[u8; 8] = b"HASH\x0d\x0a\xff\x00";
-/// First EnCase record (TSK `encase.c`).
+/// First EnCase record (Autopsy `encase.c`).
 pub(crate) const ENCASE_RECORDS: u64 = 1152;
 /// 16-byte MD5 + 2-byte divider.
 pub(crate) const ENCASE_RECORD: u64 = 18;
@@ -116,7 +116,7 @@ pub fn detect(path: &Path) -> Result<Format> {
         && (h.len() == 32 || h.len() == 41)
         && h.bytes().all(|b| b.is_ascii_hexdigit())
     {
-        return Ok(Format::TskIdx);
+        return Ok(Format::HfindIdx);
     }
     if parse_md5sum(&first).is_some() {
         return Ok(Format::Md5sum);
@@ -172,7 +172,7 @@ pub(crate) fn parse_line(format: Format, layout: NsrlLayout, line: &str) -> Opti
                 comment: f.get(9).filter(|c| !c.is_empty()).cloned(),
             })
         }
-        Format::TskIdx => {
+        Format::HfindIdx => {
             let (h, _) = line.split_once('|')?;
             let md5 = parse_md5_hex(h)?;
             // The header line is all zeros.
@@ -210,7 +210,7 @@ fn parse_md5sum(line: &str) -> Option<LineEntry> {
     })
 }
 
-/// Column layout of an NSRL RDS v2 file (TSK `nsrl.c` accepts both).
+/// Column layout of an NSRL RDS v2 file (Autopsy `nsrl.c` accepts both).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub(crate) enum NsrlLayout {
     /// `"SHA-1","MD5","CRC32","FileName",…`
@@ -313,7 +313,7 @@ mod tests {
         assert_eq!(e.comment.as_deref(), Some("known bad"));
         assert!(
             parse_line(
-                Format::TskIdx,
+                Format::HfindIdx,
                 NsrlLayout::Current,
                 &format!("{}|db", "0".repeat(32))
             )
@@ -321,7 +321,7 @@ mod tests {
         );
         assert!(
             parse_line(
-                Format::TskIdx,
+                Format::HfindIdx,
                 NsrlLayout::Current,
                 &format!("{H}|0000000123")
             )

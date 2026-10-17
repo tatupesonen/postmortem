@@ -4,9 +4,9 @@
 //! Sets every file's MIME type with Autopsy's `FileTypeDetector`
 //! (`pm_filetype`): user-defined signatures, Autopsy's own signatures,
 //! then Apache Tika 3.0.0 detection. A file matching a user-defined type
-//! that asks for it gets a `TSK_INTERESTING_ITEM` result (score Likely
-//! Notable, configuration and `TSK_SET_NAME` = the type's set name,
-//! `TSK_CATEGORY` = its MIME type). The job ends with Autopsy's "File Type
+//! that asks for it gets a `KAAMOS_INTERESTING_ITEM` result (score Likely
+//! Notable, configuration and `KAAMOS_SET_NAME` = the type's set name,
+//! `KAAMOS_CATEGORY` = its MIME type). The job ends with Autopsy's "File Type
 //! Id Results" summary.
 //!
 //! Directories and virtual directories get no MIME type (Autopsy stores
@@ -156,14 +156,14 @@ fn interesting_hit(ctx: &JobContext, file_id: i64, t: &FileType) {
     Art::result(
         ctx,
         NAME,
-        "TSK_INTERESTING_ITEM",
+        "KAAMOS_INTERESTING_ITEM",
         file_id,
         Significance::LikelyNotable,
     )
     .configuration(t.interesting_files_set_name.clone())
-    .text("TSK_SET_NAME", t.interesting_files_set_name.clone())
-    .text("TSK_CATEGORY", t.mime_type.clone())
-    .post(ctx, &["TSK_SET_NAME", "TSK_CATEGORY"]);
+    .text("KAAMOS_SET_NAME", t.interesting_files_set_name.clone())
+    .text("KAAMOS_CATEGORY", t.mime_type.clone())
+    .post(ctx, &["KAAMOS_SET_NAME", "KAAMOS_CATEGORY"]);
 }
 
 fn is_directory(rec: &FileRecord) -> bool {

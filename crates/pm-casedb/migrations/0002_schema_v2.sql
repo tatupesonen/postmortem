@@ -1,15 +1,15 @@
 -- postmortem case database, schema v2 (WP-0): hosts/persons, OS accounts,
 -- communication accounts, timeline events, aggregate scores, file
 -- attributes and hash lookup indexes. Table and enum semantics follow The
--- Sleuth Kit's case database (CaseDatabaseFactory, TSK 4.12); ids of files,
+-- Autopsy's case database (CaseDatabaseFactory, Autopsy 4.12); ids of files,
 -- artifacts and OS accounts live in separate tables here, so references
--- that TSK makes through tsk_objects name the table explicitly.
+-- that Autopsy makes through its shared object table name the table explicitly.
 
 -- Hash lookups by SHA-1/SHA-256 (MD5 is indexed since v1).
 CREATE INDEX files_sha1   ON files(sha1)   WHERE sha1 IS NOT NULL;
 CREATE INDEX files_sha256 ON files(sha256) WHERE sha256 IS NOT NULL;
 
--- Significance codes now sort like TSK's Score.Significance ordinals:
+-- Significance codes now sort like Autopsy's Score.Significance ordinals:
 -- 0 unknown, 1 likely none, 2 likely notable, 3 none, 4 notable
 -- (v1 had 2 = none, 3 = likely notable).
 UPDATE artifacts SET significance = 5 - significance WHERE significance IN (2, 3);
@@ -118,8 +118,8 @@ CREATE TABLE os_account_instances (
 );
 CREATE INDEX os_account_instances_ds ON os_account_instances(ds_id);
 
--- The account a data artifact belongs to (tsk_data_artifacts) and a
--- file's owner (tsk_files.owner_uid / os_account_obj_id).
+-- The account a data artifact belongs to and a
+-- file's owner (owner_uid / os_account_obj_id).
 ALTER TABLE artifacts ADD COLUMN os_account_id INTEGER REFERENCES os_accounts(id) ON DELETE SET NULL;
 ALTER TABLE files ADD COLUMN owner_uid TEXT;
 ALTER TABLE files ADD COLUMN os_account_id INTEGER REFERENCES os_accounts(id) ON DELETE SET NULL;
@@ -182,7 +182,7 @@ INSERT INTO account_types (id, name, display_name) VALUES
 
 CREATE TABLE event_types (
     id            INTEGER PRIMARY KEY,
-    name          TEXT NOT NULL UNIQUE,     -- TSK display name
+    name          TEXT NOT NULL UNIQUE,     -- Autopsy display name
     super_type_id INTEGER REFERENCES event_types(id)
 );
 
@@ -276,7 +276,7 @@ INSERT INTO event_types (id, name, super_type_id) VALUES
 
 -- ---------------------------------------------------------- aggregate scores
 
--- One row per scored object (TSK tsk_aggregate_score): the highest score of
+-- One row per scored object (Autopsy's aggregate score): the highest score of
 -- its analysis results and notable tags, priority first.
 CREATE TABLE scores (
     obj_kind     INTEGER NOT NULL,          -- 0 file, 1 artifact, 2 OS account
@@ -288,7 +288,7 @@ CREATE TABLE scores (
 ) WITHOUT ROWID;
 CREATE INDEX scores_significance ON scores(significance, obj_kind, ds_id);
 
--- Artifact tags carry the examiner like file tags; tag names gain TSK's
+-- Artifact tags carry the examiner like file tags; tag names gain Autopsy's
 -- known status semantics through `notable`.
 CREATE INDEX artifact_tags_name ON artifact_tags(tag_name_id);
 

@@ -8,7 +8,7 @@ use serde_json::Value;
 
 use crate::sqlite::{each, has_column, int, text_lossy};
 
-/// One visit (`TSK_WEB_HISTORY`).
+/// One visit (`KAAMOS_WEB_HISTORY`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Visit {
     pub url: String,
@@ -33,7 +33,7 @@ pub fn history(conn: &Connection, mut f: impl FnMut(Visit) -> bool) -> rusqlite:
     })
 }
 
-/// One bookmark (`TSK_WEB_BOOKMARK`).
+/// One bookmark (`KAAMOS_WEB_BOOKMARK`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bookmark {
     pub url: String,
@@ -57,7 +57,7 @@ pub fn bookmarks(conn: &Connection, mut f: impl FnMut(Bookmark) -> bool) -> rusq
     )
 }
 
-/// One cookie (`TSK_WEB_COOKIE`).
+/// One cookie (`KAAMOS_WEB_COOKIE`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cookie {
     pub host: String,
@@ -91,7 +91,7 @@ pub fn cookies(conn: &Connection, mut f: impl FnMut(Cookie) -> bool) -> rusqlite
     })
 }
 
-/// One download (`TSK_WEB_DOWNLOAD`).
+/// One download (`KAAMOS_WEB_DOWNLOAD`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Download {
     pub url: String,
@@ -144,7 +144,7 @@ pub fn downloads_v24(
     )
 }
 
-/// One form history entry (`TSK_WEB_FORM_AUTOFILL`).
+/// One form history entry (`KAAMOS_WEB_FORM_AUTOFILL`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct FormEntry {
     pub field: String,
@@ -185,7 +185,7 @@ pub fn form_history(
     })
 }
 
-/// One `autofill-profiles.json` address (`TSK_WEB_FORM_ADDRESS`).
+/// One `autofill-profiles.json` address (`KAAMOS_WEB_FORM_ADDRESS`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Address {
     pub name: String,

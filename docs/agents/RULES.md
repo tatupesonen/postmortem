@@ -37,7 +37,7 @@ scores, messages, skip rules, defaults), not Java structure.
 - `crates/pm-casedb` **schema** changes: only the derived-files/embedded
   track may add a migration. Others needing data must use artifacts and
   attributes (the catalogue in `pm-casedb/src/catalog.rs`; add missing
-  standard TSK types there) or add read/query helpers in a **new file**
+  standard Autopsy types there) or add read/query helpers in a **new file**
   `crates/pm-casedb/src/<track>.rs` (`impl CaseDb { … }`).
 - `crates/pm-ingest`: only the derived-files/embedded track changes it.
 - Docs: write your status to `docs/agents/<track>.md` (what is done, how it

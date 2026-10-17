@@ -37,7 +37,7 @@ use crate::case::{OpenSource, open_options};
 use crate::content::layout_json;
 use crate::{Case, CaseError, Result};
 
-/// TSK's default maximum size of one unallocated-space file.
+/// Autopsy's default maximum size of one unallocated-space file.
 pub const DEFAULT_UNALLOC_CHUNK: u64 = 500_000_000;
 const MAX_DEPTH: usize = 512;
 /// Directory batches buffered between the walkers and the writer.
@@ -60,7 +60,7 @@ pub struct LoadOptions {
     /// Walker threads (0 = available parallelism).
     pub threads: usize,
     /// Host (device) the data source belongs to; `None` creates (or
-    /// reuses) TSK's default host, `"<first image file> Host"`.
+    /// reuses) Autopsy's default host, `"<first image file> Host"`.
     pub host: Option<String>,
 }
 
@@ -331,7 +331,7 @@ impl Walk<'_> {
         self.progress.is_cancelled() || self.failed.load(Ordering::Relaxed)
     }
 
-    /// Whether `inode` may be listed once more (TSK lists a directory under
+    /// Whether `inode` may be listed once more (Autopsy lists a directory under
     /// every name that reaches it; the cap stops crafted lattices).
     fn may_list(&self, inode: InodeId) -> bool {
         let shard = (inode.wrapping_mul(0x9E37_79B9_7F4A_7C15) >> 58) as usize % VISITED_SHARDS;
@@ -450,7 +450,7 @@ impl Walk<'_> {
 
     /// Named streams appear as sibling rows named `file:stream` (alternate
     /// data streams and named NTFS indexes). Returns whether the plain
-    /// name gets a row too: like TSK, not for a non-directory that has only
+    /// name gets a row too: like Autopsy, not for a non-directory that has only
     /// named streams (`$Secure` → `$Secure:$SDS`, `:$SDH`, `:$SII`).
     fn stream_rows(&self, file: &NewFile, out: &mut Vec<NewFile>) -> bool {
         let Some(inode) = file.inode else {

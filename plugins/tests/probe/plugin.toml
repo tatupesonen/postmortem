@@ -1,4 +1,4 @@
-api = "0.1"
+api = "0.3"
 component = "probe.wasm"
 
 [limits]

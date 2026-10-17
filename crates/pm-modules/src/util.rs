@@ -49,7 +49,7 @@ impl Art {
         type_id: i64,
         file_id: i64,
     ) -> Self {
-        let mut s = Self::data(ctx, module, "TSK_GEN_INFO", file_id);
+        let mut s = Self::data(ctx, module, "KAAMOS_GEN_INFO", file_id);
         s.a.type_id = type_id;
         s
     }
@@ -199,22 +199,22 @@ mod tests {
     #[test]
     fn names_exist() {
         for a in [
-            "TSK_SET_NAME",
-            "TSK_HASH_MD5",
-            "TSK_COMMENT",
-            "TSK_CATEGORY",
-            "TSK_DESCRIPTION",
+            "KAAMOS_SET_NAME",
+            "KAAMOS_HASH_MD5",
+            "KAAMOS_COMMENT",
+            "KAAMOS_CATEGORY",
+            "KAAMOS_DESCRIPTION",
         ] {
             assert!(attribute_type_id(a).is_some(), "{a}");
         }
         for t in [
-            "TSK_HASHSET_HIT",
-            "TSK_INTERESTING_FILE_HIT",
-            "TSK_INTERESTING_ITEM",
-            "TSK_EXT_MISMATCH_DETECTED",
-            "TSK_ENCRYPTION_DETECTED",
-            "TSK_ENCRYPTION_SUSPECTED",
-            "TSK_METADATA_EXIF",
+            "KAAMOS_HASHSET_HIT",
+            "KAAMOS_INTERESTING_FILE_HIT",
+            "KAAMOS_INTERESTING_ITEM",
+            "KAAMOS_EXT_MISMATCH_DETECTED",
+            "KAAMOS_ENCRYPTION_DETECTED",
+            "KAAMOS_ENCRYPTION_SUSPECTED",
+            "KAAMOS_METADATA_EXIF",
         ] {
             assert!(artifact_type_id(t).is_some(), "{t}");
         }

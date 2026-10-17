@@ -25,16 +25,16 @@ Autopsy's Communications Manager without a schema migration:
   `PM_ACCOUNT` = `TYPE:id` (indexed key).
 * **Relationship source** = each `TSK_EMAIL_MSG` / `TSK_MESSAGE` /
   `TSK_CALLLOG` / `TSK_CONTACT` carries `PM_ACCOUNT_SENDER` and
-  `PM_ACCOUNT_RECIPIENT` keys; as in TSK `addRelationships`, every pair of
+  `PM_ACCOUNT_RECIPIENT` keys; as in Autopsy `addRelationships`, every pair of
   participants is related; type from the artifact type, date from its
   date/time attributes.
 * Query helpers (all through the `attributes(type_id, value_text)` index,
   keyset paged): `accounts`, `account_type_counts`, `account_instances`,
   `communications_of`, `communication`, `related_accounts`,
-  `communications_between`; `normalize_phone/email/account_id` (TSK
-  `CommunicationsUtils`); `ACCOUNT_TYPES` (TSK 4.15 predefined types,
-  verified with `javap` on the sleuthkit-4.15.0 jar, plus `WWF`);
-  `device_account_id`; `resolve_path` (TSK `FileAttachment` lookup with
+  `communications_between`; `normalize_phone/email/account_id` (Autopsy
+  `CommunicationsUtils`); `ACCOUNT_TYPES` (Autopsy 4.15 predefined types,
+  verified with `javap` on the the reference tools-4.15.0 jar, plus `WWF`);
+  `device_account_id`; `resolve_path` (Autopsy `FileAttachment` lookup with
   Android `/storage/emulated/N` ↔ `/media/N` aliases, indexed per path
   component).
 * Custom attribute types are registered on demand with
@@ -81,10 +81,10 @@ contact relationships; unknown PST encryption → `TSK_ENCRYPTION_DETECTED`
 ("File-level Encryption"); idempotent re-runs.
 
 ### Communication helpers — `crates/pm-modules/src/comms.rs`
-`CommunicationArtifactsHelper` (addContact/addMessage/addCalllog with TSK
+`CommunicationArtifactsHelper` (addContact/addMessage/addCalllog with Autopsy
 4.15 semantics checked by disassembling the jar: from/to always go to
 `TSK_PHONE_NUMBER_FROM/_TO` (or `TSK_PHONE_NUMBER` for unknown direction),
-self account fills the missing side, TSK's argument checks),
+self account fills the missing side, Autopsy's argument checks),
 `MessageAttachments` / `GeoTrackPoints` / `GeoWaypoints` JSON exactly as
 Gson writes them, `addTrack` / `addRoute`.
 
@@ -149,7 +149,7 @@ never worked in Autopsy, AOSP `calllog.db` per SQLECmd
   (Autopsy neither); cache-location keys (BSSID/cell id) discarded as in
   Autopsy.
 * Contact relationships relate all of a contact's accounts with each
-  other (pairwise model) whereas TSK relates each only to the device.
+  other (pairwise model) whereas Autopsy relates each only to the device.
 * Not started: GPX Parser, DJI Drone Analyzer, YARA Analyzer (yara-x),
   Virtual Machine Extractor, fuzz smoke runs, benchmarks / PERF.md numbers
   for MBOX/PST throughput.

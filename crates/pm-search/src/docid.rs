@@ -1,5 +1,5 @@
 //! Autopsy's chunk document ids (`<objId>_<chunk>`, mini-chunks
-//! `<objId>_<chunk>_mini`), as stored in `TSK_KEYWORD_SEARCH_DOCUMENT_ID`
+//! `<objId>_<chunk>_mini`), as stored in `KAAMOS_KEYWORD_SEARCH_DOCUMENT_ID`
 //! by the credit-card module (Autopsy `MiniChunkHelper`).
 
 use crate::ObjRef;

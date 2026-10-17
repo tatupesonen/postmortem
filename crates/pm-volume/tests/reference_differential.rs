@@ -1,5 +1,5 @@
-//! Differential tests: postmortem's volume layout must match TSK's `mmls`.
-//! Skipped (pass with a note) when TSK is not installed.
+//! Differential tests: postmortem's volume layout must match Autopsy's `mmls`.
+//! Skipped (pass with a note) when Autopsy is not installed.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -9,7 +9,7 @@
 )]
 
 use pm_core::io::MemSource;
-use pm_testkit::tsk::{MmlsRow, mmls};
+use pm_testkit::reftools::{MmlsRow, mmls};
 use pm_testkit::{DiskBuilder, GptPart, MbrPart};
 use pm_volume::{SlotKind, detect};
 use uuid::uuid;

@@ -3,7 +3,7 @@
 //! * Block mapping through extent trees (any depth, uninitialised extents
 //!   read as zeros), classic direct/indirect blocks, and ext4 inline data.
 //! * Deleted names recovered from directory-entry slack (the gap a removed
-//!   entry leaves inside its predecessor's `rec_len`), as TSK does.
+//!   entry leaves inside its predecessor's `rec_len`), as Autopsy does.
 //! * Allocation status from the inode and block bitmaps (respecting
 //!   `INODE_UNINIT` / `BLOCK_UNINIT` groups).
 //! * Nanosecond timestamps, `crtime`, and the 2038 epoch extension bits.
@@ -713,7 +713,7 @@ impl FileSystem for ExtFs {
 
     fn orphans(&self) -> Result<Vec<DirEntry>> {
         // Inodes that were used (mode set) but are no longer allocated and
-        // not referenced by any name: TSK's ext $OrphanFiles.
+        // not referenced by any name: Autopsy's ext $OrphanFiles.
         let mut named = HashSet::new();
         walk(self, &WalkOptions::default(), |i| {
             named.insert(i.entry.inode);

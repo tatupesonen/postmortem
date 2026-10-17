@@ -97,29 +97,29 @@ fn run(case: &DemoCase) {
 fn mailboxes_messages_threads_attachments_accounts_and_contacts() {
     let case = DemoCase::with_image(&image());
     run(&case);
-    let mail = case.artifacts("TSK_EMAIL_MSG");
+    let mail = case.artifacts("KAAMOS_EMAIL_MSG");
     assert_eq!(mail.len(), 4, "3 in the MBOX, 1 EML");
     let by_subject = |s: &str| {
         mail.iter()
-            .find(|(_, a)| a.get("TSK_SUBJECT").map(String::as_str) == Some(s))
+            .find(|(_, a)| a.get("KAAMOS_SUBJECT").map(String::as_str) == Some(s))
             .unwrap()
     };
     let (m1, a1) = by_subject("Plans");
     let (_, a2) = by_subject("Re: Plans");
     let (_, a3) = by_subject("Lunch?");
-    assert_eq!(a1["TSK_EMAIL_FROM"], "Alice <alice@example.com>; ");
-    assert_eq!(a1["TSK_PATH"], "/Local Folders/Inbox");
+    assert_eq!(a1["KAAMOS_EMAIL_FROM"], "Alice <alice@example.com>; ");
+    assert_eq!(a1["KAAMOS_PATH"], "/Local Folders/Inbox");
     assert_eq!(a1["EMAIL_HAS_ATTACHMENT"], "Yes");
     assert_eq!(
-        a1["TSK_THREAD_ID"], a2["TSK_THREAD_ID"],
+        a1["KAAMOS_THREAD_ID"], a2["KAAMOS_THREAD_ID"],
         "reply threads with its parent"
     );
-    assert_ne!(a1["TSK_THREAD_ID"], a3["TSK_THREAD_ID"]);
-    assert_eq!(a2["TSK_EMAIL_CC"], "carol@example.org; ");
+    assert_ne!(a1["KAAMOS_THREAD_ID"], a3["KAAMOS_THREAD_ID"]);
+    assert_eq!(a2["KAAMOS_EMAIL_CC"], "carol@example.org; ");
     assert!(
-        a1["TSK_ATTACHMENTS"].contains("\"objectID\":"),
+        a1["KAAMOS_ATTACHMENTS"].contains("\"objectID\":"),
         "{}",
-        a1["TSK_ATTACHMENTS"]
+        a1["KAAMOS_ATTACHMENTS"]
     );
 
     // The attachment is a derived file of the mailbox.
@@ -154,18 +154,18 @@ fn mailboxes_messages_threads_attachments_accounts_and_contacts() {
     );
 
     // The vCard: a contact with a typed phone number.
-    let contacts = case.artifacts("TSK_CONTACT");
+    let contacts = case.artifacts("KAAMOS_CONTACT");
     assert_eq!(contacts.len(), 1);
     let c = &contacts[0].1;
-    assert_eq!(c["TSK_NAME"], "Carol Example");
-    assert_eq!(c["TSK_PHONE_NUMBER_CELL"], "+358401234567");
-    assert_eq!(c["TSK_ORGANIZATION"], "Acme");
+    assert_eq!(c["KAAMOS_NAME"], "Carol Example");
+    assert_eq!(c["KAAMOS_PHONE_NUMBER_CELL"], "+358401234567");
+    assert_eq!(c["KAAMOS_ORGANIZATION"], "Acme");
 
     // Re-running adds nothing.
     let files = case.files().len();
     run(&case);
-    assert_eq!(case.artifacts("TSK_EMAIL_MSG").len(), 4);
-    assert_eq!(case.artifacts("TSK_CONTACT").len(), 1);
+    assert_eq!(case.artifacts("KAAMOS_EMAIL_MSG").len(), 4);
+    assert_eq!(case.artifacts("KAAMOS_CONTACT").len(), 1);
     assert_eq!(case.files().len(), files);
     let _ = Arc::clone(&case.case);
 }

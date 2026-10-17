@@ -51,7 +51,7 @@ impl Browser {
         Self::Safari,
     ];
 
-    /// Autopsy's extractor display name (also the `TSK_PROG_NAME` of
+    /// Autopsy's extractor display name (also the `KAAMOS_PROG_NAME` of
     /// Firefox, IE, Edge and Safari artifacts).
     pub(crate) fn display_name(self) -> &'static str {
         match self {
@@ -385,7 +385,7 @@ impl TempDb {
 #[derive(Debug)]
 pub(crate) struct WebArt {
     a: NewArtifact,
-    /// Post a `TSK_ASSOCIATED_OBJECT` on this file pointing here.
+    /// Post a `KAAMOS_ASSOCIATED_OBJECT` on this file pointing here.
     associate: Option<i64>,
 }
 
@@ -481,14 +481,14 @@ impl WebArt {
 
     /// Autopsy `createHistoryAttributes`.
     pub(crate) fn history(ctx: &JobContext, file_id: i64, h: &History<'_>) -> Self {
-        Self::new(ctx, "TSK_WEB_HISTORY", file_id)
-            .text("TSK_URL", h.url)
-            .time("TSK_DATETIME_ACCESSED", h.time)
-            .text_nonblank("TSK_REFERRER", h.referrer)
-            .text_nonblank("TSK_TITLE", h.title)
-            .text_nonblank("TSK_PROG_NAME", h.program)
-            .text_if(!h.url.trim().is_empty(), "TSK_DOMAIN", h.domain)
-            .text_nonblank("TSK_USER_NAME", h.user)
+        Self::new(ctx, "KAAMOS_WEB_HISTORY", file_id)
+            .text("KAAMOS_URL", h.url)
+            .time("KAAMOS_DATETIME_ACCESSED", h.time)
+            .text_nonblank("KAAMOS_REFERRER", h.referrer)
+            .text_nonblank("KAAMOS_TITLE", h.title)
+            .text_nonblank("KAAMOS_PROG_NAME", h.program)
+            .text_if(!h.url.trim().is_empty(), "KAAMOS_DOMAIN", h.domain)
+            .text_nonblank("KAAMOS_USER_NAME", h.user)
     }
 
     fn text_if(self, cond: bool, name: &str, v: &str) -> Self {
@@ -509,7 +509,7 @@ pub(crate) struct History<'a> {
 }
 
 /// Batched artifact writer: one transaction per [`Sink::FLUSH_EVERY`]
-/// artifacts, `TSK_ASSOCIATED_OBJECT` links written with the ids.
+/// artifacts, `KAAMOS_ASSOCIATED_OBJECT` links written with the ids.
 #[derive(Debug, Default)]
 pub(crate) struct Sink {
     items: Vec<WebArt>,
@@ -533,8 +533,8 @@ impl Sink {
             return Ok(());
         }
         let items = std::mem::take(&mut self.items);
-        let assoc_type = artifact_type_id("TSK_ASSOCIATED_OBJECT").unwrap_or(0);
-        let assoc_attr = std_attr("TSK_ASSOCIATED_ARTIFACT");
+        let assoc_type = artifact_type_id("KAAMOS_ASSOCIATED_OBJECT").unwrap_or(0);
+        let assoc_attr = std_attr("KAAMOS_ASSOCIATED_ARTIFACT");
         let now = ctx.now();
         let ds = ctx.ds_id;
         let n = ctx.case.db().bulk(|b| {

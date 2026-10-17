@@ -4,25 +4,25 @@
 //! File level (`EncryptionDetectionFileIngestModule`): a file typed
 //! `application/octet-stream` whose size qualifies (≥ the minimum size and,
 //! optionally, a multiple of 512 bytes; `.db` files from 64 KiB) and whose
-//! byte entropy reaches the minimum gets `TSK_ENCRYPTION_SUSPECTED`
+//! byte entropy reaches the minimum gets `KAAMOS_ENCRYPTION_SUSPECTED`
 //! (Likely Notable, "Suspected encryption due to high entropy (%f).").
 //! Otherwise a password-protected document — protected OOXML, or a
 //! Word/Excel/PowerPoint, PDF or Access file that Tika/Jackcess cannot
-//! open without a password — gets `TSK_ENCRYPTION_DETECTED` (Notable,
+//! open without a password — gets `KAAMOS_ENCRYPTION_DETECTED` (Notable,
 //! "Password protection detected."). Both carry the comment as
-//! `TSK_COMMENT` and justification, and post an inbox data message.
+//! `KAAMOS_COMMENT` and justification, and post an inbox data message.
 //! Skipped: unallocated space, directories, slack (unless allowed), known
 //! files, files with unallocated metadata and Autopsy's (misspelt)
 //! `hiberfile.sys` / `pagefile.sys` in the root folder.
 //!
 //! Data-source level (`EncryptionDetectionDataSourceIngestModule`): for a
 //! disk image, the first volume that is BitLocker-encrypted
-//! (`TSK_ENCRYPTION_DETECTED`, "Bitlocker encryption detected.") or that
-//! has no file system and high entropy (`TSK_ENCRYPTION_SUSPECTED`) is
+//! (`KAAMOS_ENCRYPTION_DETECTED`, "Bitlocker encryption detected.") or that
+//! has no file system and high entropy (`KAAMOS_ENCRYPTION_SUSPECTED`) is
 //! flagged, and the check stops there, as in Autopsy. Beyond Autopsy,
 //! LUKS volumes are detected and Core Storage (FileVault 2) volumes
 //! suspected. Volume results are attached to the data source (the case
-//! database has no volume objects) with the volume in `TSK_DESCRIPTION`.
+//! database has no volume objects) with the volume in `KAAMOS_DESCRIPTION`.
 
 use std::sync::Arc;
 
@@ -185,7 +185,7 @@ struct Flag {
 impl Flag {
     fn suspected(entropy: f64) -> Self {
         Self {
-            ty: "TSK_ENCRYPTION_SUSPECTED",
+            ty: "KAAMOS_ENCRYPTION_SUSPECTED",
             significance: Significance::LikelyNotable,
             comment: suspected_comment(entropy),
             entropy: Some(entropy),
@@ -194,7 +194,7 @@ impl Flag {
 
     fn detected(comment: &str) -> Self {
         Self {
-            ty: "TSK_ENCRYPTION_DETECTED",
+            ty: "KAAMOS_ENCRYPTION_DETECTED",
             significance: Significance::Notable,
             comment: comment.to_owned(),
             entropy: None,
@@ -202,7 +202,7 @@ impl Flag {
     }
 
     fn display(&self) -> &'static str {
-        if self.ty == "TSK_ENCRYPTION_DETECTED" {
+        if self.ty == "KAAMOS_ENCRYPTION_DETECTED" {
             "Encryption Detected"
         } else {
             "Encryption Suspected"
@@ -305,9 +305,9 @@ fn post(
     path: &str,
     volume: Option<String>,
 ) {
-    let mut key: Vec<(&str, &str)> = vec![("TSK_COMMENT", &flag.comment)];
+    let mut key: Vec<(&str, &str)> = vec![("KAAMOS_COMMENT", &flag.comment)];
     if let Some(v) = &volume {
-        key.push(("TSK_DESCRIPTION", v));
+        key.push(("KAAMOS_DESCRIPTION", v));
     }
     // Re-ingest posts nothing new (Autopsy would duplicate the result).
     let exists = match file_id {
@@ -322,9 +322,9 @@ fn post(
         None => Art::ds_result(ctx, NAME, flag.ty, flag.significance),
     }
     .justification(flag.comment.clone())
-    .text("TSK_COMMENT", flag.comment.clone());
+    .text("KAAMOS_COMMENT", flag.comment.clone());
     if let Some(v) = volume {
-        art = art.text("TSK_DESCRIPTION", v);
+        art = art.text("KAAMOS_DESCRIPTION", v);
     }
     art.post_unchecked(ctx);
     let details = match flag.entropy {
@@ -379,7 +379,7 @@ impl DataSourceModule for Volumes {
                 Some(VolumeEncryption::BitLocker) => Some(Flag::detected(BITLOCKER_MESSAGE)),
                 Some(VolumeEncryption::Luks) => Some(Flag::detected(LUKS_MESSAGE)),
                 Some(VolumeEncryption::CoreStorage) => Some(Flag {
-                    ty: "TSK_ENCRYPTION_SUSPECTED",
+                    ty: "KAAMOS_ENCRYPTION_SUSPECTED",
                     significance: Significance::LikelyNotable,
                     comment: CORE_STORAGE_MESSAGE.to_owned(),
                     entropy: None,

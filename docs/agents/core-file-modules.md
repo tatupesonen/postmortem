@@ -278,7 +278,7 @@ failure.
 
 `crates/pm-casedb/src/integrity.rs`: `ImageHash`, `data_source_hashes`,
 `set_data_source_hash` (validated hex, stored lower case, never
-overwrites, like TSK's `setMD5`), usable by the add-data-source UI for
+overwrites, like Autopsy's `setMD5`), usable by the add-data-source UI for
 user-entered hashes.
 
 `crates/pm-modules/src/data_source_integrity.rs`: module

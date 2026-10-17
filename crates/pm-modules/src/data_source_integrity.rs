@@ -3,7 +3,7 @@
 //!
 //! For a disk image with stored hashes (from the E01 headers or entered
 //! when it was added) it reads the whole image and verifies every stored
-//! MD5 / SHA-1 / SHA-256; a mismatch posts `TSK_VERIFICATION_FAILED` on
+//! MD5 / SHA-1 / SHA-256; a mismatch posts `KAAMOS_VERIFICATION_FAILED` on
 //! the data source (Notable, comment and justification "<algorithm> hash
 //! verification failed: …") and a warning message, a match an info
 //! message. An image without stored hashes gets all three computed and
@@ -228,7 +228,7 @@ impl DataSourceModule for Integrity {
     }
 }
 
-/// The verification report and, on a mismatch, `TSK_VERIFICATION_FAILED`.
+/// The verification report and, on a mismatch, `KAAMOS_VERIFICATION_FAILED`.
 fn verify_hashes(
     ctx: &JobContext,
     img: &str,
@@ -272,12 +272,22 @@ fn verify_hashes(
     };
     let details =
         format!("Data Source Verification Results for {img}\nResult:{result}{hash_results}");
-    if !verified && !ds_result_exists(ctx, "TSK_VERIFICATION_FAILED", &[("TSK_COMMENT", &comment)])
+    if !verified
+        && !ds_result_exists(
+            ctx,
+            "KAAMOS_VERIFICATION_FAILED",
+            &[("KAAMOS_COMMENT", &comment)],
+        )
     {
-        Art::ds_result(ctx, NAME, "TSK_VERIFICATION_FAILED", Significance::Notable)
-            .justification(comment.clone())
-            .text("TSK_COMMENT", comment)
-            .post_unchecked(ctx);
+        Art::ds_result(
+            ctx,
+            NAME,
+            "KAAMOS_VERIFICATION_FAILED",
+            Significance::Notable,
+        )
+        .justification(comment.clone())
+        .text("KAAMOS_COMMENT", comment)
+        .post_unchecked(ctx);
     }
     ctx.post_message(IngestMessage::new(kind, NAME, subject).details(details));
 }

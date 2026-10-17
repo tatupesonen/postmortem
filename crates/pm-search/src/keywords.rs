@@ -22,7 +22,7 @@ use unicode_normalization::UnicodeNormalization as _;
 pub const BOUNDARY_CHARACTERS: &str =
     "[ \t\r\n\\.\\-\\?\\,\\;\\\\!\\:\\[\\]\\/\\(\\)\\\"\\'\\>\\{\\}]";
 
-/// Built-in list names (Autopsy's, used in settings and `TSK_SET_NAME`).
+/// Built-in list names (Autopsy's, used in settings and `KAAMOS_SET_NAME`).
 pub const PHONE_NUMBERS: &str = "Phone Numbers";
 pub const IP_ADDRESSES: &str = "IP Addresses";
 pub const EMAIL_ADDRESSES: &str = "Email Addresses";
@@ -54,17 +54,17 @@ pub const URL_REGEX: &str = "(((((h|H)(t|T))|(f|F))(t|T)(p|P)(s|S?)\\:\\/\\/)|(w
 pub const CCN_REGEX: &str = "(%?)(B?)([0-9][ \\-]*?){12,19}(\\^?)";
 
 /// Selector attribute types of the built-in lists.
-pub const SEL_PHONE: &str = "TSK_PHONE_NUMBER";
-pub const SEL_IP: &str = "TSK_IP_ADDRESS";
-pub const SEL_EMAIL: &str = "TSK_EMAIL";
-pub const SEL_URL: &str = "TSK_URL";
-pub const SEL_CARD: &str = "TSK_CARD_NUMBER";
+pub const SEL_PHONE: &str = "KAAMOS_PHONE_NUMBER";
+pub const SEL_IP: &str = "KAAMOS_IP_ADDRESS";
+pub const SEL_EMAIL: &str = "KAAMOS_EMAIL";
+pub const SEL_URL: &str = "KAAMOS_URL";
+pub const SEL_CARD: &str = "KAAMOS_CARD_NUMBER";
 
 /// Date format of `keywords.xml` (`yyyy-MM-dd HH:mm:ss`, local time).
 const DATE_FORMAT: &str = "%Y-%m-%d %H:%M:%S";
 
 /// How a keyword matches (Autopsy `KeywordSearch.QueryType`; the ordinal
-/// is stored in `TSK_KEYWORD_SEARCH_TYPE`).
+/// is stored in `KAAMOS_KEYWORD_SEARCH_TYPE`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
 pub enum SearchType {
@@ -96,7 +96,7 @@ pub struct Keyword {
     /// Whole-word match (meaningful for literals).
     #[serde(default = "yes")]
     pub whole_word: bool,
-    /// Attribute type that receives the hit (`TSK_EMAIL`, …): selects
+    /// Attribute type that receives the hit (`KAAMOS_EMAIL`, …): selects
     /// validators and, for credit cards, account creation.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub selector: Option<String>,
@@ -715,7 +715,7 @@ mod tests {
     fn xml_flags_selectors_and_escapes() {
         let xml = r#"<keyword_lists>
             <keyword_list created="2020-01-01 00:00:00" modified="2020-01-02 00:00:00" name="a &amp; b" use_for_ingest="false" ingest_messages="false">
-              <keyword literal="false" whole="false" selector="TSK_EMAIL">[a-z]+@x\.com</keyword>
+              <keyword literal="false" whole="false" selector="KAAMOS_EMAIL">[a-z]+@x\.com</keyword>
               <keyword literal="true" whole="false">C&lt;3</keyword>
               <keyword literal="true" whole="">blank</keyword>
             </keyword_list></keyword_lists>"#;
@@ -723,7 +723,7 @@ mod tests {
         assert_eq!(l.name, "a & b");
         assert!(!l.use_for_ingest && !l.ingest_messages);
         assert_eq!(l.keywords[0].search_type(), SearchType::Regex);
-        assert_eq!(l.keywords[0].selector.as_deref(), Some("TSK_EMAIL"));
+        assert_eq!(l.keywords[0].selector.as_deref(), Some("KAAMOS_EMAIL"));
         assert_eq!(l.keywords[1].term, "C<3");
         assert_eq!(l.keywords[1].search_type(), SearchType::Substring);
         assert_eq!(l.keywords[2].search_type(), SearchType::Exact);

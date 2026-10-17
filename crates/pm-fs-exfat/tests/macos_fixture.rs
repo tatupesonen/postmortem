@@ -104,7 +104,7 @@ fn deleted_files_recovered() {
 #[test]
 fn timestamps_use_utc_offset() {
     // The fixture was written at 18:46:38 local time (UTC+3), so the true
-    // UTC time is 15:46:38. TSK 4.15 shows 12:46:38 EEST (it misapplies
+    // UTC time is 15:46:38. Autopsy 4.15 shows 12:46:38 EEST (it misapplies
     // the offset); we decode the stored offset correctly.
     let fs = open();
     let m = fs.metadata(find(&fs, "/hello.txt").0).unwrap();
@@ -119,11 +119,11 @@ fn timestamps_use_utc_offset() {
 }
 
 #[test]
-fn matches_tsk_fls() {
+fn matches_reference_fls() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("ex.raw");
     std::fs::write(&path, &*RAW).unwrap();
-    let Some(theirs) = pm_testkit::tsk::fls(&path, 0) else {
+    let Some(theirs) = pm_testkit::reftools::fls(&path, 0) else {
         eprintln!("fls not available; skipping");
         return;
     };

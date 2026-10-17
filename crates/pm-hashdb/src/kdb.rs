@@ -1,4 +1,4 @@
-//! TSK's SQLite hash database (`.kdb`, TSK `sqlite_hdb.cpp`), read and
+//! Autopsy's SQLite hash database (`.kdb`, Autopsy `sqlite_hdb.cpp`), read and
 //! written in its own schema so sets stay interchangeable with Autopsy.
 
 use std::path::Path;

@@ -193,15 +193,15 @@ impl<'a> HitSink<'a> {
         let m = || NAME.to_owned();
         let text = |name: &str, v: &str| (attr(name), Value::Text(v.to_owned()), m());
         let mut extra = vec![
-            text("TSK_KEYWORD", &card.raw_number),
-            text("TSK_CARD_NUMBER", &card.number),
+            text("KAAMOS_KEYWORD", &card.raw_number),
+            text("KAAMOS_CARD_NUMBER", &card.number),
         ];
         for (name, v) in [
-            ("TSK_CARD_EXPIRATION", &card.expiration),
-            ("TSK_CARD_SERVICE_CODE", &card.service_code),
-            ("TSK_CARD_DISCRETIONARY", &card.discretionary),
-            ("TSK_CARD_LRC", &card.lrc),
-            ("TSK_NAME_PERSON", &card.name),
+            ("KAAMOS_CARD_EXPIRATION", &card.expiration),
+            ("KAAMOS_CARD_SERVICE_CODE", &card.service_code),
+            ("KAAMOS_CARD_DISCRETIONARY", &card.discretionary),
+            ("KAAMOS_CARD_LRC", &card.lrc),
+            ("KAAMOS_NAME_PERSON", &card.name),
         ] {
             if let Some(v) = v {
                 extra.push(text(name, v));
@@ -214,14 +214,14 @@ impl<'a> HitSink<'a> {
             .and_then(|b| b.lookup_card(&card.number))
         {
             for (name, v) in [
-                ("TSK_CARD_SCHEME", &bin.scheme),
-                ("TSK_CARD_TYPE", &bin.card_type),
-                ("TSK_BRAND_NAME", &bin.brand),
-                ("TSK_BANK_NAME", &bin.bank_name),
-                ("TSK_PHONE_NUMBER", &bin.bank_phone),
-                ("TSK_URL", &bin.bank_url),
-                ("TSK_COUNTRY", &bin.country),
-                ("TSK_CITY", &bin.bank_city),
+                ("KAAMOS_CARD_SCHEME", &bin.scheme),
+                ("KAAMOS_CARD_TYPE", &bin.card_type),
+                ("KAAMOS_BRAND_NAME", &bin.brand),
+                ("KAAMOS_BANK_NAME", &bin.bank_name),
+                ("KAAMOS_PHONE_NUMBER", &bin.bank_phone),
+                ("KAAMOS_URL", &bin.bank_url),
+                ("KAAMOS_COUNTRY", &bin.country),
+                ("KAAMOS_CITY", &bin.bank_city),
             ] {
                 if let Some(v) = v {
                     extra.push(text(name, v));
@@ -230,18 +230,18 @@ impl<'a> HitSink<'a> {
         }
         if self.target.unallocated {
             extra.push(text(
-                "TSK_KEYWORD_SEARCH_DOCUMENT_ID",
+                "KAAMOS_KEYWORD_SEARCH_DOCUMENT_ID",
                 &pm_search::docid::document_id(self.target.obj, page),
             ));
         }
         if !list_name.trim().is_empty() {
-            extra.push(text("TSK_SET_NAME", list_name));
+            extra.push(text("KAAMOS_SET_NAME", list_name));
         }
-        extra.push(text("TSK_KEYWORD_PREVIEW", &h.snippet));
+        extra.push(text("KAAMOS_KEYWORD_PREVIEW", &h.snippet));
         if let Some(a) = self.associated_artifact() {
-            extra.push((attr("TSK_ASSOCIATED_ARTIFACT"), Value::Int(a), m()));
+            extra.push((attr("KAAMOS_ASSOCIATED_ARTIFACT"), Value::Int(a), m()));
         }
-        extra.push((attr("TSK_KEYWORD_SEARCH_TYPE"), Value::Int(2), m()));
+        extra.push((attr("KAAMOS_KEYWORD_SEARCH_TYPE"), Value::Int(2), m()));
         let spec = AccountInstanceSpec {
             type_name: "CREDIT_CARD",
             id: &card.number,

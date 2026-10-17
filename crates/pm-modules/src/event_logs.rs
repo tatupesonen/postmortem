@@ -20,7 +20,7 @@ use crate::recent_activity::find_by_extension;
 use crate::util::Art;
 
 pub const NAME: &str = "Windows Event Logs";
-const ARTIFACT: (&str, &str) = ("PM_EVENT_LOG", "Event Log Entries");
+const ARTIFACT: (&str, &str) = ("KAAMOS_EVENT_LOG", "Event Log Entries");
 
 /// Per-job settings.
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
@@ -97,21 +97,25 @@ impl Types {
         let mut payload = [0i64; 6];
         for (i, p) in payload.iter_mut().enumerate() {
             *p = a(
-                &format!("PM_PAYLOAD_DATA_{}", i + 1),
+                &format!("KAAMOS_PAYLOAD_DATA_{}", i + 1),
                 &format!("Payload {}", i + 1),
                 ValueType::String,
             )?;
         }
         Ok(Self {
             artifact: db.artifact_type(ARTIFACT.0, ARTIFACT.1, Category::DataArtifact)?,
-            event_id: a("PM_EVENT_ID", "Event ID", ValueType::Integer)?,
-            channel: a("PM_EVENT_CHANNEL", "Channel", ValueType::String)?,
-            provider: a("PM_EVENT_PROVIDER", "Provider", ValueType::String)?,
-            description: a("PM_EVENT_DESCRIPTION", "Event", ValueType::String)?,
-            remote_host: a("PM_REMOTE_HOST", "Remote Host", ValueType::String)?,
-            executable: a("PM_EXECUTABLE_INFO", "Executable Info", ValueType::String)?,
-            computer: a("PM_COMPUTER_NAME", "Computer", ValueType::String)?,
-            record_id: a("PM_EVENT_RECORD_ID", "Event Record ID", ValueType::Long)?,
+            event_id: a("KAAMOS_EVENT_ID", "Event ID", ValueType::Integer)?,
+            channel: a("KAAMOS_EVENT_CHANNEL", "Channel", ValueType::String)?,
+            provider: a("KAAMOS_EVENT_PROVIDER", "Provider", ValueType::String)?,
+            description: a("KAAMOS_EVENT_DESCRIPTION", "Event", ValueType::String)?,
+            remote_host: a("KAAMOS_REMOTE_HOST", "Remote Host", ValueType::String)?,
+            executable: a(
+                "KAAMOS_EXECUTABLE_INFO",
+                "Executable Info",
+                ValueType::String,
+            )?,
+            computer: a("KAAMOS_COMPUTER_NAME", "Computer", ValueType::String)?,
+            record_id: a("KAAMOS_EVENT_RECORD_ID", "Event Record ID", ValueType::Long)?,
             payload,
         })
     }
@@ -224,18 +228,18 @@ impl Extractor {
                 Art::result(
                     ctx,
                     NAME,
-                    "TSK_INTERESTING_ITEM",
+                    "KAAMOS_INTERESTING_ITEM",
                     f.id,
                     Significance::LikelyNotable,
                 )
-                .text("TSK_SET_NAME", "Anti-forensics")
+                .text("KAAMOS_SET_NAME", "Anti-forensics")
                 .text(
-                    "TSK_COMMENT",
+                    "KAAMOS_COMMENT",
                     format!("Event log cleared ({} event {})", rec.channel, rec.event_id),
                 )
-                .value("TSK_DATETIME", Value::DateTime(rec.time))
+                .value("KAAMOS_DATETIME", Value::DateTime(rec.time))
                 .text_opt(
-                    "TSK_USER_NAME",
+                    "KAAMOS_USER_NAME",
                     rec.get("SubjectUserName").map(str::to_owned).or_else(|| {
                         rec.nth(4)
                             .map(str::to_owned)
@@ -265,15 +269,15 @@ impl Extractor {
     fn post(&self, ctx: &JobContext, f: &FileRecord, rec: &EventRecord, m: Mapped) {
         let t = &self.types;
         let mut art = Art::data_of_type(ctx, NAME, t.artifact, f.id)
-            .value("TSK_DATETIME", Value::DateTime(rec.time))
+            .value("KAAMOS_DATETIME", Value::DateTime(rec.time))
             .custom_int(t.event_id, i64::from(rec.event_id))
             .custom_text(t.channel, Some(rec.channel.clone()))
             .custom_text(t.provider, Some(rec.provider.clone()))
             .custom_text(t.description, Some(m.description))
-            .text_opt("TSK_USER_NAME", m.user_name)
+            .text_opt("KAAMOS_USER_NAME", m.user_name)
             .custom_text(t.remote_host, m.remote_host)
             .custom_text(t.executable, m.executable_info)
-            .text_opt("TSK_USER_ID", rec.user_sid.clone())
+            .text_opt("KAAMOS_USER_ID", rec.user_sid.clone())
             .custom_text(t.computer, Some(rec.computer.clone()))
             .custom_int(
                 t.record_id,

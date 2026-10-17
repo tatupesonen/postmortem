@@ -18,12 +18,12 @@
 //! more (the check is skipped for deleted archives and for
 //! `application/x-gzip`, as in Autopsy). `pm-archive` additionally
 //! applies the ratio to the bytes actually decoded, and caps members,
-//! dictionaries and memory. Flagging posts `TSK_INTERESTING_ITEM` (set
+//! dictionaries and memory. Flagging posts `KAAMOS_INTERESTING_ITEM` (set
 //! "Possible Zip Bomb") on the root and a warning; archives below a
 //! flagged root are skipped.
 //!
 //! **Encryption**: members that cannot be decrypted are listed without
-//! content and the archive gets `TSK_ENCRYPTION_DETECTED` ("Password
+//! content and the archive gets `KAAMOS_ENCRYPTION_DETECTED` ("Password
 //! protection detected." when every item is encrypted, else
 //! "Content-only Encryption (Archive File)").
 //!
@@ -64,7 +64,7 @@ pub const OUTPUT_FOLDER: &str = "EFE";
 pub const MAX_DEPTH: u32 = 4;
 /// Interesting-item set name of zip bombs.
 pub const ZIP_BOMB_SET: &str = "Possible Zip Bomb";
-/// `TSK_ENCRYPTION_DETECTED` comment when every item is encrypted
+/// `KAAMOS_ENCRYPTION_DETECTED` comment when every item is encrypted
 /// (`EncryptionDetectionModuleFactory.PASSWORD_PROTECT_MESSAGE`).
 pub const ENCRYPTION_FULL: &str = "Password protection detected.";
 /// … when only some items are.
@@ -252,18 +252,21 @@ impl Job {
         Art::result(
             ctx,
             NAME,
-            "TSK_INTERESTING_ITEM",
+            "KAAMOS_INTERESTING_ITEM",
             root.id,
             Significance::LikelyNotable,
         )
         .configuration(ZIP_BOMB_SET)
-        .text("TSK_SET_NAME", ZIP_BOMB_SET)
+        .text("KAAMOS_SET_NAME", ZIP_BOMB_SET)
         .text(
-            "TSK_DESCRIPTION",
+            "KAAMOS_DESCRIPTION",
             format!("Zip Bomb Detected {}", archive.rec.name),
         )
-        .text("TSK_COMMENT", details)
-        .post(ctx, &["TSK_SET_NAME", "TSK_DESCRIPTION", "TSK_COMMENT"]);
+        .text("KAAMOS_COMMENT", details)
+        .post(
+            ctx,
+            &["KAAMOS_SET_NAME", "KAAMOS_DESCRIPTION", "KAAMOS_COMMENT"],
+        );
         ctx.post_message(
             IngestMessage::new(
                 MessageKind::Warning,

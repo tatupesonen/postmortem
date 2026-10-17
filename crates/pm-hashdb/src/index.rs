@@ -132,7 +132,7 @@ pub(crate) fn for_each_entry(
             }
             Ok(())
         }
-        Format::Md5sum | Format::NsrlV2 | Format::HashKeeper | Format::TskIdx => {
+        Format::Md5sum | Format::NsrlV2 | Format::HashKeeper | Format::HfindIdx => {
             let file = File::open(source).map_err(|e| HashDbError::io(source, e))?;
             let mut r = BufReader::with_capacity(1 << 20, file);
             let mut buf = Vec::new();

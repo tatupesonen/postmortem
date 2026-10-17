@@ -2,8 +2,8 @@
 //! inventory 03 §2.8), over the reusable rule engine in `pm-rules`.
 //!
 //! Every enabled files set is matched against every file (slack files
-//! excepted); a match posts `TSK_INTERESTING_ITEM` (score Likely Notable,
-//! configuration and `TSK_SET_NAME` = the set, `TSK_CATEGORY` = the rule)
+//! excepted); a match posts `KAAMOS_INTERESTING_ITEM` (score Likely Notable,
+//! configuration and `KAAMOS_SET_NAME` = the set, `KAAMOS_CATEGORY` = the rule)
 //! once per file and set, and an "Interesting File Match" inbox message.
 //! The sets are the job's (Autopsy's global "Interesting Files" options);
 //! by default Autopsy's standard sets.
@@ -142,22 +142,22 @@ impl FileModule for Worker {
             if file_result_exists(
                 ctx,
                 rec.id,
-                "TSK_INTERESTING_ITEM",
-                &[("TSK_SET_NAME", set_name), ("TSK_CATEGORY", rule)],
+                "KAAMOS_INTERESTING_ITEM",
+                &[("KAAMOS_SET_NAME", set_name), ("KAAMOS_CATEGORY", rule)],
             ) {
                 continue;
             }
             Art::result(
                 ctx,
                 NAME,
-                "TSK_INTERESTING_ITEM",
+                "KAAMOS_INTERESTING_ITEM",
                 rec.id,
                 Significance::LikelyNotable,
             )
             .configuration(set_name.clone())
-            .text("TSK_SET_NAME", set_name.clone())
-            .text("TSK_CATEGORY", rule)
-            .post(ctx, &["TSK_SET_NAME", "TSK_CATEGORY"]);
+            .text("KAAMOS_SET_NAME", set_name.clone())
+            .text("KAAMOS_CATEGORY", rule)
+            .post(ctx, &["KAAMOS_SET_NAME", "KAAMOS_CATEGORY"]);
             ctx.post_message(
                 IngestMessage::new(
                     MessageKind::Data,

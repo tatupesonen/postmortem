@@ -9,7 +9,7 @@ target list. Everything is native Rust (no external tools), feeds the
 standard result tree and the Timeline, and follows ADR-014 (streaming,
 bounded memory).
 
-Results use standard TSK artifact types where one fits; otherwise
+Results use standard Autopsy artifact types where one fits; otherwise
 custom types named `PM_*` (Autopsy itself supports custom types, so
 reports and the UI handle them generically).
 
@@ -19,10 +19,10 @@ code 2026-10-18.)
 
 ## 1. System overview ("OS Info" on the Data Source Summary)
 
-Autopsy's `TSK_OS_INFO` has product name, version, owner, organisation,
+Autopsy's `KAAMOS_OS_INFO` has product name, version, owner, organisation,
 install date, computer name and a few more. Additionally **[done]**
-(`TSK_OS_INFO` extended attributes, `PM_NETWORK_INTERFACE`,
-`PM_NETWORK_PROFILE`; install/upgrade history and auto-logon not yet):
+(`KAAMOS_OS_INFO` extended attributes, `KAAMOS_NETWORK_INTERFACE`,
+`KAAMOS_NETWORK_PROFILE`; install/upgrade history and auto-logon not yet):
 
 | Item | Source |
 |---|---|
@@ -47,10 +47,10 @@ Autopsy only reaches EVTX through Plaso. postmortem parses every
 `*.evtx` (and legacy `.evt`) natively (`pm-evtlog`, `evtx` crate) and
 applies maps in the spirit of EvtxECmd's (`pm-evtlog/src/maps.rs`).
 
-**Done:** every mapped record becomes one generic `PM_EVENT_LOG` artifact
+**Done:** every mapped record becomes one generic `KAAMOS_EVENT_LOG` artifact
 (channel, event ID, provider, description, user, remote host,
 executable, payload fields) and a Log Entry timeline event; event-log
-clearing (1102/104) becomes a Likely Notable `TSK_INTERESTING_ITEM`
+clearing (1102/104) becomes a Likely Notable `KAAMOS_INTERESTING_ITEM`
 ("Anti-forensics"). MCP `query_event_logs` filters by channel, ID,
 provider, time and text.
 
@@ -71,14 +71,14 @@ field test showed substring filters are too blunt, e.g. logon type 10):
   6005/6006/6008, Kernel-Power 41/42/1, Power-Troubleshooter 1) →
   `PM_SYSTEM_POWER`.
 - **Anti-forensics** (1102 Security log cleared, 104 log cleared, 4616
-  system time changed) → `TSK_INTERESTING_ITEM` (Likely Notable).
+  system time changed) → `KAAMOS_INTERESTING_ITEM` (Likely Notable).
 - **PowerShell** (4103/4104 script block, 400/403/600) →
   `PM_POWERSHELL`.
 - **USB / devices** (DriverFrameworks-UserMode 2003/2100/2102,
-  Partition/Diagnostic 1006 with serials) → `TSK_DEVICE_ATTACHED`
+  Partition/Diagnostic 1006 with serials) → `KAAMOS_DEVICE_ATTACHED`
   events with times.
-- **Windows Defender** detections (1116/1117) → `TSK_MALWARE`.
-- **Wi-Fi** (WLAN-AutoConfig 8001/8003) → `TSK_WIFI_NETWORK` connections.
+- **Windows Defender** detections (1116/1117) → `KAAMOS_MALWARE`.
+- **Wi-Fi** (WLAN-AutoConfig 8001/8003) → `KAAMOS_WIFI_NETWORK` connections.
 All of them become Timeline events.
 
 ## 3. NTFS internals (MFTECmd) — **[next]**
@@ -89,26 +89,26 @@ All of them become Timeline events.
   via sequence numbers). Recovers evidence of deleted files whose MFT
   entries are reused.
 - **$LogFile** transaction records (create/rename/delete operations).
-- **$I30 slack** — already recovered as deleted names (TSK parity).
+- **$I30 slack** — already recovered as deleted names (Autopsy parity).
 - **$STANDARD_INFORMATION vs $FILE_NAME** comparison: timestomp
   indicators (SI earlier than FN, zero sub-second precision) →
-  `TSK_INTERESTING_ITEM` "Possible timestomping".
+  `KAAMOS_INTERESTING_ITEM` "Possible timestomping".
 - **$Secure:$SDS** owners/ACL summary per file (file owner SID).
 - **Volume Shadow Copies** (VSCMount): enumerate and expose snapshots as
   additional file systems of the volume (read-only) **[later]**.
 
 ## 4. Program execution and presence — **[partial]**
 
-Done: ShimCache (`PM_SHIMCACHE`), Amcache file entries
-(`PM_AMCACHE_FILE`), RecentFileCache.bcf, BAM/DAM, Prefetch, UserAssist
-(all in Recent Activity as `TSK_PROG_RUN` or `PM_*` types). Not yet:
+Done: ShimCache (`KAAMOS_SHIMCACHE`), Amcache file entries
+(`KAAMOS_AMCACHE_FILE`), RecentFileCache.bcf, BAM/DAM, Prefetch, UserAssist
+(all in Recent Activity as `KAAMOS_PROG_RUN` or `PM_*` types). Not yet:
 SRUM, Windows Timeline, PowerShell history, scheduled tasks/autoruns
 overview.
 
 
 - **ShimCache / AppCompatCache** (AppCompatCacheParser): path, last
-  modified, executed flag (XP–Win11 formats) → `TSK_PROG_RUN`-like
-  `PM_SHIMCACHE`.
+  modified, executed flag (XP–Win11 formats) → `KAAMOS_PROG_RUN`-like
+  `KAAMOS_SHIMCACHE`.
 - **Amcache.hve** (AmcacheParser): InventoryApplicationFile (path, SHA-1,
   link date, publisher), InventoryApplication, devices, drivers;
   hash lookups of Amcache SHA-1s against hash sets.

@@ -1,5 +1,5 @@
 # The pm-plugin-api version this plugin was built against.
-api = "0.1"
+api = "0.3"
 component = "big_round_files.wasm"
 
 [limits]

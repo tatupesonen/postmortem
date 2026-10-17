@@ -1,9 +1,10 @@
-//! Differential testing against The Sleuth Kit command-line tools.
+//! Differential testing against the reference command-line tools.
 //!
-//! When `mmls`/`fls` are installed (e.g. `apt install sleuthkit` / `brew install sleuthkit`), tests can
-//! compare postmortem's view of an image with TSK's — the engine Autopsy uses.
+//! When the `mmls`/`fls` reference tools are installed (from the
+//! distribution's forensics tools package), tests can
+//! compare postmortem's view of an image with Autopsy's — the engine Autopsy uses.
 //! Every function returns `None` when the tool is unavailable so tests can
-//! skip gracefully on machines without TSK.
+//! skip gracefully on machines without Autopsy.
 
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -34,7 +35,7 @@ pub struct MmlsRow {
     pub description: String,
 }
 
-/// Runs `mmls` on an image; `None` if TSK is missing or mmls fails.
+/// Runs `mmls` on an image; `None` if Autopsy is missing or mmls fails.
 pub fn mmls(image: &Path) -> Option<Vec<MmlsRow>> {
     let text = run("mmls", &[image.as_os_str()])?;
     let rows = text

@@ -134,8 +134,8 @@ impl TextQuery {
     /// The query that finds a keyword hit again (Extracted Text viewer):
     /// the regular expression if the hit has one, else the hit text as
     /// an exact (search type 0) or substring match. Arguments are the
-    /// hit's `TSK_KEYWORD`, `TSK_KEYWORD_SEARCH_TYPE` and
-    /// `TSK_KEYWORD_REGEXP`.
+    /// hit's `KAAMOS_KEYWORD`, `KAAMOS_KEYWORD_SEARCH_TYPE` and
+    /// `KAAMOS_KEYWORD_REGEXP`.
     pub fn for_keyword_hit(keyword: &str, search_type: Option<i64>, regexp: Option<&str>) -> Self {
         let (term, search_type) = match (regexp, search_type) {
             (Some(r), _) if !r.is_empty() => (r.to_owned(), SearchType::Regex),

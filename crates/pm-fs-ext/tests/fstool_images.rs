@@ -1,4 +1,4 @@
-//! ext2/3/4 tests on images written by `fstool`, cross-checked with TSK.
+//! ext2/3/4 tests on images written by `fstool`, cross-checked with Autopsy.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -124,12 +124,12 @@ fn unallocated_blocks_are_coalesced() {
 #[case(ExtKind::Ext2)]
 #[case(ExtKind::Ext3)]
 #[case(ExtKind::Ext4)]
-fn matches_tsk_fls(#[case] kind: ExtKind) {
+fn matches_reference_fls(#[case] kind: ExtKind) {
     let img = image(kind, 1024);
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("ext.img");
     std::fs::write(&path, &img).unwrap();
-    let Some(theirs) = pm_testkit::tsk::fls(&path, 0) else {
+    let Some(theirs) = pm_testkit::reftools::fls(&path, 0) else {
         eprintln!("fls not available; skipping");
         return;
     };

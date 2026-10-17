@@ -1,9 +1,9 @@
 //! Chrome blockfile cache (Autopsy `ChromeCacheExtractor`): every
 //! `index` whose path contains `default/cache` with `data_0`..`data_3`
-//! beside it. Each entry with a payload stream becomes a `TSK_WEB_CACHE`
+//! beside it. Each entry with a payload stream becomes a `KAAMOS_WEB_CACHE`
 //! artifact on the block file holding the entry; the cached item is the
 //! `f_xxxxxx` file, or a derived file `data_N__<address>` extracted from
-//! the block file, linked by `TSK_ASSOCIATED_OBJECT`. Brotli-encoded items
+//! the block file, linked by `KAAMOS_ASSOCIATED_OBJECT`. Brotli-encoded items
 //! get the MIME type `application/x-brotli`.
 
 use std::collections::HashMap;
@@ -122,7 +122,7 @@ fn folder(ctx: &JobContext, web: &mut Web<'_>, parent: i64) -> Result<(), Module
     // Re-run: the folder's block files already carry the artifacts.
     for i in 0..4 {
         if let Some(r) = files.record(&format!("data_{i}"))
-            && done_std(ctx, &r, "TSK_WEB_CACHE")
+            && done_std(ctx, &r, "KAAMOS_WEB_CACHE")
         {
             return Ok(());
         }
@@ -270,13 +270,13 @@ fn store(
         };
         sink.push(
             ctx,
-            WebArt::new(ctx, "TSK_WEB_CACHE", entry_file.id)
-                .text("TSK_URL", &e.key)
-                .text("TSK_DOMAIN", extract_domain(&e.key))
-                .time("TSK_DATETIME_CREATED", Some(e.created))
-                .text("TSK_HEADERS", e.headers_text())
-                .text("TSK_PATH", item_path)
-                .int("TSK_PATH_ID", item_id)
+            WebArt::new(ctx, "KAAMOS_WEB_CACHE", entry_file.id)
+                .text("KAAMOS_URL", &e.key)
+                .text("KAAMOS_DOMAIN", extract_domain(&e.key))
+                .time("KAAMOS_DATETIME_CREATED", Some(e.created))
+                .text("KAAMOS_HEADERS", e.headers_text())
+                .text("KAAMOS_PATH", item_path)
+                .int("KAAMOS_PATH_ID", item_id)
                 .associate(Some(item_id)),
         )?;
     }

@@ -2,7 +2,7 @@
 //!
 //! Features beyond plain reading:
 //! * deleted files: unallocated MFT records are attached to their parent
-//!   directory when the parent's sequence number still matches (TSK's
+//!   directory when the parent's sequence number still matches (Autopsy's
 //!   "parent map"); otherwise they are reported as orphans;
 //! * deleted names recovered from `$I30` index slack and unallocated INDX
 //!   blocks;
@@ -482,7 +482,7 @@ impl FileSystem for NtfsFs {
         Ok(m)
     }
 
-    /// TSK's rule: NTFS increments an MFT entry's sequence number when it
+    /// Autopsy's rule: NTFS increments an MFT entry's sequence number when it
     /// is freed, so a deleted record matches a name carrying the previous
     /// sequence; any other mismatch means the entry was reused.
     fn name_matches_meta(&self, entry: &DirEntry, meta: &Metadata) -> bool {
@@ -540,7 +540,7 @@ impl FileSystem for NtfsFs {
                     short_name: None,
                     inode: *child,
                     // The record's sequence was bumped when it was freed;
-                    // the name refers to the one before (as TSK reports).
+                    // the name refers to the one before (as Autopsy reports).
                     seq: Some(u32::from(child_seq.saturating_sub(1))),
                     kind: if is_dir {
                         FileKind::Directory
@@ -643,7 +643,7 @@ impl FileSystem for NtfsFs {
                     name: fname.name.clone(),
                     short_name: None,
                     inode: *child,
-                    // Freed records carry the next sequence (see TSK).
+                    // Freed records carry the next sequence (see Autopsy).
                     seq: Some(u32::from(seq.saturating_sub(1))),
                     kind: if is_dir {
                         FileKind::Directory

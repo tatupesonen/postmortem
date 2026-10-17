@@ -72,7 +72,7 @@ fn run(case: &Arc<Case>, ds_id: i64, s: IntegritySettings) -> Result<Vec<IngestM
 }
 
 fn failures(case: &Case, ds_id: i64) -> Vec<(Option<i64>, Option<Significance>, String)> {
-    let ty = pm_casedb::catalog::artifact_type_id("TSK_VERIFICATION_FAILED").unwrap();
+    let ty = pm_casedb::catalog::artifact_type_id("KAAMOS_VERIFICATION_FAILED").unwrap();
     let db = case.db();
     db.artifacts_of_type(ty, Some(ds_id), 0, 100)
         .unwrap()
@@ -82,7 +82,7 @@ fn failures(case: &Case, ds_id: i64) -> Vec<(Option<i64>, Option<Significance>, 
                 .attributes(a.id)
                 .unwrap()
                 .into_iter()
-                .find(|x| x.name == "TSK_COMMENT")
+                .find(|x| x.name == "KAAMOS_COMMENT")
                 .unwrap()
                 .value
                 .display();

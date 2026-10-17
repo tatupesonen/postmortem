@@ -72,7 +72,7 @@ the hives alone (needs event logs / SRUM), so it is not reported.
    not run yet.
 2. **OS accounts** are posted as `TSK_OS_ACCOUNT` artifacts (one per SID)
    because the case DB has no OS-account tables (schema is owned by
-   another track); Autopsy uses `tsk_os_accounts` + instances.
+   another track); Autopsy uses  + instances.
 3. **Jump-list entries** are reported on the jump-list file; Autopsy adds each
    LNK stream as a derived file (needs the derived-files track's API).
 4. **Recycle Bin**: recycled files are not re-created at their original

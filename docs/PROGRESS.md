@@ -47,7 +47,7 @@ events (fd63f70), jump-list fix (3f83fcc), gallery on DB with MD5 dedup
 ## Previous state (end of 2026-10-14) — historical snapshot, see the Log for later work
 
 ### What works (all on `master`)
-- **Evidence & file systems:** raw/split/EWF images, MBR/GPT, NTFS (TSK-exact,
+- **Evidence & file systems:** raw/split/EWF images, MBR/GPT, NTFS (reference-exact,
   verified against `fls` on the NIST "Hacking Case" image), FAT, exFAT, ext.
 - **Cases (`pm-case`, `pm-casedb`):** case folders (`case.pmcase` +
   `case.db`), parallel loader into SQLite (205 k rows/s synthetic),
@@ -104,7 +104,7 @@ events (fd63f70), jump-list fix (3f83fcc), gallery on DB with MD5 dedup
 - Recent Activity gaps: Firefox (helper `prtime` already in place),
   Safari, legacy Edge (ESE WebCacheV01.dat), Chrome cache/favicons/
   extensions/web-form addresses, full public-suffix list, download
-  TSK_PATH_ID / associated objects, other Recent Activity parts
+  KAAMOS_PATH_ID / associated objects, other Recent Activity parts
   (registry, recent docs, programs, USB, …).
 - Module agent's remaining plan: File Type Identification (`pm-filetype`,
   Tika parity), Extension Mismatch, Encryption Detection, Interesting
@@ -129,7 +129,7 @@ _None._
   answers match the published key (BEYOND-AUTOPSY §8). Ingest 4 min,
   peak resident 3.25 GB.
 * Found and fixed: the DB timeline held only file times — data artifacts
-  now post TSK timeline events in their transaction (back-filled once for
+  now post Autopsy timeline events in their transaction (back-filled once for
   older cases); Windows 10 jump-list times read from the wrong offset.
 * Timeline window, Image Gallery (MD5 de-duplication) now read the case
   DB; schema v3 indexes all file time columns.
@@ -155,23 +155,23 @@ v0.1.1.
 ### 2026-10-17 — WP-0 schema v2
 - Migration `0002_schema_v2.sql` + `pm-casedb` modules `scores`, `tags`,
   `hosts`, `os_accounts` (+ `windows` SID rules), `communications`,
-  `events`. TSK semantics throughout (ADR-017); FS events virtual
-  (ADR-018). Significance codes reordered to TSK ordinals; v1 cases
+  `events`. Autopsy semantics throughout (ADR-017); FS events virtual
+  (ADR-018). Significance codes reordered to Autopsy ordinals; v1 cases
   migrate and get scores backfilled. Notable tags score instead of
   setting `known`.
-- Tests: TSK `OsAccountTest` ported (13 cases + delete-host guard), score
+- Tests: Autopsy `OsAccountTest` ported (13 cases + delete-host guard), score
   ordering/override/artifact targets, tag-set exclusivity and rescoring,
   events, communications normalisation/relationships/filters, v1→v2
   migration, default host per data source. Workspace: 481 tests.
-- Environment: toolchain clippy component reinstalled; sleuthkit and
+- Environment: toolchain clippy component reinstalled; the reference tools and
   ewf-tools installed; three agent tracks relaunched.
 
-- 2026-10-14: pm-case loader (205 k rows/s synthetic), ingest framework, Hash Lookup, case-first UI with status-bar progress, results tree; NTFS TSK-exact on the NIST Hacking Case image.
+- 2026-10-14: pm-case loader (205 k rows/s synthetic), ingest framework, Hash Lookup, case-first UI with status-bar progress, results tree; NTFS reference-exact on the NIST Hacking Case image.
 ### 2026-10-14 — Picture Analyzer (EXIF)
 - `pm-modules::picture_analyzer` + `exif` (random-access TIFF/JPEG EXIF
-  reader): `TSK_METADATA_EXIF` (DATETIME_CREATED in the data source's
+  reader): `KAAMOS_METADATA_EXIF` (DATETIME_CREATED in the data source's
   zone, GEO_LATITUDE/LONGITUDE/ALTITUDE, DEVICE_MODEL/MAKE) and
-  `TSK_USER_CONTENT_SUSPECTED`, per Autopsy's `EXIFProcessor`. Unit tests
+  `KAAMOS_USER_CONTENT_SUSPECTED`, per Autopsy's `EXIFProcessor`. Unit tests
   for the reader (both byte orders, multiple APP1, corrupt offsets,
   proptest) and dates; **no end-to-end ingest test yet**. HEIC conversion
   not implemented. Falls back to a JPEG/TIFF/WAV signature check until File
@@ -214,7 +214,7 @@ v0.1.1.
   About.
 - `pm-fs-exfat`: fixture written by macOS's own exFAT driver
   (`scripts/fixtures/make-exfat.sh`, gzip-committed); matches `fls`
-  exactly. Timestamps honour the UTC offset; TSK 4.15 is off by the offset
+  exactly. Timestamps honour the UTC offset; Autopsy 4.15 is off by the offset
   twice. Fuzzed for 2 min (149k runs, clean). Workspace: 179 tests.
 
 ### 2026-10-14 — UI first slice
@@ -235,7 +235,7 @@ v0.1.1.
   attribute lists, torn-record tolerance, LZNT1 and slack recovery, so it is
   used as an oracle). `pm-testkit::ntfs::NtfsBuilder` writes complete NTFS
   3.1 volumes (system files, multi-level $I30 B-trees, ADS, fragmented and
-  compressed data, deleted files in slack, unindexed or orphaned). TSK reads
+  compressed data, deleted files in slack, unindexed or orphaned). Autopsy reads
   them correctly (fls/icat/istat).
 - Tests: tree/contents/ADS/metadata/deleted/orphans/unallocated, a `fls`
   differential, an `ntfs`-crate differential, a 128-case corruption
@@ -244,16 +244,16 @@ v0.1.1.
   `fuzz/regressions/`.
 - `pm_core::cache::ShardedLru`. Workspace: 150 tests.
 
-### 2026-10-14 — TSK differential harness, EWF
+### 2026-10-14 — reference-tool differential harness, EWF
 - All 8 inventories landed (01–08). ADRs 007–012 record the crate and
   licence decisions.
-- Dev tools installed: cargo-fuzz, libewf (ewfacquire/ewfinfo), sleuthkit
+- Dev tools installed: cargo-fuzz, libewf (ewfacquire/ewfinfo), the reference tools
   4.15 (mmls/fls/istat/icat).
-- `pm_testkit::tsk` differential harness: volume layouts match mmls
+- `pm_testkit::reftools` differential harness: volume layouts match mmls
   (unallocated semantics, GPT names, a 256-entry MBR name table generated
-  from TSK). FAT trees match fls on FAT12/16/32, including `$OrphanFiles`
+  from Autopsy). FAT trees match fls on FAT12/16/32, including `$OrphanFiles`
   (new orphan scan of free clusters). Recovering full deleted LFN names
-  goes beyond TSK.
+  goes beyond Autopsy.
 - EWF v1 reader verified against ewfacquire output across 9 format,
   compression and chunk-size variants. Fuzzing found a section-chain
   overflow on day one (fixed). `scripts/gate.sh` added; commits are now
@@ -264,7 +264,7 @@ v0.1.1.
 - `pm-fs-fat`: BPB/geometry with MS cluster-count typing, FAT12/16/32 tables,
   chain following with loop guards, LFN incl. deleted (checksum brute-force),
   CP437 short names, case flags, volume-label entries, virtual $MBR/$FATn,
-  TSK recovery heuristic, reused-deleted-dir detection, unallocated sectors.
+  Autopsy recovery heuristic, reused-deleted-dir detection, unallocated sectors.
   Tested against `fatfs`-generated images (FAT12/16/32): tree, content, LFN,
   deleted recovery, cluster reuse, fragmentation, deleted dirs, time zones,
   plus a 256-case corruption proptest. Workspace: 103 tests.
@@ -280,7 +280,7 @@ v0.1.1.
 ### 2026-10-14 — pm-volume
 - `pm-volume`: DOS/MBR (primary + EBR chains, loop guard, FS-boot-sector
   rejection), GPT (CRC-validated header and array, backup fallback, 512/4096
-  sectors, 30+ type GUID names). TSK-style full layout with Meta and
+  sectors, 30+ type GUID names). Autopsy-style full layout with Meta and
   Unallocated slots. `pm-testkit::DiskBuilder` builds MBR/EBR/GPT disks.
 - 16 integration tests + 3 proptests (random sector 0, random MBR/EBR,
   GPT bit flips) checking layout invariants. Workspace total: 50 tests.

@@ -1,6 +1,6 @@
 //! Discovery of the remaining segments of a split image from its first file.
 //!
-//! Supported naming schemes (as accepted by TSK/Autopsy):
+//! Supported naming schemes (as accepted by Autopsy):
 //!
 //! * numeric extensions: `name.000`/`name.001`, `.002`, … of any width
 //! * alphabetic extensions: `name.aa`, `.ab`, … `.az`, `.ba`, …

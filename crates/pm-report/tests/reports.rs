@@ -74,7 +74,7 @@ fn case() -> (tempfile::TempDir, Arc<Case>) {
         .remove(0);
     db.tag_file(pw.id, notable.id, "router password", "examiner", 1)
         .unwrap();
-    let download_type = pm_casedb::catalog::artifact_type_id("TSK_WEB_DOWNLOAD").unwrap();
+    let download_type = pm_casedb::catalog::artifact_type_id("KAAMOS_WEB_DOWNLOAD").unwrap();
     let download = db
         .artifacts_of_type(download_type, None, 0, 10)
         .unwrap()
@@ -225,7 +225,7 @@ fn body_file_lists_file_system_files_for_mactime() {
         &NoProgress,
     )
     .unwrap();
-    assert!(g.path.ends_with("TSK Body File/BodyFile.txt"));
+    assert!(g.path.ends_with("Body File/BodyFile.txt"));
     let text = read(&g.path);
     let line = text
         .lines()

@@ -3,7 +3,7 @@
 //! Computes MD5 and SHA-256 in one pass and checks the MD5 against the
 //! configured hash sets:
 //! * **notable** sets: the file becomes notable and gets a
-//!   `TSK_HASHSET_HIT` result (score Notable);
+//!   `KAAMOS_HASHSET_HIT` result (score Notable);
 //! * **no-change** sets: a hit is recorded, the file's status is untouched;
 //! * **known** sets (only when nothing notable matched): the file becomes
 //!   known; no artifact.
@@ -65,7 +65,7 @@ impl HashSetConfig {
         })
     }
 
-    /// Whether hashes can be added: a TSK `.kdb` set.
+    /// Whether hashes can be added: a Autopsy `.kdb` set.
     pub fn updateable(&self) -> bool {
         self.path
             .extension()
@@ -390,12 +390,12 @@ impl Worker {
                     } else {
                         Significance::Unknown
                     };
-                    Art::result(ctx, NAME, "TSK_HASHSET_HIT", file.rec.id, significance)
+                    Art::result(ctx, NAME, "KAAMOS_HASHSET_HIT", file.rec.id, significance)
                         .configuration(&set.name)
-                        .text("TSK_SET_NAME", &set.name)
-                        .text("TSK_HASH_MD5", hex(md5))
-                        .text("TSK_COMMENT", comment)
-                        .post(ctx, &["TSK_SET_NAME"]);
+                        .text("KAAMOS_SET_NAME", &set.name)
+                        .text("KAAMOS_HASH_MD5", hex(md5))
+                        .text("KAAMOS_COMMENT", comment)
+                        .post(ctx, &["KAAMOS_SET_NAME"]);
                     if set.messages {
                         let label = if notable { "Notable" } else { "No Change" };
                         ctx.post_message(

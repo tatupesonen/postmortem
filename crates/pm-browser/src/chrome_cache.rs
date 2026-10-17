@@ -159,7 +159,7 @@ pub struct Entry {
 }
 
 impl Entry {
-    /// Autopsy's `TSK_HEADERS` text: `"key : value"` joined by `" \n"`.
+    /// Autopsy's `KAAMOS_HEADERS` text: `"key : value"` joined by `" \n"`.
     pub fn headers_text(&self) -> String {
         self.headers
             .iter()

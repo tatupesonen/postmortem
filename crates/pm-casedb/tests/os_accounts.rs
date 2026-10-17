@@ -1,5 +1,5 @@
-//! OS accounts, realms, hosts and persons: ports of TSK's
-//! `bindings/java/test/org/sleuthkit/datamodel/OsAccountTest.java`
+//! OS accounts, realms, hosts and persons: ports of Autopsy's
+//! Autopsy's data-model `OsAccountTest.java`
 //! (host address tests excepted).
 #![allow(
     clippy::unwrap_used,
@@ -288,7 +288,7 @@ fn merge_realms_tests() {
             .count()
     };
     // Realms are separate until merged, but both look up the same SID by
-    // address: TSK returns the first account for the second insert too.
+    // address: Autopsy returns the first account for the second insert too.
     assert_eq!(with_sid1(&db), 1);
 
     db.merge_os_account_realms(src.id, dest.id).unwrap();
@@ -673,8 +673,8 @@ fn os_account_instance_tests() {
     assert_eq!(db.os_accounts(Some(ds), 0, 10).unwrap()[0].id, a.id);
 
     let h2 = host(&db, "host2222");
-    let reset = catalog::attribute_type_id("TSK_DATETIME_PASSWORD_RESET").unwrap();
-    let hint = catalog::attribute_type_id("TSK_PASSWORD_HINT").unwrap();
+    let reset = catalog::attribute_type_id("KAAMOS_DATETIME_PASSWORD_RESET").unwrap();
+    let hint = catalog::attribute_type_id("KAAMOS_PASSWORD_HINT").unwrap();
     db.add_os_account_attributes(
         a.id,
         &[

@@ -1,8 +1,8 @@
-//! Timeline events (TSK `TimelineManager`, `tsk_events`).
+//! Timeline events (Autopsy `TimelineManager`, ).
 //!
 //! Artifact events (web history, messages, registry, …) are stored in
 //! `events` with a shared `event_descriptions` row per (description,
-//! content, artifact), as TSK does. File-system MACB events are *not*
+//! content, artifact), as Autopsy does. File-system MACB events are *not*
 //! stored (ADR-017): they are read from the indexed time columns of
 //! `files`, which avoids duplicating every path four times on cases with
 //! hundreds of millions of files.
@@ -11,7 +11,7 @@ use rusqlite::{Connection, OptionalExtension, params};
 
 use crate::{CaseDb, Result};
 
-/// TSK event type ids used by postmortem's writers.
+/// Autopsy event type ids used by postmortem's writers.
 pub mod types {
     pub const FILE_MODIFIED: i64 = 4;
     pub const FILE_ACCESSED: i64 = 5;
@@ -185,7 +185,7 @@ impl CaseDb {
         self.write(|tx| insert_events(tx, events))
     }
 
-    /// The event type hierarchy (TSK ids), by id.
+    /// The event type hierarchy (Autopsy ids), by id.
     pub fn event_types(&self) -> Result<Vec<EventType>> {
         self.read(|c| {
             let mut st =

@@ -68,7 +68,7 @@ memory use, good design and a sane architecture in mind.
 * **Existing cases** made by older builds may be upgraded/re-analysed
   (e.g. re-run Recent Activity after a parser fix), owner-approved
   2026-10-18.
-* Reference sources (Eric Zimmerman's tools, sleuthkit, Tika) may be
+* Reference sources (Eric Zimmerman's tools, the reference tools, Tika) may be
   cloned **outside** the repo (`../reference/`).
 * **Secrets:** credentials the owner shares (e.g. for package installs)
   are used once and never written to files, commits or notes.

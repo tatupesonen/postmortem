@@ -1,4 +1,4 @@
-//! ext2/3/4 images built with the `fstool` writer (validated against TSK).
+//! ext2/3/4 images built with the `fstool` writer (validated against the reference tools).
 
 use std::path::Path;
 

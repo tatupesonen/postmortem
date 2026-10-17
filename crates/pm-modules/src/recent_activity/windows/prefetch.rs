@@ -1,5 +1,5 @@
 //! Prefetch (Autopsy `ExtractPrefetch`, which runs the external
-//! `mm_artifact_parser`): one `TSK_PROG_RUN` per distinct last-run time
+//! `mm_artifact_parser`): one `KAAMOS_PROG_RUN` per distinct last-run time
 //! of each `*.pf` under `\Windows\Prefetch`, parsed natively (versions 17–31,
 //! Windows 10+ compression included).
 
@@ -37,13 +37,13 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
         let times: BTreeSet<i64> = p.last_run_unix().into_iter().filter(|&t| t > 0).collect();
         for t in times {
             batch.push(
-                NewArt::std(ctx, "TSK_PROG_RUN", Some(f.id))
-                    .text("TSK_PROG_NAME", p.executable.clone())
-                    .text("TSK_PATH", dir.clone())
-                    .time("TSK_DATETIME", Some(t))
-                    .int("TSK_COUNT", i64::from(p.run_count))
-                    .text("TSK_COMMENT", COMMENT)
-                    .key(&["TSK_PROG_NAME", "TSK_DATETIME"])
+                NewArt::std(ctx, "KAAMOS_PROG_RUN", Some(f.id))
+                    .text("KAAMOS_PROG_NAME", p.executable.clone())
+                    .text("KAAMOS_PATH", dir.clone())
+                    .time("KAAMOS_DATETIME", Some(t))
+                    .int("KAAMOS_COUNT", i64::from(p.run_count))
+                    .text("KAAMOS_COMMENT", COMMENT)
+                    .key(&["KAAMOS_PROG_NAME", "KAAMOS_DATETIME"])
                     .associate(target),
             );
         }

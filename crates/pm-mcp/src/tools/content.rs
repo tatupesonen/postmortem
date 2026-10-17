@@ -184,7 +184,7 @@ fn file_metadata(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
         .collect::<Result<_, _>>()?;
     let mismatch = reasons
         .iter()
-        .any(|r| r["artifactType"] == "TSK_EXT_MISMATCH_DETECTED");
+        .any(|r| r["artifactType"] == "KAAMOS_EXT_MISMATCH_DETECTED");
     let tags: Vec<Value> = db
         .file_tags(f.id)?
         .iter()

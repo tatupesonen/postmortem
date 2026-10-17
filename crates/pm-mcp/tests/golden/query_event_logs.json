@@ -6,31 +6,31 @@
       "objectId": 19,
       "sourceFileId": null,
       "sourceRef": null,
-      "artifactType": "PM_EVENT_LOG",
+      "artifactType": "KAAMOS_EVENT_LOG",
       "artifactTypeDisplayName": "Event Log Entries",
       "analysisResult": false,
       "dataSourceId": 1,
       "evidence": {
         "attributes": [
           {
-            "type": "PM_EVENT_ID",
+            "type": "KAAMOS_EVENT_ID",
             "value": 4624
           },
           {
-            "type": "PM_EVENT_CHANNEL",
+            "type": "KAAMOS_EVENT_CHANNEL",
             "value": "Security"
           },
           {
-            "type": "PM_EVENT_PROVIDER",
+            "type": "KAAMOS_EVENT_PROVIDER",
             "value": "Microsoft-Windows-Security-Auditing"
           },
           {
-            "type": "TSK_DATETIME",
+            "type": "KAAMOS_DATETIME",
             "value": "2021-05-31T23:51:40Z",
             "epoch": 1622505100
           },
           {
-            "type": "TSK_USER_NAME",
+            "type": "KAAMOS_USER_NAME",
             "value": "alice"
           }
         ]

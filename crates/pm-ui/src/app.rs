@@ -1576,7 +1576,7 @@ impl PostmortemApp {
                 let icon =
                     icons::artifact(&t.name, cat == pm_casedb::catalog::Category::AnalysisResult);
                 let label = format!("{icon} {} ({})", t.display, crate::format::grouped(t.count));
-                if t.name == "TSK_KEYWORD_HIT" {
+                if t.name == "KAAMOS_KEYWORD_HIT" {
                     self.keyword_hits_node(ui, &node, &label, case.as_ref(), t.count);
                 } else {
                     self.tree_node(ui, &node, &label, false, |_, _| {});
@@ -2994,7 +2994,7 @@ impl PostmortemApp {
                 }
                 ui.label(format!("Version {}", env!("CARGO_PKG_VERSION")));
                 ui.label("A digital forensics platform written in Rust,");
-                ui.label("inspired by Autopsy® and The Sleuth Kit®.");
+                ui.label("inspired by Autopsy®®.");
                 ui.add_space(8.0);
                 ui.button("Close").clicked()
             });

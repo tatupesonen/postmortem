@@ -1,4 +1,4 @@
-//! Schema v2: aggregate scores (TSK `ScoringManager`), tags with tag sets,
+//! Schema v2: aggregate scores (Autopsy `ScoringManager`), tags with tag sets,
 //! timeline events, communication accounts and the v1 → v2 migration.
 #![allow(
     clippy::unwrap_used,
@@ -52,7 +52,7 @@ fn result(
     prio: Priority,
 ) -> NewArtifact {
     NewArtifact {
-        type_id: catalog::artifact_type_id("TSK_INTERESTING_FILE_HIT").unwrap(),
+        type_id: catalog::artifact_type_id("KAAMOS_INTERESTING_FILE_HIT").unwrap(),
         ds_id: ds,
         file_id: file,
         source_artifact_id: source,
@@ -81,7 +81,7 @@ fn data_artifact(ds: i64, file: i64, ty: &str) -> NewArtifact {
 }
 
 #[test]
-fn aggregate_score_follows_tsk_ordering() {
+fn aggregate_score_follows_autopsy_ordering() {
     let (_d, db) = new_db();
     let (ds, a, b) = populate(&db);
     assert_eq!(db.score(ObjKind::File, a).unwrap(), Score::UNKNOWN);
@@ -133,7 +133,7 @@ fn aggregate_score_follows_tsk_ordering() {
 
     // A result about an artifact scores the artifact, not its file.
     let art = db
-        .add_artifact(&data_artifact(ds, b, "TSK_WEB_HISTORY"))
+        .add_artifact(&data_artifact(ds, b, "KAAMOS_WEB_HISTORY"))
         .unwrap();
     db.add_artifact(&result(
         ds,
@@ -202,7 +202,7 @@ fn notable_tags_score_and_tag_sets_are_exclusive() {
 
     // Result tags.
     let art = db
-        .add_artifact(&data_artifact(ds, b, "TSK_WEB_HISTORY"))
+        .add_artifact(&data_artifact(ds, b, "KAAMOS_WEB_HISTORY"))
         .unwrap();
     let notable = db
         .tag_names()
@@ -267,10 +267,10 @@ fn notable_tags_score_and_tag_sets_are_exclusive() {
 fn events_are_idempotent_and_flag_hash_hits() {
     let (_d, db) = new_db();
     let (ds, a, _) = populate(&db);
-    let hit = data_artifact(ds, a, "TSK_HASHSET_HIT");
+    let hit = data_artifact(ds, a, "KAAMOS_HASHSET_HIT");
     db.add_artifact(&hit).unwrap();
     let art = db
-        .add_artifact(&data_artifact(ds, a, "TSK_WEB_HISTORY"))
+        .add_artifact(&data_artifact(ds, a, "KAAMOS_WEB_HISTORY"))
         .unwrap();
     let ev = |t: i64| NewEvent {
         type_id: types::WEB_HISTORY,
@@ -348,13 +348,13 @@ fn communications_accounts_and_relationships() {
     );
 
     let msg1 = db
-        .add_artifact(&data_artifact(ds, a, "TSK_EMAIL_MSG"))
+        .add_artifact(&data_artifact(ds, a, "KAAMOS_EMAIL_MSG"))
         .unwrap();
     let msg2 = db
-        .add_artifact(&data_artifact(ds, b, "TSK_EMAIL_MSG"))
+        .add_artifact(&data_artifact(ds, b, "KAAMOS_EMAIL_MSG"))
         .unwrap();
     let call = db
-        .add_artifact(&data_artifact(ds, b, "TSK_CALLLOG"))
+        .add_artifact(&data_artifact(ds, b, "KAAMOS_CALLLOG"))
         .unwrap();
     db.add_relationships(
         &[alice.id, bob.id, carol.id],
@@ -461,8 +461,8 @@ fn v1_cases_migrate_to_v2() {
         c.execute_batch(include_str!("../migrations/0001_initial.sql"))
             .unwrap();
         c.execute_batch(
-            "INSERT INTO meta (key, value) VALUES ('schema_version', '1');
-             INSERT INTO artifact_types (id, name, display_name, category) VALUES (12, 'TSK_INTERESTING_FILE_HIT', 'Interesting Files', 1);
+            "INSERT INTO meta (key, value) VALUES ('schema_version', '1'), ('type_namespace', 'kaamos');
+             INSERT INTO artifact_types (id, name, display_name, category) VALUES (12, 'KAAMOS_INTERESTING_FILE_HIT', 'Interesting Files', 1);
              INSERT INTO data_sources (id, name, kind, paths, size, sector_size, timezone, added_at) VALUES (1, 'img', 0, '[]', 0, 512, 'UTC', 0);
              INSERT INTO files (id, ds_id, origin, name, parent_path, kind, name_alloc, meta_alloc, meta_flags, size, extension)
                  VALUES (1, 1, 3, 'a', '/', 1, 1, 1, 0, 0, ''), (2, 1, 3, 'b', '/', 1, 1, 1, 0, 0, ''), (3, 1, 3, 'c', '/', 1, 1, 1, 0, 0, '');
@@ -503,29 +503,29 @@ fn keyword_hits_group_like_autopsy() {
     let (ds, a, b) = populate(&db);
     let attr = |n: &str| catalog::attribute_type_id(n).unwrap();
     let hit = |file: i64, list: &str, st: i64, re: Option<&str>, kw: &str| {
-        let mut art = data_artifact(ds, file, "TSK_KEYWORD_HIT");
+        let mut art = data_artifact(ds, file, "KAAMOS_KEYWORD_HIT");
         let mut attrs = vec![
             (
-                attr("TSK_KEYWORD"),
+                attr("KAAMOS_KEYWORD"),
                 Value::Text(kw.into()),
                 "Keyword Search".into(),
             ),
             (
-                attr("TSK_KEYWORD_SEARCH_TYPE"),
+                attr("KAAMOS_KEYWORD_SEARCH_TYPE"),
                 Value::Int(st),
                 "Keyword Search".into(),
             ),
         ];
         if !list.is_empty() {
             attrs.push((
-                attr("TSK_SET_NAME"),
+                attr("KAAMOS_SET_NAME"),
                 Value::Text(list.into()),
                 "Keyword Search".into(),
             ));
         }
         if let Some(re) = re {
             attrs.push((
-                attr("TSK_KEYWORD_REGEXP"),
+                attr("KAAMOS_KEYWORD_REGEXP"),
                 Value::Text(re.into()),
                 "Keyword Search".into(),
             ));
@@ -629,7 +629,7 @@ fn keyword_hit_groups_on_a_real_case() {
     }
 }
 
-/// Data artifacts become timeline events as they are posted (TSK
+/// Data artifacts become timeline events as they are posted (Autopsy
 /// `TimelineManager`); analysis results do not; a case without them is
 /// back-filled once.
 #[test]
@@ -637,15 +637,15 @@ fn artifacts_post_their_timeline_events() {
     let (dir, db) = new_db();
     let (ds, a, _) = populate(&db);
     let attr = |n: &str| catalog::attribute_type_id(n).unwrap();
-    let mut run = data_artifact(ds, a, "TSK_PROG_RUN");
+    let mut run = data_artifact(ds, a, "KAAMOS_PROG_RUN");
     run.attributes = vec![
         (
-            attr("TSK_PROG_NAME"),
+            attr("KAAMOS_PROG_NAME"),
             Value::Text("COREUPDATER.EXE".into()),
             "t".into(),
         ),
         (
-            attr("TSK_DATETIME"),
+            attr("KAAMOS_DATETIME"),
             Value::DateTime(1_600_486_859),
             "t".into(),
         ),
@@ -659,25 +659,25 @@ fn artifacts_post_their_timeline_events() {
     assert_eq!(evs[0].file_id, Some(a));
 
     // Web history: one event per mapped time (accessed and created).
-    let mut web = data_artifact(ds, a, "TSK_WEB_HISTORY");
+    let mut web = data_artifact(ds, a, "KAAMOS_WEB_HISTORY");
     web.attributes = vec![
         (
-            attr("TSK_URL"),
+            attr("KAAMOS_URL"),
             Value::Text("https://example.com/".into()),
             "t".into(),
         ),
         (
-            attr("TSK_DOMAIN"),
+            attr("KAAMOS_DOMAIN"),
             Value::Text("example.com".into()),
             "t".into(),
         ),
         (
-            attr("TSK_DATETIME_ACCESSED"),
+            attr("KAAMOS_DATETIME_ACCESSED"),
             Value::DateTime(200),
             "t".into(),
         ),
         (
-            attr("TSK_DATETIME_CREATED"),
+            attr("KAAMOS_DATETIME_CREATED"),
             Value::DateTime(100),
             "t".into(),
         ),
@@ -694,12 +694,12 @@ fn artifacts_post_their_timeline_events() {
 
     // Custom types: the catch-all, one event per date attribute.
     let custom = db
-        .artifact_type("PM_THING", "Things", catalog::Category::DataArtifact)
+        .artifact_type("KAAMOS_THING", "Things", catalog::Category::DataArtifact)
         .unwrap();
     let when = db
-        .attribute_type("PM_WHEN", "When", catalog::ValueType::DateTime)
+        .attribute_type("KAAMOS_WHEN", "When", catalog::ValueType::DateTime)
         .unwrap();
-    let mut thing = data_artifact(ds, a, "TSK_PROG_RUN");
+    let mut thing = data_artifact(ds, a, "KAAMOS_PROG_RUN");
     thing.type_id = custom;
     thing.attributes = vec![(when, Value::DateTime(300), "t".into())];
     let thing_id = db.add_artifact(&thing).unwrap();
@@ -747,7 +747,7 @@ fn committed_writes_bump_their_domains() {
     assert!(ch.generation(Domain::Files) > files0);
     assert!(ch.generation(Domain::DataSources) > 0);
     assert_eq!(ch.generation(Domain::Artifacts), arts0, "no artifact yet");
-    db.add_artifact(&data_artifact(ds, a, "TSK_WEB_HISTORY"))
+    db.add_artifact(&data_artifact(ds, a, "KAAMOS_WEB_HISTORY"))
         .unwrap();
     assert!(ch.generation(Domain::Artifacts) > arts0);
     assert_eq!(ch.generation(Domain::Tags), tags0);
@@ -759,4 +759,19 @@ fn committed_writes_bump_their_domains() {
     });
     assert!(r.is_err());
     assert_eq!(ch.generation(Domain::Files), files, "rolled back");
+}
+
+/// Cases made before the KAAMOS_ type namespace are refused.
+#[test]
+fn cases_without_the_kaamos_namespace_are_refused() {
+    let (dir, db) = new_db();
+    drop(db);
+    let path = dir.path().join("case.db");
+    rusqlite::Connection::open(&path)
+        .unwrap()
+        .execute("DELETE FROM meta WHERE key = 'type_namespace'", [])
+        .unwrap();
+    let e = CaseDb::open(&path).expect_err("refused");
+    assert!(e.to_string().contains("create the case again"), "{e}");
+    assert!(CaseDb::open_read_only(&path).is_err());
 }

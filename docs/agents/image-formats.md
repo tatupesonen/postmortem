@@ -50,7 +50,7 @@ Shared machinery:
   backing chains made with `convert -B` (qcow2 over qcow2/raw, v2, VMDK
   delta) plus a missing-parent error after moving the base; 4.5 GiB split
   sparse/flat VMDKs (reads across the 2 GiB extent boundaries); encrypted
-  LUKS qcow2 refusal; sniffing; and **TSK `img_cat` (libvhdi/libvmdk) as a
+  LUKS qcow2 refusal; sniffing; and **Autopsy `img_cat` (libvhdi/libvmdk) as a
   second oracle** for VHD, monolithic/split sparse and streamOptimized VMDK.
   Skips with a message when `qemu-img` (or `img_cat`) is absent.
 * `tests/vm_handbuilt.rs` (15): `pm-testkit::vdisk` builders for what qemu
@@ -110,9 +110,9 @@ one large read.
 * VM Extractor module (email-mobile track): it can now call
   `pm_image::open` on extracted VMDK/VHD/VHDX files.
 
-## Gaps vs TSK / libvmdk / libvhdi / Autopsy
+## Gaps vs Autopsy / libvmdk / libvhdi / Autopsy
 
-* TSK (and so Autopsy) opens VMDK and VHD only, and does **not** follow
+* Autopsy (and so Autopsy) opens VMDK and VHD only, and does **not** follow
   differencing/delta parents. postmortem follows parents for all formats
   and also reads VHDX and QCOW2 (Autopsy cannot).
 * Not supported: VMDK `COWD`/vmfsSparse (ESX snapshot deltas),

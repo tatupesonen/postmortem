@@ -167,14 +167,14 @@ fn types_files_like_autopsy() {
     }
 
     // One interesting item, for the user type that asks for it.
-    let hits = c.artifacts("TSK_INTERESTING_ITEM");
+    let hits = c.artifacts("KAAMOS_INTERESTING_ITEM");
     assert_eq!(hits.len(), 1, "{hits:?}");
     let (a, attrs) = &hits[0];
     assert_eq!(a.file_id, Some(c.file("/docs/a.mine").id));
     assert_eq!(a.significance, Some(Significance::LikelyNotable));
     assert_eq!(a.configuration.as_deref(), Some("Mine files"));
-    assert_eq!(attrs["TSK_SET_NAME"], "Mine files");
-    assert_eq!(attrs["TSK_CATEGORY"], "application/x-mine");
+    assert_eq!(attrs["KAAMOS_SET_NAME"], "Mine files");
+    assert_eq!(attrs["KAAMOS_CATEGORY"], "application/x-mine");
 
     // The summary message.
     let msgs = inbox.since(0);
@@ -196,7 +196,7 @@ fn types_files_like_autopsy() {
 
     // Re-ingest: no duplicate result, types unchanged.
     c.run_one(Arc::new(FileTypeFactory), settings(user_types()));
-    assert_eq!(c.artifacts("TSK_INTERESTING_ITEM").len(), 1);
+    assert_eq!(c.artifacts("KAAMOS_INTERESTING_ITEM").len(), 1);
     assert_eq!(mime("/docs/report.pdf").as_deref(), Some("application/pdf"));
 }
 

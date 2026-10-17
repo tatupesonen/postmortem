@@ -10,49 +10,48 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
-use pm_casedb::events::types as tsk;
+use pm_casedb::events::types as ev;
 use pm_casedb::mcp::{EventFilter, EventKeyset, TimeColumn};
 use pm_casedb::{CaseDb, FileRecord, Result};
 
 use crate::{Bin, Category, CountsQuery, DeletedFilter, EventType, FileCategory, Filter, ListRow};
 use crate::{TimeUnit, TypeZoom, bins};
 
-/// The timeline event type of a TSK event type id.
-pub fn event_type_of(tsk_id: i64) -> EventType {
-    match tsk_id {
-        tsk::FILE_MODIFIED => EventType::FileModified,
-        tsk::FILE_ACCESSED => EventType::FileAccessed,
-        tsk::FILE_CREATED => EventType::FileCreated,
-        tsk::FILE_CHANGED => EventType::FileChanged,
-        tsk::WEB_HISTORY | tsk::WEB_HISTORY_CREATED | tsk::WEB_CACHE => EventType::WebHistory,
-        tsk::WEB_DOWNLOADS => EventType::WebDownloads,
-        tsk::WEB_COOKIE | tsk::WEB_COOKIE_ACCESSED | tsk::WEB_COOKIE_END => EventType::WebCookies,
-        tsk::WEB_BOOKMARK => EventType::WebBookmarks,
-        tsk::WEB_SEARCH => EventType::WebSearches,
-        tsk::WEB_FORM_AUTOFILL
-        | tsk::WEB_FORM_AUTOFILL_ACCESSED
-        | tsk::WEB_FORM_ADDRESSES
-        | tsk::WEB_FORM_ADDRESSES_MODIFIED => EventType::WebFormAutofill,
-        tsk::MESSAGE => EventType::Messages,
-        tsk::CALL_LOG | tsk::CALL_LOG_END => EventType::Calls,
-        tsk::EMAIL | tsk::EMAIL_RCVD => EventType::Email,
-        tsk::GPS_ROUTE | tsk::GPS_TRACK => EventType::GpsRoutes,
-        tsk::GPS_TRACKPOINT
-        | tsk::GPS_BOOKMARK
-        | tsk::GPS_LAST_KNOWN_LOCATION
-        | tsk::GPS_SEARCH => EventType::GpsTrackpoint,
-        tsk::RECENT_DOCUMENTS => EventType::RecentDocuments,
-        tsk::INSTALLED_PROGRAM | tsk::PROGRAM_DELETED => EventType::InstalledPrograms,
-        tsk::EXIF => EventType::Exif,
-        tsk::DEVICES_ATTACHED
-        | tsk::BLUETOOTH_PAIRING
-        | tsk::BLUETOOTH_PAIRING_ACCESSED
-        | tsk::BLUETOOTH_ADAPTER
-        | tsk::WIFI_NETWORK => EventType::DevicesAttached,
-        tsk::LOG_ENTRY => EventType::LogEntry,
-        tsk::REGISTRY => EventType::Registry,
-        tsk::PROGRAM_EXECUTION | tsk::PROGRAM_NOTIFICATION => EventType::ProgramExecution,
-        // TSK's manual events (TSK_TL_EVENT, "User Created").
+/// The timeline event type of a Autopsy event type id.
+pub fn event_type_of(type_id: i64) -> EventType {
+    match type_id {
+        ev::FILE_MODIFIED => EventType::FileModified,
+        ev::FILE_ACCESSED => EventType::FileAccessed,
+        ev::FILE_CREATED => EventType::FileCreated,
+        ev::FILE_CHANGED => EventType::FileChanged,
+        ev::WEB_HISTORY | ev::WEB_HISTORY_CREATED | ev::WEB_CACHE => EventType::WebHistory,
+        ev::WEB_DOWNLOADS => EventType::WebDownloads,
+        ev::WEB_COOKIE | ev::WEB_COOKIE_ACCESSED | ev::WEB_COOKIE_END => EventType::WebCookies,
+        ev::WEB_BOOKMARK => EventType::WebBookmarks,
+        ev::WEB_SEARCH => EventType::WebSearches,
+        ev::WEB_FORM_AUTOFILL
+        | ev::WEB_FORM_AUTOFILL_ACCESSED
+        | ev::WEB_FORM_ADDRESSES
+        | ev::WEB_FORM_ADDRESSES_MODIFIED => EventType::WebFormAutofill,
+        ev::MESSAGE => EventType::Messages,
+        ev::CALL_LOG | ev::CALL_LOG_END => EventType::Calls,
+        ev::EMAIL | ev::EMAIL_RCVD => EventType::Email,
+        ev::GPS_ROUTE | ev::GPS_TRACK => EventType::GpsRoutes,
+        ev::GPS_TRACKPOINT | ev::GPS_BOOKMARK | ev::GPS_LAST_KNOWN_LOCATION | ev::GPS_SEARCH => {
+            EventType::GpsTrackpoint
+        }
+        ev::RECENT_DOCUMENTS => EventType::RecentDocuments,
+        ev::INSTALLED_PROGRAM | ev::PROGRAM_DELETED => EventType::InstalledPrograms,
+        ev::EXIF => EventType::Exif,
+        ev::DEVICES_ATTACHED
+        | ev::BLUETOOTH_PAIRING
+        | ev::BLUETOOTH_PAIRING_ACCESSED
+        | ev::BLUETOOTH_ADAPTER
+        | ev::WIFI_NETWORK => EventType::DevicesAttached,
+        ev::LOG_ENTRY => EventType::LogEntry,
+        ev::REGISTRY => EventType::Registry,
+        ev::PROGRAM_EXECUTION | ev::PROGRAM_NOTIFICATION => EventType::ProgramExecution,
+        // Autopsy's manual events (KAAMOS_TL_EVENT, "User Created").
         22 => EventType::UserCreated,
         _ => EventType::OtherArtifact,
     }
@@ -460,19 +459,19 @@ mod tests {
     use super::*;
 
     #[test]
-    fn tsk_types_map_to_timeline_types() {
-        assert_eq!(event_type_of(tsk::FILE_CHANGED), EventType::FileChanged);
+    fn event_types_map_to_timeline_types() {
+        assert_eq!(event_type_of(ev::FILE_CHANGED), EventType::FileChanged);
         assert_eq!(
-            event_type_of(tsk::WEB_HISTORY_CREATED),
+            event_type_of(ev::WEB_HISTORY_CREATED),
             EventType::WebHistory
         );
-        assert_eq!(event_type_of(tsk::LOG_ENTRY), EventType::LogEntry);
+        assert_eq!(event_type_of(ev::LOG_ENTRY), EventType::LogEntry);
         assert_eq!(
-            event_type_of(tsk::PROGRAM_EXECUTION),
+            event_type_of(ev::PROGRAM_EXECUTION),
             EventType::ProgramExecution
         );
         assert_eq!(
-            event_type_of(tsk::CUSTOM_ARTIFACT_CATCH_ALL),
+            event_type_of(ev::CUSTOM_ARTIFACT_CATCH_ALL),
             EventType::OtherArtifact
         );
         let file_types: Vec<EventType> = TimeColumn::ALL.into_iter().map(type_of_column).collect();

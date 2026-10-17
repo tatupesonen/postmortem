@@ -25,7 +25,7 @@
           "objectId": 15,
           "sourceFileId": 32,
           "sourceRef": "file:32",
-          "artifactType": "TSK_INTERESTING_ITEM",
+          "artifactType": "KAAMOS_INTERESTING_ITEM",
           "artifactTypeDisplayName": "Interesting Items",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -36,11 +36,11 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Credentials"
               },
               {
-                "type": "TSK_COMMENT",
+                "type": "KAAMOS_COMMENT",
                 "value": "password file"
               }
             ]
@@ -75,7 +75,7 @@
           "objectId": 8,
           "sourceFileId": 9,
           "sourceRef": "file:9",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -86,23 +86,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "bob@example.com"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": "n friday\n- contact: «bob@example.com«, +358 40 123 4567\nf"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -114,7 +114,7 @@
           "objectId": 9,
           "sourceFileId": 9,
           "sourceRef": "file:9",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -125,23 +125,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "alice@example.com"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": "te.eml\nfrom: alice <«alice@example.com«>\nto: bob <bob@examp"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -153,7 +153,7 @@
           "objectId": 10,
           "sourceFileId": 9,
           "sourceRef": "file:9",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -164,23 +164,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "carol@example.org"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": "ob@example.com>\ncc: «carol@example.org«\nsubject: friday\ndat"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -192,7 +192,7 @@
           "objectId": 11,
           "sourceFileId": 9,
           "sourceRef": "file:9",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -203,23 +203,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "invite@example.com"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": " +0000\nmessage-id: <«invite@example.com«>\nserver migration o"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -253,7 +253,7 @@
           "objectId": 1,
           "sourceFileId": 29,
           "sourceRef": "file:29",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -264,23 +264,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "bob@example.com"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": "358401234567\r\nemail:«bob@example.com«\r\nend:vcard\r\n\n\n-----"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -314,7 +314,7 @@
           "objectId": 2,
           "sourceFileId": 30,
           "sourceRef": "file:30",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -325,23 +325,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "carol@example.org"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": ":30:00z\nmessage-cc: «carol@example.org«\nmessage-from: alice"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -353,7 +353,7 @@
           "objectId": 3,
           "sourceFileId": 30,
           "sourceRef": "file:30",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -364,23 +364,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "alice@example.com"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": "essage-from: alice <«alice@example.com«>\nmessage-id: invite"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -392,7 +392,7 @@
           "objectId": 4,
           "sourceFileId": 30,
           "sourceRef": "file:30",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -403,23 +403,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "invite@example.com"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": "le.com>\nmessage-id: «invite@example.com«\nmessage-to: bob <bo"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -431,7 +431,7 @@
           "objectId": 5,
           "sourceFileId": 30,
           "sourceRef": "file:30",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -442,23 +442,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "bob@example.com"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": "om\nmessage-to: bob <«bob@example.com«>\ntitle: friday"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -492,7 +492,7 @@
           "objectId": 7,
           "sourceFileId": 31,
           "sourceRef": "file:31",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 1,
@@ -503,23 +503,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "bob@example.com"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": " friday\r\n- contact: «bob@example.com«, +358 40 123 4567\r\n"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -553,7 +553,7 @@
           "objectId": 13,
           "sourceFileId": 98,
           "sourceRef": "file:98",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 2,
@@ -564,23 +564,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "mallory@example.com"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": "tion-marker\ncontact «mallory@example.com«\n"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],
@@ -614,7 +614,7 @@
           "objectId": 12,
           "sourceFileId": 107,
           "sourceRef": "file:107",
-          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactType": "KAAMOS_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
           "dataSourceId": 2,
@@ -625,23 +625,23 @@
           "evidence": {
             "attributes": [
               {
-                "type": "TSK_KEYWORD",
+                "type": "KAAMOS_KEYWORD",
                 "value": "mallory@example.com"
               },
               {
-                "type": "TSK_KEYWORD_REGEXP",
+                "type": "KAAMOS_KEYWORD_REGEXP",
                 "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
               },
               {
-                "type": "TSK_SET_NAME",
+                "type": "KAAMOS_SET_NAME",
                 "value": "Email Addresses"
               },
               {
-                "type": "TSK_KEYWORD_PREVIEW",
+                "type": "KAAMOS_KEYWORD_PREVIEW",
                 "value": "tion-marker\ncontact «mallory@example.com«\n\n\n-----------------"
               },
               {
-                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "type": "KAAMOS_KEYWORD_SEARCH_TYPE",
                 "value": 2
               }
             ],

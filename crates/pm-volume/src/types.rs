@@ -7,9 +7,9 @@ pub(crate) fn is_extended(t: u8) -> bool {
     matches!(t, 0x05 | 0x0F | 0x85)
 }
 
-/// Name of a DOS partition type, exactly as TSK's `mmls` prints it (and
-/// therefore as Autopsy shows it). Generated from TSK 4.15 by probing every
-/// type byte; `tests/tsk_differential.rs` keeps it honest.
+/// Name of a DOS partition type, exactly as Autopsy's `mmls` prints it (and
+/// therefore as Autopsy shows it). Generated from Autopsy 4.15 by probing every
+/// type byte; `tests/reference_differential.rs` keeps it honest.
 pub fn mbr_type_name(t: u8) -> &'static str {
     #[expect(
         clippy::indexing_slicing,

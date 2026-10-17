@@ -3,12 +3,11 @@
 //! Modules write extracted bytes under
 //! `<case>/ModuleOutput/<module folder>/<source file id>/…` and record the
 //! path relative to the case folder in `files.local_path`. Like Autopsy,
-//! the bytes are normally XOR1-encoded (TSK `EncodedFileOutputStream`): a
+//! the bytes are normally XOR1-encoded (Autopsy `EncodedFileOutputStream`): a
 //! 32-byte plain-text header followed by every byte XOR 0xCA. This keeps
 //! antivirus software from quarantining (deleting) malware found in the
-//! evidence, and keeps case folders readable by Autopsy's tooling
-//! (ADR-016). The encoding is recognised from the header when the file is
-//! opened (TSK `EncodedFileUtil.getEncoding`), so the case database needs
+//! evidence (ADR-016). The encoding is recognised from the header when the file is
+//! opened (Autopsy `EncodedFileUtil.getEncoding`), so the case database needs
 //! no extra column; plain files are read as well.
 
 use std::fs::File;
@@ -17,22 +16,22 @@ use std::path::{Path, PathBuf};
 
 use pm_core::ReadAt;
 
-/// How the bytes of a derived file are stored (TSK `TskData.EncodingType`).
+/// How the bytes of a derived file are stored (Autopsy `EncodingType`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
 pub enum Encoding {
     /// Plain bytes.
     None,
-    /// TSK's XOR1: a 32-byte plain-text header, then every byte XOR 0xCA.
+    /// Autopsy's XOR1: a 32-byte plain-text header, then every byte XOR 0xCA.
     #[default]
     Xor1,
 }
 
-/// TSK's XOR1 header (`EncodedFileUtil.XOR1_HEADER`), stored unencoded.
-pub const XOR1_HEADER: &[u8; 32] = b"TSK_CONTAINER_XOR1_xxxxxxxxxxxxx";
+/// The XOR1 header written before the encoded bytes (32 bytes, unencoded).
+pub const XOR1_HEADER: &[u8; 32] = b"KAAMOS_CONTAINER_XOR1_xxxxxxxxxx";
 /// The XOR1 key.
 pub const XOR1_KEY: u8 = 0xCA;
 
-/// Detects the encoding of a stored file from its first bytes (TSK
+/// Detects the encoding of a stored file from its first bytes (Autopsy
 /// `EncodedFileUtil.getEncoding`).
 pub fn sniff_encoding(head: &[u8]) -> Encoding {
     if head.starts_with(XOR1_HEADER) {
@@ -200,7 +199,7 @@ mod tests {
     use pm_core::io::MemSource;
 
     #[test]
-    fn xor1_round_trip_matches_tsk_layout() {
+    fn xor1_round_trip_matches_the_container_layout() {
         let dir = tempfile::tempdir().unwrap();
         let p = dir.path().join("a/b/f.bin");
         let mut w = EncodedWriter::create(&p, Encoding::Xor1).unwrap();

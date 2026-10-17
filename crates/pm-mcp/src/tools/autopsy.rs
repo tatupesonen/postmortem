@@ -1,4 +1,4 @@
-//! Autopsy's MCP tools (`TskQueryService`): same names, arguments and,
+//! Autopsy's MCP tools: same names, arguments and,
 //! where it does not conflict with the `evidence` rule, result fields.
 
 use pm_casedb::mcp::{
@@ -119,19 +119,19 @@ pub(super) fn tools() -> Vec<ToolSpec> {
             "query_data_artifacts",
             "Search data artifacts: facts extracted from the evidence such as web history, downloads, recent \
              documents, installed programs, USB devices, accounts, messages, GPS points and event-log entries. Filter \
-             by artifactType (e.g. TSK_WEB_HISTORY; list_artifact_types shows the types present with counts), by an \
-             attribute (attributeType e.g. TSK_URL, attributeValue substring) and data source. Attributes are inside \
+             by artifactType (e.g. KAAMOS_WEB_HISTORY; list_artifact_types shows the types present with counts), by an \
+             attribute (attributeType e.g. KAAMOS_URL, attributeValue substring) and data source. Attributes are inside \
              `evidence`.",
             &[
                 (
                     "artifactType",
                     "string",
-                    "TSK artifact type name e.g. TSK_WEB_HISTORY",
+                    "Artifact type name e.g. KAAMOS_WEB_HISTORY",
                 ),
                 (
                     "attributeType",
                     "string",
-                    "Filter by attribute type name e.g. TSK_URL",
+                    "Filter by attribute type name e.g. KAAMOS_URL",
                 ),
                 (
                     "attributeValue",
@@ -149,18 +149,18 @@ pub(super) fn tools() -> Vec<ToolSpec> {
             "query_analysis_results",
             "Search analysis results: conclusions of ingest modules such as hash-set hits, keyword hits, \
              interesting items, extension mismatches, encryption and EXIF metadata. Each result has a score \
-             (significance Notable, Likely Notable, …). Filter by artifactType (e.g. TSK_KEYWORD_HIT, \
-             TSK_HASHSET_HIT), attribute and data source.",
+             (significance Notable, Likely Notable, …). Filter by artifactType (e.g. KAAMOS_KEYWORD_HIT, \
+             KAAMOS_HASHSET_HIT), attribute and data source.",
             &[
                 (
                     "artifactType",
                     "string",
-                    "TSK artifact type name e.g. TSK_KEYWORD_HIT",
+                    "Artifact type name e.g. KAAMOS_KEYWORD_HIT",
                 ),
                 (
                     "attributeType",
                     "string",
-                    "Filter by attribute type name e.g. TSK_KEYWORD",
+                    "Filter by attribute type name e.g. KAAMOS_KEYWORD",
                 ),
                 (
                     "attributeValue",

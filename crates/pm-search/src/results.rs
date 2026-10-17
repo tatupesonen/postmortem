@@ -1,4 +1,4 @@
-//! `TSK_KEYWORD_HIT` results exactly as Autopsy writes them
+//! `KAAMOS_KEYWORD_HIT` results exactly as Autopsy writes them
 //! (`LuceneQuery` / `RegexQuery.createKeywordHitArtifact`), shared by the
 //! ingest module and the ad-hoc "Save search results" action.
 
@@ -20,7 +20,7 @@ pub struct KeywordHitSpec<'a> {
     /// The keyword as configured.
     pub term: &'a str,
     pub search_type: SearchType,
-    /// Selector attribute type (`TSK_EMAIL`, …), if any.
+    /// Selector attribute type (`KAAMOS_EMAIL`, …), if any.
     pub selector: Option<&'a str>,
     /// The matched text.
     pub hit: &'a str,
@@ -45,26 +45,26 @@ pub fn keyword_hit_artifact(s: &KeywordHitSpec<'_>) -> (NewArtifact, KeywordHitK
     let mut attributes: Vec<(i64, Value, String)> = Vec::new();
     let (search_type, regexp) = if s.search_type == SearchType::Exact {
         // LuceneQuery.createKeywordHitArtifact.
-        attributes.push(text("TSK_KEYWORD_PREVIEW", s.snippet));
-        attributes.push(text("TSK_KEYWORD", &keyword));
+        attributes.push(text("KAAMOS_KEYWORD_PREVIEW", s.snippet));
+        attributes.push(text("KAAMOS_KEYWORD", &keyword));
         if has_list {
-            attributes.push(text("TSK_SET_NAME", s.list_name));
+            attributes.push(text("KAAMOS_SET_NAME", s.list_name));
         }
         if let Some(sel) = s.selector
             && attr(sel) != 0
         {
             attributes.push(text(sel, s.hit));
         }
-        attributes.push((attr("TSK_KEYWORD_SEARCH_TYPE"), Value::Int(0), m()));
+        attributes.push((attr("KAAMOS_KEYWORD_SEARCH_TYPE"), Value::Int(0), m()));
         (0, None)
     } else {
         // RegexQuery.createKeywordHitArtifact.
-        attributes.push(text("TSK_KEYWORD", &keyword));
-        attributes.push(text("TSK_KEYWORD_REGEXP", s.term));
+        attributes.push(text("KAAMOS_KEYWORD", &keyword));
+        attributes.push(text("KAAMOS_KEYWORD_REGEXP", s.term));
         if has_list {
-            attributes.push(text("TSK_SET_NAME", s.list_name));
+            attributes.push(text("KAAMOS_SET_NAME", s.list_name));
         }
-        attributes.push(text("TSK_KEYWORD_PREVIEW", s.snippet));
+        attributes.push(text("KAAMOS_KEYWORD_PREVIEW", s.snippet));
         let st = if s.search_type == SearchType::Substring {
             1
         } else {
@@ -73,11 +73,11 @@ pub fn keyword_hit_artifact(s: &KeywordHitSpec<'_>) -> (NewArtifact, KeywordHitK
         (st, Some(s.term.to_owned()))
     };
     if let Some(a) = s.associated_artifact {
-        attributes.push((attr("TSK_ASSOCIATED_ARTIFACT"), Value::Int(a), m()));
+        attributes.push((attr("KAAMOS_ASSOCIATED_ARTIFACT"), Value::Int(a), m()));
     }
     if s.search_type != SearchType::Exact {
         attributes.push((
-            attr("TSK_KEYWORD_SEARCH_TYPE"),
+            attr("KAAMOS_KEYWORD_SEARCH_TYPE"),
             Value::Int(search_type),
             m(),
         ));
@@ -90,7 +90,7 @@ pub fn keyword_hit_artifact(s: &KeywordHitSpec<'_>) -> (NewArtifact, KeywordHitK
         associated_artifact: s.associated_artifact,
     };
     let artifact = NewArtifact {
-        type_id: artifact_type_id("TSK_KEYWORD_HIT").unwrap_or(9),
+        type_id: artifact_type_id("KAAMOS_KEYWORD_HIT").unwrap_or(9),
         ds_id: s.ds_id,
         file_id: s.file_id,
         source_artifact_id: None,
@@ -134,10 +134,10 @@ mod tests {
         assert_eq!(
             names(&a),
             [
-                attr("TSK_KEYWORD_PREVIEW"),
-                attr("TSK_KEYWORD"),
-                attr("TSK_SET_NAME"),
-                attr("TSK_KEYWORD_SEARCH_TYPE")
+                attr("KAAMOS_KEYWORD_PREVIEW"),
+                attr("KAAMOS_KEYWORD"),
+                attr("KAAMOS_SET_NAME"),
+                attr("KAAMOS_KEYWORD_SEARCH_TYPE")
             ]
         );
         assert_eq!(k.search_type, Some(0));
@@ -155,11 +155,11 @@ mod tests {
         assert_eq!(
             names(&a),
             [
-                attr("TSK_KEYWORD"),
-                attr("TSK_KEYWORD_REGEXP"),
-                attr("TSK_KEYWORD_PREVIEW"),
-                attr("TSK_ASSOCIATED_ARTIFACT"),
-                attr("TSK_KEYWORD_SEARCH_TYPE")
+                attr("KAAMOS_KEYWORD"),
+                attr("KAAMOS_KEYWORD_REGEXP"),
+                attr("KAAMOS_KEYWORD_PREVIEW"),
+                attr("KAAMOS_ASSOCIATED_ARTIFACT"),
+                attr("KAAMOS_KEYWORD_SEARCH_TYPE")
             ]
         );
         assert_eq!(
@@ -170,12 +170,12 @@ mod tests {
         assert_eq!(k.search_type, Some(2));
 
         let mut s = spec(SearchType::Exact);
-        s.selector = Some("TSK_EMAIL");
+        s.selector = Some("KAAMOS_EMAIL");
         let (a, _) = keyword_hit_artifact(&s);
         assert!(
             a.attributes
                 .iter()
-                .any(|x| x.0 == attr("TSK_EMAIL") && x.1 == Value::Text("Hello".into()))
+                .any(|x| x.0 == attr("KAAMOS_EMAIL") && x.1 == Value::Text("Hello".into()))
         );
     }
 }

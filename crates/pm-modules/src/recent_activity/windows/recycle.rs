@@ -2,7 +2,7 @@
 //! `$Recycle.Bin\<SID>` (Vista+), plus the XP/2000 `INFO2` index in
 //! `RECYCLER\<SID>` / `RECYCLED` that Autopsy does not read.
 //!
-//! `TSK_RECYCLE_BIN` goes on the file holding the content (`$R…`,
+//! `KAAMOS_RECYCLE_BIN` goes on the file holding the content (`$R…`,
 //! `Dc<n>…`); when that file is gone the record is still reported, on the
 //! index file, with a comment. The `$R` is looked up in its own folder
 //! (Autopsy searches the whole data source by name).
@@ -22,7 +22,7 @@ const REMOVED: &str = "Removed from the Recycle Bin (restored or emptied)";
 pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleError> {
     let db = ctx.case.db();
     let mut types = Types::default();
-    let ty = types.artifact(ctx, "TSK_RECYCLE_BIN", "Recycle Bin");
+    let ty = types.artifact(ctx, "KAAMOS_RECYCLE_BIN", "Recycle Bin");
     let users = user_map(ctx);
     let mut batch = Batch::default();
     for fs in db.file_systems(ctx.ds_id)? {
@@ -83,11 +83,11 @@ fn dollar_i_dir(
         let target = r.unwrap_or(i);
         batch.push(
             NewArt::new(ctx, ty, Some(target.id))
-                .text("TSK_PATH", meta.original_path)
-                .time("TSK_DATETIME_DELETED", meta.deleted)
-                .text("TSK_USER_NAME", user.clone())
-                .text_opt("TSK_COMMENT", r.is_none().then_some(CONTENT_MISSING))
-                .key(&["TSK_PATH", "TSK_DATETIME_DELETED"]),
+                .text("KAAMOS_PATH", meta.original_path)
+                .time("KAAMOS_DATETIME_DELETED", meta.deleted)
+                .text("KAAMOS_USER_NAME", user.clone())
+                .text_opt("KAAMOS_COMMENT", r.is_none().then_some(CONTENT_MISSING))
+                .key(&["KAAMOS_PATH", "KAAMOS_DATETIME_DELETED"]),
         );
     }
     Ok(())
@@ -123,11 +123,11 @@ fn info2_dir(
         };
         batch.push(
             NewArt::new(ctx, ty, Some(content.as_ref().map_or(info2.id, |c| c.id)))
-                .text("TSK_PATH", rec.original_path)
-                .time("TSK_DATETIME_DELETED", rec.deleted)
-                .text("TSK_USER_NAME", user.clone())
-                .text_opt("TSK_COMMENT", comment)
-                .key(&["TSK_PATH", "TSK_DATETIME_DELETED"]),
+                .text("KAAMOS_PATH", rec.original_path)
+                .time("KAAMOS_DATETIME_DELETED", rec.deleted)
+                .text("KAAMOS_USER_NAME", user.clone())
+                .text_opt("KAAMOS_COMMENT", comment)
+                .key(&["KAAMOS_PATH", "KAAMOS_DATETIME_DELETED"]),
         );
     }
     Ok(())

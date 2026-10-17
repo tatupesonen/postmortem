@@ -31,7 +31,7 @@ pub(super) struct Account {
     pub(super) groups: Vec<String>,
 }
 
-/// The data source's host, created with TSK's default name if the data
+/// The data source's host, created with Autopsy's default name if the data
 /// source has none (cases loaded before schema v2).
 fn host(db: &CaseDb, ds_id: i64) -> Result<Host, DbError> {
     if let Some(h) = db.host_of_data_source(ds_id)? {
@@ -125,26 +125,29 @@ fn record_one(
         }
     };
     if let Some(dir) = &a.home_dir {
-        add("TSK_HOME_DIR", Some(Value::Text(dir.clone())));
+        add("KAAMOS_HOME_DIR", Some(Value::Text(dir.clone())));
     }
     if let Some(u) = &a.sam {
-        add("TSK_DATETIME_ACCESSED", u.last_login.map(Value::DateTime));
-        add("TSK_COUNT", Some(Value::Int(i64::from(u.login_count))));
-        if u.is_admin() {
-            add("TSK_IS_ADMIN", Some(Value::Int(1)));
-        }
-        add("TSK_DESCRIPTION", u.comment.clone().map(Value::Text));
-        add("TSK_EMAIL", u.internet_name.clone().map(Value::Text));
         add(
-            "TSK_DATETIME_PASSWORD_RESET",
+            "KAAMOS_DATETIME_ACCESSED",
+            u.last_login.map(Value::DateTime),
+        );
+        add("KAAMOS_COUNT", Some(Value::Int(i64::from(u.login_count))));
+        if u.is_admin() {
+            add("KAAMOS_IS_ADMIN", Some(Value::Int(1)));
+        }
+        add("KAAMOS_DESCRIPTION", u.comment.clone().map(Value::Text));
+        add("KAAMOS_EMAIL", u.internet_name.clone().map(Value::Text));
+        add(
+            "KAAMOS_DATETIME_PASSWORD_RESET",
             u.password_reset.map(Value::DateTime),
         );
         add(
-            "TSK_PASSWORD_HINT",
+            "KAAMOS_PASSWORD_HINT",
             u.password_hint.clone().map(Value::Text),
         );
         add(
-            "TSK_DATETIME_PASSWORD_FAIL",
+            "KAAMOS_DATETIME_PASSWORD_FAIL",
             u.password_fail.map(Value::DateTime),
         );
         let flags = |names: &[&str]| {
@@ -152,11 +155,11 @@ fn record_one(
             (!s.is_empty()).then_some(Value::Text(s))
         };
         add(
-            "TSK_PASSWORD_SETTINGS",
+            "KAAMOS_PASSWORD_SETTINGS",
             flags(&["Password does not expire", "Password not required"]),
         );
         add(
-            "TSK_ACCOUNT_SETTINGS",
+            "KAAMOS_ACCOUNT_SETTINGS",
             flags(&[
                 "Account auto locked",
                 "Home directory required",
@@ -164,7 +167,7 @@ fn record_one(
             ]),
         );
         add(
-            "TSK_FLAG",
+            "KAAMOS_FLAG",
             flags(&[
                 "Normal user account",
                 "Server trust account",
@@ -177,7 +180,7 @@ fn record_one(
         // Autopsy only adds groups when the list is *empty* (an inverted
         // test); postmortem adds them when there are any.
         if !a.groups.is_empty() {
-            add("TSK_GROUPS", Some(Value::Text(a.groups.join(", "))));
+            add("KAAMOS_GROUPS", Some(Value::Text(a.groups.join(", "))));
         }
         if let Some(email) = &u.internet_name {
             let spec = AccountInstanceSpec {

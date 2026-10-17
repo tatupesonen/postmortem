@@ -252,13 +252,13 @@ pub(super) fn unpack(
         Art::result(
             ctx,
             NAME,
-            "TSK_ENCRYPTION_DETECTED",
+            "KAAMOS_ENCRYPTION_DETECTED",
             file.rec.id,
             Significance::Notable,
         )
         .justification(kind)
-        .text("TSK_COMMENT", kind)
-        .post(ctx, &["TSK_COMMENT"]);
+        .text("KAAMOS_COMMENT", kind)
+        .post(ctx, &["KAAMOS_COMMENT"]);
         ctx.post_message(
             IngestMessage::new(
                 MessageKind::Warning,

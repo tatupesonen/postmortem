@@ -62,8 +62,8 @@ impl FileIngest for Finder {
         if file.size <= self.min_size || file.size % self.multiple != 0 {
             return Ok(());
         }
-        let mut hit = NewResult::new("TSK_INTERESTING_ITEM", Some(file.id))
-            .with(Attribute::text("TSK_SET_NAME", NAME));
+        let mut hit = NewResult::new("KAAMOS_INTERESTING_ITEM", Some(file.id))
+            .with(Attribute::text("KAAMOS_SET_NAME", NAME));
         hit.significance = Some(Significance::LikelyNotable);
         hit.configuration = Some("Big and Round Files".into());
         host.post(hit)

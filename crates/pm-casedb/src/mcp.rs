@@ -91,6 +91,7 @@ impl CaseDb {
                 "case database schema v{version} needs an upgrade to v{SCHEMA_VERSION}; open the case in postmortem once"
             )));
         }
+        crate::check_namespace(&conn)?;
         let file_ids = FileIds::load(&conn)?;
         Ok(Self {
             path,
@@ -144,7 +145,7 @@ impl TimeColumn {
         }
     }
 
-    /// TSK timeline event type id of the column (File Modified, …).
+    /// Autopsy timeline event type id of the column (File Modified, …).
     pub fn event_type(self) -> i64 {
         match self {
             Self::Modified => crate::events::types::FILE_MODIFIED,
@@ -338,7 +339,7 @@ impl FileFilter {
         if self.extension_mismatch {
             w.push(
                 "EXISTS (SELECT 1 FROM artifacts a JOIN artifact_types t ON t.id = a.type_id \
-                 WHERE a.file_id = files.id AND t.name = 'TSK_EXT_MISMATCH_DETECTED')",
+                 WHERE a.file_id = files.id AND t.name = 'KAAMOS_EXT_MISMATCH_DETECTED')",
                 [],
             );
         }
@@ -1521,8 +1522,8 @@ mod tests {
     #[test]
     fn artifact_attribute_filters() {
         let (_d, db, ds) = db();
-        let url = crate::catalog::attribute_type_id("TSK_URL").unwrap();
-        let dt = crate::catalog::attribute_type_id("TSK_DATETIME").unwrap();
+        let url = crate::catalog::attribute_type_id("KAAMOS_URL").unwrap();
+        let dt = crate::catalog::attribute_type_id("KAAMOS_DATETIME").unwrap();
         for (u, t) in [("http://a.example/x", 100), ("http://b.example/y", 200)] {
             db.add_artifact(&NewArtifact {
                 type_id: 4,
@@ -1563,7 +1564,7 @@ mod tests {
         assert_eq!(counts.len(), 1);
         assert_eq!(counts[0].count, 2);
         assert_eq!(
-            db.artifact_type_by_name("tsk_web_history")
+            db.artifact_type_by_name("kaamos_web_history")
                 .unwrap()
                 .unwrap()
                 .0,

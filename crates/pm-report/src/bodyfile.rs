@@ -1,5 +1,5 @@
-//! Autopsy's "TSK Body File" report (`BodyFileReport`): one line per file
-//! system file in TSK's body format, for `mactime`:
+//! Autopsy's "Body File" report (`BodyFileReport`): one line per file
+//! system file in Autopsy's body format, for `mactime`:
 //! `MD5|path|inode|mode|UID|GID|size|atime|mtime|ctime|crtime`.
 
 use std::io::Write as _;
@@ -12,7 +12,7 @@ use crate::{Progress, ReportError, ReportSettings, io_err};
 
 const FILE_NAME: &str = "BodyFile.txt";
 
-/// TSK's `getModesAsString`: file type, `/`, metadata type, permissions
+/// Autopsy's `getModesAsString`: file type, `/`, metadata type, permissions
 /// (`r/rrwxr-xr-x`).
 fn modes(kind: FileKindCode, mode: Option<u32>) -> String {
     let t = match kind {
@@ -106,7 +106,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn modes_follow_tsk() {
+    fn modes_follow_autopsy() {
         assert_eq!(modes(FileKindCode::Regular, Some(0o755)), "r/rrwxr-xr-x");
         assert_eq!(modes(FileKindCode::Directory, None), "d/d---------");
     }

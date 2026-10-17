@@ -47,8 +47,8 @@ impl ArtifactStage {
             .map(|(id, _, display, _)| (id, display))
             .collect();
         let skip = [
-            art_type("TSK_KEYWORD_HIT"),
-            art_type("TSK_ASSOCIATED_OBJECT"),
+            art_type("KAAMOS_KEYWORD_HIT"),
+            art_type("KAAMOS_ASSOCIATED_OBJECT"),
         ];
         let mut after = 0i64;
         let mut idle = 0u32;

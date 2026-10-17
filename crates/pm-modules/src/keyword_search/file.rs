@@ -249,14 +249,14 @@ fn sqlite_wal(ctx: &JobContext, file: &IngestFile) -> Option<pm_core::SharedSour
     ctx.case.content(&wal).ok()
 }
 
-/// `TSK_METADATA` on the file (de-duplicated on re-runs).
+/// `KAAMOS_METADATA` on the file (de-duplicated on re-runs).
 fn post_metadata(ctx: &JobContext, file_id: i64, meta: &Metadata) {
     let attrs = metadata_attributes(meta);
     if attrs.is_empty() {
         return;
     }
     let names: Vec<&str> = attrs.iter().map(|(n, _)| *n).collect();
-    let mut a = Art::data(ctx, NAME, "TSK_METADATA", file_id);
+    let mut a = Art::data(ctx, NAME, "KAAMOS_METADATA", file_id);
     for (name, v) in attrs {
         a = a.value(name, v);
     }

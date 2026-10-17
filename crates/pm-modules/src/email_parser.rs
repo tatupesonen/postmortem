@@ -1,13 +1,13 @@
 //! Autopsy's Email Parser (`ThunderbirdMboxFileIngestModule`), written
 //! against `pm-plugin-api` (ADR-022) like every new parser: MBOX and EML
-//! messages become `TSK_EMAIL_MSG` results with their attachments as
+//! messages become `KAAMOS_EMAIL_MSG` results with their attachments as
 //! derived files, e-mail accounts and MESSAGE relationships; vCards become
-//! `TSK_CONTACT` results with phone/e-mail accounts related to the device.
+//! `KAAMOS_CONTACT` results with phone/e-mail accounts related to the device.
 //!
 //! Differences from Autopsy: thread ids are derived from the thread's root
 //! message (Autopsy draws random UUIDs, so re-runs would duplicate
 //! messages); the vCard device account is named after the data source
-//! (postmortem does not record TSK device ids); PST/OST is not read yet.
+//! (postmortem does not record Autopsy device ids); PST/OST is not read yet.
 
 use std::fmt::Write as _;
 use std::io::BufReader;
@@ -85,7 +85,7 @@ fn kind(file: &FileInfo, head: &[u8]) -> Option<Kind> {
     None
 }
 
-/// Autopsy's mail folder for `TSK_PATH`: the part of the parent path below
+/// Autopsy's mail folder for `KAAMOS_PATH`: the part of the parent path below
 /// Thunderbird's `/Mail/` or `/ImapMail/`, plus the mailbox name, without
 /// `.sbd`.
 fn mbox_folder(file: &FileInfo) -> String {
@@ -217,30 +217,30 @@ fn post_email(
     }
     let text = |kind: &str, v: &str| (!v.is_empty()).then(|| Attribute::text(kind, v));
     let mut attrs: Vec<Attribute> = [
-        text("TSK_HEADERS", &e.headers),
-        text("TSK_EMAIL_FROM", &e.from),
-        text("TSK_EMAIL_TO", &e.to),
-        text("TSK_SUBJECT", &e.subject),
+        text("KAAMOS_HEADERS", &e.headers),
+        text("KAAMOS_EMAIL_FROM", &e.from),
+        text("KAAMOS_EMAIL_TO", &e.to),
+        text("KAAMOS_SUBJECT", &e.subject),
         e.sent
             .filter(|t| *t > 0)
-            .map(|t| Attribute::time("TSK_DATETIME_RCVD", t)),
+            .map(|t| Attribute::time("KAAMOS_DATETIME_RCVD", t)),
         e.sent
             .filter(|t| *t > 0)
-            .map(|t| Attribute::time("TSK_DATETIME_SENT", t)),
-        text("TSK_EMAIL_CONTENT_PLAIN", &e.text),
-        Some(Attribute::text("TSK_MSG_ID", file.id.to_string())),
+            .map(|t| Attribute::time("KAAMOS_DATETIME_SENT", t)),
+        text("KAAMOS_EMAIL_CONTENT_PLAIN", &e.text),
+        Some(Attribute::text("KAAMOS_MSG_ID", file.id.to_string())),
         (!e.attachments.is_empty()).then(|| Attribute::text(HAS_ATTACHMENT, "Yes")),
-        text("TSK_PATH", folder),
-        text("TSK_EMAIL_CC", &e.cc),
-        text("TSK_EMAIL_CONTENT_HTML", &e.html),
-        thread.map(|t| Attribute::text("TSK_THREAD_ID", t)),
+        text("KAAMOS_PATH", folder),
+        text("KAAMOS_EMAIL_CC", &e.cc),
+        text("KAAMOS_EMAIL_CONTENT_HTML", &e.html),
+        thread.map(|t| Attribute::text("KAAMOS_THREAD_ID", t)),
     ]
     .into_iter()
     .flatten()
     .collect();
     if !attachment_json.is_empty() {
         attrs.push(Attribute::new(
-            "TSK_ATTACHMENTS",
+            "KAAMOS_ATTACHMENTS",
             Value::Text(format!(
                 "{{\"fileAttachments\":[{}],\"urlAttachments\":[]}}",
                 attachment_json.join(",")
@@ -263,7 +263,7 @@ fn post_email(
         members.push(accounts.len());
         accounts.push(AccountId::new("EMAIL", addr));
     }
-    let mut result = NewResult::new("TSK_EMAIL_MSG", Some(file.id));
+    let mut result = NewResult::new("KAAMOS_EMAIL_MSG", Some(file.id));
     result.attributes = attrs;
     host.post_communication(
         result,
@@ -291,7 +291,7 @@ fn json_string(s: &str) -> String {
     out
 }
 
-/// `VcardParser`: a `TSK_CONTACT` per card, with phone and e-mail accounts
+/// `VcardParser`: a `KAAMOS_CONTACT` per card, with phone and e-mail accounts
 /// related to the device (CONTACT relationship at the file's creation
 /// time); embedded photos become derived files.
 fn vcards(host: &dyn Host, file: &FileInfo) -> Result<()> {
@@ -301,13 +301,13 @@ fn vcards(host: &dyn Host, file: &FileInfo) -> Result<()> {
         let mut attrs = Vec::new();
         let name = card.display_name();
         if !name.is_empty() {
-            attrs.push(Attribute::text("TSK_NAME", name));
+            attrs.push(Attribute::text("KAAMOS_NAME", name));
         }
         let mut accounts = vec![AccountId::new("DEVICE", &device)];
         for (ty, number) in &card.phones {
             let kind = match ty.as_deref() {
                 Some(t) => {
-                    let custom = format!("TSK_PHONE_NUMBER_{t}");
+                    let custom = format!("KAAMOS_PHONE_NUMBER_{t}");
                     host.define_attribute_type(
                         &custom,
                         &format!("Phone Number ({})", capitalize(t)),
@@ -315,7 +315,7 @@ fn vcards(host: &dyn Host, file: &FileInfo) -> Result<()> {
                     )?;
                     custom
                 }
-                None => "TSK_PHONE_NUMBER".to_owned(),
+                None => "KAAMOS_PHONE_NUMBER".to_owned(),
             };
             attrs.push(Attribute::text(kind, number));
             accounts.push(AccountId::new("PHONE", number));
@@ -323,7 +323,7 @@ fn vcards(host: &dyn Host, file: &FileInfo) -> Result<()> {
         for (ty, addr) in &card.emails {
             let kind = match ty.as_deref() {
                 Some(t) => {
-                    let custom = format!("TSK_EMAIL_{t}");
+                    let custom = format!("KAAMOS_EMAIL_{t}");
                     host.define_attribute_type(
                         &custom,
                         &format!("Email ({})", capitalize(t)),
@@ -331,16 +331,16 @@ fn vcards(host: &dyn Host, file: &FileInfo) -> Result<()> {
                     )?;
                     custom
                 }
-                None => "TSK_EMAIL".to_owned(),
+                None => "KAAMOS_EMAIL".to_owned(),
             };
             attrs.push(Attribute::text(kind, addr));
             accounts.push(AccountId::new("EMAIL", addr));
         }
         for url in &card.urls {
-            attrs.push(Attribute::text("TSK_URL", url));
+            attrs.push(Attribute::text("KAAMOS_URL", url));
         }
         if let Some(org) = card.organizations.first() {
-            attrs.push(Attribute::text("TSK_ORGANIZATION", org));
+            attrs.push(Attribute::text("KAAMOS_ORGANIZATION", org));
         }
         if !card.photos.is_empty() {
             let photos = card
@@ -363,7 +363,7 @@ fn vcards(host: &dyn Host, file: &FileInfo) -> Result<()> {
             host.add_derived(file.id, photos)?;
         }
         let members = (0..accounts.len()).collect();
-        let mut result = NewResult::new("TSK_CONTACT", Some(file.id));
+        let mut result = NewResult::new("KAAMOS_CONTACT", Some(file.id));
         result.attributes = attrs;
         host.post_communication(
             result,

@@ -1,11 +1,11 @@
-//! OS accounts and realms (TSK `OsAccountManager`, `OsAccountRealmManager`).
+//! OS accounts and realms (Autopsy `OsAccountManager`, `OsAccountRealmManager`).
 //!
 //! An OS account (a Windows SID, a Unix uid, …) lives in a realm: a domain
 //! (no scope host) or one machine (scoped to a host). Accounts are
 //! identified by address (SID) or, failing that, by login name; realms by
 //! address (the SID prefix) or name. Learning a missing SID or name later
 //! can reveal that two realms or accounts are the same, so they are merged
-//! the way TSK merges them. Every operation runs in one write transaction,
+//! the way Autopsy merges them. Every operation runs in one write transaction,
 //! so concurrent modules cannot create duplicates.
 
 pub mod windows;
@@ -221,7 +221,7 @@ pub struct OsAccountInstance {
     pub kind: InstanceKind,
 }
 
-/// An extended account attribute (`TSK_*` attribute type).
+/// An extended account attribute (`KAAMOS_*` attribute type).
 #[derive(Debug, Clone, PartialEq)]
 pub struct OsAccountAttribute {
     pub type_id: i64,
@@ -250,7 +250,7 @@ fn merged_signature() -> String {
 
 // ------------------------------------------------------------------ realms
 
-/// `"<addr or name>_<host id | DOMAIN>"` (TSK `makeRealmSignature`).
+/// `"<addr or name>_<host id | DOMAIN>"` (Autopsy `makeRealmSignature`).
 fn realm_signature(addr: Option<&str>, name: Option<&str>, host: Option<i64>) -> Result<String> {
     let key = non_blank(addr)
         .or(non_blank(name))
@@ -300,7 +300,7 @@ fn another_realm_by(
         .optional()?)
 }
 
-/// TSK `getWindowsRealm`.
+/// Autopsy `getWindowsRealm`.
 fn windows_realm(
     c: &Connection,
     sid: Option<&str>,
@@ -333,7 +333,7 @@ fn windows_realm(
 }
 
 /// Fills in a realm's missing address or name and refreshes its signature
-/// (TSK `updateRealm`). Returns whether anything changed.
+/// (Autopsy `updateRealm`). Returns whether anything changed.
 fn update_realm(
     c: &Connection,
     realm: &Realm,
@@ -378,7 +378,7 @@ fn update_realm(
     Ok(changed)
 }
 
-/// TSK `getAndUpdateWindowsRealm` plus the realm merges TSK runs after an
+/// Autopsy `getAndUpdateWindowsRealm` plus the realm merges Autopsy runs after an
 /// update (another realm with the same name but no address, or the same
 /// address but no name, is the same realm).
 fn find_and_update_windows_realm(
@@ -394,7 +394,7 @@ fn find_and_update_windows_realm(
     let name = windows::english_realm_name(realm_name);
     if update_realm(c, &realm, addr.as_deref(), name.as_deref())? {
         let realm = realm_by_id(c, realm.id)?;
-        // TSK passes the realm *name* to its by-address lookup here (a
+        // Autopsy passes the realm *name* to its by-address lookup here (a
         // bug that makes the address merge a no-op); we look up the
         // address as intended.
         if let Some(name) = name.as_deref()
@@ -414,7 +414,7 @@ fn find_and_update_windows_realm(
     Ok(Some(realm))
 }
 
-/// TSK `newWindowsRealm`.
+/// Autopsy `newWindowsRealm`.
 fn new_windows_realm(
     c: &Connection,
     sid: Option<&str>,
@@ -489,7 +489,7 @@ fn new_windows_realm(
     })
 }
 
-/// TSK `mergeRealms`: accounts move or merge into `dest`, `source` is
+/// Autopsy `mergeRealms`: accounts move or merge into `dest`, `source` is
 /// marked merged, and `dest` takes a missing address or name from it.
 fn merge_realms(c: &Connection, source: &Realm, dest: &Realm) -> Result<()> {
     merge_accounts_of_realms(c, source, dest)?;
@@ -505,7 +505,7 @@ fn merge_realms(c: &Connection, source: &Realm, dest: &Realm) -> Result<()> {
     Ok(())
 }
 
-/// TSK `moveOrMergeRealm` (used when hosts are merged).
+/// Autopsy `moveOrMergeRealm` (used when hosts are merged).
 pub(crate) fn move_or_merge_realm(c: &Connection, realm_id: i64, dest_host: i64) -> Result<()> {
     let source = realm_by_id(c, realm_id)?;
     let by_addr = match source.addr.as_deref() {
@@ -626,7 +626,7 @@ fn update_standard(c: &Connection, id: i64, u: &AccountUpdate) -> Result<bool> {
     Ok(changed)
 }
 
-/// TSK `updateOsAccountCore`: sets a missing address or login name; an
+/// Autopsy `updateOsAccountCore`: sets a missing address or login name; an
 /// address can never change once set.
 fn update_core(
     c: &Connection,
@@ -673,7 +673,7 @@ fn update_core(
     Ok(changed)
 }
 
-/// TSK `getMatchingAccountForMerge`: same address, else same login name
+/// Autopsy `getMatchingAccountForMerge`: same address, else same login name
 /// when at most one of the two has an address.
 fn matching_account<'a>(source: &OsAccount, candidates: &'a [OsAccount]) -> Option<&'a OsAccount> {
     let same = |a: Option<&str>, b: Option<&str>| match (a, b) {
@@ -697,7 +697,7 @@ fn matching_account<'a>(source: &OsAccount, candidates: &'a [OsAccount]) -> Opti
     })
 }
 
-/// TSK `mergeOsAccounts`: every reference to `source` moves to `dest`,
+/// Autopsy `mergeOsAccounts`: every reference to `source` moves to `dest`,
 /// `source` is marked merged, and `dest` takes the fields it lacks.
 fn merge_accounts(c: &Connection, source: &OsAccount, dest: &OsAccount) -> Result<()> {
     c.execute(
@@ -761,7 +761,7 @@ fn merge_accounts(c: &Connection, source: &OsAccount, dest: &OsAccount) -> Resul
     Ok(())
 }
 
-/// TSK `mergeOsAccountsForRealms`.
+/// Autopsy `mergeOsAccountsForRealms`.
 fn merge_accounts_of_realms(c: &Connection, source: &Realm, dest: &Realm) -> Result<()> {
     for account in active_accounts_of_realm(c, source.id)? {
         let mut dest_accounts = active_accounts_of_realm(c, dest.id)?;
@@ -798,7 +798,7 @@ fn merge_accounts_of_realms(c: &Connection, source: &Realm, dest: &Realm) -> Res
     Ok(())
 }
 
-/// TSK `newWindowsOsAccount(sid, login, realm)`.
+/// Autopsy `newWindowsOsAccount(sid, login, realm)`.
 fn new_account_in_realm(
     c: &Connection,
     sid: Option<&str>,
@@ -832,7 +832,7 @@ fn new_account_in_realm(
         )?
         .execute(params![realm.id, login, sid, signature])?;
     if inserted == 0 {
-        // Already there: find it the way TSK does after its insert fails.
+        // Already there: find it the way Autopsy does after its insert fails.
         if let Some(s) = sid
             && let Some(a) = account_in_realm(c, "addr", s, realm.id)?
         {
@@ -866,7 +866,7 @@ fn new_account_in_realm(
     account_by_id(c, id)
 }
 
-/// TSK `getWindowsOsAccount`.
+/// Autopsy `getWindowsOsAccount`.
 fn windows_account(
     c: &Connection,
     sid: Option<&str>,
@@ -901,7 +901,7 @@ fn windows_account(
 }
 
 impl CaseDb {
-    /// Creates (or finds) a Windows account referred to on `host` (TSK
+    /// Creates (or finds) a Windows account referred to on `host` (Autopsy
     /// `newWindowsOsAccount`). Needs a SID or a login name, and a SID or a
     /// realm name. Group SIDs are refused.
     pub fn new_windows_os_account(
@@ -940,7 +940,7 @@ impl CaseDb {
         })
     }
 
-    /// Finds a Windows account as seen from `host` (TSK
+    /// Finds a Windows account as seen from `host` (Autopsy
     /// `getWindowsOsAccount`).
     pub fn windows_os_account(
         &self,
@@ -953,7 +953,7 @@ impl CaseDb {
     }
 
     /// Fills in an account's missing SID, login name or realm details and
-    /// merges it with an account that turns out to be the same (TSK
+    /// merges it with an account that turns out to be the same (Autopsy
     /// `updateCoreWindowsOsAccountAttributes`).
     pub fn update_windows_os_account_core(
         &self,
@@ -983,7 +983,7 @@ impl CaseDb {
         })
     }
 
-    /// Sets standard account properties (TSK
+    /// Sets standard account properties (Autopsy
     /// `updateStandardOsAccountAttributes`).
     pub fn update_os_account(&self, account_id: i64, update: &AccountUpdate) -> Result<OsAccount> {
         self.write(|tx| {
@@ -1043,7 +1043,7 @@ impl CaseDb {
 
     /// Records that an account appears on a data source. Only the most
     /// significant kind per data source is kept (launched > accessed >
-    /// referenced), as TSK reports it.
+    /// referenced), as Autopsy reports it.
     pub fn add_os_account_instance(
         &self,
         account_id: i64,
@@ -1098,7 +1098,7 @@ impl CaseDb {
     }
 
     /// Active accounts, optionally only those with an instance on a data
-    /// source (TSK `getOsAccountsByDataSourceObjId`), keyset paged by id.
+    /// source (Autopsy `getOsAccountsByDataSourceObjId`), keyset paged by id.
     pub fn os_accounts(
         &self,
         ds_id: Option<i64>,
@@ -1131,7 +1131,7 @@ impl CaseDb {
         })
     }
 
-    /// Active accounts seen on any data source of a host (TSK
+    /// Active accounts seen on any data source of a host (Autopsy
     /// `getOsAccounts(Host)`).
     pub fn os_accounts_of_host(&self, host_id: i64) -> Result<Vec<OsAccount>> {
         self.read(|c| {
@@ -1164,7 +1164,7 @@ impl CaseDb {
         self.read(|c| realm_by_id(c, realm_id))
     }
 
-    /// Creates a Windows realm (TSK `newWindowsRealm`); an existing realm
+    /// Creates a Windows realm (Autopsy `newWindowsRealm`); an existing realm
     /// with the same signature is returned instead.
     pub fn new_windows_realm(
         &self,
@@ -1176,7 +1176,7 @@ impl CaseDb {
         self.write(|tx| new_windows_realm(tx, sid, realm_name, host_id, scope))
     }
 
-    /// Finds the realm of a SID or realm name as seen from a host (TSK
+    /// Finds the realm of a SID or realm name as seen from a host (Autopsy
     /// `getWindowsRealm`).
     pub fn windows_realm(
         &self,
@@ -1187,7 +1187,7 @@ impl CaseDb {
         self.read(|c| windows_realm(c, sid, realm_name, host_id))
     }
 
-    /// Fills in a realm's missing address or name (TSK `updateRealm`);
+    /// Fills in a realm's missing address or name (Autopsy `updateRealm`);
     /// returns whether it changed.
     pub fn update_os_account_realm(
         &self,
@@ -1201,7 +1201,7 @@ impl CaseDb {
         })
     }
 
-    /// Merges realm `source` into `dest` (TSK `mergeRealms`).
+    /// Merges realm `source` into `dest` (Autopsy `mergeRealms`).
     pub fn merge_os_account_realms(&self, source: i64, dest: i64) -> Result<()> {
         self.write(|tx| {
             let (s, d) = (realm_by_id(tx, source)?, realm_by_id(tx, dest)?);

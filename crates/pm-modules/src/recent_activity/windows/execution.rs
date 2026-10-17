@@ -16,8 +16,8 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
     let mut types = Types::default();
     let mut paths = PathLookup::default();
     let mut batch = Batch::default();
-    let am = types.artifact(ctx, "PM_AMCACHE_FILE", "Amcache File Entries");
-    let link = types.attribute(ctx, "PM_LINK_DATE", "PE Link Date", ValueType::DateTime);
+    let am = types.artifact(ctx, "KAAMOS_AMCACHE_FILE", "Amcache File Entries");
+    let link = types.attribute(ctx, "KAAMOS_LINK_DATE", "PE Link Date", ValueType::DateTime);
     for f in files_with_ext(ctx, "hve", Some("amcache.hve"), "")? {
         if ctx.is_cancelled() {
             break;
@@ -32,16 +32,16 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
             let target = paths.find(ctx, &e.path);
             batch.push(
                 NewArt::new(ctx, am, Some(f.id))
-                    .text("TSK_PATH", e.path)
-                    .text_opt("TSK_HASH_SHA1", e.sha1)
-                    .text_opt("TSK_PROG_NAME", e.product_name)
-                    .text_opt("TSK_ORGANIZATION", e.publisher)
-                    .text_opt("TSK_VERSION", e.version)
-                    .time("TSK_DATETIME", e.key_last_written)
-                    .time("TSK_DATETIME_MODIFIED", e.file_modified)
-                    .time("TSK_DATETIME_CREATED", e.file_created)
+                    .text("KAAMOS_PATH", e.path)
+                    .text_opt("KAAMOS_HASH_SHA1", e.sha1)
+                    .text_opt("KAAMOS_PROG_NAME", e.product_name)
+                    .text_opt("KAAMOS_ORGANIZATION", e.publisher)
+                    .text_opt("KAAMOS_VERSION", e.version)
+                    .time("KAAMOS_DATETIME", e.key_last_written)
+                    .time("KAAMOS_DATETIME_MODIFIED", e.file_modified)
+                    .time("KAAMOS_DATETIME_CREATED", e.file_created)
                     .custom(link, e.link_date.map(Value::DateTime))
-                    .key(&["TSK_PATH", "TSK_HASH_SHA1"])
+                    .key(&["KAAMOS_PATH", "KAAMOS_HASH_SHA1"])
                     .associate(target),
             );
         }
@@ -56,10 +56,10 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
         for p in list {
             let target = paths.find(ctx, &p);
             batch.push(
-                NewArt::std(ctx, "TSK_PROG_RUN", Some(f.id))
-                    .text("TSK_PROG_NAME", p)
-                    .text("TSK_COMMENT", RFC_COMMENT)
-                    .key(&["TSK_PROG_NAME", "TSK_COMMENT"])
+                NewArt::std(ctx, "KAAMOS_PROG_RUN", Some(f.id))
+                    .text("KAAMOS_PROG_NAME", p)
+                    .text("KAAMOS_COMMENT", RFC_COMMENT)
+                    .key(&["KAAMOS_PROG_NAME", "KAAMOS_COMMENT"])
                     .associate(target),
             );
         }

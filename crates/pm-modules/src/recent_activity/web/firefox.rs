@@ -44,14 +44,14 @@ pub(crate) fn extract(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleE
         if ctx.is_cancelled() {
             break;
         }
-        if !done_std(ctx, f, "TSK_WEB_HISTORY") {
+        if !done_std(ctx, f, "KAAMOS_WEB_HISTORY") {
             history(ctx, web, f, &mut sink)?;
         }
     }
     sink.flush(ctx)?;
     web.progress("Firefox Bookmarks");
     for f in &places {
-        if !ctx.is_cancelled() && !done_std(ctx, f, "TSK_WEB_BOOKMARK") {
+        if !ctx.is_cancelled() && !done_std(ctx, f, "KAAMOS_WEB_BOOKMARK") {
             bookmarks(ctx, web, f, &mut sink)?;
         }
     }
@@ -59,7 +59,7 @@ pub(crate) fn extract(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleE
     web.progress("Firefox Downloads");
     for (list, v24) in [(&downloads, false), (&places, true)] {
         for f in list {
-            if !ctx.is_cancelled() && !done_std(ctx, f, "TSK_WEB_DOWNLOAD") {
+            if !ctx.is_cancelled() && !done_std(ctx, f, "KAAMOS_WEB_DOWNLOAD") {
                 download(ctx, web, f, v24, &mut sink)?;
             }
         }
@@ -67,21 +67,21 @@ pub(crate) fn extract(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleE
     sink.flush(ctx)?;
     web.progress("Firefox Cookies");
     for f in &cookies {
-        if !ctx.is_cancelled() && !done_std(ctx, f, "TSK_WEB_COOKIE") {
+        if !ctx.is_cancelled() && !done_std(ctx, f, "KAAMOS_WEB_COOKIE") {
             cookie(ctx, web, f, &mut sink)?;
         }
     }
     sink.flush(ctx)?;
     web.progress("Firefox Form History");
     for f in &forms {
-        if !ctx.is_cancelled() && !done_std(ctx, f, "TSK_WEB_FORM_AUTOFILL") {
+        if !ctx.is_cancelled() && !done_std(ctx, f, "KAAMOS_WEB_FORM_AUTOFILL") {
             form_history(ctx, web, f, &mut sink)?;
         }
     }
     sink.flush(ctx)?;
     web.progress("Firefox Auto Fill");
     for f in &profiles {
-        if ctx.is_cancelled() || done_std(ctx, f, "TSK_WEB_FORM_ADDRESS") {
+        if ctx.is_cancelled() || done_std(ctx, f, "KAAMOS_WEB_FORM_ADDRESS") {
             continue;
         }
         let Some(data) = read_small(ctx, f) else {
@@ -160,12 +160,12 @@ fn bookmarks(
             |cb| ff::bookmarks(conn, cb),
             |b: ff::Bookmark| {
                 Some(
-                    WebArt::new(ctx, "TSK_WEB_BOOKMARK", f.id)
-                        .text("TSK_URL", &b.url)
-                        .text("TSK_TITLE", b.title)
-                        .time("TSK_DATETIME_CREATED", b.date_added)
-                        .text("TSK_PROG_NAME", PROG)
-                        .text_nonempty("TSK_DOMAIN", domain(&b.url)),
+                    WebArt::new(ctx, "KAAMOS_WEB_BOOKMARK", f.id)
+                        .text("KAAMOS_URL", &b.url)
+                        .text("KAAMOS_TITLE", b.title)
+                        .time("KAAMOS_DATETIME_CREATED", b.date_added)
+                        .text("KAAMOS_PROG_NAME", PROG)
+                        .text_nonempty("KAAMOS_DOMAIN", domain(&b.url)),
                 )
             },
         )
@@ -186,15 +186,15 @@ fn cookie(
             |cb| ff::cookies(conn, cb),
             |c: ff::Cookie| {
                 let d = domain(&c.host);
-                let mut a = WebArt::new(ctx, "TSK_WEB_COOKIE", f.id)
-                    .text("TSK_URL", &c.host)
-                    .time("TSK_DATETIME_ACCESSED", c.last_accessed)
-                    .text("TSK_NAME", c.name)
-                    .text("TSK_VALUE", c.value)
-                    .text("TSK_PROG_NAME", PROG)
-                    .time("TSK_DATETIME_CREATED", c.creation);
+                let mut a = WebArt::new(ctx, "KAAMOS_WEB_COOKIE", f.id)
+                    .text("KAAMOS_URL", &c.host)
+                    .time("KAAMOS_DATETIME_ACCESSED", c.last_accessed)
+                    .text("KAAMOS_NAME", c.name)
+                    .text("KAAMOS_VALUE", c.value)
+                    .text("KAAMOS_PROG_NAME", PROG)
+                    .time("KAAMOS_DATETIME_CREATED", c.creation);
                 if !d.is_empty() {
-                    a = a.text("TSK_DOMAIN", strip_leading_dots(&d));
+                    a = a.text("KAAMOS_DOMAIN", strip_leading_dots(&d));
                 }
                 Some(a)
             },
@@ -230,21 +230,21 @@ fn download(
             break;
         }
         let path_id = web.find_path(ctx, &d.path);
-        let mut a = WebArt::new(ctx, "TSK_WEB_DOWNLOAD", f.id).text("TSK_URL", &d.url);
+        let mut a = WebArt::new(ctx, "KAAMOS_WEB_DOWNLOAD", f.id).text("KAAMOS_URL", &d.url);
         if !v24 {
-            a = a.time("TSK_DATETIME_ACCESSED", d.time);
+            a = a.time("KAAMOS_DATETIME_ACCESSED", d.time);
         }
-        a = a.text("TSK_PATH", &d.path);
+        a = a.text("KAAMOS_PATH", &d.path);
         if let Some(id) = path_id {
-            a = a.int("TSK_PATH_ID", id);
+            a = a.int("KAAMOS_PATH_ID", id);
         }
         if v24 {
-            a = a.time("TSK_DATETIME_ACCESSED", d.time);
+            a = a.time("KAAMOS_DATETIME_ACCESSED", d.time);
         }
         sink.push(
             ctx,
-            a.text("TSK_PROG_NAME", PROG)
-                .text_nonempty("TSK_DOMAIN", domain(&d.url))
+            a.text("KAAMOS_PROG_NAME", PROG)
+                .text_nonempty("KAAMOS_DOMAIN", domain(&d.url))
                 .associate(path_id),
         )?;
     }
@@ -264,14 +264,14 @@ fn form_history(
             sink,
             |cb| ff::form_history(conn, cb),
             |e: ff::FormEntry| {
-                let mut a = WebArt::new(ctx, "TSK_WEB_FORM_AUTOFILL", f.id)
-                    .text("TSK_NAME", e.field)
-                    .text("TSK_VALUE", e.value);
+                let mut a = WebArt::new(ctx, "KAAMOS_WEB_FORM_AUTOFILL", f.id)
+                    .text("KAAMOS_NAME", e.field)
+                    .text("KAAMOS_VALUE", e.value);
                 if let Some((first, last, times)) = e.usage {
                     a = a
-                        .time("TSK_DATETIME_CREATED", Some(first))
-                        .time("TSK_DATETIME_ACCESSED", Some(last))
-                        .int("TSK_COUNT", times);
+                        .time("KAAMOS_DATETIME_CREATED", Some(first))
+                        .time("KAAMOS_DATETIME_ACCESSED", Some(last))
+                        .int("KAAMOS_COUNT", times);
                 }
                 Some(a)
             },

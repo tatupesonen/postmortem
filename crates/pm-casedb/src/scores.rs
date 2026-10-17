@@ -1,4 +1,4 @@
-//! Aggregate scores (TSK `ScoringManager`, `tsk_aggregate_score`).
+//! Aggregate scores (Autopsy `ScoringManager`, ).
 //!
 //! Every file, artifact and OS account that has an analysis result or a
 //! notable tag has one row in `scores` holding the best score of those
@@ -32,7 +32,7 @@ impl ObjKind {
     }
 }
 
-/// A score: significance plus priority (TSK `Score`).
+/// A score: significance plus priority (Autopsy `Score`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Score {
     pub significance: Significance,
@@ -74,7 +74,7 @@ impl PartialOrd for Score {
 }
 
 /// The score a tag contributes: notable tags make an item notable, other
-/// tags do not score (TSK `TaggingManager.getTagScore`).
+/// tags do not score (Autopsy `TaggingManager.getTagScore`).
 pub(crate) fn tag_score(notable: bool) -> Score {
     if notable {
         Score::NOTABLE
@@ -84,7 +84,7 @@ pub(crate) fn tag_score(notable: bool) -> Score {
 }
 
 /// Raises an object's aggregate score after a result or tag was added
-/// (TSK `updateAggregateScoreAfterAddition`): the row only changes when
+/// (Autopsy `updateAggregateScoreAfterAddition`): the row only changes when
 /// the new score is higher, and an unknown score is recorded only for
 /// objects that have none yet.
 pub(crate) fn raise(
@@ -105,7 +105,7 @@ pub(crate) fn raise(
 }
 
 /// Recomputes an object's aggregate score from all of its analysis results
-/// and tags (TSK `updateAggregateScoreAfterDeletion`).
+/// and tags (Autopsy `updateAggregateScoreAfterDeletion`).
 pub(crate) fn recompute(c: &Connection, kind: ObjKind, obj_id: i64) -> Result<()> {
     let result_rank: Option<i64> = match kind {
         ObjKind::File => c
@@ -268,7 +268,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn ordering_matches_tsk() {
+    fn ordering_matches_autopsy() {
         use Significance::*;
         // NOTABLE > NONE > LIKELY_NOTABLE > LIKELY_NONE > UNKNOWN
         let order = [Unknown, LikelyNone, LikelyNotable, None, Notable];

@@ -43,12 +43,12 @@ pm_plugin_sdk::export_plugin!(MyPlugin);
 * **Data-source ingest** (`DataSourceIngest::process`) runs once per job in
   the declared stage (1 runs alongside file analysis; 2+ after it).
 * **Host calls**: `read` (or `HostReader` for `io::Read + Seek`), `file`,
-  `find_files`, `children`, `post` (a `NewResult` with a TSK artifact type
-  such as `TSK_INTERESTING_ITEM` and TSK attribute types such as
-  `TSK_SET_NAME`), `add_derived` (extracted files, scheduled for analysis),
+  `find_files`, `children`, `post` (a `NewResult` with a Autopsy artifact type
+  such as `KAAMOS_INTERESTING_ITEM` and Autopsy attribute types such as
+  `KAAMOS_SET_NAME`), `add_derived` (extracted files, scheduled for analysis),
   `log`, `message` (ingest inbox), `is_cancelled`.
 * **Communications** (API 0.2): `post_communication` posts a result such
-  as `TSK_EMAIL_MSG` or `TSK_CONTACT` together with its accounts (e.g.
+  as `KAAMOS_EMAIL_MSG` or `KAAMOS_CONTACT` together with its accounts (e.g.
   `EMAIL` / `PHONE` identifiers) and a MESSAGE / CALL_LOG / CONTACT
   relationship between them, atomically.
 * **Custom types** (API 0.2): `define_attribute_type` and
@@ -64,7 +64,7 @@ pm_plugin_sdk::export_plugin!(MyPlugin);
 `plugin.toml`:
 
 ```toml
-api = "0.2"                  # the pm-plugin-api version you built against
+api = "0.3"                  # the pm-plugin-api version you built against
 component = "my_plugin.wasm"
 
 [limits]

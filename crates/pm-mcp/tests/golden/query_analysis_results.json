@@ -6,7 +6,7 @@
       "objectId": 15,
       "sourceFileId": 32,
       "sourceRef": "file:32",
-      "artifactType": "TSK_INTERESTING_ITEM",
+      "artifactType": "KAAMOS_INTERESTING_ITEM",
       "artifactTypeDisplayName": "Interesting Items",
       "analysisResult": true,
       "dataSourceId": 1,
@@ -17,11 +17,11 @@
       "evidence": {
         "attributes": [
           {
-            "type": "TSK_SET_NAME",
+            "type": "KAAMOS_SET_NAME",
             "value": "Credentials"
           },
           {
-            "type": "TSK_COMMENT",
+            "type": "KAAMOS_COMMENT",
             "value": "password file"
           }
         ]

@@ -7,7 +7,7 @@ use pm_ingest::{JobContext, ModuleError};
 use super::Visits;
 use super::art::{Batch, NewArt, ds_artifact_exists};
 
-/// `(marker paths, TSK_OS_INFO label, usage label)`; Windows has no label
+/// `(marker paths, KAAMOS_OS_INFO label, usage label)`; Windows has no label
 /// here (the registry analyzer reports it).
 const OS_TYPES: &[(&[&str], &str, &str)] = &[
     (&["/windows/system32"], "", "OS Drive (Windows)"),
@@ -105,9 +105,9 @@ fn first_found(ctx: &JobContext, paths: &[&str]) -> Option<i64> {
     })
 }
 
-/// `TSK_OS_INFO` on the first marker file of each non-Windows OS.
+/// `KAAMOS_OS_INFO` on the first marker file of each non-Windows OS.
 pub(crate) fn extract_os(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleError> {
-    let os_type = artifact_type_id("TSK_OS_INFO").unwrap_or(0);
+    let os_type = artifact_type_id("KAAMOS_OS_INFO").unwrap_or(0);
     let mut batch = Batch::default();
     for (paths, label, _) in OS_TYPES {
         if label.is_empty() {
@@ -124,8 +124,8 @@ pub(crate) fn extract_os(ctx: &JobContext, _v: &mut Visits) -> Result<(), Module
         if !has {
             batch.push(
                 NewArt::new(ctx, os_type, Some(file))
-                    .text("TSK_PROG_NAME", *label)
-                    .key(&["TSK_PROG_NAME"]),
+                    .text("KAAMOS_PROG_NAME", *label)
+                    .key(&["KAAMOS_PROG_NAME"]),
             );
         }
     }
@@ -133,18 +133,18 @@ pub(crate) fn extract_os(ctx: &JobContext, _v: &mut Visits) -> Result<(), Module
     Ok(())
 }
 
-/// `TSK_DATA_SOURCE_USAGE` results (deduplicated by description).
+/// `KAAMOS_DATA_SOURCE_USAGE` results (deduplicated by description).
 pub(crate) fn extract_usage(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleError> {
     let db = ctx.case.db();
-    let usage = artifact_type_id("TSK_DATA_SOURCE_USAGE").unwrap_or(0);
-    let os_type = artifact_type_id("TSK_OS_INFO").unwrap_or(0);
+    let usage = artifact_type_id("KAAMOS_DATA_SOURCE_USAGE").unwrap_or(0);
+    let os_type = artifact_type_id("KAAMOS_OS_INFO").unwrap_or(0);
     let mut labels: Vec<String> = Vec::new();
     let mut windows = false;
     for a in db.artifacts_of_type(os_type, Some(ctx.ds_id), 0, 10_000)? {
         let Some(name) = db
             .attributes(a.id)?
             .into_iter()
-            .find(|x| x.name == "TSK_PROG_NAME")
+            .find(|x| x.name == "KAAMOS_PROG_NAME")
             .map(|x| x.value.display())
         else {
             continue;
@@ -195,8 +195,8 @@ pub(crate) fn extract_usage(ctx: &JobContext, _v: &mut Visits) -> Result<(), Mod
     let mut batch = Batch::default();
     labels.dedup();
     for l in labels {
-        if !ds_artifact_exists(ctx, usage, Some(("TSK_DESCRIPTION", &l))) {
-            batch.push(NewArt::new(ctx, usage, None).text("TSK_DESCRIPTION", l));
+        if !ds_artifact_exists(ctx, usage, Some(("KAAMOS_DESCRIPTION", &l))) {
+            batch.push(NewArt::new(ctx, usage, None).text("KAAMOS_DESCRIPTION", l));
         }
     }
     batch.flush(ctx)?;

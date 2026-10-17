@@ -6,7 +6,7 @@ code or pure-Rust crates). No libtsk/libewf FFI. Rationale: memory safety on
 hostile input, no C toolchain, simpler cross-platform builds. Consequence:
 filesystems arrive incrementally and need extensive fixture/fuzz testing.
 
-## ADR-002 — Own case schema, not TSK-compatible
+## ADR-002 — Own case schema, not Autopsy-compatible
 postmortem uses its own case-database schema, designed around the queries the
 UI and ingest actually run (covering indexes, integer enums, WAL, batched
 writes). SQLite for single-user cases and PostgreSQL for multi-user, behind
@@ -99,11 +99,11 @@ Enforce with `cargo-deny` (`deny.toml`) when it lands in the gate.
 `yara-x` 1.21 requires wasmtime ^45. The WASM plugin host uses the same major
 to avoid shipping two wasmtime copies. Revisit when yara-x moves.
 
-## ADR-012 — TSK parity through differential testing
-Where Autopsy's behaviour comes from The Sleuth Kit (volume layout, FS trees,
-names, orphans), we match TSK 4.15 output (`mmls`/`fls`/`istat`) on
-generated images via `pm_testkit::tsk`. Where we recover *more* (full deleted
-long names, orphan content), the differential test accepts the TSK form as
+## ADR-012 — Autopsy parity through differential testing
+Where Autopsy's behaviour comes from Autopsy (volume layout, FS trees,
+names, orphans), we match Autopsy 4.15 output (`mmls`/`fls`/`istat`) on
+generated images via `pm_testkit::reftools`. Where we recover *more* (full deleted
+long names, orphan content), the differential test accepts the Autopsy form as
 an alternative and the improvement is documented in the test.
 
 ## ADR-013 — Analyzers: core parsers in Rust, plugins in WebAssembly
@@ -210,7 +210,7 @@ plugins (ADR-013) through a thin adapter.
 files that are analysed like any other (inventory 03 §1.9, §2.4, PhotoRec
 §3). Autopsy stores extracted bytes XOR1-encoded under
 `<case>/ModuleOutput/<module>/<parent id>/…`, records the encoding in
-`tsk_files_path`, and re-queues new files as high-priority tasks
+and re-queues new files as high-priority tasks
 (`addFilesToJob`).
 
 **Decision.**
@@ -218,11 +218,11 @@ files that are analysed like any other (inventory 03 §1.9, §2.4, PhotoRec
   derived/carved/local, `derived_from` = source file, `local_path`
   (relative to the case folder, `/`-separated, resolved without `..` or
   absolute components) or `layout` (image byte ranges for carved files).
-* **XOR1 on disk, like Autopsy.** Written files carry TSK's 32-byte header
-  `TSK_CONTAINER_XOR1_xxxxxxxxxxxxx` followed by every byte XOR 0xCA, so
+* **XOR1 on disk, like Autopsy.** Written files carry Autopsy's 32-byte header
+  `KAAMOS_CONTAINER_XOR1_xxxxxxxxxxxxx` followed by every byte XOR 0xCA, so
   antivirus software does not quarantine malware extracted into case
   folders, and Autopsy-written module output reads the same way. The
-  encoding is recognised from the header when content is opened (TSK
+  encoding is recognised from the header when content is opened (Autopsy
   `EncodedFileUtil.getEncoding`), so no column is needed; unencoded files
   read as they are. Local files with absolute paths are never decoded.
 * **One file-id allocator per open database** (`CaseDb::file_ids`, atomic,
@@ -244,18 +244,18 @@ files that are analysed like any other (inventory 03 §1.9, §2.4, PhotoRec
 files. Modules that re-extract (Embedded File Extractor) must not re-add
 files that already exist, or they would be analysed twice.
 
-## ADR-017 — Schema v2: TSK's data model on separate id spaces
+## ADR-017 — Schema v2: Autopsy's data model on separate id spaces
 
 **Status:** accepted (2026-10-17, WP-0)
 
 **Context.** Hosts/persons, OS accounts, communication accounts, timeline
 events and aggregate scores were missing (PARITY §0.4), which blocked
 OS Accounts, Communications, the Score tree, tag scoring and artifact
-timeline events. TSK keys all of these on one `tsk_objects` id space;
+timeline events. Autopsy keys all of these on one  id space;
 postmortem has separate `files`, `artifacts` and `os_accounts` tables
 (ADR-002).
 
-**Decision.** Migration `0002_schema_v2.sql` ports TSK 4.12's tables and
+**Decision.** Migration `0002_schema_v2.sql` ports Autopsy 4.12's tables and
 semantics (`CaseDatabaseFactory`, `OsAccountManager`,
 `OsAccountRealmManager`, `HostManager`, `CommunicationsManager`,
 `ScoringManager`, `TaggingManager`, `TimelineManager`):
@@ -264,19 +264,19 @@ semantics (`CaseDatabaseFactory`, `OsAccountManager`,
   analysis result scores its `source_artifact_id` if set, else its file;
   `event_descriptions(file_id, artifact_id)`; account relationships point
   at the source artifact.
-* Significance codes now sort like TSK's ordinals
+* Significance codes now sort like Autopsy's ordinals
   (`Notable > None > LikelyNotable > LikelyNone > Unknown`); v1 rows are
   remapped and scores backfilled by the migration.
 * Aggregate scores are maintained in the same transaction as the result
   or tag that changes them (raise on add, recompute on remove), so the
   Score tree, S column and Discovery never aggregate results on the fly.
-* Notable tags change the score, never `files.known` (TSK behaviour; v1
+* Notable tags change the score, never `files.known` (Autopsy behaviour; v1
   set `known = 2`).
 * OS account instances keep only the most significant kind per data
-  source (TSK's read semantics, stored once).
-* Ported from TSK's own `OsAccountTest` (13 cases) plus scoring, tag-set,
+  source (Autopsy's read semantics, stored once).
+* Ported from Autopsy's own `OsAccountTest` (13 cases) plus scoring, tag-set,
   event, communications and v1 → v2 migration tests.
-* Fixed TSK bug: after a realm update TSK looks up "another realm with
+* Fixed Autopsy bug: after a realm update Autopsy looks up "another realm with
   the same address" by the realm *name*, so that merge never happens; we
   look up the address.
 
@@ -287,7 +287,7 @@ analysis-result ingest pipelines (WP-0 follow-up in `pm-ingest`).
 
 **Status:** accepted (2026-10-17)
 
-**Context.** TSK writes four `tsk_events` rows per file (MACB), each with
+**Context.** Autopsy writes four  rows per file (MACB), each with
 an `event_descriptions` row repeating the path. With hundreds of millions
 of files (ADR-014) that is billions of rows and several copies of every
 path.
@@ -296,7 +296,7 @@ path.
 `event_descriptions`). File-system events are read from the time columns
 of `files` through indexes (the timeline WP adds the missing
 `atime`/`ctime`/`crtime` indexes and pre-aggregated per-unit counts).
-The event type ids are TSK's, so both sources merge into one timeline.
+The event type ids are Autopsy's, so both sources merge into one timeline.
 
 **Consequences.** No load-time cost for FS events; the timeline counts
 query unions two sources; "tagged"/"hash hit" filters for FS events join
@@ -374,9 +374,9 @@ keeps inline-search hits in memory until the ingest job ends (inventory
   `QueryResults` did).
 * **Page numbering:** the name is page 0 and chunks are 1…N in both hit
   bookkeeping and the index (Autopsy mixes 0-based inline chunk ids with
-  1-based Solr ids). `TSK_KEYWORD_SEARCH_DOCUMENT_ID` uses Autopsy's
+  1-based Solr ids). `KAAMOS_KEYWORD_SEARCH_DOCUMENT_ID` uses Autopsy's
   `<objId>_<chunk>` form; artifacts are `ObjRef::Artifact` with key
-  −id, as TSK numbers them below zero in Solr.
+  −id, as Autopsy numbers them below zero in Solr.
 
 **Consequences.** No JVM or Solr process, no network, smaller indexes
 (text stored once, no term vectors), substring/regex queries that touch
@@ -445,7 +445,7 @@ search goes through the name index (`search_file_names`).
 * **`pm-plugin-api`** is the module contract for everything outside the
   core framework: `Plugin` (info, settings, validation), `FileIngest`,
   `DataSourceIngest`, and a `Host` through which a module reads content,
-  finds files, posts results by TSK type names, adds derived files and
+  finds files, posts results by Autopsy type names, adds derived files and
   writes to the log and inbox. It has no dependency on the case database,
   so it can be semver-versioned (`API_VERSION`, minor = additive).
 * **Built-in parsers stay native Rust** (speed) but are written against
@@ -481,7 +481,7 @@ feature walks the evidence into memory. Evidence is opened only through
 source) for content reads.
 
 Done so far: artifact timeline events are written with each artifact
-(`pm-casedb/src/artifact_events.rs`, TSK `TimelineEventTypes`); the
+(`pm-casedb/src/artifact_events.rs`, Autopsy `TimelineEventTypes`); the
 Timeline window runs on `pm_timeline::db::DbTimeline` (indexed queries
 per range and filter, schema v3 adds the time-column indexes); the Image
 Gallery lists pictures from the DB.

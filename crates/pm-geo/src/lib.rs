@@ -1,5 +1,5 @@
 //! Geolocation (Autopsy `geolocation/datamodel`): waypoints and paths
-//! built from GPS and EXIF results, the TSK point-list JSON formats, a GPX
+//! built from GPS and EXIF results, the Autopsy point-list JSON formats, a GPX
 //! parser (Autopsy's GPX Parser module) and a KML writer (Autopsy's KML
 //! report).
 

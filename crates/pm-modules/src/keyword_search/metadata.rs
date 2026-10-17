@@ -1,4 +1,4 @@
-//! `TSK_METADATA` from extractor metadata (Autopsy
+//! `KAAMOS_METADATA` from extractor metadata (Autopsy
 //! `KeywordSearchIngestModule.createMetadataArtifact`, inventory 05
 //! §1.4.3).
 //!
@@ -14,7 +14,7 @@ use pm_text::Metadata;
 /// names; `pm-text` produces the first of each list).
 const MAPPING: &[(&str, bool, &[&str])] = &[
     (
-        "TSK_DATETIME_MODIFIED",
+        "KAAMOS_DATETIME_MODIFIED",
         true,
         &[
             "Last-Save-Date",
@@ -25,12 +25,12 @@ const MAPPING: &[(&str, bool, &[&str])] = &[
         ],
     ),
     (
-        "TSK_USER_ID",
+        "KAAMOS_USER_ID",
         false,
         &["Last-Author", "meta:last-author", "dcterms:modifier"],
     ),
     (
-        "TSK_DATETIME_CREATED",
+        "KAAMOS_DATETIME_CREATED",
         true,
         &[
             "Creation-Date",
@@ -42,12 +42,12 @@ const MAPPING: &[(&str, bool, &[&str])] = &[
         ],
     ),
     (
-        "TSK_ORGANIZATION",
+        "KAAMOS_ORGANIZATION",
         false,
         &["Company", "dc:publisher", "extended-properties:Company"],
     ),
     (
-        "TSK_OWNER",
+        "KAAMOS_OWNER",
         false,
         &[
             "Author",
@@ -58,7 +58,7 @@ const MAPPING: &[(&str, bool, &[&str])] = &[
         ],
     ),
     (
-        "TSK_PROG_NAME",
+        "KAAMOS_PROG_NAME",
         false,
         &[
             "Application-Name",
@@ -67,19 +67,19 @@ const MAPPING: &[(&str, bool, &[&str])] = &[
         ],
     ),
     (
-        "TSK_LAST_PRINTED_DATETIME",
+        "KAAMOS_LAST_PRINTED_DATETIME",
         true,
         &["Last-Printed", "cp:lastPrinted"],
     ),
     (
-        "TSK_DESCRIPTION",
+        "KAAMOS_DESCRIPTION",
         false,
         &["Title", "dc:title", "pdf:docinfo:title"],
     ),
-    ("TSK_VERSION", false, &["pdf:PDFVersion", "cp:version"]),
+    ("KAAMOS_VERSION", false, &["pdf:PDFVersion", "cp:version"]),
 ];
 
-/// The `TSK_METADATA` attributes for `meta`: `(attribute type name,
+/// The `KAAMOS_METADATA` attributes for `meta`: `(attribute type name,
 /// value)`, in Autopsy's order.
 pub fn metadata_attributes(meta: &Metadata) -> Vec<(&'static str, Value)> {
     let mut out = Vec::new();
@@ -132,12 +132,12 @@ mod tests {
         assert_eq!(
             got,
             [
-                ("TSK_DATETIME_MODIFIED", Value::DateTime(1_612_325_106)),
-                ("TSK_USER_ID", Value::Text("Bob".into())),
-                ("TSK_DATETIME_CREATED", Value::DateTime(1_577_934_245)),
-                ("TSK_OWNER", Value::Text("Jane".into())),
-                ("TSK_PROG_NAME", Value::Text("Writer".into())),
-                ("TSK_VERSION", Value::Text("1.7".into())),
+                ("KAAMOS_DATETIME_MODIFIED", Value::DateTime(1_612_325_106)),
+                ("KAAMOS_USER_ID", Value::Text("Bob".into())),
+                ("KAAMOS_DATETIME_CREATED", Value::DateTime(1_577_934_245)),
+                ("KAAMOS_OWNER", Value::Text("Jane".into())),
+                ("KAAMOS_PROG_NAME", Value::Text("Writer".into())),
+                ("KAAMOS_VERSION", Value::Text("1.7".into())),
             ]
         );
         assert!(metadata_attributes(&Metadata::new()).is_empty());

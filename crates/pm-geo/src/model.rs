@@ -15,11 +15,11 @@ pub enum WaypointKind {
     Exif,
     Search,
     Trackpoint,
-    /// A point of a `TSK_GPS_TRACK`.
+    /// A point of a `KAAMOS_GPS_TRACK`.
     TrackPoint,
-    /// A point of a `TSK_GPS_ROUTE`.
+    /// A point of a `KAAMOS_GPS_ROUTE`.
     RoutePoint,
-    /// A corner of a `TSK_GPS_AREA`.
+    /// A corner of a `KAAMOS_GPS_AREA`.
     AreaPoint,
 }
 
@@ -137,16 +137,16 @@ fn valid(lat: f64, lon: f64) -> bool {
         && (-180.0..=180.0).contains(&lon)
 }
 
-/// Waypoint label rules (Autopsy: `TSK_NAME`, then a type-specific fallback).
+/// Waypoint label rules (Autopsy: `KAAMOS_NAME`, then a type-specific fallback).
 fn label(kind: WaypointKind, a: &Attrs<'_>, file_name: Option<&str>) -> String {
-    let name = a.text("TSK_NAME");
+    let name = a.text("KAAMOS_NAME");
     match kind {
         WaypointKind::Exif => file_name.unwrap_or_default().to_owned(),
         WaypointKind::Search => name
-            .or_else(|| a.text("TSK_LOCATION"))
+            .or_else(|| a.text("KAAMOS_LOCATION"))
             .unwrap_or_else(|| "GPS Search".into()),
         WaypointKind::Trackpoint => name
-            .or_else(|| a.text("TSK_PROG_NAME"))
+            .or_else(|| a.text("KAAMOS_PROG_NAME"))
             .unwrap_or_else(|| "GPS Trackpoint".into()),
         WaypointKind::LastKnown => name.unwrap_or_else(|| "Last Known Location".into()),
         _ => name.unwrap_or_default(),
@@ -158,21 +158,25 @@ pub fn load(db: &CaseDb, filter: &GeoFilter) -> pm_casedb::Result<GeoData> {
     let mut data = GeoData::default();
     let point_types = [
         (
-            "TSK_GPS_TRACKPOINT",
+            "KAAMOS_GPS_TRACKPOINT",
             WaypointKind::Trackpoint,
-            "TSK_DATETIME",
+            "KAAMOS_DATETIME",
         ),
-        ("TSK_GPS_SEARCH", WaypointKind::Search, "TSK_DATETIME"),
+        ("KAAMOS_GPS_SEARCH", WaypointKind::Search, "KAAMOS_DATETIME"),
         (
-            "TSK_GPS_LAST_KNOWN_LOCATION",
+            "KAAMOS_GPS_LAST_KNOWN_LOCATION",
             WaypointKind::LastKnown,
-            "TSK_DATETIME",
+            "KAAMOS_DATETIME",
         ),
-        ("TSK_GPS_BOOKMARK", WaypointKind::Bookmark, "TSK_DATETIME"),
         (
-            "TSK_METADATA_EXIF",
+            "KAAMOS_GPS_BOOKMARK",
+            WaypointKind::Bookmark,
+            "KAAMOS_DATETIME",
+        ),
+        (
+            "KAAMOS_METADATA_EXIF",
             WaypointKind::Exif,
-            "TSK_DATETIME_CREATED",
+            "KAAMOS_DATETIME_CREATED",
         ),
     ];
     let in_scope = |a: &ArtifactRecord| {
@@ -184,7 +188,8 @@ pub fn load(db: &CaseDb, filter: &GeoFilter) -> pm_casedb::Result<GeoData> {
                 continue;
             }
             let a = Attrs::new(&attrs);
-            let (Some(lat), Some(lon)) = (a.f64("TSK_GEO_LATITUDE"), a.f64("TSK_GEO_LONGITUDE"))
+            let (Some(lat), Some(lon)) =
+                (a.f64("KAAMOS_GEO_LATITUDE"), a.f64("KAAMOS_GEO_LONGITUDE"))
             else {
                 continue;
             };
@@ -201,21 +206,21 @@ pub fn load(db: &CaseDb, filter: &GeoFilter) -> pm_casedb::Result<GeoData> {
                 time: a.time(time_attr),
                 latitude: lat,
                 longitude: lon,
-                altitude: a.f64("TSK_GEO_ALTITUDE"),
+                altitude: a.f64("KAAMOS_GEO_ALTITUDE"),
                 artifact_id: art.id,
                 file_id: art.file_id,
                 ds_id: art.ds_id,
             });
         }
     }
-    for (art, attrs) in artifacts(db, "TSK_GPS_TRACK")? {
+    for (art, attrs) in artifacts(db, "KAAMOS_GPS_TRACK")? {
         if !in_scope(&art) {
             continue;
         }
         let a = Attrs::new(&attrs);
-        let name = a.text("TSK_NAME").unwrap_or_default();
+        let name = a.text("KAAMOS_NAME").unwrap_or_default();
         let pts: Vec<TrackPoint> = a
-            .text("TSK_GEO_TRACKPOINTS")
+            .text("KAAMOS_GEO_TRACKPOINTS")
             .and_then(|j| points::parse(&j))
             .unwrap_or_default();
         let points = pts
@@ -243,15 +248,15 @@ pub fn load(db: &CaseDb, filter: &GeoFilter) -> pm_casedb::Result<GeoData> {
     }
     for (ty, kind, json_attr, point_kind) in [
         (
-            "TSK_GPS_ROUTE",
+            "KAAMOS_GPS_ROUTE",
             PathKind::Route,
-            "TSK_GEO_WAYPOINTS",
+            "KAAMOS_GEO_WAYPOINTS",
             WaypointKind::RoutePoint,
         ),
         (
-            "TSK_GPS_AREA",
+            "KAAMOS_GPS_AREA",
             PathKind::Area,
-            "TSK_GEO_AREAPOINTS",
+            "KAAMOS_GEO_AREAPOINTS",
             WaypointKind::AreaPoint,
         ),
     ] {
@@ -260,7 +265,7 @@ pub fn load(db: &CaseDb, filter: &GeoFilter) -> pm_casedb::Result<GeoData> {
                 continue;
             }
             let a = Attrs::new(&attrs);
-            let time = a.time("TSK_DATETIME");
+            let time = a.time("KAAMOS_DATETIME");
             let mut pts: Vec<WayPoint> = a
                 .text(json_attr)
                 .and_then(|j| points::parse(&j))
@@ -268,10 +273,10 @@ pub fn load(db: &CaseDb, filter: &GeoFilter) -> pm_casedb::Result<GeoData> {
             // Older routes: start and end coordinates only.
             if pts.is_empty()
                 && let (Some(la), Some(lo), Some(lb), Some(lob)) = (
-                    a.f64("TSK_GEO_LATITUDE_START"),
-                    a.f64("TSK_GEO_LONGITUDE_START"),
-                    a.f64("TSK_GEO_LATITUDE_END"),
-                    a.f64("TSK_GEO_LONGITUDE_END"),
+                    a.f64("KAAMOS_GEO_LATITUDE_START"),
+                    a.f64("KAAMOS_GEO_LONGITUDE_START"),
+                    a.f64("KAAMOS_GEO_LATITUDE_END"),
+                    a.f64("KAAMOS_GEO_LONGITUDE_END"),
                 )
             {
                 pts = vec![
@@ -289,7 +294,7 @@ pub fn load(db: &CaseDb, filter: &GeoFilter) -> pm_casedb::Result<GeoData> {
                     },
                 ];
             }
-            let label = a.text("TSK_NAME").unwrap_or_else(|| match kind {
+            let label = a.text("KAAMOS_NAME").unwrap_or_else(|| match kind {
                 PathKind::Route => "As-the-crow-flies Route".into(),
                 _ => String::new(),
             });

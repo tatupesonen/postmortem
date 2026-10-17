@@ -9,10 +9,10 @@
 //! extraction; known (NSRL) files, directories, empty files and archives
 //! get a metadata-only entry.
 //!
-//! Hits become `TSK_KEYWORD_HIT` analysis results (score Likely Notable,
-//! configuration = list name) or, for the credit-card list, `TSK_ACCOUNT`
+//! Hits become `KAAMOS_KEYWORD_HIT` analysis results (score Likely Notable,
+//! configuration = list name) or, for the credit-card list, `KAAMOS_ACCOUNT`
 //! credit-card account instances. Extractor metadata becomes
-//! `TSK_METADATA`. A late data-source stage indexes and searches the text
+//! `KAAMOS_METADATA`. A late data-source stage indexes and searches the text
 //! of the data source's artifacts and brings the file-name index up to
 //! date. Results are posted per file as it completes (Autopsy keeps them
 //! in memory until the job ends and drops them on cancellation).
@@ -39,7 +39,7 @@ use serde::{Deserialize, Serialize};
 
 pub use metadata::metadata_attributes;
 
-/// Display name (attribute source and `TSK_SET_NAME` module).
+/// Display name (attribute source and `KAAMOS_SET_NAME` module).
 pub const NAME: &str = "Keyword Search";
 /// Settings id.
 pub const ID: &str = "keyword_search";

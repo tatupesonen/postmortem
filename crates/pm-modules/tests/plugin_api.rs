@@ -42,13 +42,13 @@ impl FileIngest for SecretFiles {
             return Ok(());
         };
         host.post(
-            NewResult::new("TSK_INTERESTING_FILE_HIT", Some(file.id))
-                .with(Attribute::text("TSK_SET_NAME", "Secrets"))
-                .with(Attribute::text("TSK_COMMENT", line.trim())),
+            NewResult::new("KAAMOS_INTERESTING_FILE_HIT", Some(file.id))
+                .with(Attribute::text("KAAMOS_SET_NAME", "Secrets"))
+                .with(Attribute::text("KAAMOS_COMMENT", line.trim())),
         )?;
-        let mut hit = NewResult::new("TSK_INTERESTING_FILE_HIT", Some(file.id));
+        let mut hit = NewResult::new("KAAMOS_INTERESTING_FILE_HIT", Some(file.id));
         hit.significance = Some(Significance::LikelyNotable);
-        hit.attributes = vec![Attribute::text("TSK_SET_NAME", "Secrets (scored)")];
+        hit.attributes = vec![Attribute::text("KAAMOS_SET_NAME", "Secrets (scored)")];
         host.post(hit)?;
         host.add_derived(
             file.id,
@@ -161,7 +161,7 @@ fn native_plugin_runs_as_an_ingest_module() {
         "{called} calls for {txt} text files"
     );
 
-    let hits = case.artifacts("TSK_INTERESTING_FILE_HIT");
+    let hits = case.artifacts("KAAMOS_INTERESTING_FILE_HIT");
     assert_eq!(hits.len(), 2, "{hits:?}");
     let pw = case.file("/Users/alice/Documents/passwords.txt");
     assert!(hits.iter().all(|(a, _)| a.file_id == Some(pw.id)));
@@ -169,11 +169,9 @@ fn native_plugin_runs_as_an_ingest_module() {
         hits.iter()
             .any(|(a, _)| { a.significance == Some(pm_casedb::Significance::LikelyNotable) })
     );
-    assert!(
-        hits.iter()
-            .any(|(_, attrs)| attrs.get("TSK_COMMENT").map(String::as_str)
-                == Some("router: hunter2"))
-    );
+    assert!(hits.iter().any(
+        |(_, attrs)| attrs.get("KAAMOS_COMMENT").map(String::as_str) == Some("router: hunter2")
+    ));
 
     // The derived file is a child of the source file, with the line.
     let child = case
@@ -197,7 +195,7 @@ fn native_plugin_runs_as_an_ingest_module() {
     // Re-running adds nothing.
     let files_before = case.files().len();
     case.run_one(module.clone(), settings);
-    assert_eq!(case.artifacts("TSK_INTERESTING_FILE_HIT").len(), 2);
+    assert_eq!(case.artifacts("KAAMOS_INTERESTING_FILE_HIT").len(), 2);
     assert_eq!(case.files().len(), files_before);
 
     // Invalid settings stop the job before any work (Autopsy startUp).
@@ -229,13 +227,13 @@ fn unknown_result_types_are_reported_to_the_module() {
     impl FileIngest for Bad {
         fn process(&mut self, host: &dyn Host, file: &FileInfo) -> pm_plugin_api::Result<()> {
             let e = host
-                .post(NewResult::new("TSK_NOT_A_TYPE", Some(file.id)))
+                .post(NewResult::new("KAAMOS_NOT_A_TYPE", Some(file.id)))
                 .unwrap_err();
             assert!(e.0.contains("unknown artifact type"), "{e}");
             let e = host
                 .post(
-                    NewResult::new("TSK_INTERESTING_FILE_HIT", Some(file.id))
-                        .with(Attribute::text("TSK_NOPE", "x")),
+                    NewResult::new("KAAMOS_INTERESTING_FILE_HIT", Some(file.id))
+                        .with(Attribute::text("KAAMOS_NOPE", "x")),
                 )
                 .unwrap_err();
             assert!(e.0.contains("unknown attribute type"), "{e}");

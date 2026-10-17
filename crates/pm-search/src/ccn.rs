@@ -167,9 +167,9 @@ pub fn ccn_hit_is_valid(hit: &str) -> bool {
 /// Card data parsed from a hit's snippet.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CardData {
-    /// The number as found (with separators): Autopsy's `TSK_KEYWORD`.
+    /// The number as found (with separators): Autopsy's `KAAMOS_KEYWORD`.
     pub raw_number: String,
-    /// Digits only: `TSK_CARD_NUMBER` and the account id.
+    /// Digits only: `KAAMOS_CARD_NUMBER` and the account id.
     pub number: String,
     pub expiration: Option<String>,
     pub service_code: Option<String>,

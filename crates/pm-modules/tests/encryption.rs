@@ -78,21 +78,21 @@ fn run(c: &DemoCase, settings: &EncryptionSettings) -> Arc<pm_ingest::Inbox> {
 /// `path → (type, comment)` for every file-level result.
 fn flagged(c: &DemoCase) -> BTreeMap<String, (String, String)> {
     let mut out = BTreeMap::new();
-    for ty in ["TSK_ENCRYPTION_DETECTED", "TSK_ENCRYPTION_SUSPECTED"] {
+    for ty in ["KAAMOS_ENCRYPTION_DETECTED", "KAAMOS_ENCRYPTION_SUSPECTED"] {
         for (a, attrs) in c.artifacts(ty) {
             let Some(id) = a.file_id else { continue };
             let path = c.case.db().file(id).unwrap().unwrap().path();
             assert_eq!(
                 a.justification.as_deref(),
-                Some(attrs["TSK_COMMENT"].as_str())
+                Some(attrs["KAAMOS_COMMENT"].as_str())
             );
-            let want = if ty == "TSK_ENCRYPTION_DETECTED" {
+            let want = if ty == "KAAMOS_ENCRYPTION_DETECTED" {
                 Significance::Notable
             } else {
                 Significance::LikelyNotable
             };
             assert_eq!(a.significance, Some(want), "{path}");
-            out.insert(path, (ty.to_owned(), attrs["TSK_COMMENT"].clone()));
+            out.insert(path, (ty.to_owned(), attrs["KAAMOS_COMMENT"].clone()));
         }
     }
     out
@@ -140,7 +140,7 @@ fn files_like_autopsy() {
     let f = flagged(&c);
     let detected = |p: &str| {
         (
-            "TSK_ENCRYPTION_DETECTED".to_owned(),
+            "KAAMOS_ENCRYPTION_DETECTED".to_owned(),
             "Password protection detected.".to_owned(),
         ) == f[p]
     };
@@ -157,7 +157,7 @@ fn files_like_autopsy() {
     }
     for p in ["/c/container.hc", "/c/vault.db"] {
         let (ty, comment) = &f[p];
-        assert_eq!(ty, "TSK_ENCRYPTION_SUSPECTED");
+        assert_eq!(ty, "KAAMOS_ENCRYPTION_SUSPECTED");
         assert!(
             comment.starts_with("Suspected encryption due to high entropy (7.99"),
             "{comment}"
@@ -267,13 +267,13 @@ fn disk(raw: &[Vec<u8>]) -> Vec<u8> {
 
 fn volume_results(c: &DemoCase) -> Vec<(String, String, String)> {
     let mut out = Vec::new();
-    for ty in ["TSK_ENCRYPTION_DETECTED", "TSK_ENCRYPTION_SUSPECTED"] {
+    for ty in ["KAAMOS_ENCRYPTION_DETECTED", "KAAMOS_ENCRYPTION_SUSPECTED"] {
         for (a, attrs) in c.artifacts(ty) {
             if a.file_id.is_none() {
                 out.push((
                     ty.to_owned(),
-                    attrs["TSK_COMMENT"].clone(),
-                    attrs["TSK_DESCRIPTION"].clone(),
+                    attrs["KAAMOS_COMMENT"].clone(),
+                    attrs["KAAMOS_DESCRIPTION"].clone(),
                 ));
             }
         }
@@ -289,7 +289,7 @@ fn bitlocker_volume() {
     run(&c, &EncryptionSettings::default());
     let v = volume_results(&c);
     assert_eq!(v.len(), 1, "{v:?}");
-    assert_eq!(v[0].0, "TSK_ENCRYPTION_DETECTED");
+    assert_eq!(v[0].0, "KAAMOS_ENCRYPTION_DETECTED");
     assert_eq!(v[0].1, "Bitlocker encryption detected.");
     assert!(v[0].2.starts_with("vol"), "{}", v[0].2);
 }
@@ -301,7 +301,7 @@ fn unformatted_random_volume_and_luks() {
     run(&c, &EncryptionSettings::default());
     let v = volume_results(&c);
     assert_eq!(v.len(), 1, "{v:?}");
-    assert_eq!(v[0].0, "TSK_ENCRYPTION_SUSPECTED");
+    assert_eq!(v[0].0, "KAAMOS_ENCRYPTION_SUSPECTED");
     assert!(
         v[0].1
             .starts_with("Suspected encryption due to high entropy (7.99"),

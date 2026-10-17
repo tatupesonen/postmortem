@@ -100,7 +100,7 @@ pub struct DomainRole<T> {
 }
 
 impl<T> DomainRole<T> {
-    /// Autopsy's `TSK_TEXT`: `"<role> (<platform>)"`.
+    /// Autopsy's `KAAMOS_TEXT`: `"<role> (<platform>)"`.
     pub fn text(&self) -> String {
         format!("{} ({})", self.role.description(), self.platform)
     }

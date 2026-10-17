@@ -104,10 +104,10 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
         }
         for p in software::installed_programs(&h) {
             batch.push(
-                NewArt::std(ctx, "TSK_INSTALLED_PROG", Some(f.id))
-                    .text("TSK_PROG_NAME", p.name)
-                    .time("TSK_DATETIME", p.last_written)
-                    .key(&["TSK_PROG_NAME", "TSK_DATETIME"]),
+                NewArt::std(ctx, "KAAMOS_INSTALLED_PROG", Some(f.id))
+                    .text("KAAMOS_PROG_NAME", p.name)
+                    .time("KAAMOS_DATETIME", p.last_written)
+                    .key(&["KAAMOS_PROG_NAME", "KAAMOS_DATETIME"]),
             );
         }
         for p in software::profile_list(&h) {
@@ -133,13 +133,13 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
             os.logon = Some(l);
         }
         let d = software::defender(&h);
-        let excl = types.artifact(ctx, "PM_DEFENDER_EXCLUSION", "Defender Exclusions");
+        let excl = types.artifact(ctx, "KAAMOS_DEFENDER_EXCLUSION", "Defender Exclusions");
         for (kind, value) in &d.exclusions {
             batch.push(
                 NewArt::new(ctx, excl, Some(f.id))
-                    .text("TSK_CATEGORY", kind.clone())
-                    .text("TSK_VALUE", value.clone())
-                    .key(&["TSK_CATEGORY", "TSK_VALUE"]),
+                    .text("KAAMOS_CATEGORY", kind.clone())
+                    .text("KAAMOS_VALUE", value.clone())
+                    .key(&["KAAMOS_CATEGORY", "KAAMOS_VALUE"]),
             );
         }
         if os.defender.is_none() && d != software::DefenderInfo::default() {
@@ -272,57 +272,57 @@ fn system_artifacts(
             (String::new(), d.device.clone())
         };
         batch.push(
-            NewArt::std(ctx, "TSK_DEVICE_ATTACHED", Some(file_id))
-                .time("TSK_DATETIME", d.last_written.filter(|&t| t > 0))
-                .text("TSK_DEVICE_MAKE", make)
-                .text("TSK_DEVICE_MODEL", model)
-                .text("TSK_DEVICE_ID", d.serial)
-                .key(&["TSK_DEVICE_ID", "TSK_DEVICE_MODEL"]),
+            NewArt::std(ctx, "KAAMOS_DEVICE_ATTACHED", Some(file_id))
+                .time("KAAMOS_DATETIME", d.last_written.filter(|&t| t > 0))
+                .text("KAAMOS_DEVICE_MAKE", make)
+                .text("KAAMOS_DEVICE_MODEL", model)
+                .text("KAAMOS_DEVICE_ID", d.serial)
+                .key(&["KAAMOS_DEVICE_ID", "KAAMOS_DEVICE_MODEL"]),
         );
     }
     for s in system::interface_ssids(h) {
         batch.push(
-            NewArt::std(ctx, "TSK_WIFI_NETWORK", Some(file_id))
-                .text("TSK_SSID", s.ssid)
-                .time("TSK_DATETIME", s.last_written)
-                .text("TSK_DEVICE_ID", s.adapter)
-                .key(&["TSK_SSID", "TSK_DEVICE_ID"]),
+            NewArt::std(ctx, "KAAMOS_WIFI_NETWORK", Some(file_id))
+                .text("KAAMOS_SSID", s.ssid)
+                .time("KAAMOS_DATETIME", s.last_written)
+                .text("KAAMOS_DEVICE_ID", s.adapter)
+                .key(&["KAAMOS_SSID", "KAAMOS_DEVICE_ID"]),
         );
     }
     for b in system::bam(h) {
         let user = users.get(&b.sid).cloned().unwrap_or_else(|| b.sid.clone());
         let target = paths.find(ctx, &b.path);
         batch.push(
-            NewArt::std(ctx, "TSK_PROG_RUN", Some(file_id))
-                .text("TSK_PROG_NAME", b.path)
-                .text("TSK_USER_NAME", user)
-                .time("TSK_DATETIME", Some(b.last_run))
+            NewArt::std(ctx, "KAAMOS_PROG_RUN", Some(file_id))
+                .text("KAAMOS_PROG_NAME", b.path)
+                .text("KAAMOS_USER_NAME", user)
+                .time("KAAMOS_DATETIME", Some(b.last_run))
                 .text(
-                    "TSK_COMMENT",
+                    "KAAMOS_COMMENT",
                     if b.source == "BAM" {
                         BAM_COMMENT
                     } else {
                         DAM_COMMENT
                     },
                 )
-                .key(&["TSK_PROG_NAME", "TSK_DATETIME", "TSK_COMMENT"])
+                .key(&["KAAMOS_PROG_NAME", "KAAMOS_DATETIME", "KAAMOS_COMMENT"])
                 .associate(target),
         );
     }
     for d in system::bluetooth_devices(h) {
         batch.push(
-            NewArt::std(ctx, "TSK_BLUETOOTH_PAIRING", Some(file_id))
-                .text("TSK_DEVICE_ID", d.address)
-                .text_opt("TSK_NAME", d.name)
-                .time("TSK_DATETIME", d.last_seen)
-                .time("TSK_DATETIME_ACCESSED", d.last_connected)
-                .key(&["TSK_DEVICE_ID"]),
+            NewArt::std(ctx, "KAAMOS_BLUETOOTH_PAIRING", Some(file_id))
+                .text("KAAMOS_DEVICE_ID", d.address)
+                .text_opt("KAAMOS_NAME", d.name)
+                .time("KAAMOS_DATETIME", d.last_seen)
+                .time("KAAMOS_DATETIME_ACCESSED", d.last_connected)
+                .key(&["KAAMOS_DEVICE_ID"]),
         );
     }
-    let shim = types.artifact(ctx, "PM_SHIMCACHE", "AppCompatCache (ShimCache)");
+    let shim = types.artifact(ctx, "KAAMOS_SHIMCACHE", "AppCompatCache (ShimCache)");
     let pos = types.attribute(
         ctx,
-        "PM_CACHE_POSITION",
+        "KAAMOS_CACHE_POSITION",
         "Cache Position",
         ValueType::Integer,
     );
@@ -330,23 +330,23 @@ fn system_artifacts(
         let target = paths.find(ctx, &e.path);
         batch.push(
             NewArt::new(ctx, shim, Some(file_id))
-                .text("TSK_PATH", e.path)
-                .time("TSK_DATETIME_MODIFIED", e.last_modified)
+                .text("KAAMOS_PATH", e.path)
+                .time("KAAMOS_DATETIME_MODIFIED", e.last_modified)
                 .text_opt(
-                    "TSK_FLAG",
+                    "KAAMOS_FLAG",
                     e.executed
                         .map(|x| if x { "Executed" } else { "Not executed" }),
                 )
                 .custom(pos, Some(Value::Int(e.position as i64)))
-                .key(&["TSK_PATH", "TSK_DATETIME_MODIFIED"])
+                .key(&["KAAMOS_PATH", "KAAMOS_DATETIME_MODIFIED"])
                 .associate(target),
         );
     }
-    let nic = types.artifact(ctx, "PM_NETWORK_INTERFACE", "Network Interfaces");
-    let dhcp = types.attribute(ctx, "PM_DHCP_SERVER", "DHCP Server", ValueType::String);
-    let gw = types.attribute(ctx, "PM_GATEWAY", "Default Gateway", ValueType::String);
-    let dns = types.attribute(ctx, "PM_DNS_SERVERS", "DNS Servers", ValueType::String);
-    let mask = types.attribute(ctx, "PM_SUBNET_MASK", "Subnet Mask", ValueType::String);
+    let nic = types.artifact(ctx, "KAAMOS_NETWORK_INTERFACE", "Network Interfaces");
+    let dhcp = types.attribute(ctx, "KAAMOS_DHCP_SERVER", "DHCP Server", ValueType::String);
+    let gw = types.attribute(ctx, "KAAMOS_GATEWAY", "Default Gateway", ValueType::String);
+    let dns = types.attribute(ctx, "KAAMOS_DNS_SERVERS", "DNS Servers", ValueType::String);
+    let mask = types.attribute(ctx, "KAAMOS_SUBNET_MASK", "Subnet Mask", ValueType::String);
     for n in system::network_interfaces(h) {
         let ip = if n.ip_addresses.is_empty() {
             n.dhcp_ip.clone()
@@ -369,12 +369,12 @@ fn system_artifacts(
         let txt = |s: Option<String>| s.filter(|x| !x.is_empty()).map(Value::Text);
         batch.push(
             NewArt::new(ctx, nic, Some(file_id))
-                .text("TSK_DEVICE_ID", n.guid)
-                .text_opt("TSK_NAME", n.connection_name)
-                .text_opt("TSK_IP_ADDRESS", ip)
-                .text_opt("TSK_DOMAIN", n.domain.or(n.dhcp_domain))
+                .text("KAAMOS_DEVICE_ID", n.guid)
+                .text_opt("KAAMOS_NAME", n.connection_name)
+                .text_opt("KAAMOS_IP_ADDRESS", ip)
+                .text_opt("KAAMOS_DOMAIN", n.domain.or(n.dhcp_domain))
                 .text(
-                    "TSK_FLAG",
+                    "KAAMOS_FLAG",
                     if n.dhcp_enabled == Some(true) {
                         "DHCP"
                     } else {
@@ -388,10 +388,10 @@ fn system_artifacts(
                     mask,
                     txt(n.dhcp_subnet.or_else(|| n.subnet_masks.first().cloned())),
                 )
-                .time("TSK_DATETIME_START", n.lease_obtained)
-                .time("TSK_DATETIME_END", n.lease_expires)
-                .time("TSK_DATETIME", n.last_written)
-                .key(&["TSK_DEVICE_ID"]),
+                .time("KAAMOS_DATETIME_START", n.lease_obtained)
+                .time("KAAMOS_DATETIME_END", n.lease_expires)
+                .time("KAAMOS_DATETIME", n.last_written)
+                .key(&["KAAMOS_DEVICE_ID"]),
         );
     }
 }
@@ -403,32 +403,32 @@ fn post_network_profiles(
     h: &Hive,
     file_id: i64,
 ) {
-    let prof = types.artifact(ctx, "PM_NETWORK_PROFILE", "Network Profiles");
+    let prof = types.artifact(ctx, "KAAMOS_NETWORK_PROFILE", "Network Profiles");
     for p in software::network_profiles(h) {
         if p.name_type == Some(71) {
             batch.push(
-                NewArt::std(ctx, "TSK_WIFI_NETWORK", Some(file_id))
-                    .text("TSK_SSID", p.name.clone())
-                    .time("TSK_DATETIME", p.last_connected)
-                    .text("TSK_DEVICE_ID", p.guid.clone())
-                    .key(&["TSK_SSID", "TSK_DEVICE_ID"]),
+                NewArt::std(ctx, "KAAMOS_WIFI_NETWORK", Some(file_id))
+                    .text("KAAMOS_SSID", p.name.clone())
+                    .time("KAAMOS_DATETIME", p.last_connected)
+                    .text("KAAMOS_DEVICE_ID", p.guid.clone())
+                    .key(&["KAAMOS_SSID", "KAAMOS_DEVICE_ID"]),
             );
         }
         batch.push(
             NewArt::new(ctx, prof, Some(file_id))
-                .text("TSK_ID", p.guid.clone())
-                .text("TSK_NAME", p.name.clone())
-                .text_opt("TSK_DESCRIPTION", p.description.clone())
-                .text("TSK_CATEGORY", p.type_name())
+                .text("KAAMOS_ID", p.guid.clone())
+                .text("KAAMOS_NAME", p.name.clone())
+                .text_opt("KAAMOS_DESCRIPTION", p.description.clone())
+                .text("KAAMOS_CATEGORY", p.type_name())
                 .text_opt(
-                    "TSK_FLAG",
+                    "KAAMOS_FLAG",
                     p.managed.map(|m| if m { "Managed" } else { "Unmanaged" }),
                 )
-                .time("TSK_DATETIME_CREATED", p.first_connected)
-                .time("TSK_DATETIME_ACCESSED", p.last_connected)
-                .text_opt("TSK_MAC_ADDRESS", p.gateway_mac.clone())
-                .text_opt("TSK_DOMAIN", p.dns_suffix.clone())
-                .key(&["TSK_ID"]),
+                .time("KAAMOS_DATETIME_CREATED", p.first_connected)
+                .time("KAAMOS_DATETIME_ACCESSED", p.last_connected)
+                .text_opt("KAAMOS_MAC_ADDRESS", p.gateway_mac.clone())
+                .text_opt("KAAMOS_DOMAIN", p.dns_suffix.clone())
+                .key(&["KAAMOS_ID"]),
         );
     }
 }
@@ -448,39 +448,39 @@ fn ntuser_artifacts(
 ) {
     for d in ntuser::network_drives(h) {
         batch.push(
-            NewArt::std(ctx, "TSK_REMOTE_DRIVE", Some(file_id))
-                .text("TSK_LOCAL_PATH", d.local_path)
-                .text("TSK_REMOTE_PATH", d.remote_path)
-                .key(&["TSK_LOCAL_PATH", "TSK_REMOTE_PATH"]),
+            NewArt::std(ctx, "KAAMOS_REMOTE_DRIVE", Some(file_id))
+                .text("KAAMOS_LOCAL_PATH", d.local_path)
+                .text("KAAMOS_REMOTE_PATH", d.remote_path)
+                .key(&["KAAMOS_LOCAL_PATH", "KAAMOS_REMOTE_PATH"]),
         );
     }
     for o in ntuser::office_legacy(h) {
         batch.push(
-            NewArt::std(ctx, "TSK_RECENT_OBJECT", Some(file_id))
-                .time("TSK_DATETIME_ACCESSED", o.mtime)
-                .text("TSK_NAME", o.name)
-                .text("TSK_VALUE", o.value)
-                .text("TSK_PROG_NAME", o.program)
-                .key(&["TSK_NAME", "TSK_VALUE", "TSK_PROG_NAME"]),
+            NewArt::std(ctx, "KAAMOS_RECENT_OBJECT", Some(file_id))
+                .time("KAAMOS_DATETIME_ACCESSED", o.mtime)
+                .text("KAAMOS_NAME", o.name)
+                .text("KAAMOS_VALUE", o.value)
+                .text("KAAMOS_PROG_NAME", o.program)
+                .key(&["KAAMOS_NAME", "KAAMOS_VALUE", "KAAMOS_PROG_NAME"]),
         );
     }
     for r in ntuser::recent_files(h) {
         let target = paths.find(ctx, &r.path.replace('\0', ""));
         batch.push(
-            NewArt::std(ctx, "TSK_RECENT_OBJECT", Some(file_id))
-                .text("TSK_PATH", r.path)
-                .time("TSK_DATETIME_ACCESSED", r.accessed)
-                .text("TSK_COMMENT", r.comment)
-                .key(&["TSK_PATH", "TSK_COMMENT"])
+            NewArt::std(ctx, "KAAMOS_RECENT_OBJECT", Some(file_id))
+                .text("KAAMOS_PATH", r.path)
+                .time("KAAMOS_DATETIME_ACCESSED", r.accessed)
+                .text("KAAMOS_COMMENT", r.comment)
+                .key(&["KAAMOS_PATH", "KAAMOS_COMMENT"])
                 .associate(target),
         );
     }
     for p in ntuser::typed_paths(h) {
         batch.push(
-            NewArt::std(ctx, "TSK_RECENT_OBJECT", Some(file_id))
-                .text("TSK_PATH", p)
-                .text("TSK_COMMENT", TYPED_PATHS_COMMENT)
-                .key(&["TSK_PATH", "TSK_COMMENT"]),
+            NewArt::std(ctx, "KAAMOS_RECENT_OBJECT", Some(file_id))
+                .text("KAAMOS_PATH", p)
+                .text("KAAMOS_COMMENT", TYPED_PATHS_COMMENT)
+                .key(&["KAAMOS_PATH", "KAAMOS_COMMENT"]),
         );
     }
     let wsl = types.artifact(ctx, "WSL_NAME", "Windows Subsystem For Linux");
@@ -493,24 +493,24 @@ fn ntuser_artifacts(
     for d in ntuser::wsl(h) {
         batch.push(
             NewArt::new(ctx, wsl, Some(file_id))
-                .text("TSK_NAME", d.name)
-                .text("TSK_PATH", d.image_path)
-                .time("TSK_DATETIME_ACCESSED", d.last_written)
+                .text("KAAMOS_NAME", d.name)
+                .text("KAAMOS_PATH", d.image_path)
+                .time("KAAMOS_DATETIME_ACCESSED", d.last_written)
                 .custom(kc, Some(Value::Text(d.kernel_command)))
-                .text("TSK_COMMENT", WSL_COMMENT)
-                .key(&["TSK_NAME", "TSK_PATH"]),
+                .text("KAAMOS_COMMENT", WSL_COMMENT)
+                .key(&["KAAMOS_NAME", "KAAMOS_PATH"]),
         );
     }
     for u in ntuser::user_assist(h) {
         let target = paths.find(ctx, &u.name);
         batch.push(
-            NewArt::std(ctx, "TSK_PROG_RUN", Some(file_id))
-                .text("TSK_PROG_NAME", u.name)
-                .text_opt("TSK_USER_NAME", Some(user.to_owned()))
-                .time("TSK_DATETIME", u.last_run)
-                .int("TSK_COUNT", i64::from(u.run_count))
-                .text("TSK_COMMENT", USERASSIST_COMMENT)
-                .key(&["TSK_PROG_NAME", "TSK_COMMENT"])
+            NewArt::std(ctx, "KAAMOS_PROG_RUN", Some(file_id))
+                .text("KAAMOS_PROG_NAME", u.name)
+                .text_opt("KAAMOS_USER_NAME", Some(user.to_owned()))
+                .time("KAAMOS_DATETIME", u.last_run)
+                .int("KAAMOS_COUNT", i64::from(u.run_count))
+                .text("KAAMOS_COMMENT", USERASSIST_COMMENT)
+                .key(&["KAAMOS_PROG_NAME", "KAAMOS_COMMENT"])
                 .associate(target),
         );
     }
@@ -524,24 +524,27 @@ fn ntuser_artifacts(
         .and_then(|k| k.last_written_unix());
     for (i, cmd) in ntuser::run_mru(h).into_iter().enumerate() {
         batch.push(
-            NewArt::std(ctx, "TSK_PROG_RUN", Some(file_id))
-                .text("TSK_PROG_NAME", cmd)
-                .text_opt("TSK_USER_NAME", Some(user.to_owned()))
-                .time("TSK_DATETIME", if i == 0 { run_time } else { None })
-                .text("TSK_COMMENT", RUNMRU_COMMENT)
-                .key(&["TSK_PROG_NAME", "TSK_COMMENT"]),
+            NewArt::std(ctx, "KAAMOS_PROG_RUN", Some(file_id))
+                .text("KAAMOS_PROG_NAME", cmd)
+                .text_opt("KAAMOS_USER_NAME", Some(user.to_owned()))
+                .time("KAAMOS_DATETIME", if i == 0 { run_time } else { None })
+                .text("KAAMOS_COMMENT", RUNMRU_COMMENT)
+                .key(&["KAAMOS_PROG_NAME", "KAAMOS_COMMENT"]),
         );
     }
     for (url, t) in ntuser::typed_urls(h) {
         batch.push(
-            NewArt::std(ctx, "TSK_WEB_HISTORY", Some(file_id))
-                .text("TSK_URL", url.clone())
-                .time("TSK_DATETIME_ACCESSED", t)
-                .text("TSK_PROG_NAME", "Internet Explorer")
-                .text("TSK_DOMAIN", crate::recent_activity::extract_domain(&url))
-                .text_opt("TSK_USER_NAME", Some(user.to_owned()))
-                .text("TSK_COMMENT", "Typed URL")
-                .key(&["TSK_URL", "TSK_COMMENT"]),
+            NewArt::std(ctx, "KAAMOS_WEB_HISTORY", Some(file_id))
+                .text("KAAMOS_URL", url.clone())
+                .time("KAAMOS_DATETIME_ACCESSED", t)
+                .text("KAAMOS_PROG_NAME", "Internet Explorer")
+                .text(
+                    "KAAMOS_DOMAIN",
+                    crate::recent_activity::extract_domain(&url),
+                )
+                .text_opt("KAAMOS_USER_NAME", Some(user.to_owned()))
+                .text("KAAMOS_COMMENT", "Typed URL")
+                .key(&["KAAMOS_URL", "KAAMOS_COMMENT"]),
         );
     }
 }
@@ -565,23 +568,23 @@ fn post_shellbags(
     for b in shellbags::shellbags(h, roots) {
         batch.push(
             NewArt::new(ctx, bag, Some(file_id))
-                .text("TSK_PATH", b.path)
+                .text("KAAMOS_PATH", b.path)
                 .custom(key_attr, Some(Value::Text(b.key)))
                 .custom(lw, b.last_written.map(Value::DateTime))
-                .time("TSK_DATETIME_MODIFIED", b.modified)
-                .time("TSK_DATETIME_CREATED", b.created)
-                .time("TSK_DATETIME_ACCESSED", b.accessed)
-                .key(&["TSK_PATH"])
+                .time("KAAMOS_DATETIME_MODIFIED", b.modified)
+                .time("KAAMOS_DATETIME_CREATED", b.created)
+                .time("KAAMOS_DATETIME_ACCESSED", b.accessed)
+                .key(&["KAAMOS_PATH"])
                 .key_ids(&[key_attr]),
         );
     }
 }
 
-/// `TSK_OS_INFO` on the data source (only if it has none), with
+/// `KAAMOS_OS_INFO` on the data source (only if it has none), with
 /// Autopsy's attributes and the extended overview (`PM_*` attributes).
 #[allow(clippy::many_single_char_names, reason = "short local names")]
 fn post_os_info(ctx: &JobContext, types: &mut Types, batch: &mut Batch, os: &OsInfo) {
-    let os_type = pm_casedb::catalog::artifact_type_id("TSK_OS_INFO").unwrap_or(0);
+    let os_type = pm_casedb::catalog::artifact_type_id("KAAMOS_OS_INFO").unwrap_or(0);
     if ds_artifact_exists(ctx, os_type, None) {
         return;
     }
@@ -594,21 +597,21 @@ fn post_os_info(ctx: &JobContext, types: &mut Types, batch: &mut Batch, os: &OsI
         .or_else(|| s.os_env.clone())
         .unwrap_or_else(|| "Windows".to_owned());
     let mut a = NewArt::new(ctx, os_type, None)
-        .text_opt("TSK_NAME", s.computer_name.clone())
-        .text_opt("TSK_DOMAIN", s.domain.clone())
-        .text("TSK_PROG_NAME", prog)
+        .text_opt("KAAMOS_NAME", s.computer_name.clone())
+        .text_opt("KAAMOS_DOMAIN", s.domain.clone())
+        .text("KAAMOS_PROG_NAME", prog)
         .text_opt(
-            "TSK_PROCESSOR_ARCHITECTURE",
+            "KAAMOS_PROCESSOR_ARCHITECTURE",
             s.processor_architecture.clone(),
         )
-        .text_opt("TSK_TEMP_DIR", s.temp_dir.clone())
-        .time("TSK_DATETIME", w.install_date)
-        .text_opt("TSK_PATH", w.system_root.clone())
-        .text_opt("TSK_PRODUCT_ID", w.product_id.clone())
-        .text_opt("TSK_OWNER", w.registered_owner.clone())
-        .text_opt("TSK_ORGANIZATION", w.registered_organization.clone())
-        .text_opt("TSK_VERSION", w.current_version.clone())
-        .text_opt("TSK_HOST", s.hostname.clone());
+        .text_opt("KAAMOS_TEMP_DIR", s.temp_dir.clone())
+        .time("KAAMOS_DATETIME", w.install_date)
+        .text_opt("KAAMOS_PATH", w.system_root.clone())
+        .text_opt("KAAMOS_PRODUCT_ID", w.product_id.clone())
+        .text_opt("KAAMOS_OWNER", w.registered_owner.clone())
+        .text_opt("KAAMOS_ORGANIZATION", w.registered_organization.clone())
+        .text_opt("KAAMOS_VERSION", w.current_version.clone())
+        .text_opt("KAAMOS_HOST", s.hostname.clone());
     let mut add = |name: &str, display: &str, v: Option<Value>| {
         let vt = match v {
             Some(Value::DateTime(_)) => ValueType::DateTime,
@@ -620,19 +623,23 @@ fn post_os_info(ctx: &JobContext, types: &mut Types, batch: &mut Batch, os: &OsI
     };
     let t = |s: Option<String>| s.filter(|x| !x.is_empty()).map(Value::Text);
     if let Some(tz) = &s.time_zone {
-        add("PM_TIMEZONE", "Time Zone", t(tz.name().map(str::to_owned)));
         add(
-            "PM_UTC_OFFSET",
+            "KAAMOS_TIMEZONE",
+            "Time Zone",
+            t(tz.name().map(str::to_owned)),
+        );
+        add(
+            "KAAMOS_UTC_OFFSET",
             "UTC Offset (minutes)",
             tz.utc_offset_minutes().map(|m| Value::Int(i64::from(m))),
         );
         add(
-            "PM_ACTIVE_UTC_OFFSET",
+            "KAAMOS_ACTIVE_UTC_OFFSET",
             "Active UTC Offset (minutes)",
             tz.active_bias.map(|b| Value::Int(-i64::from(b))),
         );
         add(
-            "PM_DAYLIGHT_NAME",
+            "KAAMOS_DAYLIGHT_NAME",
             "Daylight Time Name",
             t(tz.daylight_name.clone()),
         );
@@ -640,63 +647,67 @@ fn post_os_info(ctx: &JobContext, types: &mut Types, batch: &mut Batch, os: &OsI
             (Some(st), Some(dl)) => Some(format!("standard from {st}; daylight from {dl}")),
             _ => None,
         };
-        add("PM_DST_RULES", "Daylight Saving Rules", t(rules));
+        add("KAAMOS_DST_RULES", "Daylight Saving Rules", t(rules));
         add(
-            "PM_DYNAMIC_DST_DISABLED",
+            "KAAMOS_DYNAMIC_DST_DISABLED",
             "Automatic DST Adjustment",
             tz.dynamic_dst_disabled
                 .map(|d| Value::Text(if d { "Disabled" } else { "Enabled" }.into())),
         );
     }
     add(
-        "PM_LAST_SHUTDOWN",
+        "KAAMOS_LAST_SHUTDOWN",
         "Last Shutdown",
         s.last_shutdown.map(Value::DateTime),
     );
-    add("PM_EDITION", "Edition", t(w.edition_id.clone()));
-    add("PM_BUILD", "Build", t(w.build()));
+    add("KAAMOS_EDITION", "Edition", t(w.edition_id.clone()));
+    add("KAAMOS_BUILD", "Build", t(w.build()));
     add(
-        "PM_DISPLAY_VERSION",
+        "KAAMOS_DISPLAY_VERSION",
         "Display Version",
         t(w.display_version.clone()),
     );
     add(
-        "PM_INSTALLATION_TYPE",
+        "KAAMOS_INSTALLATION_TYPE",
         "Installation Type",
         t(w.installation_type.clone()),
     );
-    add("PM_BUILD_LAB", "Build Lab", t(w.build_lab_ex.clone()));
-    add("PM_PRODUCT_KEY", "Product Key", t(w.product_key.clone()));
-    add("PM_NV_DOMAIN", "Domain (NV)", t(s.nv_domain.clone()));
+    add("KAAMOS_BUILD_LAB", "Build Lab", t(w.build_lab_ex.clone()));
     add(
-        "PM_PROCESSOR_IDENTIFIER",
+        "KAAMOS_PRODUCT_KEY",
+        "Product Key",
+        t(w.product_key.clone()),
+    );
+    add("KAAMOS_NV_DOMAIN", "Domain (NV)", t(s.nv_domain.clone()));
+    add(
+        "KAAMOS_PROCESSOR_IDENTIFIER",
         "Processor",
         t(s.processor_identifier.clone()),
     );
     add(
-        "PM_PROCESSOR_COUNT",
+        "KAAMOS_PROCESSOR_COUNT",
         "Number of Processors",
         t(s.number_of_processors.clone()),
     );
     add(
-        "PM_PAGE_FILES",
+        "KAAMOS_PAGE_FILES",
         "Page Files",
         t(Some(s.page_files.join("; "))),
     );
     add(
-        "PM_CLEAR_PAGEFILE",
+        "KAAMOS_CLEAR_PAGEFILE",
         "Clear Page File at Shutdown",
         s.clear_page_file_at_shutdown
             .map(|b| Value::Text(yes_no(b).into())),
     );
     add(
-        "PM_HIBERNATION",
+        "KAAMOS_HIBERNATION",
         "Hibernation",
         s.hibernate_enabled
             .map(|b| Value::Text(if b { "Enabled" } else { "Disabled" }.into())),
     );
     add(
-        "PM_CRASH_DUMP",
+        "KAAMOS_CRASH_DUMP",
         "Crash Dump",
         s.crash_dump_enabled.map(|c| {
             let kind = match c {
@@ -714,7 +725,7 @@ fn post_os_info(ctx: &JobContext, types: &mut Types, batch: &mut Batch, os: &OsI
         }),
     );
     add(
-        "PM_BITLOCKER",
+        "KAAMOS_BITLOCKER",
         "BitLocker Boot Status",
         s.bitlocker_boot_status.map(|b| Value::Int(i64::from(b))),
     );
@@ -738,18 +749,18 @@ fn post_os_info(ctx: &JobContext, types: &mut Types, batch: &mut Batch, os: &OsI
         })
         .collect();
     add(
-        "PM_UPGRADE_HISTORY",
+        "KAAMOS_UPGRADE_HISTORY",
         "Upgrade History",
         t(Some(upgrades.join("; "))),
     );
     if let Some(l) = &os.logon {
         add(
-            "PM_LAST_LOGGED_ON_USER",
+            "KAAMOS_LAST_LOGGED_ON_USER",
             "Last Logged-on User",
             t(l.last_logged_on_user.clone()),
         );
         add(
-            "PM_LAST_LOGGED_ON_SAM_USER",
+            "KAAMOS_LAST_LOGGED_ON_SAM_USER",
             "Last Logged-on SAM User",
             t(l.last_logged_on_sam_user.clone()),
         );
@@ -765,13 +776,13 @@ fn post_os_info(ctx: &JobContext, types: &mut Types, batch: &mut Batch, os: &OsI
                 ""
             };
             add(
-                "PM_AUTOLOGON",
+                "KAAMOS_AUTOLOGON",
                 "Auto Logon",
                 Some(Value::Text(format!("Enabled ({who}{pw})"))),
             );
         }
         add(
-            "PM_AUTOLOGON_PASSWORD",
+            "KAAMOS_AUTOLOGON_PASSWORD",
             "Auto Logon Password",
             t(l.default_password.clone()),
         );
@@ -794,13 +805,13 @@ fn post_os_info(ctx: &JobContext, types: &mut Types, batch: &mut Batch, os: &OsI
             parts.push(format!("{} exclusions", d.exclusions.len()));
         }
         add(
-            "PM_DEFENDER",
+            "KAAMOS_DEFENDER",
             "Microsoft Defender",
             t(Some(parts.join(", "))),
         );
     }
     add(
-        "PM_DEFAULT_BROWSER",
+        "KAAMOS_DEFAULT_BROWSER",
         "Default Browser",
         t(Some(os.browsers.join("; "))),
     );

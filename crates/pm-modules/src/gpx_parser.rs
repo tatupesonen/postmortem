@@ -1,6 +1,6 @@
 //! Autopsy's GPX Parser module (`InternalPythonModules/GPX_Module`), on
-//! `pm-plugin-api`: waypoints become `TSK_GPS_BOOKMARK`, each track
-//! segment a `TSK_GPS_TRACK` and each route a `TSK_GPS_ROUTE`, with TSK's
+//! `pm-plugin-api`: waypoints become `KAAMOS_GPS_BOOKMARK`, each track
+//! segment a `KAAMOS_GPS_TRACK` and each route a `KAAMOS_GPS_ROUTE`, with Autopsy's
 //! point-list JSON attributes.
 
 use pm_geo::points::{self, TrackPoint, WayPoint};
@@ -71,31 +71,31 @@ impl FileIngest for Worker {
                 })
                 .collect();
             host.post(
-                NewResult::new("TSK_GPS_TRACK", Some(file.id))
-                    .with(Attribute::text("TSK_NAME", "Track"))
+                NewResult::new("KAAMOS_GPS_TRACK", Some(file.id))
+                    .with(Attribute::text("KAAMOS_NAME", "Track"))
                     .with(Attribute::new(
-                        "TSK_GEO_TRACKPOINTS",
+                        "KAAMOS_GEO_TRACKPOINTS",
                         Value::Text(points::to_json(&pts)),
                     )),
             )?;
         }
         for w in &gpx.waypoints {
             host.post(
-                NewResult::new("TSK_GPS_BOOKMARK", Some(file.id))
+                NewResult::new("KAAMOS_GPS_BOOKMARK", Some(file.id))
                     .with(Attribute::new(
-                        "TSK_GEO_LATITUDE",
+                        "KAAMOS_GEO_LATITUDE",
                         Value::Double(w.latitude),
                     ))
                     .with(Attribute::new(
-                        "TSK_GEO_LONGITUDE",
+                        "KAAMOS_GEO_LONGITUDE",
                         Value::Double(w.longitude),
                     ))
-                    .with(Attribute::text("TSK_FLAG", "Waypoint"))
+                    .with(Attribute::text("KAAMOS_FLAG", "Waypoint"))
                     .with(Attribute::text(
-                        "TSK_NAME",
+                        "KAAMOS_NAME",
                         w.name.clone().unwrap_or_default(),
                     ))
-                    .with(Attribute::text("TSK_PROG_NAME", "GPXParser")),
+                    .with(Attribute::text("KAAMOS_PROG_NAME", "GPXParser")),
             )?;
         }
         for route in &gpx.routes {
@@ -109,8 +109,8 @@ impl FileIngest for Worker {
                 })
                 .collect();
             host.post(
-                NewResult::new("TSK_GPS_ROUTE", Some(file.id)).with(Attribute::new(
-                    "TSK_GEO_WAYPOINTS",
+                NewResult::new("KAAMOS_GPS_ROUTE", Some(file.id)).with(Attribute::new(
+                    "KAAMOS_GEO_WAYPOINTS",
                     Value::Text(points::to_json(&pts)),
                 )),
             )?;

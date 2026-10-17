@@ -689,21 +689,21 @@ fn load_rate() {
     eprintln!("database size {:.1} MB", size as f64 / 1e6);
 }
 
-// ------------------------------------------------- real evidence vs. TSK
+// ------------------------------------------------- real evidence vs. Autopsy
 
 /// Loads a real disk image (path in `PM_REAL_DISK`, e.g. the NIST "Hacking
 /// Case" `4Dell Latitude CPi.E01`) and requires every name of every file
 /// system to match `fls -r -p` on path, metadata address and allocation.
-/// Skipped when the variable is unset or TSK is not installed.
+/// Skipped when the variable is unset or Autopsy is not installed.
 #[test]
-fn real_disk_matches_tsk() {
+fn real_disk_matches_reference() {
     use std::collections::BTreeMap;
 
     let Some(image) = std::env::var_os("PM_REAL_DISK").map(PathBuf::from) else {
         eprintln!("PM_REAL_DISK not set; skipping");
         return;
     };
-    if pm_testkit::tsk::tool("fls").is_none() {
+    if pm_testkit::reftools::tool("fls").is_none() {
         eprintln!("fls not installed; skipping");
         return;
     }
@@ -718,12 +718,12 @@ fn real_disk_matches_tsk() {
     .unwrap();
     let files = all_files(&case, s.ds_id);
     for fs in case.db().file_systems(s.ds_id).unwrap() {
-        let tsk = pm_testkit::tsk::fls(&image, fs.byte_offset / 512).unwrap();
+        let reference = pm_testkit::reftools::fls(&image, fs.byte_offset / 512).unwrap();
         // (path, address, allocated) → count
         let mut want: BTreeMap<(String, u64, bool), i32> = BTreeMap::new();
-        // TSK's `$OrphanFiles` directory has a synthetic address; ours is a
+        // Autopsy's `$OrphanFiles` directory has a synthetic address; ours is a
         // virtual-directory row.
-        for r in tsk.iter().filter(|r| r.path != "$OrphanFiles") {
+        for r in reference.iter().filter(|r| r.path != "$OrphanFiles") {
             let addr = r.inode.split('-').next().unwrap().parse().unwrap();
             *want.entry((r.path.clone(), addr, !r.deleted)).or_default() += 1;
         }
@@ -747,15 +747,19 @@ fn real_disk_matches_tsk() {
             .collect();
         assert!(
             missing.is_empty() && extra.is_empty(),
-            "fs at {}: TSK-only {missing:#?}\nours-only {extra:#?}",
+            "fs at {}: reference-only {missing:#?}\nours-only {extra:#?}",
             fs.byte_offset
         );
-        eprintln!("fs at {}: {} names match TSK", fs.byte_offset, want.len());
+        eprintln!(
+            "fs at {}: {} names match the reference tools",
+            fs.byte_offset,
+            want.len()
+        );
     }
 }
 
 #[test]
-fn data_sources_get_tsks_default_host_or_the_chosen_one() {
+fn data_sources_get_the_default_host_or_the_chosen_one() {
     let (_tmp, case, s) = loaded_case();
     let file_name = demo_image()
         .file_name()

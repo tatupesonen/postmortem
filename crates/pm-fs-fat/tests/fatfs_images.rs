@@ -451,7 +451,7 @@ fn assert_matches_fls(name: &str, img: &[u8]) {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join(format!("{name}.dd"));
     std::fs::write(&path, img).unwrap();
-    let Some(theirs) = pm_testkit::tsk::fls(&path, 0) else {
+    let Some(theirs) = pm_testkit::reftools::fls(&path, 0) else {
         eprintln!("fls not available; skipping {name}");
         return;
     };
@@ -459,8 +459,8 @@ fn assert_matches_fls(name: &str, img: &[u8]) {
     let mut unmatched: Vec<_> = ours.clone();
     for t in &theirs {
         let is_dir = t.kind.ends_with("/d") || t.kind == "V/V";
-        // TSK truncates some deleted long names; accept a prefix match.
-        // TSK truncates some deleted long names and shows only the short
+        // Autopsy truncates some deleted long names; accept a prefix match.
+        // Autopsy truncates some deleted long names and shows only the short
         // name of orphans; we recover more, so accept those forms.
         let pos = unmatched.iter().position(|(p, alt, del, dir)| {
             *del == t.deleted
@@ -473,12 +473,12 @@ fn assert_matches_fls(name: &str, img: &[u8]) {
             Some(i) => {
                 unmatched.remove(i);
             }
-            None => panic!("{name}: TSK entry {t:?} missing from ours: {ours:#?}"),
+            None => panic!("{name}: reference entry {t:?} missing from ours: {ours:#?}"),
         }
     }
     assert!(
         unmatched.is_empty(),
-        "{name}: entries TSK does not report: {unmatched:#?}"
+        "{name}: entries the reference tools do not report: {unmatched:#?}"
     );
 }
 
@@ -486,7 +486,7 @@ fn assert_matches_fls(name: &str, img: &[u8]) {
 #[case(FatType::Fat12, 2)]
 #[case(FatType::Fat16, 20)]
 #[case(FatType::Fat32, 40)]
-fn tree_matches_tsk_fls(#[case] fat: FatType, #[case] mib: usize) {
+fn tree_matches_reference_fls(#[case] fat: FatType, #[case] mib: usize) {
     let img = build(fat, mib, |fs| {
         write_file(fs, "keep.txt", b"keep");
         write_file(
@@ -535,6 +535,6 @@ fn orphan_found_when_parent_entry_overwritten() {
     );
     assert_eq!(orphans[0].short_name.as_deref(), Some("_NSIDE.TXT"));
     assert!(!orphans[0].allocated);
-    // Unlike TSK, we still recover the orphan's content.
+    // Unlike Autopsy, we still recover the orphan's content.
     assert_eq!(read_all(&fs, orphans[0].inode), b"inside");
 }

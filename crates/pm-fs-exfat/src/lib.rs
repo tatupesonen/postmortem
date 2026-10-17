@@ -5,7 +5,7 @@
 //!   and orphan scans in unallocated space reliable.
 //! * Deleted entries (in-use bit cleared) are listed with their full names.
 //! * Timestamps honour the per-entry UTC offset field; when it is absent the
-//!   configured time zone is used (TSK 4.15 misapplies the offset).
+//!   configured time zone is used (Autopsy 4.15 misapplies the offset).
 //! * Content follows the FAT chain, or the contiguous run for `NoFatChain`
 //!   streams; bytes past the valid data length read as zeros.
 //!

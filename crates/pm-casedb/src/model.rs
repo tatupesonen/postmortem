@@ -166,7 +166,7 @@ impl FileSystemRecord {
     }
 }
 
-/// How a file came to be in the case (Autopsy's `TSK_DB_FILES_TYPE_ENUM`).
+/// How a file came to be in the case (Autopsy's `KAAMOS_DB_FILES_TYPE_ENUM`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum Origin {
     FileSystem = 0,
@@ -462,7 +462,7 @@ impl FileAnalysis {
     }
 }
 
-/// Analysis-result significance, ordered like TSK's `Score.Significance`:
+/// Analysis-result significance, ordered like Autopsy's `Score.Significance`:
 /// definitive conclusions outrank likely ones, so
 /// `Notable > None > LikelyNotable > LikelyNone > Unknown`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]

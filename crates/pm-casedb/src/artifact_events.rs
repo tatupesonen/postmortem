@@ -1,10 +1,10 @@
-//! Timeline events of data artifacts (TSK `TimelineManager.addArtifactEvents`
+//! Timeline events of data artifacts (Autopsy `TimelineManager.addArtifactEvents`
 //! with the `TimelineEventType` definitions): written in the same
 //! transaction as the artifact, so the timeline, MCP and reports see web
 //! activity, program runs, devices, messages and log entries next to file
 //! times.
 //!
-//! Types TSK maps get their own event types and descriptions; any other
+//! Types Autopsy maps get their own event types and descriptions; any other
 //! data artifact gets one catch-all event per date attribute
 //! ("Standard Artifact" / "Custom Artifact" in Autopsy's timeline).
 //! Analysis results get no events.
@@ -39,275 +39,290 @@ const fn m(
     }
 }
 
-const ACCESSED: &[&str] = &["TSK_DATETIME_ACCESSED"];
-const CREATED: &[&str] = &["TSK_DATETIME_CREATED"];
-const DATETIME: &[&str] = &["TSK_DATETIME"];
-const START: &[&str] = &["TSK_DATETIME_START"];
-const END: &[&str] = &["TSK_DATETIME_END"];
-const GEO: &[&str] = &["TSK_NAME", "TSK_GEO_LATITUDE", "TSK_GEO_LONGITUDE"];
+const ACCESSED: &[&str] = &["KAAMOS_DATETIME_ACCESSED"];
+const CREATED: &[&str] = &["KAAMOS_DATETIME_CREATED"];
+const DATETIME: &[&str] = &["KAAMOS_DATETIME"];
+const START: &[&str] = &["KAAMOS_DATETIME_START"];
+const END: &[&str] = &["KAAMOS_DATETIME_END"];
+const GEO: &[&str] = &["KAAMOS_NAME", "KAAMOS_GEO_LATITUDE", "KAAMOS_GEO_LONGITUDE"];
 
-/// TSK's artifact event types (`TimelineEventTypes`), plus postmortem's
+/// Autopsy's artifact event types (`TimelineEventTypes`), plus postmortem's
 /// event-log entries as Log Entry events.
 const MAPPINGS: &[Mapping] = &[
     m(
-        "TSK_WEB_BOOKMARK",
+        "KAAMOS_WEB_BOOKMARK",
         &[(ev::WEB_BOOKMARK, CREATED)],
-        &["TSK_URL", "TSK_TITLE"],
-        &["TSK_DOMAIN"],
+        &["KAAMOS_URL", "KAAMOS_TITLE"],
+        &["KAAMOS_DOMAIN"],
     ),
     m(
-        "TSK_WEB_COOKIE",
+        "KAAMOS_WEB_COOKIE",
         &[
-            (ev::WEB_COOKIE, &["TSK_DATETIME_CREATED", "TSK_DATETIME"]),
+            (
+                ev::WEB_COOKIE,
+                &["KAAMOS_DATETIME_CREATED", "KAAMOS_DATETIME"],
+            ),
             (ev::WEB_COOKIE_ACCESSED, ACCESSED),
             (ev::WEB_COOKIE_END, END),
         ],
-        &["TSK_URL", "TSK_NAME", "TSK_VALUE"],
-        &["TSK_DOMAIN"],
+        &["KAAMOS_URL", "KAAMOS_NAME", "KAAMOS_VALUE"],
+        &["KAAMOS_DOMAIN"],
     ),
     m(
-        "TSK_WEB_HISTORY",
+        "KAAMOS_WEB_HISTORY",
         &[
             (ev::WEB_HISTORY, ACCESSED),
             (ev::WEB_HISTORY_CREATED, CREATED),
         ],
-        &["TSK_URL", "TSK_TITLE"],
-        &["TSK_DOMAIN"],
+        &["KAAMOS_URL", "KAAMOS_TITLE"],
+        &["KAAMOS_DOMAIN"],
     ),
     m(
-        "TSK_WEB_DOWNLOAD",
+        "KAAMOS_WEB_DOWNLOAD",
         &[(ev::WEB_DOWNLOADS, ACCESSED)],
-        &["TSK_PATH", "TSK_URL"],
-        &["TSK_DOMAIN"],
+        &["KAAMOS_PATH", "KAAMOS_URL"],
+        &["KAAMOS_DOMAIN"],
     ),
     m(
-        "TSK_WEB_SEARCH_QUERY",
+        "KAAMOS_WEB_SEARCH_QUERY",
         &[(ev::WEB_SEARCH, ACCESSED)],
-        &["TSK_TEXT", "TSK_DOMAIN", "TSK_PROG_NAME"],
-        &["TSK_DOMAIN"],
+        &["KAAMOS_TEXT", "KAAMOS_DOMAIN", "KAAMOS_PROG_NAME"],
+        &["KAAMOS_DOMAIN"],
     ),
     m(
-        "TSK_WEB_FORM_AUTOFILL",
+        "KAAMOS_WEB_FORM_AUTOFILL",
         &[
             (ev::WEB_FORM_AUTOFILL, CREATED),
             (ev::WEB_FORM_AUTOFILL_ACCESSED, ACCESSED),
         ],
-        &["TSK_NAME", "TSK_VALUE"],
-        &["TSK_NAME"],
+        &["KAAMOS_NAME", "KAAMOS_VALUE"],
+        &["KAAMOS_NAME"],
     ),
     m(
-        "TSK_WEB_FORM_ADDRESS",
+        "KAAMOS_WEB_FORM_ADDRESS",
         &[
             (ev::WEB_FORM_ADDRESSES, ACCESSED),
-            (ev::WEB_FORM_ADDRESSES_MODIFIED, &["TSK_DATETIME_MODIFIED"]),
+            (
+                ev::WEB_FORM_ADDRESSES_MODIFIED,
+                &["KAAMOS_DATETIME_MODIFIED"],
+            ),
         ],
-        &["TSK_NAME", "TSK_LOCATION"],
-        &["TSK_NAME"],
+        &["KAAMOS_NAME", "KAAMOS_LOCATION"],
+        &["KAAMOS_NAME"],
     ),
     m(
-        "TSK_WEB_CACHE",
+        "KAAMOS_WEB_CACHE",
         &[(ev::WEB_CACHE, CREATED)],
-        &["TSK_PATH", "TSK_URL"],
-        &["TSK_DOMAIN"],
+        &["KAAMOS_PATH", "KAAMOS_URL"],
+        &["KAAMOS_DOMAIN"],
     ),
     m(
-        "TSK_MESSAGE",
+        "KAAMOS_MESSAGE",
         &[(ev::MESSAGE, DATETIME)],
         &[
-            "TSK_MESSAGE_TYPE",
-            "TSK_DIRECTION",
-            "TSK_PHONE_NUMBER_FROM",
-            "TSK_PHONE_NUMBER_TO",
-            "TSK_SUBJECT",
-            "TSK_TEXT",
+            "KAAMOS_MESSAGE_TYPE",
+            "KAAMOS_DIRECTION",
+            "KAAMOS_PHONE_NUMBER_FROM",
+            "KAAMOS_PHONE_NUMBER_TO",
+            "KAAMOS_SUBJECT",
+            "KAAMOS_TEXT",
         ],
-        &["TSK_MESSAGE_TYPE"],
+        &["KAAMOS_MESSAGE_TYPE"],
     ),
     m(
-        "TSK_EMAIL_MSG",
+        "KAAMOS_EMAIL_MSG",
         &[
-            (ev::EMAIL, &["TSK_DATETIME_SENT"]),
-            (ev::EMAIL_RCVD, &["TSK_DATETIME_RCVD"]),
+            (ev::EMAIL, &["KAAMOS_DATETIME_SENT"]),
+            (ev::EMAIL_RCVD, &["KAAMOS_DATETIME_RCVD"]),
         ],
-        &["TSK_EMAIL_FROM", "TSK_EMAIL_TO", "TSK_SUBJECT"],
-        &["TSK_EMAIL_FROM"],
+        &["KAAMOS_EMAIL_FROM", "KAAMOS_EMAIL_TO", "KAAMOS_SUBJECT"],
+        &["KAAMOS_EMAIL_FROM"],
     ),
     m(
-        "TSK_CALLLOG",
+        "KAAMOS_CALLLOG",
         &[(ev::CALL_LOG, START), (ev::CALL_LOG_END, END)],
-        &["TSK_NAME", "TSK_PHONE_NUMBER", "TSK_DIRECTION"],
-        &["TSK_DIRECTION"],
+        &["KAAMOS_NAME", "KAAMOS_PHONE_NUMBER", "KAAMOS_DIRECTION"],
+        &["KAAMOS_DIRECTION"],
     ),
     m(
-        "TSK_RECENT_OBJECT",
+        "KAAMOS_RECENT_OBJECT",
         &[(
             ev::RECENT_DOCUMENTS,
-            &["TSK_DATETIME_ACCESSED", "TSK_DATETIME"],
+            &["KAAMOS_DATETIME_ACCESSED", "KAAMOS_DATETIME"],
         )],
-        &["TSK_PATH", "TSK_PROG_NAME"],
-        &["TSK_PROG_NAME"],
+        &["KAAMOS_PATH", "KAAMOS_PROG_NAME"],
+        &["KAAMOS_PROG_NAME"],
     ),
     m(
-        "TSK_INSTALLED_PROG",
+        "KAAMOS_INSTALLED_PROG",
         &[(ev::INSTALLED_PROGRAM, DATETIME)],
-        &["TSK_PROG_NAME", "TSK_VERSION", "TSK_PATH"],
-        &["TSK_PROG_NAME"],
+        &["KAAMOS_PROG_NAME", "KAAMOS_VERSION", "KAAMOS_PATH"],
+        &["KAAMOS_PROG_NAME"],
     ),
     m(
-        "TSK_DELETED_PROG",
+        "KAAMOS_DELETED_PROG",
         &[(
             ev::PROGRAM_DELETED,
-            &["TSK_DATETIME_DELETED", "TSK_DATETIME"],
+            &["KAAMOS_DATETIME_DELETED", "KAAMOS_DATETIME"],
         )],
-        &["TSK_PROG_NAME", "TSK_PATH"],
-        &["TSK_PROG_NAME"],
+        &["KAAMOS_PROG_NAME", "KAAMOS_PATH"],
+        &["KAAMOS_PROG_NAME"],
     ),
     m(
-        "TSK_PROG_RUN",
+        "KAAMOS_PROG_RUN",
         &[(ev::PROGRAM_EXECUTION, DATETIME)],
-        &["TSK_PROG_NAME", "TSK_PATH", "TSK_COMMENT", "TSK_COUNT"],
-        &["TSK_PROG_NAME"],
-    ),
-    m(
-        "TSK_PROG_NOTIFICATIONS",
-        &[(ev::PROGRAM_NOTIFICATION, DATETIME)],
-        &["TSK_PROG_NAME", "TSK_TITLE", "TSK_TEXT"],
-        &["TSK_PROG_NAME"],
-    ),
-    m(
-        "TSK_METADATA_EXIF",
-        &[(ev::EXIF, CREATED)],
-        &["TSK_DEVICE_MAKE", "TSK_DEVICE_MODEL"],
-        &["TSK_DEVICE_MAKE"],
-    ),
-    m(
-        "TSK_METADATA",
         &[
-            (ev::METADATA_LAST_PRINTED, &["TSK_LAST_PRINTED_DATETIME"]),
-            (ev::METADATA_LAST_SAVED, &["TSK_DATETIME_MODIFIED"]),
+            "KAAMOS_PROG_NAME",
+            "KAAMOS_PATH",
+            "KAAMOS_COMMENT",
+            "KAAMOS_COUNT",
+        ],
+        &["KAAMOS_PROG_NAME"],
+    ),
+    m(
+        "KAAMOS_PROG_NOTIFICATIONS",
+        &[(ev::PROGRAM_NOTIFICATION, DATETIME)],
+        &["KAAMOS_PROG_NAME", "KAAMOS_TITLE", "KAAMOS_TEXT"],
+        &["KAAMOS_PROG_NAME"],
+    ),
+    m(
+        "KAAMOS_METADATA_EXIF",
+        &[(ev::EXIF, CREATED)],
+        &["KAAMOS_DEVICE_MAKE", "KAAMOS_DEVICE_MODEL"],
+        &["KAAMOS_DEVICE_MAKE"],
+    ),
+    m(
+        "KAAMOS_METADATA",
+        &[
+            (ev::METADATA_LAST_PRINTED, &["KAAMOS_LAST_PRINTED_DATETIME"]),
+            (ev::METADATA_LAST_SAVED, &["KAAMOS_DATETIME_MODIFIED"]),
             (ev::METADATA_CREATED, CREATED),
         ],
         &[
-            "TSK_PROG_NAME",
-            "TSK_USER_ID",
-            "TSK_OWNER",
-            "TSK_LAST_SAVED_BY",
+            "KAAMOS_PROG_NAME",
+            "KAAMOS_USER_ID",
+            "KAAMOS_OWNER",
+            "KAAMOS_LAST_SAVED_BY",
         ],
-        &["TSK_PROG_NAME"],
+        &["KAAMOS_PROG_NAME"],
     ),
     m(
-        "TSK_DEVICE_ATTACHED",
+        "KAAMOS_DEVICE_ATTACHED",
         &[(ev::DEVICES_ATTACHED, DATETIME)],
-        &["TSK_DEVICE_MAKE", "TSK_DEVICE_MODEL", "TSK_DEVICE_ID"],
-        &["TSK_DEVICE_MODEL", "TSK_DEVICE_ID"],
+        &[
+            "KAAMOS_DEVICE_MAKE",
+            "KAAMOS_DEVICE_MODEL",
+            "KAAMOS_DEVICE_ID",
+        ],
+        &["KAAMOS_DEVICE_MODEL", "KAAMOS_DEVICE_ID"],
     ),
     m(
-        "TSK_OS_INFO",
+        "KAAMOS_OS_INFO",
         &[(ev::OS_INFO, DATETIME)],
-        &["TSK_PROG_NAME", "TSK_VERSION", "TSK_NAME"],
-        &["TSK_PROG_NAME"],
+        &["KAAMOS_PROG_NAME", "KAAMOS_VERSION", "KAAMOS_NAME"],
+        &["KAAMOS_PROG_NAME"],
     ),
     m(
-        "TSK_WIFI_NETWORK",
+        "KAAMOS_WIFI_NETWORK",
         &[(ev::WIFI_NETWORK, DATETIME)],
-        &["TSK_SSID", "TSK_DEVICE_ID"],
-        &["TSK_SSID"],
+        &["KAAMOS_SSID", "KAAMOS_DEVICE_ID"],
+        &["KAAMOS_SSID"],
     ),
     m(
-        "TSK_BLUETOOTH_PAIRING",
+        "KAAMOS_BLUETOOTH_PAIRING",
         &[
             (ev::BLUETOOTH_PAIRING, DATETIME),
             (ev::BLUETOOTH_PAIRING_ACCESSED, ACCESSED),
         ],
-        &["TSK_DEVICE_NAME", "TSK_MAC_ADDRESS"],
-        &["TSK_DEVICE_NAME"],
+        &["KAAMOS_DEVICE_NAME", "KAAMOS_MAC_ADDRESS"],
+        &["KAAMOS_DEVICE_NAME"],
     ),
     m(
-        "TSK_BLUETOOTH_ADAPTER",
+        "KAAMOS_BLUETOOTH_ADAPTER",
         &[(ev::BLUETOOTH_ADAPTER, DATETIME)],
-        &["TSK_NAME", "TSK_MAC_ADDRESS"],
-        &["TSK_NAME"],
+        &["KAAMOS_NAME", "KAAMOS_MAC_ADDRESS"],
+        &["KAAMOS_NAME"],
     ),
     m(
-        "TSK_SERVICE_ACCOUNT",
+        "KAAMOS_SERVICE_ACCOUNT",
         &[(ev::SERVICE_ACCOUNT, CREATED)],
-        &["TSK_PROG_NAME", "TSK_USER_ID", "TSK_DOMAIN"],
-        &["TSK_PROG_NAME"],
+        &["KAAMOS_PROG_NAME", "KAAMOS_USER_ID", "KAAMOS_DOMAIN"],
+        &["KAAMOS_PROG_NAME"],
     ),
     m(
-        "TSK_SCREEN_SHOTS",
+        "KAAMOS_SCREEN_SHOTS",
         &[(ev::SCREEN_SHOT, DATETIME)],
-        &["TSK_PROG_NAME", "TSK_PATH"],
-        &["TSK_PROG_NAME"],
+        &["KAAMOS_PROG_NAME", "KAAMOS_PATH"],
+        &["KAAMOS_PROG_NAME"],
     ),
     m(
-        "TSK_CALENDAR_ENTRY",
+        "KAAMOS_CALENDAR_ENTRY",
         &[
             (ev::CALENDAR_ENTRY_START, START),
             (ev::CALENDAR_ENTRY_END, END),
         ],
-        &["TSK_DESCRIPTION", "TSK_LOCATION"],
-        &["TSK_DESCRIPTION"],
+        &["KAAMOS_DESCRIPTION", "KAAMOS_LOCATION"],
+        &["KAAMOS_DESCRIPTION"],
     ),
     m(
-        "TSK_USER_DEVICE_EVENT",
+        "KAAMOS_USER_DEVICE_EVENT",
         &[
             (ev::USER_DEVICE_EVENT_START, START),
             (ev::USER_DEVICE_EVENT_END, END),
         ],
-        &["TSK_PROG_NAME", "TSK_ACTIVITY_TYPE", "TSK_VALUE"],
-        &["TSK_ACTIVITY_TYPE"],
+        &["KAAMOS_PROG_NAME", "KAAMOS_ACTIVITY_TYPE", "KAAMOS_VALUE"],
+        &["KAAMOS_ACTIVITY_TYPE"],
     ),
     m(
-        "TSK_BACKUP_EVENT",
+        "KAAMOS_BACKUP_EVENT",
         &[(ev::BACKUP_EVENT_START, START), (ev::BACKUP_EVENT_END, END)],
-        &["TSK_PROG_NAME", "TSK_PATH"],
-        &["TSK_PROG_NAME"],
+        &["KAAMOS_PROG_NAME", "KAAMOS_PATH"],
+        &["KAAMOS_PROG_NAME"],
     ),
     m(
-        "TSK_GPS_TRACKPOINT",
+        "KAAMOS_GPS_TRACKPOINT",
         &[(ev::GPS_TRACKPOINT, DATETIME)],
         GEO,
-        &["TSK_NAME"],
+        &["KAAMOS_NAME"],
     ),
     m(
-        "TSK_GPS_BOOKMARK",
+        "KAAMOS_GPS_BOOKMARK",
         &[(ev::GPS_BOOKMARK, DATETIME)],
         GEO,
-        &["TSK_NAME"],
+        &["KAAMOS_NAME"],
     ),
     m(
-        "TSK_GPS_LAST_KNOWN_LOCATION",
+        "KAAMOS_GPS_LAST_KNOWN_LOCATION",
         &[(ev::GPS_LAST_KNOWN_LOCATION, DATETIME)],
         GEO,
-        &["TSK_NAME"],
+        &["KAAMOS_NAME"],
     ),
     m(
-        "TSK_GPS_SEARCH",
+        "KAAMOS_GPS_SEARCH",
         &[(ev::GPS_SEARCH, DATETIME)],
         GEO,
-        &["TSK_NAME"],
+        &["KAAMOS_NAME"],
     ),
     m(
-        "TSK_GPS_ROUTE",
+        "KAAMOS_GPS_ROUTE",
         &[(ev::GPS_ROUTE, DATETIME)],
-        &["TSK_NAME", "TSK_LOCATION"],
-        &["TSK_NAME"],
+        &["KAAMOS_NAME", "KAAMOS_LOCATION"],
+        &["KAAMOS_NAME"],
     ),
     m(
-        "PM_EVENT_LOG",
+        "KAAMOS_EVENT_LOG",
         &[(ev::LOG_ENTRY, DATETIME)],
         &[
-            "PM_EVENT_CHANNEL",
-            "PM_EVENT_ID",
-            "PM_EVENT_DESCRIPTION",
-            "TSK_USER_NAME",
-            "PM_REMOTE_HOST",
-            "PM_EXECUTABLE_INFO",
-            "PM_PAYLOAD_DATA_1",
-            "PM_PAYLOAD_DATA_2",
+            "KAAMOS_EVENT_CHANNEL",
+            "KAAMOS_EVENT_ID",
+            "KAAMOS_EVENT_DESCRIPTION",
+            "KAAMOS_USER_NAME",
+            "KAAMOS_REMOTE_HOST",
+            "KAAMOS_EXECUTABLE_INFO",
+            "KAAMOS_PAYLOAD_DATA_1",
+            "KAAMOS_PAYLOAD_DATA_2",
         ],
-        &["PM_EVENT_DESCRIPTION"],
+        &["KAAMOS_EVENT_DESCRIPTION"],
     ),
 ];
 
@@ -358,7 +373,7 @@ pub(crate) fn add_artifact_events(tx: &Connection, id: i64, a: &NewArtifact) -> 
             Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?))
         })
         .optional()?;
-    // Data artifacts only (category 0), as TSK.
+    // Data artifacts only (category 0), as Autopsy.
     let Some((type_name, type_display, 0, custom)) = ty else {
         return Ok(0);
     };
@@ -409,7 +424,7 @@ pub(crate) fn add_artifact_events(tx: &Connection, id: i64, a: &NewArtifact) -> 
             }
         }
     } else {
-        // TSK's catch-all: one event per date attribute.
+        // Autopsy's catch-all: one event per date attribute.
         let catch_all = if custom {
             ev::CUSTOM_ARTIFACT_CATCH_ALL
         } else {

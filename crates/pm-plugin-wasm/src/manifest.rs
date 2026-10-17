@@ -1,7 +1,7 @@
 //! `plugin.toml`, the manifest next to a plugin's component:
 //!
 //! ```toml
-//! api = "0.1"                # pm-plugin-api version the plugin was built for
+//! api = "0.3"                # pm-plugin-api version the plugin was built for
 //! component = "plugin.wasm"  # path relative to the folder (default)
 //!
 //! [limits]                   # optional; defaults in `Limits::default()`
@@ -90,7 +90,7 @@ mod tests {
     #[test]
     fn manifests_are_checked() {
         let d = tempfile::tempdir().unwrap();
-        write(d.path(), "api = \"0.1\"\n[limits]\nmemory_mb = 64\n");
+        write(d.path(), "api = \"0.3\"\n[limits]\nmemory_mb = 64\n");
         let m = Manifest::read(d.path()).unwrap();
         assert_eq!(m.component, PathBuf::from("plugin.wasm"));
         assert_eq!(m.limits.memory_mb, Some(64));
@@ -98,9 +98,15 @@ mod tests {
         write(d.path(), "api = \"0.9\"\n");
         let e = Manifest::read(d.path()).unwrap_err();
         assert!(e.reason.contains("built for plugin API 0.9"), "{e}");
-        write(d.path(), "api = \"0.1\"\ncomponent = \"../x.wasm\"\n");
+        write(d.path(), "api = \"0.3\"\ncomponent = \"../x.wasm\"\n");
         assert!(Manifest::read(d.path()).is_err(), "no escaping the folder");
-        write(d.path(), "api = \"0.1\"\nunknown = 1\n");
+        write(d.path(), "api = \"0.3\"\nunknown = 1\n");
         assert!(Manifest::read(d.path()).is_err());
+        write(d.path(), "api = \"0.2\"\n");
+        let e = Manifest::read(d.path()).unwrap_err();
+        assert!(
+            e.reason.contains("built for plugin API 0.2"),
+            "older type names: {e}"
+        );
     }
 }

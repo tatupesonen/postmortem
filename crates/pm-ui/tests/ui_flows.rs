@@ -390,10 +390,10 @@ fn analysis_results_are_listed_and_open_the_source_file() {
             .into_iter()
             .find(|f| f.name == "setup.exe")
             .unwrap();
-        let set = pm_casedb::catalog::attribute_type_id("TSK_SET_NAME").unwrap();
+        let set = pm_casedb::catalog::attribute_type_id("KAAMOS_SET_NAME").unwrap();
         case.db()
             .add_artifact(&pm_casedb::NewArtifact {
-                type_id: pm_casedb::catalog::artifact_type_id("TSK_HASHSET_HIT").unwrap(),
+                type_id: pm_casedb::catalog::artifact_type_id("KAAMOS_HASHSET_HIT").unwrap(),
                 ds_id: s.ds_id,
                 file_id: Some(exe.id),
                 source_artifact_id: None,
@@ -636,7 +636,7 @@ fn case_with_history(name: &str) -> PathBuf {
     ] {
         case.db()
             .add_artifact(&pm_casedb::NewArtifact {
-                type_id: pm_casedb::catalog::artifact_type_id("TSK_WEB_HISTORY").unwrap(),
+                type_id: pm_casedb::catalog::artifact_type_id("KAAMOS_WEB_HISTORY").unwrap(),
                 ds_id: s.ds_id,
                 file_id: None,
                 source_artifact_id: None,
@@ -646,16 +646,16 @@ fn case_with_history(name: &str) -> PathBuf {
                 justification: None,
                 created_at: 0,
                 attributes: [
-                    (attr("TSK_URL"), text(url)),
+                    (attr("KAAMOS_URL"), text(url)),
                     (
-                        attr("TSK_DATETIME_ACCESSED"),
+                        attr("KAAMOS_DATETIME_ACCESSED"),
                         pm_casedb::Value::DateTime(1_600_000_000 + t),
                     ),
-                    (attr("TSK_TITLE"), text("A page title")),
-                    (attr("TSK_REFERRER"), text("https://referrer.example/")),
-                    (attr("TSK_PROG_NAME"), text("Internet Explorer")),
-                    (attr("TSK_DOMAIN"), text("example")),
-                    (attr("TSK_USER_NAME"), text("alice")),
+                    (attr("KAAMOS_TITLE"), text("A page title")),
+                    (attr("KAAMOS_REFERRER"), text("https://referrer.example/")),
+                    (attr("KAAMOS_PROG_NAME"), text("Internet Explorer")),
+                    (attr("KAAMOS_DOMAIN"), text("example")),
+                    (attr("KAAMOS_USER_NAME"), text("alice")),
                 ]
                 .into_iter()
                 .map(|(a, v)| (a, v, "test".to_owned()))
@@ -920,7 +920,7 @@ fn archives_open_like_folders() {
     shot(&mut h, "archive_member");
 }
 
-/// Hosts: the image gets TSK's default host; Manage Hosts adds a host;
+/// Hosts: the image gets Autopsy's default host; Manage Hosts adds a host;
 /// the host menu associates the host with a new person.
 #[test]
 fn hosts_and_persons() {

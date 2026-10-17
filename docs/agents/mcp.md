@@ -96,7 +96,7 @@ Write (only with `allow_writes` on a writable case): `add_tag`,
 * `get_file_content`/`get_report_content` read at most 192 KiB per call
   (Autopsy 1 MiB) to respect the 256 KiB response cap; `truncated`/`eof`
   as in Autopsy.
-* `knownState` says `NOTABLE` (Autopsy printed TSK's `BAD`; both accepted
+* `knownState` says `NOTABLE` (Autopsy printed Autopsy's `BAD`; both accepted
   as input). Object ids are per table: `objectId` of `query_files` is a
   file id, artifacts are `artifact:N`.
 * `get_communications_accounts` lists every account (with its

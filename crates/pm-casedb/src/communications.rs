@@ -1,7 +1,7 @@
-//! Communication accounts and relationships (TSK `CommunicationsManager`).
+//! Communication accounts and relationships (Autopsy `CommunicationsManager`).
 //!
 //! An *account* (a phone number, an e-mail address, a Skype id, …) is unique
-//! per case; an *account instance* is a `TSK_ACCOUNT` artifact on the file
+//! per case; an *account instance* is a `KAAMOS_ACCOUNT` artifact on the file
 //! where the account was found. Messages, call logs and contacts relate
 //! every pair of their participants. The Communications view reads the
 //! relationship table through its indexes, so it never scans artifacts.
@@ -29,7 +29,7 @@ pub struct Account {
     pub identifier: String,
 }
 
-/// Relationship kinds (TSK `Relationship.Type`).
+/// Relationship kinds (Autopsy `Relationship.Type`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum RelationshipKind {
     Message = 1,
@@ -56,12 +56,12 @@ impl RelationshipKind {
     }
 
     /// The artifact types a relationship of this kind may come from
-    /// (TSK `Relationship.Type.isCreatableFrom`).
+    /// (Autopsy `Relationship.Type.isCreatableFrom`).
     pub fn source_artifact_types(self) -> &'static [&'static str] {
         match self {
-            Self::Message => &["TSK_EMAIL_MSG", "TSK_MESSAGE"],
-            Self::CallLog => &["TSK_CALLLOG"],
-            Self::Contact => &["TSK_CONTACT"],
+            Self::Message => &["KAAMOS_EMAIL_MSG", "KAAMOS_MESSAGE"],
+            Self::CallLog => &["KAAMOS_CALLLOG"],
+            Self::Contact => &["KAAMOS_CONTACT"],
         }
     }
 }
@@ -70,7 +70,7 @@ impl RelationshipKind {
 const TELEPHONY_CHARS: &[char] = &['-', '(', ')', '#', '*', ','];
 const MIN_PHONE_LEN: usize = 3;
 
-/// TSK `CommunicationsUtils.isValidPhoneNumber`.
+/// Autopsy `CommunicationsUtils.isValidPhoneNumber`.
 pub fn is_valid_phone_number(s: &str) -> bool {
     let t = s.trim();
     !t.is_empty()
@@ -82,7 +82,7 @@ pub fn is_valid_phone_number(s: &str) -> bool {
         })
 }
 
-/// TSK `CommunicationsUtils.isValidEmailAddress`.
+/// Autopsy `CommunicationsUtils.isValidEmailAddress`.
 pub fn is_valid_email_address(s: &str) -> bool {
     if !s.contains('@') || !s.contains('.') {
         return false;
@@ -99,7 +99,7 @@ pub fn is_valid_email_address(s: &str) -> bool {
     matches!((labels.next(), labels.next()), (Some(a), Some(b)) if !a.is_empty() && !b.is_empty())
 }
 
-/// Normalises an account identifier (TSK `normalizeAccountID`): phone
+/// Normalises an account identifier (Autopsy `normalizeAccountID`): phone
 /// numbers lose spaces, dashes and parentheses; e-mail addresses are lower
 /// cased without `;`; other ids are lower cased and trimmed.
 pub fn normalize_account_id(type_name: &str, id: &str) -> Result<String> {
@@ -137,7 +137,7 @@ pub fn normalize_account_id(type_name: &str, id: &str) -> Result<String> {
     }
 }
 
-/// Filters of the Communications view (TSK `CommunicationsFilter`).
+/// Filters of the Communications view (Autopsy `CommunicationsFilter`).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct CommsFilter {
     /// Only relationships from these data sources (empty: all).
@@ -318,16 +318,16 @@ impl CaseDb {
         })
     }
 
-    /// Creates an account instance (TSK `createAccountFileInstance`): the
-    /// account, and a `TSK_ACCOUNT` artifact on `file_id` with
-    /// `TSK_ACCOUNT_TYPE` and the normalised `TSK_ID` unless the file
+    /// Creates an account instance (Autopsy `createAccountFileInstance`): the
+    /// account, and a `KAAMOS_ACCOUNT` artifact on `file_id` with
+    /// `KAAMOS_ACCOUNT_TYPE` and the normalised `KAAMOS_ID` unless the file
     /// already has one. Returns the account and the instance artifact id.
     pub fn account_instance(&self, inst: AccountInstanceSpec<'_>) -> Result<(Account, i64)> {
         self.write(|tx| account_instance_tx(tx, inst))
     }
 
     /// Relates every pair of `participants` through `source_artifact_id`
-    /// (TSK `addRelationships`; duplicates are ignored, the direction is
+    /// (Autopsy `addRelationships`; duplicates are ignored, the direction is
     /// not kept). `date_time` ≤ 0 is stored as unknown.
     pub fn add_relationships(
         &self,
@@ -343,7 +343,7 @@ impl CaseDb {
     }
 
     /// Accounts with at least one relationship passing `filter`, per data
-    /// source, with their relationship counts (TSK
+    /// source, with their relationship counts (Autopsy
     /// `getAccountDeviceInstancesWithRelationships`).
     pub fn account_device_instances(
         &self,
@@ -374,7 +374,7 @@ impl CaseDb {
     }
 
     /// Accounts related to `account_id` with the number of relationships
-    /// shared with it (TSK `getRelatedAccountDeviceInstances` +
+    /// shared with it (Autopsy `getRelatedAccountDeviceInstances` +
     /// `getRelationshipCountsPairwise`).
     pub fn related_accounts(
         &self,
@@ -425,7 +425,7 @@ impl CaseDb {
         })
     }
 
-    /// Accounts taking part in the relationships of an artifact (TSK
+    /// Accounts taking part in the relationships of an artifact (Autopsy
     /// `getAccountsRelatedToArtifact`).
     pub fn accounts_of_artifact(&self, artifact_id: i64) -> Result<Vec<Account>> {
         self.read(|c| {
@@ -440,13 +440,13 @@ impl CaseDb {
         })
     }
 
-    /// `TSK_ACCOUNT` instance artifacts of an account (TSK
+    /// `KAAMOS_ACCOUNT` instance artifacts of an account (Autopsy
     /// `getAccountFileInstances`).
     pub fn account_instances_of(&self, account: &Account) -> Result<Vec<i64>> {
-        let art_type = artifact_type_id("TSK_ACCOUNT").unwrap_or(39);
+        let art_type = artifact_type_id("KAAMOS_ACCOUNT").unwrap_or(39);
         let (Some(type_attr), Some(id_attr)) = (
-            attribute_type_id("TSK_ACCOUNT_TYPE"),
-            attribute_type_id("TSK_ID"),
+            attribute_type_id("KAAMOS_ACCOUNT_TYPE"),
+            attribute_type_id("KAAMOS_ID"),
         ) else {
             return Ok(Vec::new());
         };
@@ -481,10 +481,10 @@ pub(crate) fn account_instance_tx(
         extra,
         now,
     } = inst;
-    let art_type = artifact_type_id("TSK_ACCOUNT").unwrap_or(39);
+    let art_type = artifact_type_id("KAAMOS_ACCOUNT").unwrap_or(39);
     let (Some(type_attr), Some(id_attr)) = (
-        attribute_type_id("TSK_ACCOUNT_TYPE"),
-        attribute_type_id("TSK_ID"),
+        attribute_type_id("KAAMOS_ACCOUNT_TYPE"),
+        attribute_type_id("KAAMOS_ID"),
     ) else {
         return Err(DbError::Invalid(
             "account attributes missing from the catalogue".into(),
@@ -578,7 +578,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn phone_normalisation_matches_tsk() {
+    fn phone_normalisation_matches_autopsy() {
         assert_eq!(
             normalize_account_id("PHONE", " +1 (555) 123-4567 ").unwrap(),
             "+15551234567"
@@ -596,7 +596,7 @@ mod tests {
     }
 
     #[test]
-    fn email_normalisation_matches_tsk() {
+    fn email_normalisation_matches_autopsy() {
         assert_eq!(
             normalize_account_id("EMAIL", "Bob@Example.COM;").unwrap(),
             "bob@example.com"

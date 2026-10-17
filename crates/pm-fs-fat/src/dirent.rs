@@ -64,7 +64,7 @@ impl ShortEntry {
     }
 
     /// 8.3 name as displayed. Deleted entries show `_` for the lost first
-    /// character (TSK convention); `0x05` encodes a literal `0xE5`.
+    /// character (Autopsy convention); `0x05` encodes a literal `0xE5`.
     pub(crate) fn short_name(&self) -> String {
         let mut base: [u8; 8] = [0; 8];
         base.copy_from_slice(&self.raw_name[..8]);

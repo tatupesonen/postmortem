@@ -105,10 +105,10 @@ fn example_plugin_finds_big_round_files() {
         .map(|f| f.id)
         .collect();
     let mut got: Vec<i64> = case
-        .artifacts("TSK_INTERESTING_ITEM")
+        .artifacts("KAAMOS_INTERESTING_ITEM")
         .into_iter()
         .filter(|(_, a)| {
-            a.get("TSK_SET_NAME").map(String::as_str) == Some("Big and Round File Finder")
+            a.get("KAAMOS_SET_NAME").map(String::as_str) == Some("Big and Round File Finder")
         })
         .filter_map(|(a, _)| a.file_id)
         .collect();
@@ -148,10 +148,10 @@ fn probe_plugin_uses_every_host_call_and_survives_traps() {
 
     // Other text files were processed: results, derived files, reads.
     let pw = case.file("/Users/alice/Documents/passwords.txt");
-    let hits = case.artifacts("TSK_INTERESTING_FILE_HIT");
+    let hits = case.artifacts("KAAMOS_INTERESTING_FILE_HIT");
     assert!(
         hits.iter().any(|(a, attrs)| a.file_id == Some(pw.id)
-            && attrs.get("TSK_COMMENT").map(String::as_str) == Some("router: hunter2")),
+            && attrs.get("KAAMOS_COMMENT").map(String::as_str) == Some("router: hunter2")),
         "{hits:?}"
     );
     let child = case

@@ -75,7 +75,7 @@ impl Case {
                 // Local files of a logical-files data source may point at
                 // their original absolute location and are read as they
                 // are; derived files live in the case folder, normally
-                // XOR1-encoded (recognised by the header, as TSK does).
+                // XOR1-encoded (recognised by the header, as Autopsy does).
                 if f.origin == Origin::Local && std::path::Path::new(rel).is_absolute() {
                     return Ok(Arc::new(FileSource::open(rel).map_err(io_err(rel))?));
                 }

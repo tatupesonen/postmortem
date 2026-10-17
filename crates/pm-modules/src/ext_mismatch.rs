@@ -2,7 +2,7 @@
 //! inventory 03 §2.4).
 //!
 //! Flags files whose extension is not one of those allowed for their MIME
-//! type: a `TSK_EXT_MISMATCH_DETECTED` result with score Likely Notable,
+//! type: a `KAAMOS_EXT_MISMATCH_DETECTED` result with score Likely Notable,
 //! justification "File has MIME type of <type>" and no attributes. Only
 //! MIME types listed in the configuration are checked (Autopsy's default
 //! `mismatch_config.xml`, embedded verbatim, or the job's own map).
@@ -344,7 +344,7 @@ fn post(ctx: &JobContext, file_id: i64, mime: &str) {
     Art::result(
         ctx,
         NAME,
-        "TSK_EXT_MISMATCH_DETECTED",
+        "KAAMOS_EXT_MISMATCH_DETECTED",
         file_id,
         Significance::LikelyNotable,
     )

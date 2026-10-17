@@ -1,5 +1,5 @@
 //! Zone.Identifier analyzer (Autopsy `ExtractZoneIdentifier`): NTFS
-//! `file:Zone.Identifier` streams become `TSK_WEB_DOWNLOAD` artifacts
+//! `file:Zone.Identifier` streams become `KAAMOS_WEB_DOWNLOAD` artifacts
 //! unless a browser extractor already reported the download.
 
 use std::collections::HashSet;
@@ -49,17 +49,20 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
         let z = zone::parse(&data);
         let url = z.host_url.clone().unwrap_or_default();
         batch.push(
-            NewArt::std(ctx, "TSK_WEB_DOWNLOAD", Some(s.id))
-                .text("TSK_PATH", d.path())
+            NewArt::std(ctx, "KAAMOS_WEB_DOWNLOAD", Some(s.id))
+                .text("KAAMOS_PATH", d.path())
                 .attr(
-                    attribute_type_id("TSK_PATH_ID").unwrap_or(0),
+                    attribute_type_id("KAAMOS_PATH_ID").unwrap_or(0),
                     Value::Int(d.id),
                 )
-                .text_opt("TSK_URL", z.host_url.clone())
-                .text("TSK_DOMAIN", crate::recent_activity::extract_domain(&url))
-                .text_opt("TSK_COMMENT", z.zone_id.map(zone::zone_name))
-                .text_opt("TSK_REFERRER", z.referrer_url)
-                .key(&["TSK_PATH"])
+                .text_opt("KAAMOS_URL", z.host_url.clone())
+                .text(
+                    "KAAMOS_DOMAIN",
+                    crate::recent_activity::extract_domain(&url),
+                )
+                .text_opt("KAAMOS_COMMENT", z.zone_id.map(zone::zone_name))
+                .text_opt("KAAMOS_REFERRER", z.referrer_url)
+                .key(&["KAAMOS_PATH"])
                 .associate(Some(d.id)),
         );
     }
@@ -67,10 +70,10 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
     Ok(())
 }
 
-/// `TSK_PATH_ID`s of the data source's web downloads.
+/// `KAAMOS_PATH_ID`s of the data source's web downloads.
 fn known_downloads(ctx: &JobContext) -> Result<HashSet<i64>, ModuleError> {
     let db = ctx.case.db();
-    let Some(ty) = artifact_type_id("TSK_WEB_DOWNLOAD") else {
+    let Some(ty) = artifact_type_id("KAAMOS_WEB_DOWNLOAD") else {
         return Ok(HashSet::new());
     };
     let mut out = HashSet::new();
@@ -81,7 +84,7 @@ fn known_downloads(ctx: &JobContext) -> Result<HashSet<i64>, ModuleError> {
         after = last.id;
         for a in page {
             for attr in db.attributes(a.id)? {
-                if attr.name == "TSK_PATH_ID"
+                if attr.name == "KAAMOS_PATH_ID"
                     && let Value::Int(id) = attr.value
                 {
                     out.insert(id);

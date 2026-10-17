@@ -1,4 +1,4 @@
-//! Windows security identifier rules (TSK `WindowsAccountUtils`).
+//! Windows security identifier rules (Autopsy `WindowsAccountUtils`).
 
 /// Windows uses this SID when the real one is unknown; it is treated as
 /// no SID at all.
@@ -218,7 +218,7 @@ fn strip_backup(sid: &str) -> String {
     }
 }
 
-/// The NN of `S-1-5-NN-…` (TSK's special-account prefix regex).
+/// The NN of `S-1-5-NN-…` (Autopsy's special-account prefix regex).
 fn nt_sub_authority(sid: &str) -> Option<u32> {
     let rest = sid
         .strip_prefix("S-1-5-")
@@ -274,7 +274,7 @@ pub fn realm_address(sid: &str) -> Option<String> {
     if stripped.matches('-').count() < 3 {
         return None;
     }
-    // TSK cuts the original SID at the stripped SID's last '-'.
+    // Autopsy cuts the original SID at the stripped SID's last '-'.
     let cut = stripped.rfind('-')?;
     sid.get(..cut).map(str::to_owned)
 }

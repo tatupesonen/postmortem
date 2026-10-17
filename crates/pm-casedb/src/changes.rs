@@ -69,9 +69,15 @@ impl Domain {
             "scores" => Self::Scores,
             "events" | "event_descriptions" => Self::Events,
             "data_sources" | "volume_systems" | "volumes" | "file_systems" => Self::DataSources,
-            "hosts" | "persons" | "host_addresses" | "host_address_map"
-            | "host_address_dns_ip_map" | "host_address_usage" => Self::Hosts,
-            "os_accounts" | "os_account_realms" | "os_account_instances"
+            "hosts"
+            | "persons"
+            | "host_addresses"
+            | "host_address_map"
+            | "host_address_dns_ip_map"
+            | "host_address_usage" => Self::Hosts,
+            "os_accounts"
+            | "os_account_realms"
+            | "os_account_instances"
             | "os_account_attributes" => Self::OsAccounts,
             "accounts" | "account_types" | "account_relationships" => Self::Accounts,
             "reports" => Self::Reports,

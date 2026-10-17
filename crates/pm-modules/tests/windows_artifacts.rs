@@ -300,57 +300,63 @@ fn windows_artifacts_end_to_end() {
             .unwrap_or_else(|| panic!("no {ty}: {d:#?}"))
     };
 
-    let os = one("TSK_OS_INFO");
-    assert_eq!(os["TSK_PROG_NAME"], "Microsoft Windows XP Service Pack 2");
-    assert_eq!(os["TSK_NAME"], "TESTPC");
-    assert_eq!(os["TSK_OWNER"], "Tester");
-    assert_eq!(os["TSK_DATETIME"], "1092955707");
-    assert_eq!(os["PM_TIMEZONE"], "Central Standard Time");
-    assert_eq!(os["PM_UTC_OFFSET"], "-360");
-
-    let usb = one("TSK_DEVICE_ATTACHED");
-    assert_eq!(usb["TSK_DEVICE_MAKE"], "SanDisk Corp.");
-    assert_eq!(usb["TSK_DEVICE_ID"], "SERIAL123");
-    assert_eq!(one("TSK_INSTALLED_PROG")["TSK_PROG_NAME"], "Tool");
-    assert_eq!(one("TSK_REMOTE_DRIVE")["TSK_REMOTE_PATH"], "\\\\srv\\share");
+    let os = one("KAAMOS_OS_INFO");
     assert_eq!(
-        one("TSK_DATA_SOURCE_USAGE")["TSK_DESCRIPTION"],
+        os["KAAMOS_PROG_NAME"],
+        "Microsoft Windows XP Service Pack 2"
+    );
+    assert_eq!(os["KAAMOS_NAME"], "TESTPC");
+    assert_eq!(os["KAAMOS_OWNER"], "Tester");
+    assert_eq!(os["KAAMOS_DATETIME"], "1092955707");
+    assert_eq!(os["KAAMOS_TIMEZONE"], "Central Standard Time");
+    assert_eq!(os["KAAMOS_UTC_OFFSET"], "-360");
+
+    let usb = one("KAAMOS_DEVICE_ATTACHED");
+    assert_eq!(usb["KAAMOS_DEVICE_MAKE"], "SanDisk Corp.");
+    assert_eq!(usb["KAAMOS_DEVICE_ID"], "SERIAL123");
+    assert_eq!(one("KAAMOS_INSTALLED_PROG")["KAAMOS_PROG_NAME"], "Tool");
+    assert_eq!(
+        one("KAAMOS_REMOTE_DRIVE")["KAAMOS_REMOTE_PATH"],
+        "\\\\srv\\share"
+    );
+    assert_eq!(
+        one("KAAMOS_DATA_SOURCE_USAGE")["KAAMOS_DESCRIPTION"],
         "OS Drive (Microsoft Windows XP Service Pack 2)"
     );
 
-    let recent = one("TSK_RECENT_OBJECT");
+    let recent = one("KAAMOS_RECENT_OBJECT");
     assert_eq!(
-        recent["TSK_PATH"],
+        recent["KAAMOS_PATH"],
         "C:\\Documents and Settings\\bob\\notes.txt"
     );
-    assert_ne!(recent["TSK_PATH_ID"], "-1", "target resolved");
+    assert_ne!(recent["KAAMOS_PATH_ID"], "-1", "target resolved");
 
-    let pf = one("TSK_PROG_RUN");
-    assert_eq!(pf["TSK_PROG_NAME"], "NOTEPAD.EXE");
-    assert_eq!(pf["TSK_PATH"], "/WINDOWS/SYSTEM32");
-    assert_eq!(pf["TSK_DATETIME"], "1093500000");
-    assert_eq!(pf["TSK_COUNT"], "3");
-    assert_eq!(pf["TSK_COMMENT"], "Prefetch File");
+    let pf = one("KAAMOS_PROG_RUN");
+    assert_eq!(pf["KAAMOS_PROG_NAME"], "NOTEPAD.EXE");
+    assert_eq!(pf["KAAMOS_PATH"], "/WINDOWS/SYSTEM32");
+    assert_eq!(pf["KAAMOS_DATETIME"], "1093500000");
+    assert_eq!(pf["KAAMOS_COUNT"], "3");
+    assert_eq!(pf["KAAMOS_COMMENT"], "Prefetch File");
 
-    let rb = one("TSK_RECYCLE_BIN");
-    assert_eq!(rb["TSK_PATH"], "C:\\secret.txt");
-    assert_eq!(rb["TSK_DATETIME_DELETED"], "1094000000");
-    assert!(!rb.contains_key("TSK_COMMENT"), "content file found");
+    let rb = one("KAAMOS_RECYCLE_BIN");
+    assert_eq!(rb["KAAMOS_PATH"], "C:\\secret.txt");
+    assert_eq!(rb["KAAMOS_DATETIME_DELETED"], "1094000000");
+    assert!(!rb.contains_key("KAAMOS_COMMENT"), "content file found");
 
-    let dl = one("TSK_WEB_DOWNLOAD");
-    assert_eq!(dl["TSK_URL"], "https://dl.example.com/setup.exe");
-    assert_eq!(dl["TSK_DOMAIN"], "example.com");
-    assert_eq!(dl["TSK_COMMENT"], "Internet Zone");
+    let dl = one("KAAMOS_WEB_DOWNLOAD");
+    assert_eq!(dl["KAAMOS_URL"], "https://dl.example.com/setup.exe");
+    assert_eq!(dl["KAAMOS_DOMAIN"], "example.com");
+    assert_eq!(dl["KAAMOS_COMMENT"], "Internet Zone");
 
     // Associated objects link the LNK target, the executable and the download.
     assert!(
-        d.get("TSK_ASSOCIATED_OBJECT").map_or(0, Vec::len) >= 3,
+        d.get("KAAMOS_ASSOCIATED_OBJECT").map_or(0, Vec::len) >= 3,
         "{d:#?}"
     );
 
     // SAM and ProfileList users are OS accounts, not artifacts (Autopsy
     // 4.19+).
-    assert!(!d.contains_key("TSK_OS_ACCOUNT"));
+    assert!(!d.contains_key("KAAMOS_OS_ACCOUNT"));
     let db = case.db();
     let host = db.host_of_data_source(s.ds_id).unwrap().unwrap();
     let accounts = db.os_accounts(Some(s.ds_id), 0, 100).unwrap();
@@ -373,13 +379,16 @@ fn windows_artifacts_end_to_end() {
         .into_iter()
         .map(|(a, name, _)| (name, a.value.display()))
         .collect();
-    assert_eq!(attrs["TSK_DATETIME_ACCESSED"], "1090000000");
-    assert_eq!(attrs["TSK_COUNT"], "7");
-    assert_eq!(attrs["TSK_IS_ADMIN"], "1");
-    assert_eq!(attrs["TSK_DESCRIPTION"], "Built-in");
-    assert_eq!(attrs["TSK_EMAIL"], "Admin@Example.com");
-    assert_eq!(attrs["TSK_PASSWORD_SETTINGS"], "Password does not expire");
-    assert_eq!(attrs["TSK_FLAG"], "Normal user account");
+    assert_eq!(attrs["KAAMOS_DATETIME_ACCESSED"], "1090000000");
+    assert_eq!(attrs["KAAMOS_COUNT"], "7");
+    assert_eq!(attrs["KAAMOS_IS_ADMIN"], "1");
+    assert_eq!(attrs["KAAMOS_DESCRIPTION"], "Built-in");
+    assert_eq!(attrs["KAAMOS_EMAIL"], "Admin@Example.com");
+    assert_eq!(
+        attrs["KAAMOS_PASSWORD_SETTINGS"],
+        "Password does not expire"
+    );
+    assert_eq!(attrs["KAAMOS_FLAG"], "Normal user account");
     assert_eq!(attrs["RA_SAM_QUESTION_1"], "First pet?");
     assert_eq!(attrs["RA_SAM_ANSWER_1"], "Rex");
     assert_eq!(
@@ -399,8 +408,8 @@ fn windows_artifacts_end_to_end() {
         .into_iter()
         .map(|(a, name, _)| (name, a.value.display()))
         .collect();
-    assert_eq!(bob_attrs["TSK_HOME_DIR"], "/Documents and Settings/bob");
-    assert_eq!(bob_attrs["TSK_GROUPS"], "Administrators");
+    assert_eq!(bob_attrs["KAAMOS_HOME_DIR"], "/Documents and Settings/bob");
+    assert_eq!(bob_attrs["KAAMOS_GROUPS"], "Administrators");
     let carol = by_sid("S-1-5-21-77-88-99-1105");
     assert_eq!(carol.login_name.as_deref(), Some("carol"));
     let carol_realm = db.os_account_realm(carol.realm_id).unwrap();
@@ -429,5 +438,5 @@ fn windows_artifacts_end_to_end() {
         db.os_account_attributes(admin.id).unwrap().len(),
         attrs_before
     );
-    assert!(artifact_type_id("TSK_OS_INFO").is_some());
+    assert!(artifact_type_id("KAAMOS_OS_INFO").is_some());
 }

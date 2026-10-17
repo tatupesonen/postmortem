@@ -192,10 +192,10 @@ impl FileModule for ProbeFile {
             assert!(file.head().len() as u64 <= file.rec.size.max(HEAD_LEN as u64));
         }
         if file.rec.extension == "exe" {
-            let set = attribute_type_id("TSK_SET_NAME").unwrap();
+            let set = attribute_type_id("KAAMOS_SET_NAME").unwrap();
             ctx.post_artifact(
                 NewArtifact {
-                    type_id: artifact_type_id("TSK_INTERESTING_FILE_HIT").unwrap(),
+                    type_id: artifact_type_id("KAAMOS_INTERESTING_FILE_HIT").unwrap(),
                     ds_id: ctx.ds_id,
                     file_id: Some(file.rec.id),
                     source_artifact_id: None,

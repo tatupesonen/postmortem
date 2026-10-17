@@ -1,4 +1,4 @@
-//! Data source hashes for Data Source Integrity (TSK `Image.setMD5` /
+//! Data source hashes for Data Source Integrity (Autopsy `Image.setMD5` /
 //! `setSha1` / `setSha256`): stored hashes from E01 headers or entered by
 //! the user, and hashes the module computes.
 
@@ -67,8 +67,8 @@ impl CaseDb {
         .collect())
     }
 
-    /// Stores a hash of a data source when none is stored yet (TSK refuses
-    /// to overwrite one: `TskDataException`). Returns whether it was
+    /// Stores a hash of a data source when none is stored yet (Autopsy refuses
+    /// to overwrite one: an exception). Returns whether it was
     /// stored. The value must be hex of the algorithm's length.
     pub fn set_data_source_hash(&self, ds_id: i64, algo: ImageHash, value: &str) -> Result<bool> {
         let v = normalize_hash(algo, value).ok_or_else(|| {

@@ -7,7 +7,7 @@ for line in open(base + 'Bundle.properties-MERGED', encoding='latin-1'):
         k, v = line.rstrip('\n').split('=', 1)
         bundle[k.strip()] = v.strip()
 body = '\n'.join(src[1283:1835])
-start = body.index('if (BlackboardArtifact.ARTIFACT_TYPE.TSK_WEB_BOOKMARK')
+start = body.index('if (BlackboardArtifact.ARTIFACT_TYPE.KAAMOS_WEB_BOOKMARK')
 end = body.index('} else {\n            // This is the case that it is a custom type')
 chain = body[start:end]
 # split into blocks at "} else if (" boundaries

@@ -146,34 +146,34 @@ fn populate(case: &Case, demo: i64, bait: i64) {
     // Web history with injected text, and its timeline event.
     let web = db
         .add_artifact(&art(
-            "TSK_WEB_HISTORY",
+            "KAAMOS_WEB_HISTORY",
             demo,
             Some(setup),
             vec![
                 text(
-                    "TSK_URL",
+                    "KAAMOS_URL",
                     "https://example.com/setup.exe?q=INJECTION-MARKER",
                 ),
-                text("TSK_TITLE", INJECTION),
+                text("KAAMOS_TITLE", INJECTION),
                 (
-                    attr("TSK_DATETIME_ACCESSED"),
+                    attr("KAAMOS_DATETIME_ACCESSED"),
                     Value::DateTime(1_622_505_480),
                     "test".into(),
                 ),
-                text("TSK_PROG_NAME", "Edge"),
+                text("KAAMOS_PROG_NAME", "Edge"),
             ],
         ))
         .unwrap();
-    // Posting the artifact adds its Web History event (TSK TimelineManager).
+    // Posting the artifact adds its Web History event (Autopsy TimelineManager).
     assert_eq!(db.events_of_artifact(web).unwrap().len(), 1);
     // A notable interesting-item result.
     let mut hit = art(
-        "TSK_INTERESTING_ITEM",
+        "KAAMOS_INTERESTING_ITEM",
         demo,
         Some(passwords),
         vec![
-            text("TSK_SET_NAME", "Credentials"),
-            text("TSK_COMMENT", "password file"),
+            text("KAAMOS_SET_NAME", "Credentials"),
+            text("KAAMOS_COMMENT", "password file"),
         ],
     );
     hit.score = Some((Significance::Notable, Priority::Normal));
@@ -204,16 +204,16 @@ fn populate(case: &Case, demo: i64, bait: i64) {
     // Communications: a message thread between two phones.
     let msg = db
         .add_artifact(&art(
-            "TSK_MESSAGE",
+            "KAAMOS_MESSAGE",
             bait,
             Some(readme),
             vec![
-                text("TSK_PHONE_NUMBER_FROM", "+358401234567"),
-                text("TSK_PHONE_NUMBER_TO", "+358409876543"),
-                text("TSK_TEXT", INJECTION),
-                text("TSK_THREAD_ID", "thread-1"),
+                text("KAAMOS_PHONE_NUMBER_FROM", "+358401234567"),
+                text("KAAMOS_PHONE_NUMBER_TO", "+358409876543"),
+                text("KAAMOS_TEXT", INJECTION),
+                text("KAAMOS_THREAD_ID", "thread-1"),
                 (
-                    attr("TSK_DATETIME"),
+                    attr("KAAMOS_DATETIME"),
                     Value::DateTime(1_622_505_000),
                     "test".into(),
                 ),
@@ -231,52 +231,56 @@ fn populate(case: &Case, demo: i64, bait: i64) {
     )
     .unwrap();
     db.add_artifact(&art(
-        "TSK_CONTACT",
+        "KAAMOS_CONTACT",
         bait,
         Some(readme),
         vec![
-            text("TSK_NAME", "Mallory INJECTION-MARKER"),
-            text("TSK_PHONE_NUMBER", "+358409876543"),
+            text("KAAMOS_NAME", "Mallory INJECTION-MARKER"),
+            text("KAAMOS_PHONE_NUMBER", "+358409876543"),
         ],
     ))
     .unwrap();
     // A GPS bookmark.
     db.add_artifact(&art(
-        "TSK_GPS_BOOKMARK",
+        "KAAMOS_GPS_BOOKMARK",
         demo,
         Some(setup),
         vec![
             (
-                attr("TSK_GEO_LATITUDE"),
+                attr("KAAMOS_GEO_LATITUDE"),
                 Value::Double(60.1699),
                 "test".into(),
             ),
             (
-                attr("TSK_GEO_LONGITUDE"),
+                attr("KAAMOS_GEO_LONGITUDE"),
                 Value::Double(24.9384),
                 "test".into(),
             ),
             (
-                attr("TSK_DATETIME"),
+                attr("KAAMOS_DATETIME"),
                 Value::DateTime(1_622_400_000),
                 "test".into(),
             ),
-            text("TSK_NAME", "Helsinki"),
+            text("KAAMOS_NAME", "Helsinki"),
         ],
     ))
     .unwrap();
     // An event-log entry as the Windows Event Logs module writes it.
     let ty = db
-        .artifact_type("PM_EVENT_LOG", "Event Log Entries", Category::DataArtifact)
+        .artifact_type(
+            "KAAMOS_EVENT_LOG",
+            "Event Log Entries",
+            Category::DataArtifact,
+        )
         .unwrap();
     let eid = db
-        .attribute_type("PM_EVENT_ID", "Event ID", ValueType::Integer)
+        .attribute_type("KAAMOS_EVENT_ID", "Event ID", ValueType::Integer)
         .unwrap();
     let ch = db
-        .attribute_type("PM_EVENT_CHANNEL", "Channel", ValueType::String)
+        .attribute_type("KAAMOS_EVENT_CHANNEL", "Channel", ValueType::String)
         .unwrap();
     let pr = db
-        .attribute_type("PM_EVENT_PROVIDER", "Provider", ValueType::String)
+        .attribute_type("KAAMOS_EVENT_PROVIDER", "Provider", ValueType::String)
         .unwrap();
     for (id, t) in [(4624, 1_622_505_100), (4625, 1_622_505_200)] {
         db.add_artifact(&NewArtifact {
@@ -289,10 +293,10 @@ fn populate(case: &Case, demo: i64, bait: i64) {
                     Value::Text("Microsoft-Windows-Security-Auditing".into()),
                     "test".into(),
                 ),
-                (attr("TSK_DATETIME"), Value::DateTime(t), "test".into()),
-                text("TSK_USER_NAME", "alice"),
+                (attr("KAAMOS_DATETIME"), Value::DateTime(t), "test".into()),
+                text("KAAMOS_USER_NAME", "alice"),
             ],
-            ..art("TSK_GEN_INFO", demo, None, vec![])
+            ..art("KAAMOS_GEN_INFO", demo, None, vec![])
         })
         .unwrap();
     }

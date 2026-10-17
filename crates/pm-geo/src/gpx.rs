@@ -21,7 +21,7 @@ pub struct GpxPoint {
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct Gpx {
     pub waypoints: Vec<GpxPoint>,
-    /// Track segments (Autopsy posts one `TSK_GPS_TRACK` per segment).
+    /// Track segments (Autopsy posts one `KAAMOS_GPS_TRACK` per segment).
     pub track_segments: Vec<Vec<GpxPoint>>,
     pub routes: Vec<Vec<GpxPoint>>,
 }

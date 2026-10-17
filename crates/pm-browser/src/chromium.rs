@@ -40,7 +40,7 @@ pub fn browser_for_path(parent_path: &str) -> Option<(&'static str, usize)> {
     None
 }
 
-/// One visit (`TSK_WEB_HISTORY`).
+/// One visit (`KAAMOS_WEB_HISTORY`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Visit {
     pub url: String,
@@ -66,7 +66,7 @@ pub fn history(conn: &Connection, mut f: impl FnMut(Visit) -> bool) -> rusqlite:
     })
 }
 
-/// One download (`TSK_WEB_DOWNLOAD`).
+/// One download (`KAAMOS_WEB_DOWNLOAD`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Download {
     pub full_path: String,
@@ -91,7 +91,7 @@ pub fn downloads(conn: &Connection, mut f: impl FnMut(Download) -> bool) -> rusq
     })
 }
 
-/// One cookie (`TSK_WEB_COOKIE`).
+/// One cookie (`KAAMOS_WEB_COOKIE`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cookie {
     pub host_key: String,
@@ -119,7 +119,7 @@ pub fn cookies(conn: &Connection, mut f: impl FnMut(Cookie) -> bool) -> rusqlite
     )
 }
 
-/// One saved login (`TSK_SERVICE_ACCOUNT`).
+/// One saved login (`KAAMOS_SERVICE_ACCOUNT`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Login {
     pub origin_url: String,
@@ -144,7 +144,7 @@ pub fn logins(conn: &Connection, mut f: impl FnMut(Login) -> bool) -> rusqlite::
     )
 }
 
-/// One autofill entry (`TSK_WEB_FORM_AUTOFILL`).
+/// One autofill entry (`KAAMOS_WEB_FORM_AUTOFILL`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Autofill {
     pub name: String,
@@ -187,7 +187,7 @@ pub fn autofill(conn: &Connection, mut f: impl FnMut(Autofill) -> bool) -> rusql
     })
 }
 
-/// One autofill address (`TSK_WEB_FORM_ADDRESS`).
+/// One autofill address (`KAAMOS_WEB_FORM_ADDRESS`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Address {
     pub name: String,
@@ -265,7 +265,7 @@ pub fn addresses(conn: &Connection, mut f: impl FnMut(Address) -> bool) -> rusql
     })
 }
 
-/// One favicon mapping (`TSK_FAVICON`).
+/// One favicon mapping (`KAAMOS_FAVICON`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Favicon {
     pub page_url: String,
@@ -288,7 +288,7 @@ pub fn favicons(conn: &Connection, mut f: impl FnMut(Favicon) -> bool) -> rusqli
     )
 }
 
-/// One bookmark (`TSK_WEB_BOOKMARK`).
+/// One bookmark (`KAAMOS_WEB_BOOKMARK`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bookmark {
     pub url: String,
@@ -350,7 +350,7 @@ pub fn bookmarks(data: &[u8]) -> Option<Vec<Bookmark>> {
     Some(out)
 }
 
-/// One profile of `Local State` (`TSK_LOCAL_STATE`).
+/// One profile of `Local State` (`KAAMOS_LOCAL_STATE`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Profile {
     /// The profile directory name (`Default`, `Profile 1`).
@@ -398,7 +398,7 @@ pub fn local_state(data: &[u8]) -> Result<Option<Vec<Profile>>, NotLocalState> {
     ))
 }
 
-/// One installed extension (`TSK_CHROME_EXTENSIONS`).
+/// One installed extension (`KAAMOS_CHROME_EXTENSIONS`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Extension {
     pub id: String,

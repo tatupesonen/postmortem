@@ -15,7 +15,7 @@ branch `worktree-agent-ac9d7b3293b4d4267`).
 * `pm-casedb/src/derived.rs`: `NewFile::new`, `add_derived_files`,
   `derived_files_of` (keyset), `has_children`, `count_children` (new),
   `child_named`, `update_derived_file`.
-* XOR1 storage (`pm-case/src/derived.rs`): TSK's format, `EncodedWriter`,
+* XOR1 storage (`pm-case/src/derived.rs`): Autopsy's format, `EncodedWriter`,
   `EncodedSource`, `OutputDir`, `resolve`.
 * `pm-ingest`: `JobContext::{reserve_file_ids, add_derived_files,
   insert_derived_files (new: insert without scheduling), add_files_to_job}`;
@@ -109,7 +109,7 @@ returns each stream's file id, and is a no-op on re-ingest. Tested in
   `extensions`) and start-up errors (empty include list, invalid names,
   filter ignoring unallocated space); carved rows (origin carved, unalloc
   name/meta flags, layout = image ranges, `derived_from` = the unallocated
-  file) under `/$CarvedFiles/<n>/` (2000 per folder, TSK's rule, existing
+  file) under `/$CarvedFiles/<n>/` (2000 per folder, Autopsy's rule, existing
   folders reused), scheduled into the job; "PhotoRec Results" info
   message.
 
@@ -149,7 +149,7 @@ cache (I/O bound in practice). Zip deflate 475 MiB/s, stored 11 GiB/s,
 20 000 small members at 406 k/s; gzip 377 MiB/s.
 
 ## Known gaps vs Autopsy
-* Derived-file tool name/version (`tsk_files_derived_method`) is not
+* Derived-file tool name/version () is not
   stored (no schema change); the producer is implied by the
   `ModuleOutput/<module>` folder.
 * "Unzip contents with password" action is UI (coordinator-owned);

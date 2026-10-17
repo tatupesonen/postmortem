@@ -21,16 +21,16 @@ pub struct KeywordHitKey {
 }
 
 impl CaseDb {
-    /// The identities of a file's `TSK_KEYWORD_HIT` results, in one query.
+    /// The identities of a file's `KAAMOS_KEYWORD_HIT` results, in one query.
     pub fn keyword_hit_keys(&self, file_id: i64) -> Result<HashSet<KeywordHitKey>> {
-        let kwh = artifact_type_id("TSK_KEYWORD_HIT").unwrap_or(9);
+        let kwh = artifact_type_id("KAAMOS_KEYWORD_HIT").unwrap_or(9);
         let attr = |n: &str| attribute_type_id(n).unwrap_or(-1);
         let (kw, set, st, re, assoc) = (
-            attr("TSK_KEYWORD"),
-            attr("TSK_SET_NAME"),
-            attr("TSK_KEYWORD_SEARCH_TYPE"),
-            attr("TSK_KEYWORD_REGEXP"),
-            attr("TSK_ASSOCIATED_ARTIFACT"),
+            attr("KAAMOS_KEYWORD"),
+            attr("KAAMOS_SET_NAME"),
+            attr("KAAMOS_KEYWORD_SEARCH_TYPE"),
+            attr("KAAMOS_KEYWORD_REGEXP"),
+            attr("KAAMOS_ASSOCIATED_ARTIFACT"),
         );
         self.read(|c| {
             let mut stmt = c.prepare_cached(
@@ -86,22 +86,30 @@ mod tests {
         let a = |n: &str| attribute_type_id(n).unwrap();
         let mut attributes = vec![
             (
-                a("TSK_KEYWORD"),
+                a("KAAMOS_KEYWORD"),
                 Value::Text(keyword.into()),
                 "m".to_owned(),
             ),
-            (a("TSK_SET_NAME"), Value::Text(set.into()), "m".to_owned()),
-            (a("TSK_KEYWORD_SEARCH_TYPE"), Value::Int(2), "m".to_owned()),
+            (
+                a("KAAMOS_SET_NAME"),
+                Value::Text(set.into()),
+                "m".to_owned(),
+            ),
+            (
+                a("KAAMOS_KEYWORD_SEARCH_TYPE"),
+                Value::Int(2),
+                "m".to_owned(),
+            ),
         ];
         if let Some(r) = regexp {
             attributes.push((
-                a("TSK_KEYWORD_REGEXP"),
+                a("KAAMOS_KEYWORD_REGEXP"),
                 Value::Text(r.into()),
                 "m".to_owned(),
             ));
         }
         NewArtifact {
-            type_id: artifact_type_id("TSK_KEYWORD_HIT").unwrap(),
+            type_id: artifact_type_id("KAAMOS_KEYWORD_HIT").unwrap(),
             ds_id: 1,
             file_id: Some(file_id),
             source_artifact_id: None,

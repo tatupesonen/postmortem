@@ -171,10 +171,10 @@ impl Fixture {
         inbox
     }
 
-    /// `(file name, TSK_KEYWORD, TSK_SET_NAME, search type)` of every hit.
+    /// `(file name, KAAMOS_KEYWORD, KAAMOS_SET_NAME, search type)` of every hit.
     fn hits(&self) -> BTreeSet<(String, String, String, i64)> {
         let db = self.case.db();
-        let kwh = artifact_type_id("TSK_KEYWORD_HIT").unwrap();
+        let kwh = artifact_type_id("KAAMOS_KEYWORD_HIT").unwrap();
         let mut out = BTreeSet::new();
         for a in db
             .artifacts_of_type(kwh, Some(self.ds_id), 0, 10_000)
@@ -186,7 +186,7 @@ impl Fixture {
                 Some(Value::Text(s)) => s,
                 _ => String::new(),
             };
-            let st = match get("TSK_KEYWORD_SEARCH_TYPE") {
+            let st = match get("KAAMOS_KEYWORD_SEARCH_TYPE") {
                 Some(Value::Int(i)) => i,
                 _ => -1,
             };
@@ -197,10 +197,10 @@ impl Fixture {
             assert_eq!(a.significance, Some(Significance::LikelyNotable));
             assert_eq!(
                 a.configuration.as_deref(),
-                Some(text("TSK_SET_NAME").as_str())
+                Some(text("KAAMOS_SET_NAME").as_str())
             );
-            assert!(text("TSK_KEYWORD_PREVIEW").contains('\u{AB}'));
-            out.insert((file, text("TSK_KEYWORD"), text("TSK_SET_NAME"), st));
+            assert!(text("KAAMOS_KEYWORD_PREVIEW").contains('\u{AB}'));
+            out.insert((file, text("KAAMOS_KEYWORD"), text("KAAMOS_SET_NAME"), st));
         }
         out
     }
@@ -260,7 +260,7 @@ fn keyword_search_end_to_end() {
     // An artifact whose text mentions a keyword.
     let notes = fx.file("notes.txt");
     let bookmark = NewArtifact {
-        type_id: artifact_type_id("TSK_WEB_BOOKMARK").unwrap(),
+        type_id: artifact_type_id("KAAMOS_WEB_BOOKMARK").unwrap(),
         ds_id: fx.ds_id,
         file_id: Some(notes.id),
         source_artifact_id: None,
@@ -270,7 +270,7 @@ fn keyword_search_end_to_end() {
         justification: None,
         created_at: 0,
         attributes: vec![(
-            attribute_type_id("TSK_TITLE").unwrap(),
+            attribute_type_id("KAAMOS_TITLE").unwrap(),
             Value::Text("Molotov cocktails at home".into()),
             "test".into(),
         )],
@@ -304,7 +304,7 @@ fn keyword_search_end_to_end() {
         .case
         .db()
         .artifacts_of_type(
-            artifact_type_id("TSK_KEYWORD_HIT").unwrap(),
+            artifact_type_id("KAAMOS_KEYWORD_HIT").unwrap(),
             Some(fx.ds_id),
             0,
             10_000,
@@ -324,18 +324,18 @@ fn keyword_search_end_to_end() {
         });
     assert!(unalloc_hit, "{hits:#?}");
     // The artifact's text was searched: a hit with the associated artifact.
-    let kwh = artifact_type_id("TSK_KEYWORD_HIT").unwrap();
-    let assoc =
-        fx.case
-            .db()
-            .artifacts_of_type(kwh, Some(fx.ds_id), 0, 10_000)
-            .unwrap()
-            .into_iter()
-            .any(|a| {
-                fx.case.db().attributes(a.id).unwrap().iter().any(|x| {
-                    x.name == "TSK_ASSOCIATED_ARTIFACT" && x.value == Value::Int(bookmark_id)
-                })
-            });
+    let kwh = artifact_type_id("KAAMOS_KEYWORD_HIT").unwrap();
+    let assoc = fx
+        .case
+        .db()
+        .artifacts_of_type(kwh, Some(fx.ds_id), 0, 10_000)
+        .unwrap()
+        .into_iter()
+        .any(|a| {
+            fx.case.db().attributes(a.id).unwrap().iter().any(|x| {
+                x.name == "KAAMOS_ASSOCIATED_ARTIFACT" && x.value == Value::Int(bookmark_id)
+            })
+        });
     assert!(assoc);
     // Scores.
     assert_eq!(
@@ -352,7 +352,7 @@ fn keyword_search_end_to_end() {
         .artifacts_for_file(cards.id)
         .unwrap()
         .into_iter()
-        .filter(|a| a.type_id == artifact_type_id("TSK_ACCOUNT").unwrap())
+        .filter(|a| a.type_id == artifact_type_id("KAAMOS_ACCOUNT").unwrap())
         .collect();
     assert_eq!(accounts.len(), 1);
     let attrs = fx.case.db().attributes(accounts[0].id).unwrap();
@@ -361,10 +361,10 @@ fn keyword_search_end_to_end() {
             .iter()
             .any(|x| x.name == n && x.value == Value::Text(v.into()))
     };
-    assert!(has("TSK_ACCOUNT_TYPE", "CREDIT_CARD"));
-    assert!(has("TSK_ID", "4539747947839518654"));
-    assert!(has("TSK_CARD_NUMBER", "4539747947839518654"));
-    assert!(has("TSK_SET_NAME", CREDIT_CARD_NUMBERS));
+    assert!(has("KAAMOS_ACCOUNT_TYPE", "CREDIT_CARD"));
+    assert!(has("KAAMOS_ID", "4539747947839518654"));
+    assert!(has("KAAMOS_CARD_NUMBER", "4539747947839518654"));
+    assert!(has("KAAMOS_SET_NAME", CREDIT_CARD_NUMBERS));
     assert!(
         fx.case
             .db()
@@ -381,16 +381,22 @@ fn keyword_search_end_to_end() {
         .artifacts_for_file(docx.id)
         .unwrap()
         .into_iter()
-        .filter(|a| a.type_id == artifact_type_id("TSK_METADATA").unwrap())
+        .filter(|a| a.type_id == artifact_type_id("KAAMOS_METADATA").unwrap())
         .collect();
     assert_eq!(meta.len(), 1);
     let attrs = fx.case.db().attributes(meta[0].id).unwrap();
     let get = |n: &str| attrs.iter().find(|x| x.name == n).map(|x| x.value.clone());
-    assert_eq!(get("TSK_OWNER"), Some(Value::Text("Alice Author".into())));
-    assert_eq!(get("TSK_USER_ID"), Some(Value::Text("Bob Editor".into())));
-    assert_eq!(get("TSK_DESCRIPTION"), Some(Value::Text("Plans".into())));
     assert_eq!(
-        get("TSK_DATETIME_CREATED"),
+        get("KAAMOS_OWNER"),
+        Some(Value::Text("Alice Author".into()))
+    );
+    assert_eq!(
+        get("KAAMOS_USER_ID"),
+        Some(Value::Text("Bob Editor".into()))
+    );
+    assert_eq!(get("KAAMOS_DESCRIPTION"), Some(Value::Text("Plans".into())));
+    assert_eq!(
+        get("KAAMOS_DATETIME_CREATED"),
         Some(Value::DateTime(1_577_934_245))
     );
 
@@ -460,15 +466,15 @@ fn keyword_search_end_to_end() {
 
     // Re-running adds nothing.
     let before = (
-        fx.count("TSK_KEYWORD_HIT"),
-        fx.count("TSK_ACCOUNT"),
-        fx.count("TSK_METADATA"),
+        fx.count("KAAMOS_KEYWORD_HIT"),
+        fx.count("KAAMOS_ACCOUNT"),
+        fx.count("KAAMOS_METADATA"),
     );
     fx.run(&settings());
     let after = (
-        fx.count("TSK_KEYWORD_HIT"),
-        fx.count("TSK_ACCOUNT"),
-        fx.count("TSK_METADATA"),
+        fx.count("KAAMOS_KEYWORD_HIT"),
+        fx.count("KAAMOS_ACCOUNT"),
+        fx.count("KAAMOS_METADATA"),
     );
     assert_eq!(before, after);
 }
@@ -521,7 +527,7 @@ fn disabled_by_default() {
         &Arc::new(Inbox::default()),
     );
     assert!(matches!(r, Err(IngestError::NoModules)), "{r:?}");
-    assert_eq!(fx.count("TSK_KEYWORD_HIT"), 0);
+    assert_eq!(fx.count("KAAMOS_KEYWORD_HIT"), 0);
     assert!(
         pm_modules::core_modules()
             .iter()

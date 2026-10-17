@@ -430,7 +430,7 @@ fn hash_sets_ui(ui: &mut egui::Ui, s: &mut HashLookupSettings) {
     }
     if ui
         .button("Add Hash Set…")
-        .on_hover_text("TSK .kdb, NSRL (txt or RDS v3), md5sum, HashKeeper, EnCase or a TSK .idx")
+        .on_hover_text(".kdb, NSRL (txt or RDS v3), md5sum, HashKeeper, EnCase or an hfind .idx")
         .clicked()
         && let Some(paths) = rfd::FileDialog::new()
             .set_title("Add Hash Set")

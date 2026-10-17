@@ -194,8 +194,8 @@ impl<'a> Generator<'a> {
             self.progress
                 .status(&format!("Now processing {display}..."));
             match name.as_str() {
-                "TSK_KEYWORD_HIT" => self.keyword_hits(m, type_id, &comment)?,
-                "TSK_HASHSET_HIT" => self.hashset_hits(m, type_id, &comment)?,
+                "KAAMOS_KEYWORD_HIT" => self.keyword_hits(m, type_id, &comment)?,
+                "KAAMOS_HASHSET_HIT" => self.hashset_hits(m, type_id, &comment)?,
                 _ => {
                     let arts = self.artifacts(type_id)?;
                     if !arts.is_empty() {
@@ -257,7 +257,7 @@ impl<'a> Generator<'a> {
     ) -> Vec<String> {
         let tag_list = tags.iter().cloned().collect::<Vec<_>>().join(", ");
         let path = file.map(|f| self.unique_path(f)).unwrap_or_default();
-        if type_name == "TSK_EXT_MISMATCH_DETECTED" {
+        if type_name == "KAAMOS_EXT_MISMATCH_DETECTED" {
             return match file {
                 Some(f) => vec![
                     f.name.clone(),
@@ -280,10 +280,10 @@ impl<'a> Generator<'a> {
             .map(|c| match c {
                 Column::Attr(_, attr) => {
                     // Interesting items show the file's unique path as Path.
-                    if attr == "TSK_PATH"
+                    if attr == "KAAMOS_PATH"
                         && matches!(
                             type_name,
-                            "TSK_INTERESTING_FILE_HIT" | "TSK_INTERESTING_ITEM"
+                            "KAAMOS_INTERESTING_FILE_HIT" | "KAAMOS_INTERESTING_ITEM"
                         )
                     {
                         return path.clone();
@@ -335,7 +335,7 @@ impl<'a> Generator<'a> {
         // (list, keyword, parent path, name, preview) as Autopsy orders them.
         let mut hits: Vec<(String, String, String, String, String, String, String)> = Vec::new();
         for (a, attrs, tags) in &arts {
-            let list = match text(attrs, "TSK_SET_NAME") {
+            let list = match text(attrs, "KAAMOS_SET_NAME") {
                 l if l.is_empty() => "User Searches".to_owned(),
                 l => l,
             };
@@ -345,10 +345,10 @@ impl<'a> Generator<'a> {
             });
             hits.push((
                 list,
-                text(attrs, "TSK_KEYWORD"),
+                text(attrs, "KAAMOS_KEYWORD"),
                 parent,
                 name,
-                text(attrs, "TSK_KEYWORD_PREVIEW"),
+                text(attrs, "KAAMOS_KEYWORD_PREVIEW"),
                 path,
                 tags.iter().cloned().collect::<Vec<_>>().join(", "),
             ));
@@ -411,7 +411,7 @@ impl<'a> Generator<'a> {
         for (a, attrs, tags) in &arts {
             let set = attrs
                 .iter()
-                .find(|x| x.name == "TSK_SET_NAME")
+                .find(|x| x.name == "KAAMOS_SET_NAME")
                 .map(|x| x.value.display())
                 .unwrap_or_default();
             let file = self.file(a.file_id);
@@ -630,7 +630,7 @@ fn columns_for(type_name: &str, present: &BTreeMap<String, String>) -> Vec<Colum
             Col::Status => Column::Status,
         })
         .collect();
-    if type_name == "TSK_EXT_MISMATCH_DETECTED" {
+    if type_name == "KAAMOS_EXT_MISMATCH_DETECTED" {
         cols.push(Column::Tags);
         return cols;
     }
@@ -676,11 +676,11 @@ mod tests {
     #[test]
     fn web_history_columns_follow_autopsy() {
         let cols = columns_for(
-            "TSK_WEB_HISTORY",
+            "KAAMOS_WEB_HISTORY",
             &present(&[
-                ("URL", "TSK_URL"),
-                ("Domain", "TSK_DOMAIN"),
-                ("Title", "TSK_TITLE"),
+                ("URL", "KAAMOS_URL"),
+                ("Domain", "KAAMOS_DOMAIN"),
+                ("Title", "KAAMOS_TITLE"),
             ]),
         );
         let headers: Vec<String> = cols.iter().map(Column::header).collect();
@@ -703,8 +703,8 @@ mod tests {
     #[test]
     fn unknown_types_list_every_attribute() {
         let cols = columns_for(
-            "PM_SHIMCACHE",
-            &present(&[("Path", "TSK_PATH"), ("Date/Time", "TSK_DATETIME")]),
+            "KAAMOS_SHIMCACHE",
+            &present(&[("Path", "KAAMOS_PATH"), ("Date/Time", "KAAMOS_DATETIME")]),
         );
         let headers: Vec<String> = cols.iter().map(Column::header).collect();
         assert_eq!(headers, ["Date/Time", "Path", "Source File", "Tags"]);

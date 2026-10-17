@@ -148,7 +148,7 @@ impl NewArt {
         self
     }
 
-    /// Also posts a `TSK_ASSOCIATED_OBJECT` on `file_id` pointing here.
+    /// Also posts a `KAAMOS_ASSOCIATED_OBJECT` on `file_id` pointing here.
     pub(crate) fn associate(mut self, file_id: Option<i64>) -> Self {
         self.associate = file_id;
         self
@@ -171,8 +171,8 @@ impl Batch {
         if self.items.is_empty() {
             return Ok(0);
         }
-        let assoc_type = artifact_type_id("TSK_ASSOCIATED_OBJECT").unwrap_or(0);
-        let assoc_attr = std_attr("TSK_ASSOCIATED_ARTIFACT");
+        let assoc_type = artifact_type_id("KAAMOS_ASSOCIATED_OBJECT").unwrap_or(0);
+        let assoc_attr = std_attr("KAAMOS_ASSOCIATED_ARTIFACT");
         let created = ctx.now();
         let ds = ctx.ds_id;
         let n = ctx.case.db().bulk(|b| {

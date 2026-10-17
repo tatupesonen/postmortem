@@ -100,17 +100,17 @@ fn cases() -> Vec<(&'static str, &'static str, Value)> {
         (
             "query_data_artifacts",
             "query_data_artifacts",
-            json!({"artifactType": "TSK_WEB_HISTORY"}),
+            json!({"artifactType": "KAAMOS_WEB_HISTORY"}),
         ),
         (
             "query_data_artifacts_attr",
             "query_data_artifacts",
-            json!({"attributeType": "TSK_NAME", "attributeValue": "helsinki"}),
+            json!({"attributeType": "KAAMOS_NAME", "attributeValue": "helsinki"}),
         ),
         (
             "query_analysis_results",
             "query_analysis_results",
-            json!({"artifactType": "TSK_INTERESTING_ITEM"}),
+            json!({"artifactType": "KAAMOS_INTERESTING_ITEM"}),
         ),
         ("query_data_sources", "query_data_sources", json!({})),
         ("get_hosts", "get_hosts", json!({})),
@@ -239,7 +239,7 @@ fn golden_responses_per_tool() {
     let web = first_ref(
         &s,
         "query_data_artifacts",
-        json!({"artifactType": "TSK_WEB_HISTORY"}),
+        json!({"artifactType": "KAAMOS_WEB_HISTORY"}),
     );
     let setup = file_ref(&s, "setup.exe");
     let with_ref: Vec<(&str, &str, Value)> = vec![
@@ -566,7 +566,7 @@ fn write_tools_tag_as_the_client_and_audit() {
     let before = all_rows(
         &s,
         "query_analysis_results",
-        json!({"artifactType": "TSK_KEYWORD_HIT"}),
+        json!({"artifactType": "KAAMOS_KEYWORD_HIT"}),
         500,
     )
     .len();
@@ -578,7 +578,7 @@ fn write_tools_tag_as_the_client_and_audit() {
     let after = all_rows(
         &s,
         "query_analysis_results",
-        json!({"artifactType": "TSK_KEYWORD_HIT"}),
+        json!({"artifactType": "KAAMOS_KEYWORD_HIT"}),
         500,
     )
     .len();

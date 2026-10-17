@@ -492,99 +492,117 @@ fn browsers_end_to_end() {
     let d = dump(&c);
 
     // ---- Chromium
-    let ls = find(&d, "TSK_LOCAL_STATE", "TSK_PATH", "Default");
-    assert_eq!(ls["TSK_USER_ID"], "1234");
-    assert_eq!(ls["TSK_NAME"], "Bob Personal");
-    assert_eq!(ls["TSK_USER_NAME"], "bob@example.com");
-    assert_eq!(ls["TSK_PROG_NAME"], "Google Chrome");
-    assert_eq!(count(&d, "TSK_LOCAL_STATE"), 2);
+    let ls = find(&d, "KAAMOS_LOCAL_STATE", "KAAMOS_PATH", "Default");
+    assert_eq!(ls["KAAMOS_USER_ID"], "1234");
+    assert_eq!(ls["KAAMOS_NAME"], "Bob Personal");
+    assert_eq!(ls["KAAMOS_USER_NAME"], "bob@example.com");
+    assert_eq!(ls["KAAMOS_PROG_NAME"], "Google Chrome");
+    assert_eq!(count(&d, "KAAMOS_LOCAL_STATE"), 2);
 
     let ext = find(
         &d,
-        "TSK_CHROME_EXTENSIONS",
-        "TSK_ID",
+        "KAAMOS_CHROME_EXTENSIONS",
+        "KAAMOS_ID",
         "aapocclcgogkmnckokdopfmhonfmgoek",
     );
-    assert_eq!(ext["TSK_FLAG"], "Enabled");
-    assert_eq!(ext["TSK_PERMISSIONS"], "storage, tabs");
-    assert_eq!(ext["TSK_USER_NAME"], "Bob Personal");
-    assert!(!ext.contains_key("TSK_COMMENT"));
+    assert_eq!(ext["KAAMOS_FLAG"], "Enabled");
+    assert_eq!(ext["KAAMOS_PERMISSIONS"], "storage, tabs");
+    assert_eq!(ext["KAAMOS_USER_NAME"], "Bob Personal");
+    assert!(!ext.contains_key("KAAMOS_COMMENT"));
     let bad = find(
         &d,
-        "TSK_CHROME_EXTENSIONS",
-        "TSK_ID",
+        "KAAMOS_CHROME_EXTENSIONS",
+        "KAAMOS_ID",
         "cflijgpldfbmdijnkeoadcjpfgokoeck",
     );
-    assert!(bad["TSK_COMMENT"].starts_with("Malicious Extension Found - https://"));
+    assert!(bad["KAAMOS_COMMENT"].starts_with("Malicious Extension Found - https://"));
 
     let v = find(
         &d,
-        "TSK_WEB_HISTORY",
-        "TSK_TITLE",
+        "KAAMOS_WEB_HISTORY",
+        "KAAMOS_TITLE",
         "forensic tools - Google Search",
     );
-    assert_eq!(v["TSK_DATETIME_ACCESSED"], "1600000100");
-    assert_eq!(v["TSK_REFERRER"], "https://www.example.com/");
-    assert_eq!(v["TSK_DOMAIN"], "google.com");
-    assert_eq!(v["TSK_PROG_NAME"], "Google Chrome");
-    assert_eq!(v["TSK_USER_NAME"], "Bob Personal");
+    assert_eq!(v["KAAMOS_DATETIME_ACCESSED"], "1600000100");
+    assert_eq!(v["KAAMOS_REFERRER"], "https://www.example.com/");
+    assert_eq!(v["KAAMOS_DOMAIN"], "google.com");
+    assert_eq!(v["KAAMOS_PROG_NAME"], "Google Chrome");
+    assert_eq!(v["KAAMOS_USER_NAME"], "Bob Personal");
     // The WAL's visits are read.
-    let wal = find(&d, "TSK_WEB_HISTORY", "TSK_URL", "https://wal.example.com/");
-    assert_eq!(wal["TSK_DATETIME_ACCESSED"], "1600000300");
+    let wal = find(
+        &d,
+        "KAAMOS_WEB_HISTORY",
+        "KAAMOS_URL",
+        "https://wal.example.com/",
+    );
+    assert_eq!(wal["KAAMOS_DATETIME_ACCESSED"], "1600000300");
     let work = find(
         &d,
-        "TSK_WEB_HISTORY",
-        "TSK_URL",
+        "KAAMOS_WEB_HISTORY",
+        "KAAMOS_URL",
         "https://work.example.com/",
     );
-    assert_eq!(work["TSK_USER_NAME"], "Bob Work");
+    assert_eq!(work["KAAMOS_USER_NAME"], "Bob Work");
 
     let bm = find(
         &d,
-        "TSK_WEB_BOOKMARK",
-        "TSK_URL",
+        "KAAMOS_WEB_BOOKMARK",
+        "KAAMOS_URL",
         "https://www.rust-lang.org/",
     );
-    assert_eq!(bm["TSK_COMMENT"], "bookmark_bar");
-    assert_eq!(bm["TSK_DATETIME_CREATED"], "1600526400");
+    assert_eq!(bm["KAAMOS_COMMENT"], "bookmark_bar");
+    assert_eq!(bm["KAAMOS_DATETIME_CREATED"], "1600526400");
     // Folders are walked (Autopsy reads only the first level).
-    find(&d, "TSK_WEB_BOOKMARK", "TSK_URL", "https://docs.rs/");
+    find(&d, "KAAMOS_WEB_BOOKMARK", "KAAMOS_URL", "https://docs.rs/");
 
-    let ck = find(&d, "TSK_WEB_COOKIE", "TSK_NAME", "sid");
-    assert_eq!(ck["TSK_URL"], ".example.com");
-    assert_eq!(ck["TSK_DOMAIN"], "example.com");
-    assert_eq!(ck["TSK_DATETIME_ACCESSED"], "1600000500");
-    assert_eq!(ck["TSK_USER_NAME"], "Bob Personal");
+    let ck = find(&d, "KAAMOS_WEB_COOKIE", "KAAMOS_NAME", "sid");
+    assert_eq!(ck["KAAMOS_URL"], ".example.com");
+    assert_eq!(ck["KAAMOS_DOMAIN"], "example.com");
+    assert_eq!(ck["KAAMOS_DATETIME_ACCESSED"], "1600000500");
+    assert_eq!(ck["KAAMOS_USER_NAME"], "Bob Personal");
 
-    let login = find(&d, "TSK_SERVICE_ACCOUNT", "TSK_USER_ID", "bob@example.com");
-    assert_eq!(login["TSK_URL"], "https://accounts.shop.example.com/login");
-    assert_eq!(login["TSK_REALM"], "https://accounts.shop.example.com/");
-    assert_eq!(login["TSK_DOMAIN"], "example.com");
-    assert_eq!(login["TSK_DATETIME_CREATED"], "1600001000");
+    let login = find(
+        &d,
+        "KAAMOS_SERVICE_ACCOUNT",
+        "KAAMOS_USER_ID",
+        "bob@example.com",
+    );
+    assert_eq!(
+        login["KAAMOS_URL"],
+        "https://accounts.shop.example.com/login"
+    );
+    assert_eq!(login["KAAMOS_REALM"], "https://accounts.shop.example.com/");
+    assert_eq!(login["KAAMOS_DOMAIN"], "example.com");
+    assert_eq!(login["KAAMOS_DATETIME_CREATED"], "1600001000");
 
-    let af = find(&d, "TSK_WEB_FORM_AUTOFILL", "TSK_NAME", "email");
-    assert_eq!(af["TSK_VALUE"], "bob@example.com");
-    assert_eq!(af["TSK_COUNT"], "3");
-    assert_eq!(af["TSK_DATETIME_CREATED"], "1600000000");
-    assert_eq!(af["TSK_DATETIME_ACCESSED"], "1600000600");
-    let enc = find(&d, "TSK_WEB_FORM_AUTOFILL", "TSK_NAME", "cc");
-    assert_eq!(enc["TSK_COMMENT"], "The data was encrypted.");
+    let af = find(&d, "KAAMOS_WEB_FORM_AUTOFILL", "KAAMOS_NAME", "email");
+    assert_eq!(af["KAAMOS_VALUE"], "bob@example.com");
+    assert_eq!(af["KAAMOS_COUNT"], "3");
+    assert_eq!(af["KAAMOS_DATETIME_CREATED"], "1600000000");
+    assert_eq!(af["KAAMOS_DATETIME_ACCESSED"], "1600000600");
+    let enc = find(&d, "KAAMOS_WEB_FORM_AUTOFILL", "KAAMOS_NAME", "cc");
+    assert_eq!(enc["KAAMOS_COMMENT"], "The data was encrypted.");
     let ed = find(
         &d,
-        "TSK_ENCRYPTION_DETECTED",
-        "TSK_COMMENT",
+        "KAAMOS_ENCRYPTION_DETECTED",
+        "KAAMOS_COMMENT",
         "Google Chrome Autofill Database Encryption Detected",
     );
     assert_eq!(ed.len(), 1);
-    let addr = find(&d, "TSK_WEB_FORM_ADDRESS", "TSK_EMAIL", "bob@example.com");
-    assert_eq!(addr["TSK_NAME"], "Bob Q Builder");
-    assert_eq!(addr["TSK_PHONE_NUMBER"], "+1 555 0100");
+    let addr = find(
+        &d,
+        "KAAMOS_WEB_FORM_ADDRESS",
+        "KAAMOS_EMAIL",
+        "bob@example.com",
+    );
+    assert_eq!(addr["KAAMOS_NAME"], "Bob Q Builder");
+    assert_eq!(addr["KAAMOS_PHONE_NUMBER"], "+1 555 0100");
     assert_eq!(
-        addr["TSK_LOCATION"],
+        addr["KAAMOS_LOCATION"],
         "1 Main St, Springfield, IL, 62701, US"
     );
-    assert_eq!(addr["TSK_DATETIME_ACCESSED"], "1600000800");
-    assert_eq!(addr["TSK_COUNT"], "4");
+    assert_eq!(addr["KAAMOS_DATETIME_ACCESSED"], "1600000800");
+    assert_eq!(addr["KAAMOS_COUNT"], "4");
     assert!(
         c.case
             .db()
@@ -596,56 +614,61 @@ fn browsers_end_to_end() {
     let setup_id = c.file("/Users/bob/Downloads/setup.exe").id.to_string();
     let dl = find(
         &d,
-        "TSK_WEB_DOWNLOAD",
-        "TSK_URL",
+        "KAAMOS_WEB_DOWNLOAD",
+        "KAAMOS_URL",
         "https://cdn.example.net/setup.exe",
     );
-    assert_eq!(dl["TSK_PATH"], "C:\\Users\\bob\\Downloads\\setup.exe");
-    assert_eq!(dl["TSK_PATH_ID"], setup_id);
-    assert_eq!(dl["TSK_DATETIME_ACCESSED"], "1600000100");
+    assert_eq!(dl["KAAMOS_PATH"], "C:\\Users\\bob\\Downloads\\setup.exe");
+    assert_eq!(dl["KAAMOS_PATH_ID"], setup_id);
+    assert_eq!(dl["KAAMOS_DATETIME_ACCESSED"], "1600000100");
     // v30+: one artifact per URL-chain entry.
     find(
         &d,
-        "TSK_WEB_DOWNLOAD",
-        "TSK_URL",
+        "KAAMOS_WEB_DOWNLOAD",
+        "KAAMOS_URL",
         "http://dl.example.net/redirect",
     );
     let old = find(
         &d,
-        "TSK_WEB_DOWNLOAD",
-        "TSK_URL",
+        "KAAMOS_WEB_DOWNLOAD",
+        "KAAMOS_URL",
         "https://work.example.com/report.pdf",
     );
-    assert!(!old.contains_key("TSK_PATH_ID"), "file not on the image");
-    assert_eq!(old["TSK_USER_NAME"], "Bob Work");
+    assert!(!old.contains_key("KAAMOS_PATH_ID"), "file not on the image");
+    assert_eq!(old["KAAMOS_USER_NAME"], "Bob Work");
 
-    let fav = find(&d, "TSK_FAVICON", "TSK_URL", "https://www.example.com/");
-    assert_eq!(fav["TSK_DATETIME_MODIFIED"], "1600000010");
-    assert_eq!(fav["TSK_DATETIME_ACCESSED"], "1600000020");
+    let fav = find(
+        &d,
+        "KAAMOS_FAVICON",
+        "KAAMOS_URL",
+        "https://www.example.com/",
+    );
+    assert_eq!(fav["KAAMOS_DATETIME_MODIFIED"], "1600000010");
+    assert_eq!(fav["KAAMOS_DATETIME_ACCESSED"], "1600000020");
 
     // Chrome cache: one in-block payload (derived file), one f_ file.
     assert_eq!(
-        count(&d, "TSK_WEB_CACHE"),
+        count(&d, "KAAMOS_WEB_CACHE"),
         2,
         "{:#?}",
-        d.get("TSK_WEB_CACHE")
+        d.get("KAAMOS_WEB_CACHE")
     );
     let logo = find(
         &d,
-        "TSK_WEB_CACHE",
-        "TSK_URL",
+        "KAAMOS_WEB_CACHE",
+        "KAAMOS_URL",
         "https://www.example.com/logo.png",
     );
     assert!(
-        logo["TSK_PATH"].ends_with("/Cache/data_2/data_2__b0020001"),
+        logo["KAAMOS_PATH"].ends_with("/Cache/data_2/data_2__b0020001"),
         "{logo:?}"
     );
-    assert_eq!(logo["TSK_DATETIME_CREATED"], "1600000050");
-    assert!(logo["TSK_HEADERS"].contains("content-type :  image/png"));
+    assert_eq!(logo["KAAMOS_DATETIME_CREATED"], "1600000050");
+    assert!(logo["KAAMOS_HEADERS"].contains("content-type :  image/png"));
     let derived = c
         .case
         .db()
-        .file(logo["TSK_PATH_ID"].parse().unwrap())
+        .file(logo["KAAMOS_PATH_ID"].parse().unwrap())
         .unwrap()
         .unwrap();
     assert_eq!(derived.name, "data_2__b0020001");
@@ -655,15 +678,15 @@ fn browsers_end_to_end() {
     );
     let js = find(
         &d,
-        "TSK_WEB_CACHE",
-        "TSK_URL",
+        "KAAMOS_WEB_CACHE",
+        "KAAMOS_URL",
         "https://cdn.example.net/app.js",
     );
-    assert!(js["TSK_PATH"].ends_with("/Cache/f_000001"), "{js:?}");
+    assert!(js["KAAMOS_PATH"].ends_with("/Cache/f_000001"), "{js:?}");
     let f1 = c
         .case
         .db()
-        .file(js["TSK_PATH_ID"].parse().unwrap())
+        .file(js["KAAMOS_PATH_ID"].parse().unwrap())
         .unwrap()
         .unwrap();
     assert_eq!(f1.mime.as_deref(), Some("application/x-brotli"));
@@ -671,159 +694,212 @@ fn browsers_end_to_end() {
     // ---- Firefox
     let fv = find(
         &d,
-        "TSK_WEB_HISTORY",
-        "TSK_URL",
+        "KAAMOS_WEB_HISTORY",
+        "KAAMOS_URL",
         "https://blog.example.net/wp-admin/options.php",
     );
-    assert_eq!(fv["TSK_PROG_NAME"], "FireFox Analyzer");
-    assert_eq!(fv["TSK_DATETIME_ACCESSED"], "1600100100");
+    assert_eq!(fv["KAAMOS_PROG_NAME"], "FireFox Analyzer");
+    assert_eq!(fv["KAAMOS_DATETIME_ACCESSED"], "1600100100");
     assert_eq!(
-        fv["TSK_REFERRER"],
+        fv["KAAMOS_REFERRER"],
         "https://duckduckgo.com/?q=rust+parser&t=h_"
     );
-    assert!(!fv.contains_key("TSK_USER_NAME"));
+    assert!(!fv.contains_key("KAAMOS_USER_NAME"));
     assert!(
-        d["TSK_WEB_HISTORY"]
+        d["KAAMOS_WEB_HISTORY"]
             .iter()
-            .all(|a| a["TSK_URL"] != "https://hidden.example.com/")
+            .all(|a| a["KAAMOS_URL"] != "https://hidden.example.com/")
     );
-    let place = find(&d, "TSK_WEB_BOOKMARK", "TSK_TITLE", "Most Visited");
-    assert!(!place.contains_key("TSK_DOMAIN"));
-    assert!(!place.contains_key("TSK_DATETIME_CREATED"));
-    let fbm = find(&d, "TSK_WEB_BOOKMARK", "TSK_TITLE", "Blog admin");
-    assert_eq!(fbm["TSK_DATETIME_CREATED"], "1600100300");
-    assert_eq!(fbm["TSK_DOMAIN"], "example.net");
+    let place = find(&d, "KAAMOS_WEB_BOOKMARK", "KAAMOS_TITLE", "Most Visited");
+    assert!(!place.contains_key("KAAMOS_DOMAIN"));
+    assert!(!place.contains_key("KAAMOS_DATETIME_CREATED"));
+    let fbm = find(&d, "KAAMOS_WEB_BOOKMARK", "KAAMOS_TITLE", "Blog admin");
+    assert_eq!(fbm["KAAMOS_DATETIME_CREATED"], "1600100300");
+    assert_eq!(fbm["KAAMOS_DOMAIN"], "example.net");
     let fdl = find(
         &d,
-        "TSK_WEB_DOWNLOAD",
-        "TSK_URL",
+        "KAAMOS_WEB_DOWNLOAD",
+        "KAAMOS_URL",
         "https://files.example.net/tool.zip",
     );
-    assert_eq!(fdl["TSK_PATH"], "C:/Users/bob/Downloads/tool v2.zip");
+    assert_eq!(fdl["KAAMOS_PATH"], "C:/Users/bob/Downloads/tool v2.zip");
     assert_eq!(
-        fdl["TSK_PATH_ID"],
+        fdl["KAAMOS_PATH_ID"],
         c.file("/Users/bob/Downloads/tool v2.zip").id.to_string()
     );
     let fdl_old = find(
         &d,
-        "TSK_WEB_DOWNLOAD",
-        "TSK_URL",
+        "KAAMOS_WEB_DOWNLOAD",
+        "KAAMOS_URL",
         "http://old.example.com/old.exe",
     );
-    assert_eq!(fdl_old["TSK_DATETIME_ACCESSED"], "1200000000");
-    let fck = find(&d, "TSK_WEB_COOKIE", "TSK_NAME", "_ga");
-    assert_eq!(fck["TSK_DOMAIN"], "example.org");
-    assert_eq!(fck["TSK_DATETIME_CREATED"], "1600100000");
-    let v3 = find(&d, "TSK_WEB_COOKIE", "TSK_NAME", "old");
-    assert!(!v3.contains_key("TSK_DATETIME_CREATED"));
-    let form = find(&d, "TSK_WEB_FORM_AUTOFILL", "TSK_NAME", "searchbar-history");
-    assert_eq!(form["TSK_COUNT"], "2");
-    assert_eq!(form["TSK_DATETIME_ACCESSED"], "1600100900");
-    assert!(
-        d["TSK_WEB_FORM_AUTOFILL"]
-            .iter()
-            .all(|a| a["TSK_NAME"] != "ts")
+    assert_eq!(fdl_old["KAAMOS_DATETIME_ACCESSED"], "1200000000");
+    let fck = find(&d, "KAAMOS_WEB_COOKIE", "KAAMOS_NAME", "_ga");
+    assert_eq!(fck["KAAMOS_DOMAIN"], "example.org");
+    assert_eq!(fck["KAAMOS_DATETIME_CREATED"], "1600100000");
+    let v3 = find(&d, "KAAMOS_WEB_COOKIE", "KAAMOS_NAME", "old");
+    assert!(!v3.contains_key("KAAMOS_DATETIME_CREATED"));
+    let form = find(
+        &d,
+        "KAAMOS_WEB_FORM_AUTOFILL",
+        "KAAMOS_NAME",
+        "searchbar-history",
     );
-    let faddr = find(&d, "TSK_WEB_FORM_ADDRESS", "TSK_NAME", "Alice Example");
-    assert_eq!(faddr["TSK_LOCATION"], "Main St 1, 00100, FI");
-    assert_eq!(faddr["TSK_DATETIME_CREATED"], "1600100000");
-    assert_eq!(faddr["TSK_COUNT"], "2");
+    assert_eq!(form["KAAMOS_COUNT"], "2");
+    assert_eq!(form["KAAMOS_DATETIME_ACCESSED"], "1600100900");
+    assert!(
+        d["KAAMOS_WEB_FORM_AUTOFILL"]
+            .iter()
+            .all(|a| a["KAAMOS_NAME"] != "ts")
+    );
+    let faddr = find(
+        &d,
+        "KAAMOS_WEB_FORM_ADDRESS",
+        "KAAMOS_NAME",
+        "Alice Example",
+    );
+    assert_eq!(faddr["KAAMOS_LOCATION"], "Main St 1, 00100, FI");
+    assert_eq!(faddr["KAAMOS_DATETIME_CREATED"], "1600100000");
+    assert_eq!(faddr["KAAMOS_COUNT"], "2");
 
     // ---- Internet Explorer
     let ie = find(
         &d,
-        "TSK_WEB_HISTORY",
-        "TSK_URL",
+        "KAAMOS_WEB_HISTORY",
+        "KAAMOS_URL",
         "http://www.google.com/search?hl=en&q=hacking+tools",
     );
-    assert_eq!(ie["TSK_USER_NAME"], "Mr. Evil");
-    assert_eq!(ie["TSK_DATETIME_ACCESSED"], "1093532400");
-    assert_eq!(ie["TSK_PROG_NAME"], "Internet Explorer Analyzer");
-    let yahoo = find(&d, "TSK_WEB_HISTORY", "TSK_URL", "http://www.yahoo.com/");
-    assert_eq!(yahoo["TSK_USER_NAME"], "Mr. Evil");
+    assert_eq!(ie["KAAMOS_USER_NAME"], "Mr. Evil");
+    assert_eq!(ie["KAAMOS_DATETIME_ACCESSED"], "1093532400");
+    assert_eq!(ie["KAAMOS_PROG_NAME"], "Internet Explorer Analyzer");
+    let yahoo = find(
+        &d,
+        "KAAMOS_WEB_HISTORY",
+        "KAAMOS_URL",
+        "http://www.yahoo.com/",
+    );
+    assert_eq!(yahoo["KAAMOS_USER_NAME"], "Mr. Evil");
     find(
         &d,
-        "TSK_WEB_HISTORY",
-        "TSK_URL",
+        "KAAMOS_WEB_HISTORY",
+        "KAAMOS_URL",
         "http://www.google.com/intl/en/images/logo.gif",
     );
     assert!(
-        d["TSK_WEB_HISTORY"]
+        d["KAAMOS_WEB_HISTORY"]
             .iter()
-            .all(|a| a["TSK_URL"] != "http://leak.example.com/")
+            .all(|a| a["KAAMOS_URL"] != "http://leak.example.com/")
     );
-    let ief = find(&d, "TSK_WEB_BOOKMARK", "TSK_TITLE", "Google.url");
-    assert_eq!(ief["TSK_URL"], "http://www.google.com/");
-    assert_eq!(ief["TSK_DATETIME_CREATED"], "1090000000");
-    let iec = find(&d, "TSK_WEB_COOKIE", "TSK_NAME", "PREF");
-    assert_eq!(iec["TSK_URL"], "google.com/");
-    assert_eq!(iec["TSK_DOMAIN"], "google.com");
+    let ief = find(&d, "KAAMOS_WEB_BOOKMARK", "KAAMOS_TITLE", "Google.url");
+    assert_eq!(ief["KAAMOS_URL"], "http://www.google.com/");
+    assert_eq!(ief["KAAMOS_DATETIME_CREATED"], "1090000000");
+    let iec = find(&d, "KAAMOS_WEB_COOKIE", "KAAMOS_NAME", "PREF");
+    assert_eq!(iec["KAAMOS_URL"], "google.com/");
+    assert_eq!(iec["KAAMOS_DOMAIN"], "google.com");
 
     // ---- Safari
-    let sv = find(&d, "TSK_WEB_HISTORY", "TSK_PROG_NAME", "Safari Analyzer");
-    assert_eq!(sv["TSK_URL"], "https://www.bing.com/search?q=mac+forensics");
-    assert_eq!(sv["TSK_DATETIME_ACCESSED"], "1600100000");
-    assert_eq!(sv["TSK_TITLE"], "mac forensics - Bing");
-    let sb = find(&d, "TSK_WEB_BOOKMARK", "TSK_URL", "https://www.apple.com/");
-    assert_eq!(sb["TSK_TITLE"], "Apple");
+    let sv = find(
+        &d,
+        "KAAMOS_WEB_HISTORY",
+        "KAAMOS_PROG_NAME",
+        "Safari Analyzer",
+    );
+    assert_eq!(
+        sv["KAAMOS_URL"],
+        "https://www.bing.com/search?q=mac+forensics"
+    );
+    assert_eq!(sv["KAAMOS_DATETIME_ACCESSED"], "1600100000");
+    assert_eq!(sv["KAAMOS_TITLE"], "mac forensics - Bing");
+    let sb = find(
+        &d,
+        "KAAMOS_WEB_BOOKMARK",
+        "KAAMOS_URL",
+        "https://www.apple.com/",
+    );
+    assert_eq!(sb["KAAMOS_TITLE"], "Apple");
     let sd = find(
         &d,
-        "TSK_WEB_DOWNLOAD",
-        "TSK_URL",
+        "KAAMOS_WEB_DOWNLOAD",
+        "KAAMOS_URL",
         "https://dl.example.org/app.dmg",
     );
-    assert_eq!(sd["TSK_DATETIME_ACCESSED"], "1600200000");
+    assert_eq!(sd["KAAMOS_DATETIME_ACCESSED"], "1600200000");
     assert_eq!(
-        sd["TSK_PATH_ID"],
+        sd["KAAMOS_PATH_ID"],
         c.file("/Users/alice/Downloads/app.dmg").id.to_string()
     );
-    let sc = find(&d, "TSK_WEB_COOKIE", "TSK_NAME", "sess");
-    assert_eq!(sc["TSK_DATETIME_CREATED"], "1578307200");
-    assert_eq!(sc["TSK_DATETIME_END"], "1678307200");
-    assert_eq!(sc["TSK_DOMAIN"], "icq.com");
+    let sc = find(&d, "KAAMOS_WEB_COOKIE", "KAAMOS_NAME", "sess");
+    assert_eq!(sc["KAAMOS_DATETIME_CREATED"], "1578307200");
+    assert_eq!(sc["KAAMOS_DATETIME_END"], "1678307200");
+    assert_eq!(sc["KAAMOS_DOMAIN"], "icq.com");
 
     // ---- Analyses
-    let q = find(&d, "TSK_WEB_SEARCH_QUERY", "TSK_TEXT", "forensic tools");
-    assert_eq!(q["TSK_PROG_NAME"], "Google Chrome");
-    assert_eq!(q["TSK_DOMAIN"], "google.com");
-    assert_eq!(q["TSK_DATETIME_ACCESSED"], "1600000100");
-    find(&d, "TSK_WEB_SEARCH_QUERY", "TSK_TEXT", "rust parser");
-    find(&d, "TSK_WEB_SEARCH_QUERY", "TSK_TEXT", "hacking tools");
-    find(&d, "TSK_WEB_SEARCH_QUERY", "TSK_TEXT", "mac forensics");
+    let q = find(
+        &d,
+        "KAAMOS_WEB_SEARCH_QUERY",
+        "KAAMOS_TEXT",
+        "forensic tools",
+    );
+    assert_eq!(q["KAAMOS_PROG_NAME"], "Google Chrome");
+    assert_eq!(q["KAAMOS_DOMAIN"], "google.com");
+    assert_eq!(q["KAAMOS_DATETIME_ACCESSED"], "1600000100");
+    find(&d, "KAAMOS_WEB_SEARCH_QUERY", "KAAMOS_TEXT", "rust parser");
+    find(
+        &d,
+        "KAAMOS_WEB_SEARCH_QUERY",
+        "KAAMOS_TEXT",
+        "hacking tools",
+    );
+    find(
+        &d,
+        "KAAMOS_WEB_SEARCH_QUERY",
+        "KAAMOS_TEXT",
+        "mac forensics",
+    );
 
     let admin = find(
         &d,
-        "TSK_WEB_ACCOUNT_TYPE",
-        "TSK_TEXT",
+        "KAAMOS_WEB_ACCOUNT_TYPE",
+        "KAAMOS_TEXT",
         "Administrator role (myBB platform)",
     );
-    assert_eq!(admin["TSK_DOMAIN"], "example.org");
+    assert_eq!(admin["KAAMOS_DOMAIN"], "example.org");
     assert_eq!(
-        admin["TSK_URL"],
+        admin["KAAMOS_URL"],
         "https://forum.example.org/admin/index.php"
     );
-    let wp = find(&d, "TSK_WEB_ACCOUNT_TYPE", "TSK_DOMAIN", "example.net");
-    assert_eq!(wp["TSK_TEXT"], "Administrator role (WordPress platform)");
+    let wp = find(
+        &d,
+        "KAAMOS_WEB_ACCOUNT_TYPE",
+        "KAAMOS_DOMAIN",
+        "example.net",
+    );
+    assert_eq!(wp["KAAMOS_TEXT"], "Administrator role (WordPress platform)");
     find(
         &d,
-        "TSK_WEB_ACCOUNT_TYPE",
-        "TSK_TEXT",
+        "KAAMOS_WEB_ACCOUNT_TYPE",
+        "KAAMOS_TEXT",
         "User role (phpBB platform)",
     );
     let svc = find(
         &d,
-        "TSK_WEB_ACCOUNT_TYPE",
-        "TSK_TEXT",
+        "KAAMOS_WEB_ACCOUNT_TYPE",
+        "KAAMOS_TEXT",
         "User role (example.com)",
     );
-    assert_eq!(svc["TSK_URL"], "https://accounts.shop.example.com/login");
+    assert_eq!(svc["KAAMOS_URL"], "https://accounts.shop.example.com/login");
 
     // The search query artifact (no URL; host = its domain) sorts first.
-    let se = find(&d, "TSK_WEB_CATEGORIZATION", "TSK_DOMAIN", "google.com");
-    assert_eq!(se["TSK_NAME"], "Search Engine");
-    assert_eq!(se["TSK_HOST"], "google.com");
-    let icq = find(&d, "TSK_WEB_CATEGORIZATION", "TSK_NAME", "Messaging");
-    assert_eq!(icq["TSK_DOMAIN"], "icq.com");
+    let se = find(
+        &d,
+        "KAAMOS_WEB_CATEGORIZATION",
+        "KAAMOS_DOMAIN",
+        "google.com",
+    );
+    assert_eq!(se["KAAMOS_NAME"], "Search Engine");
+    assert_eq!(se["KAAMOS_HOST"], "google.com");
+    let icq = find(&d, "KAAMOS_WEB_CATEGORIZATION", "KAAMOS_NAME", "Messaging");
+    assert_eq!(icq["KAAMOS_DOMAIN"], "icq.com");
 
     // ---- Inbox
     let msgs = inbox.since(0);
@@ -873,8 +949,13 @@ fn custom_web_categories_win() {
         serde_json::json!({"custom_web_categories": [{"suffix": "google.com", "category": "Work tools"}]}),
     );
     let d = dump(&c);
-    let g = find(&d, "TSK_WEB_CATEGORIZATION", "TSK_DOMAIN", "google.com");
-    assert_eq!(g["TSK_NAME"], "Work tools");
+    let g = find(
+        &d,
+        "KAAMOS_WEB_CATEGORIZATION",
+        "KAAMOS_DOMAIN",
+        "google.com",
+    );
+    assert_eq!(g["KAAMOS_NAME"], "Work tools");
 }
 
 #[test]

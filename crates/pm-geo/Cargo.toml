@@ -1,6 +1,6 @@
 [package]
 name = "pm-geo"
-description = "Geolocation: waypoints and paths from GPS/EXIF results, TSK point-list JSON, GPX parsing, KML writing"
+description = "Geolocation: waypoints and paths from GPS/EXIF results, Autopsy point-list JSON, GPX parsing, KML writing"
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true

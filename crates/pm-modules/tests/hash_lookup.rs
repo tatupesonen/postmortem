@@ -170,7 +170,7 @@ fn hashes_and_hash_set_hits() {
             .artifacts_for_file(id)
             .unwrap()
             .into_iter()
-            .filter(|a| Some(a.type_id) == artifact_type_id("TSK_HASHSET_HIT"))
+            .filter(|a| Some(a.type_id) == artifact_type_id("KAAMOS_HASHSET_HIT"))
             .collect::<Vec<_>>()
     };
     let evil_hits = hits(evil.id);
@@ -179,10 +179,13 @@ fn hashes_and_hash_set_hits() {
     assert_eq!(evil_hits[0].configuration.as_deref(), Some("Malware"));
     let attrs = demo.case.db().attributes(evil_hits[0].id).unwrap();
     let attr = |n: &str| attrs.iter().find(|a| a.name == n).map(|a| a.value.clone());
-    assert_eq!(attr("TSK_SET_NAME"), Some(Value::Text("Malware".into())));
-    assert_eq!(attr("TSK_HASH_MD5"), Some(Value::Text(hex(&md5_of(evil)))));
+    assert_eq!(attr("KAAMOS_SET_NAME"), Some(Value::Text("Malware".into())));
     assert_eq!(
-        attr("TSK_COMMENT"),
+        attr("KAAMOS_HASH_MD5"),
+        Some(Value::Text(hex(&md5_of(evil))))
+    );
+    assert_eq!(
+        attr("KAAMOS_COMMENT"),
         Some(Value::Text("dropper seen in case 7".into()))
     );
     assert!(hits(boring.id).is_empty(), "known sets create no artifact");

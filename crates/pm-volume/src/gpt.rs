@@ -171,7 +171,7 @@ pub(crate) fn parse(src: &dyn ReadAt, ss: u32) -> Result<Option<VolumeSystem>, V
             start_sector: first,
             sector_count: last - first + 1,
             ptype: Some(PartitionType::Gpt(ty)),
-            // TSK describes GPT partitions by their name, falling back to type.
+            // Autopsy describes GPT partitions by their name, falling back to type.
             description: if name.is_empty() {
                 gpt_type_name(&ty).map_or_else(|| ty.hyphenated().to_string(), str::to_owned)
             } else {

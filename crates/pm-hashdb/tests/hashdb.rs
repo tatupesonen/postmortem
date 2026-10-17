@@ -187,7 +187,7 @@ fn encase_set() {
 }
 
 #[test]
-fn tsk_idx_only() {
+fn idx_only() {
     let dir = tempfile::tempdir().unwrap();
     let body = format!(
         "{}|set.txt\n{}|0000000000\n{}|0000000044\n",
@@ -196,7 +196,7 @@ fn tsk_idx_only() {
         hex(&md5_of(2))
     );
     let p = write(dir.path(), "set.txt-md5.idx", &body);
-    assert_eq!(detect(&p).unwrap(), Format::TskIdx);
+    assert_eq!(detect(&p).unwrap(), Format::HfindIdx);
     let db = indexed(&p);
     assert_eq!(db.len().unwrap(), 2);
     assert!(db.contains(&md5_of(2)).unwrap());

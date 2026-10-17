@@ -32,9 +32,9 @@ use pm_ingest::{
 use serde::{Deserialize, Serialize};
 
 pub const NAME: &str = "PhotoRec Carver";
-/// Virtual folder of carved files (TSK `VirtualDirectory.NAME_CARVED`).
+/// Virtual folder of carved files (Autopsy `VirtualDirectory.NAME_CARVED`).
 pub const CARVED_DIR: &str = "$CarvedFiles";
-/// Carved files per numbered sub-folder (TSK
+/// Carved files per numbered sub-folder (Autopsy
 /// `MAX_CARVED_FILES_PER_FOLDER`).
 pub const FILES_PER_FOLDER: u64 = 2000;
 /// Rows inserted per transaction.
@@ -258,7 +258,7 @@ impl Job {
     }
 
     /// Finds or creates `$CarvedFiles` and its most recent numbered
-    /// sub-folder (TSK `addCarvedFiles`).
+    /// sub-folder (Autopsy `addCarvedFiles`).
     fn open_folders(ctx: &JobContext, root: &FileRecord) -> Result<Folders, ModuleError> {
         let db = ctx.case.db();
         let base = if let Some(b) = db.child_named(root.id, CARVED_DIR)? {

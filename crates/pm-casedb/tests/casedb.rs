@@ -412,10 +412,10 @@ fn artifacts_attributes_and_scores() {
         )
         .unwrap()
         .remove(0);
-    let set_name = catalog::attribute_type_id("TSK_SET_NAME").unwrap();
+    let set_name = catalog::attribute_type_id("KAAMOS_SET_NAME").unwrap();
     let hit = db
         .add_artifact(&NewArtifact {
-            type_id: catalog::artifact_type_id("TSK_HASHSET_HIT").unwrap(),
+            type_id: catalog::artifact_type_id("KAAMOS_HASHSET_HIT").unwrap(),
             ds_id,
             file_id: Some(f.id),
             source_artifact_id: None,
@@ -431,10 +431,10 @@ fn artifacts_attributes_and_scores() {
             )],
         })
         .unwrap();
-    let url = catalog::attribute_type_id("TSK_URL").unwrap();
-    let when = catalog::attribute_type_id("TSK_DATETIME_ACCESSED").unwrap();
+    let url = catalog::attribute_type_id("KAAMOS_URL").unwrap();
+    let when = catalog::attribute_type_id("KAAMOS_DATETIME_ACCESSED").unwrap();
     db.add_artifact(&NewArtifact {
-        type_id: catalog::artifact_type_id("TSK_WEB_HISTORY").unwrap(),
+        type_id: catalog::artifact_type_id("KAAMOS_WEB_HISTORY").unwrap(),
         ds_id,
         file_id: Some(f.id),
         source_artifact_id: None,
@@ -464,7 +464,7 @@ fn artifacts_attributes_and_scores() {
     let attrs = db.attributes(hit).unwrap();
     assert_eq!(
         (attrs[0].name.as_str(), attrs[0].value.clone()),
-        ("TSK_SET_NAME", Value::Text("Malware DB".into()))
+        ("KAAMOS_SET_NAME", Value::Text("Malware DB".into()))
     );
     let web = db
         .artifacts_for_file(f.id)
@@ -534,7 +534,7 @@ fn tags_and_notable() {
     assert_eq!(
         db.file_score(f.id).unwrap(),
         Significance::Notable,
-        "a notable tag scores the file notable (TSK TaggingManager)"
+        "a notable tag scores the file notable (Autopsy TaggingManager)"
     );
     assert_eq!(
         db.file(f.id).unwrap().unwrap().known,
@@ -729,10 +729,10 @@ fn artifacts_are_not_duplicated_on_reingest() {
         .into_iter()
         .find(|f| f.name == "z.exe")
         .unwrap();
-    let set = catalog::attribute_type_id("TSK_SET_NAME").unwrap();
-    let comment = catalog::attribute_type_id("TSK_COMMENT").unwrap();
+    let set = catalog::attribute_type_id("KAAMOS_SET_NAME").unwrap();
+    let comment = catalog::attribute_type_id("KAAMOS_COMMENT").unwrap();
     let hit = |set_name: &str, note: &str| NewArtifact {
-        type_id: catalog::artifact_type_id("TSK_HASHSET_HIT").unwrap(),
+        type_id: catalog::artifact_type_id("KAAMOS_HASHSET_HIT").unwrap(),
         ds_id,
         file_id: Some(f.id),
         source_artifact_id: None,

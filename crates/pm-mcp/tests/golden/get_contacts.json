@@ -6,18 +6,18 @@
       "objectId": 17,
       "sourceFileId": 107,
       "sourceRef": "file:107",
-      "artifactType": "TSK_CONTACT",
+      "artifactType": "KAAMOS_CONTACT",
       "artifactTypeDisplayName": "Contacts",
       "analysisResult": false,
       "dataSourceId": 2,
       "evidence": {
         "attributes": [
           {
-            "type": "TSK_NAME",
+            "type": "KAAMOS_NAME",
             "value": "Mallory INJECTION-MARKER"
           },
           {
-            "type": "TSK_PHONE_NUMBER",
+            "type": "KAAMOS_PHONE_NUMBER",
             "value": "+358409876543"
           }
         ]

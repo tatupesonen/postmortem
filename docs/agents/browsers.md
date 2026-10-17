@@ -123,5 +123,5 @@ quirk, no second `TSK_USER_NAME`); Chromium cookies also get
 = directory name), Local State users kept per `User Data` folder; WAL /
 journal read; Firefox download paths keep `+`; Safari bookmark titles
 and download times fixed; IE times UTC; Edge "found" only when files
-exist; address `TSK_DATETIME_MODIFIED` kept (TSK drops it); malicious
+exist; address `TSK_DATETIME_MODIFIED` kept (Autopsy drops it); malicious
 extension URLs without CSV quotes; Chrome cache collision chains.

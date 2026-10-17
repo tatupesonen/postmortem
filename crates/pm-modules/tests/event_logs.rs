@@ -150,7 +150,7 @@ fn evtx_and_legacy_logs_become_event_log_entries() {
     assert!(summary.errors.is_empty(), "{:?}", summary.errors);
     let db = f.case.db();
     let entries = db
-        .artifacts_of_type(type_id(&f, "PM_EVENT_LOG"), None, 0, 1000)
+        .artifacts_of_type(type_id(&f, "KAAMOS_EVENT_LOG"), None, 0, 1000)
         .unwrap();
     // 4 + 7 mapped EVTX events, 2 mapped legacy events.
     assert_eq!(entries.len(), 13);
@@ -166,7 +166,7 @@ fn evtx_and_legacy_logs_become_event_log_entries() {
     let mut xp_logon = None;
     for e in &entries {
         let a = attrs_of(e.id);
-        match text(&a, "PM_EVENT_ID").as_deref() {
+        match text(&a, "KAAMOS_EVENT_ID").as_deref() {
             Some("4720") => created = Some(a),
             Some("528") => xp_logon = Some(a),
             _ => {}
@@ -174,37 +174,37 @@ fn evtx_and_legacy_logs_become_event_log_entries() {
     }
     let created = created.expect("4720 entry");
     assert_eq!(
-        text(&created, "PM_EVENT_DESCRIPTION").as_deref(),
+        text(&created, "KAAMOS_EVENT_DESCRIPTION").as_deref(),
         Some("A new account was created")
     );
     assert_eq!(
-        text(&created, "PM_EVENT_CHANNEL").as_deref(),
+        text(&created, "KAAMOS_EVENT_CHANNEL").as_deref(),
         Some("Security")
     );
     assert!(
         created
             .iter()
-            .any(|a| a.name == "TSK_DATETIME" && a.value == Value::DateTime(1_382_545_359))
+            .any(|a| a.name == "KAAMOS_DATETIME" && a.value == Value::DateTime(1_382_545_359))
     );
 
     let xp = xp_logon.expect("legacy 528 entry");
     assert_eq!(
-        text(&xp, "TSK_USER_NAME").as_deref(),
+        text(&xp, "KAAMOS_USER_NAME").as_deref(),
         Some("N-1A9ODN6ZXK4LQ\\Mr. Evil")
     );
     assert_eq!(
-        text(&xp, "PM_REMOTE_HOST").as_deref(),
+        text(&xp, "KAAMOS_REMOTE_HOST").as_deref(),
         Some("N-1A9ODN6ZXK4LQ (127.0.0.1)")
     );
     assert_eq!(
-        text(&xp, "PM_PAYLOAD_DATA_1").as_deref(),
+        text(&xp, "KAAMOS_PAYLOAD_DATA_1").as_deref(),
         Some("LogonType Interactive")
     );
 
     // The cleared legacy security log is flagged.
     let flagged = db
         .artifacts_of_type(
-            artifact_type_id("TSK_INTERESTING_ITEM").unwrap(),
+            artifact_type_id("KAAMOS_INTERESTING_ITEM").unwrap(),
             None,
             0,
             10,
@@ -212,7 +212,10 @@ fn evtx_and_legacy_logs_become_event_log_entries() {
         .unwrap();
     assert_eq!(flagged.len(), 1);
     let fa = attrs_of(flagged[0].id);
-    assert_eq!(text(&fa, "TSK_SET_NAME").as_deref(), Some("Anti-forensics"));
+    assert_eq!(
+        text(&fa, "KAAMOS_SET_NAME").as_deref(),
+        Some("Anti-forensics")
+    );
     let evt = db
         .query_files(
             &FileQuery {
@@ -229,7 +232,7 @@ fn evtx_and_legacy_logs_become_event_log_entries() {
     let again = run(&f);
     assert_eq!(again.artifacts, 0);
     assert_eq!(
-        db.artifacts_of_type(type_id(&f, "PM_EVENT_LOG"), None, 0, 1000)
+        db.artifacts_of_type(type_id(&f, "KAAMOS_EVENT_LOG"), None, 0, 1000)
             .unwrap()
             .len(),
         13

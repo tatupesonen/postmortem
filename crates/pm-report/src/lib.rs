@@ -129,7 +129,7 @@ impl ReportKind {
             Self::Html => "HTML Report",
             Self::Excel => "Excel Report",
             Self::FilesText => "Files - Text",
-            Self::BodyFile => "TSK Body File",
+            Self::BodyFile => "Body File",
             Self::TaggedHashes => "Save Tagged Hashes",
             Self::Kml => "Google Earth KML",
         }

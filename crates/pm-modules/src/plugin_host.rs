@@ -358,7 +358,7 @@ impl JobHost {
             .collect::<api::Result<Vec<_>>>()?;
         // Every attribute takes part in the identity except attachment
         // references, which hold object ids that a re-run does not get back.
-        let attachments = attribute_type_id("TSK_ATTACHMENTS");
+        let attachments = attribute_type_id("KAAMOS_ATTACHMENTS");
         let key: Vec<i64> = attributes
             .iter()
             .map(|a| a.0)

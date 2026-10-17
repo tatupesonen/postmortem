@@ -1,9 +1,9 @@
-//! Tags on files and results (TSK `TaggingManager`, Autopsy `TagsManager`).
+//! Tags on files and results (Autopsy `TaggingManager`, Autopsy `TagsManager`).
 //!
 //! * A notable tag scores the item notable; removing it recomputes the
 //!   aggregate score.
 //! * Tag names in a tag set are mutually exclusive on one item: adding one
-//!   removes the item's other tags from the same set (TSK
+//!   removes the item's other tags from the same set (Autopsy
 //!   `addContentTag` / `addArtifactTag`).
 
 use rusqlite::{Connection, OptionalExtension, params};
@@ -37,7 +37,7 @@ pub struct TagSet {
 pub struct NewTagName {
     pub name: String,
     pub description: String,
-    /// TSK `TagName.HTML_COLOR` name (`NONE`, `RED`, …).
+    /// Autopsy `TagName.HTML_COLOR` name (`NONE`, `RED`, …).
     pub color: String,
     pub notable: bool,
 }
@@ -133,7 +133,7 @@ impl CaseDb {
     }
 
     /// Adds a tag name, or updates the description, colour and notable
-    /// flag of the one with that name (TSK `addOrUpdateTagName`, used for
+    /// flag of the one with that name (Autopsy `addOrUpdateTagName`, used for
     /// the user's tag definitions); scores follow a notable change.
     pub fn add_or_update_tag_name(&self, t: &NewTagName) -> Result<i64> {
         self.write(|tx| {
@@ -162,7 +162,7 @@ impl CaseDb {
         })
     }
 
-    /// Creates a tag set with its members in rank order (TSK `addTagSet`).
+    /// Creates a tag set with its members in rank order (Autopsy `addTagSet`).
     pub fn add_tag_set(&self, name: &str, members: &[NewTagName]) -> Result<TagSet> {
         self.write(|tx| {
             tx.execute("INSERT INTO tag_sets (name) VALUES (?1)", [name])?;

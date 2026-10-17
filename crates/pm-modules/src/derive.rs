@@ -4,7 +4,7 @@
 //!
 //! The extracted bytes are written to
 //! `ModuleOutput/<module folder>/<source id>/…` in the case folder,
-//! XOR1-encoded like TSK's `EncodedFileOutputStream`; the rows are
+//! XOR1-encoded like Autopsy's `EncodedFileOutputStream`; the rows are
 //! Autopsy's `addDerivedFile` rows (origin derived, `derived_from` = the
 //! source file), inserted parents before children through the job's
 //! writer, with ids taken from the shared allocator. New and updated

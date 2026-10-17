@@ -55,27 +55,27 @@ fn each_artifact(
     }
 }
 
-/// `TSK_WEB_SEARCH_QUERY` for every search-engine query in the URLs of
+/// `KAAMOS_WEB_SEARCH_QUERY` for every search-engine query in the URLs of
 /// bookmarks and history (one per distinct query and source artifact).
 pub(crate) fn search_queries_step(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleError> {
     web.progress("Find Search Queries");
     let (url, prog, domain, time, text) = (
-        at("TSK_URL"),
-        at("TSK_PROG_NAME"),
-        at("TSK_DOMAIN"),
-        at("TSK_DATETIME_ACCESSED"),
-        at("TSK_TEXT"),
+        at("KAAMOS_URL"),
+        at("KAAMOS_PROG_NAME"),
+        at("KAAMOS_DOMAIN"),
+        at("KAAMOS_DATETIME_ACCESSED"),
+        at("KAAMOS_TEXT"),
     );
     // What earlier runs produced: (file, text, domain, program, time).
     let mut existing: HashSet<(i64, String, String, String, i64)> = HashSet::new();
     each_artifact(
         ctx,
-        &["TSK_WEB_SEARCH_QUERY"],
+        &["KAAMOS_WEB_SEARCH_QUERY"],
         &[
-            "TSK_TEXT",
-            "TSK_DOMAIN",
-            "TSK_PROG_NAME",
-            "TSK_DATETIME_ACCESSED",
+            "KAAMOS_TEXT",
+            "KAAMOS_DOMAIN",
+            "KAAMOS_PROG_NAME",
+            "KAAMOS_DATETIME_ACCESSED",
         ],
         |r| {
             if let Some(file) = r.file_id {
@@ -93,12 +93,12 @@ pub(crate) fn search_queries_step(ctx: &JobContext, web: &mut Web<'_>) -> Result
     let mut sink = Sink::default();
     each_artifact(
         ctx,
-        &["TSK_WEB_BOOKMARK", "TSK_WEB_HISTORY"],
+        &["KAAMOS_WEB_BOOKMARK", "KAAMOS_WEB_HISTORY"],
         &[
-            "TSK_URL",
-            "TSK_PROG_NAME",
-            "TSK_DOMAIN",
-            "TSK_DATETIME_ACCESSED",
+            "KAAMOS_URL",
+            "KAAMOS_PROG_NAME",
+            "KAAMOS_DOMAIN",
+            "KAAMOS_DATETIME_ACCESSED",
         ],
         |r| {
             let (Some(file), Some(u)) = (r.file_id, r.text(url)) else {
@@ -120,11 +120,11 @@ pub(crate) fn search_queries_step(ctx: &JobContext, web: &mut Web<'_>) -> Result
                 existing.insert(key);
                 sink.push(
                     ctx,
-                    WebArt::new(ctx, "TSK_WEB_SEARCH_QUERY", file)
-                        .text("TSK_DOMAIN", &d)
-                        .text("TSK_TEXT", q)
-                        .text("TSK_PROG_NAME", &browser)
-                        .time("TSK_DATETIME_ACCESSED", Some(t)),
+                    WebArt::new(ctx, "KAAMOS_WEB_SEARCH_QUERY", file)
+                        .text("KAAMOS_DOMAIN", &d)
+                        .text("KAAMOS_TEXT", q)
+                        .text("KAAMOS_PROG_NAME", &browser)
+                        .time("KAAMOS_DATETIME_ACCESSED", Some(t)),
                 )?;
             }
             Ok(())
@@ -133,16 +133,16 @@ pub(crate) fn search_queries_step(ctx: &JobContext, web: &mut Web<'_>) -> Result
     sink.flush(ctx)
 }
 
-/// `TSK_WEB_ACCOUNT_TYPE`: the highest role per (domain, platform) seen
+/// `KAAMOS_WEB_ACCOUNT_TYPE`: the highest role per (domain, platform) seen
 /// in history and saved-login URLs.
 pub(crate) fn account_types_step(ctx: &JobContext, _web: &mut Web<'_>) -> Result<(), ModuleError> {
-    let (url, domain, text) = (at("TSK_URL"), at("TSK_DOMAIN"), at("TSK_TEXT"));
-    let service = ty("TSK_SERVICE_ACCOUNT");
+    let (url, domain, text) = (at("KAAMOS_URL"), at("KAAMOS_DOMAIN"), at("KAAMOS_TEXT"));
+    let service = ty("KAAMOS_SERVICE_ACCOUNT");
     let mut roles: RoleProcessor<i64> = RoleProcessor::default();
     each_artifact(
         ctx,
-        &["TSK_WEB_HISTORY", "TSK_SERVICE_ACCOUNT"],
-        &["TSK_URL", "TSK_DOMAIN"],
+        &["KAAMOS_WEB_HISTORY", "KAAMOS_SERVICE_ACCOUNT"],
+        &["KAAMOS_URL", "KAAMOS_DOMAIN"],
         |r| {
             if let (Some(file), Some(u), Some(d)) = (r.file_id, r.text(url), r.text(domain)) {
                 roles.add(u, d, r.type_id == service, &file);
@@ -157,8 +157,8 @@ pub(crate) fn account_types_step(ctx: &JobContext, _web: &mut Web<'_>) -> Result
     let mut existing: HashSet<(i64, String, String)> = HashSet::new();
     each_artifact(
         ctx,
-        &["TSK_WEB_ACCOUNT_TYPE"],
-        &["TSK_DOMAIN", "TSK_TEXT"],
+        &["KAAMOS_WEB_ACCOUNT_TYPE"],
+        &["KAAMOS_DOMAIN", "KAAMOS_TEXT"],
         |r| {
             if let Some(f) = r.file_id {
                 existing.insert((
@@ -181,10 +181,10 @@ pub(crate) fn account_types_step(ctx: &JobContext, _web: &mut Web<'_>) -> Result
         }
         sink.push(
             ctx,
-            WebArt::new(ctx, "TSK_WEB_ACCOUNT_TYPE", role.source)
-                .text("TSK_DOMAIN", &role.domain)
-                .text("TSK_TEXT", t)
-                .text("TSK_URL", &role.url),
+            WebArt::new(ctx, "KAAMOS_WEB_ACCOUNT_TYPE", role.source)
+                .text("KAAMOS_DOMAIN", &role.domain)
+                .text("KAAMOS_TEXT", t)
+                .text("KAAMOS_URL", &role.url),
         )?;
     }
     sink.flush(ctx)
@@ -208,17 +208,17 @@ fn autopsy_order(a: &HostFirst, b: &HostFirst) -> Ordering {
         .then_with(|| a.id.cmp(&b.id))
 }
 
-/// `TSK_WEB_CATEGORIZATION`: the category of each host suffix (search
+/// `KAAMOS_WEB_CATEGORIZATION`: the category of each host suffix (search
 /// engine, web mail, disposable mail, messaging, user categories), once
 /// per suffix, on the file of the most recent artifact of the first host
 /// that matched it.
 pub(crate) fn categories_step(ctx: &JobContext, web: &mut Web<'_>) -> Result<(), ModuleError> {
     web.progress("Finding Domain Types");
     let (url, domain, time, host_attr) = (
-        at("TSK_URL"),
-        at("TSK_DOMAIN"),
-        at("TSK_DATETIME_ACCESSED"),
-        at("TSK_HOST"),
+        at("KAAMOS_URL"),
+        at("KAAMOS_DOMAIN"),
+        at("KAAMOS_DATETIME_ACCESSED"),
+        at("KAAMOS_HOST"),
     );
     let categorizer = Categorizer {
         custom: web.custom_categories.clone(),
@@ -227,14 +227,14 @@ pub(crate) fn categories_step(ctx: &JobContext, web: &mut Web<'_>) -> Result<(),
     each_artifact(
         ctx,
         &[
-            "TSK_WEB_BOOKMARK",
-            "TSK_WEB_CACHE",
-            "TSK_WEB_COOKIE",
-            "TSK_WEB_DOWNLOAD",
-            "TSK_WEB_HISTORY",
-            "TSK_WEB_SEARCH_QUERY",
+            "KAAMOS_WEB_BOOKMARK",
+            "KAAMOS_WEB_CACHE",
+            "KAAMOS_WEB_COOKIE",
+            "KAAMOS_WEB_DOWNLOAD",
+            "KAAMOS_WEB_HISTORY",
+            "KAAMOS_WEB_SEARCH_QUERY",
         ],
-        &["TSK_URL", "TSK_DOMAIN", "TSK_DATETIME_ACCESSED"],
+        &["KAAMOS_URL", "KAAMOS_DOMAIN", "KAAMOS_DATETIME_ACCESSED"],
         |r| {
             let Some(file_id) = r.file_id else {
                 return Ok(());
@@ -268,8 +268,8 @@ pub(crate) fn categories_step(ctx: &JobContext, web: &mut Web<'_>) -> Result<(),
     let mut suffixes: HashSet<String> = HashSet::new();
     each_artifact(
         ctx,
-        &["TSK_WEB_CATEGORIZATION"],
-        &["TSK_HOST", "TSK_DOMAIN"],
+        &["KAAMOS_WEB_CATEGORIZATION"],
+        &["KAAMOS_HOST", "KAAMOS_DOMAIN"],
         |r| {
             let h = r.text(host_attr).unwrap_or_default();
             let d = r.text(domain).unwrap_or_default();
@@ -297,10 +297,10 @@ pub(crate) fn categories_step(ctx: &JobContext, web: &mut Web<'_>) -> Result<(),
         }
         sink.push(
             ctx,
-            WebArt::new(ctx, "TSK_WEB_CATEGORIZATION", first.file_id)
-                .text("TSK_DOMAIN", &first.domain)
-                .text("TSK_HOST", &host)
-                .text("TSK_NAME", c.category),
+            WebArt::new(ctx, "KAAMOS_WEB_CATEGORIZATION", first.file_id)
+                .text("KAAMOS_DOMAIN", &first.domain)
+                .text("KAAMOS_HOST", &host)
+                .text("KAAMOS_NAME", c.category),
         )?;
     }
     sink.flush(ctx)

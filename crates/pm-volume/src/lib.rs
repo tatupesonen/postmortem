@@ -1,7 +1,7 @@
 //! Volume-system (partition table) parsing.
 //!
 //! [`detect`] probes a byte source for a GPT or DOS/MBR partition table and
-//! returns a [`VolumeSystem`]. Like The Sleuth Kit, the result describes the
+//! returns a [`VolumeSystem`]. Like Autopsy, the result describes the
 //! *whole* disk: allocated partitions plus `Meta` slots (partition tables,
 //! extended containers) and `Unallocated` gaps, so investigators can reach
 //! every byte of the evidence.

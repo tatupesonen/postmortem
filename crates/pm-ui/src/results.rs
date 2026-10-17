@@ -25,7 +25,7 @@ const REFRESH: Duration = Duration::from_secs(2);
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct TypeCount {
     pub(crate) type_id: i64,
-    /// Type name (`TSK_WEB_HISTORY`), for the tree icon.
+    /// Type name (`KAAMOS_WEB_HISTORY`), for the tree icon.
     pub(crate) name: String,
     pub(crate) display: String,
     pub(crate) category: Category,
@@ -240,7 +240,7 @@ pub(crate) fn load_rows(case: &Case, key: &ResultKey) -> Result<ResultRows, Stri
 /// The query that finds a keyword hit result again (for the Extracted
 /// Text viewer); `None` for other results and hits in an artifact's text.
 pub(crate) fn keyword_query(r: &ResultRow) -> Option<pm_search::TextQuery> {
-    if Some(r.artifact.type_id) != pm_casedb::catalog::artifact_type_id("TSK_KEYWORD_HIT") {
+    if Some(r.artifact.type_id) != pm_casedb::catalog::artifact_type_id("KAAMOS_KEYWORD_HIT") {
         return None;
     }
     let attr = |name: &str| r.attrs.iter().find(|(n, _)| n == name).map(|(_, v)| v);

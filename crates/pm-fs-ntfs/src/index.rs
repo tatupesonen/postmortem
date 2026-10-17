@@ -1,6 +1,6 @@
 //! `$I30` directory index parsing (index root, INDX records, slack).
 //!
-//! Mirrors TSK's `ntfs_proc_idxentry` so that recovered names match
+//! Mirrors Autopsy's `ntfs_proc_idxentry` so that recovered names match
 //! Autopsy: one pass over the node's whole allocated area, live entries
 //! first, then remnants in slack found by stepping 4 bytes at a time. An
 //! entry beyond the node's used length (or with a zero key length) is
@@ -141,7 +141,7 @@ fn entry_at(
     )
 }
 
-/// A plausible FILETIME: after 1970 and before 2100. (TSK stops at 2020,
+/// A plausible FILETIME: after 1970 and before 2100. (Autopsy stops at 2020,
 /// which would reject entries written by current systems.)
 fn is_time(t: u64) -> bool {
     (116_444_736_000_000_000..=159_000_000_000_000_000).contains(&t)

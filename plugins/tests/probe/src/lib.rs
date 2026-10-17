@@ -74,9 +74,9 @@ impl FileIngest for Files {
             .unwrap_or_default()
             .trim()
             .to_owned();
-        let mut hit = NewResult::new("TSK_INTERESTING_FILE_HIT", Some(file.id))
-            .with(Attribute::text("TSK_SET_NAME", "Probe"))
-            .with(Attribute::text("TSK_COMMENT", first.clone()));
+        let mut hit = NewResult::new("KAAMOS_INTERESTING_FILE_HIT", Some(file.id))
+            .with(Attribute::text("KAAMOS_SET_NAME", "Probe"))
+            .with(Attribute::text("KAAMOS_COMMENT", first.clone()));
         hit.significance = Some(Significance::LikelyNotable);
         host.post(hit)?;
         host.add_derived(

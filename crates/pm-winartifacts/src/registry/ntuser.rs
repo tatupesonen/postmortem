@@ -12,7 +12,7 @@ use super::{key, numbered_values, sub, subkeys, text};
 /// A mapped network drive (`Network\<letter>`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NetworkDrive {
-    /// `Network\X` (as Autopsy's `TSK_LOCAL_PATH`).
+    /// `Network\X` (as Autopsy's `KAAMOS_LOCAL_PATH`).
     pub local_path: String,
     pub remote_path: String,
     pub last_written: Option<i64>,
@@ -115,7 +115,7 @@ pub struct RecentFile {
     pub path: String,
     /// Access time when the MRU records one (Unix seconds).
     pub accessed: Option<i64>,
-    /// Autopsy's `TSK_COMMENT` for the source.
+    /// Autopsy's `KAAMOS_COMMENT` for the source.
     pub comment: &'static str,
 }
 

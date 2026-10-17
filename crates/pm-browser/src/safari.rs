@@ -10,7 +10,7 @@ use rusqlite::Connection;
 
 use crate::sqlite::{each, real, text_lossy};
 
-/// One visit (`TSK_WEB_HISTORY`).
+/// One visit (`KAAMOS_WEB_HISTORY`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Visit {
     pub url: String,
@@ -33,7 +33,7 @@ pub fn history(conn: &Connection, mut f: impl FnMut(Visit) -> bool) -> rusqlite:
     )
 }
 
-/// One bookmark (`TSK_WEB_BOOKMARK`).
+/// One bookmark (`KAAMOS_WEB_BOOKMARK`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Bookmark {
     pub url: Option<String>,
@@ -83,7 +83,7 @@ pub fn bookmarks(data: &[u8]) -> Option<Vec<Bookmark>> {
     Some(out)
 }
 
-/// One download (`TSK_WEB_DOWNLOAD`).
+/// One download (`KAAMOS_WEB_DOWNLOAD`).
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Download {
     pub url: Option<String>,

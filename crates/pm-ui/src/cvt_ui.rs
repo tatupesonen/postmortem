@@ -161,40 +161,47 @@ fn load_selection(
             .map_or("", |n| n.1.as_str());
         let t = |n: &[&str]| text(&attrs, n, prefs);
         match ty {
-            "TSK_EMAIL_MSG" | "TSK_MESSAGE" => {
-                let date = ["TSK_DATETIME_SENT", "TSK_DATETIME_RCVD", "TSK_DATETIME"];
+            "KAAMOS_EMAIL_MSG" | "KAAMOS_MESSAGE" => {
+                let date = [
+                    "KAAMOS_DATETIME_SENT",
+                    "KAAMOS_DATETIME_RCVD",
+                    "KAAMOS_DATETIME",
+                ];
                 sel.messages.1.push(vec![
-                    (t(&["TSK_EMAIL_FROM", "TSK_PHONE_NUMBER_FROM"]), None),
-                    (t(&["TSK_EMAIL_TO", "TSK_PHONE_NUMBER_TO"]), None),
+                    (t(&["KAAMOS_EMAIL_FROM", "KAAMOS_PHONE_NUMBER_FROM"]), None),
+                    (t(&["KAAMOS_EMAIL_TO", "KAAMOS_PHONE_NUMBER_TO"]), None),
                     (t(&date), time_key(&attrs, &date)),
-                    (t(&["TSK_SUBJECT", "TSK_TEXT"]), None),
+                    (t(&["KAAMOS_SUBJECT", "KAAMOS_TEXT"]), None),
                 ]);
                 sel.messages.0.push(Item { artifact, attrs });
             }
-            "TSK_CALLLOG" => {
-                let date = ["TSK_DATETIME_START", "TSK_DATETIME"];
+            "KAAMOS_CALLLOG" => {
+                let date = ["KAAMOS_DATETIME_START", "KAAMOS_DATETIME"];
                 sel.calls.1.push(vec![
-                    (t(&["TSK_PHONE_NUMBER_FROM"]), None),
-                    (t(&["TSK_PHONE_NUMBER_TO"]), None),
+                    (t(&["KAAMOS_PHONE_NUMBER_FROM"]), None),
+                    (t(&["KAAMOS_PHONE_NUMBER_TO"]), None),
                     (t(&date), time_key(&attrs, &date)),
-                    (t(&["TSK_DIRECTION"]), None),
-                    (t(&["TSK_DATETIME_END"]), None),
+                    (t(&["KAAMOS_DIRECTION"]), None),
+                    (t(&["KAAMOS_DATETIME_END"]), None),
                 ]);
                 sel.calls.0.push(Item { artifact, attrs });
             }
-            "TSK_CONTACT" => {
+            "KAAMOS_CONTACT" => {
                 sel.contacts.1.push(vec![
-                    (t(&["TSK_NAME"]), None),
+                    (t(&["KAAMOS_NAME"]), None),
                     (
                         t(&[
-                            "TSK_PHONE_NUMBER",
-                            "TSK_PHONE_NUMBER_MOBILE",
-                            "TSK_PHONE_NUMBER_CELL",
-                            "TSK_PHONE_NUMBER_HOME",
+                            "KAAMOS_PHONE_NUMBER",
+                            "KAAMOS_PHONE_NUMBER_MOBILE",
+                            "KAAMOS_PHONE_NUMBER_CELL",
+                            "KAAMOS_PHONE_NUMBER_HOME",
                         ]),
                         None,
                     ),
-                    (t(&["TSK_EMAIL", "TSK_EMAIL_HOME", "TSK_EMAIL_WORK"]), None),
+                    (
+                        t(&["KAAMOS_EMAIL", "KAAMOS_EMAIL_HOME", "KAAMOS_EMAIL_WORK"]),
+                        None,
+                    ),
                 ]);
                 sel.contacts.0.push(Item { artifact, attrs });
             }

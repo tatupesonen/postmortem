@@ -8,7 +8,7 @@ pub const ENCASE_IMAGE_EXTS: &[&str] = &[".e01"];
 /// `GeneralFilter.VIRTUAL_MACHINE_EXTS`: what the VM Extractor looks for.
 pub const VIRTUAL_MACHINE_EXTS: &[&str] = &[".vmdk", ".vhd", ".vhdx"];
 /// Every extension [`crate::open`] accepts: Autopsy's lists plus QCOW2,
-/// which TSK cannot open but postmortem can.
+/// which Autopsy cannot open but postmortem can.
 pub const SUPPORTED_IMAGE_EXTS: &[&str] = &[
     ".img", ".dd", ".001", ".aa", ".raw", ".bin", ".e01", ".vmdk", ".vhd", ".vhdx", ".qcow2",
     ".qcow",

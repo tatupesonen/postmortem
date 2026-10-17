@@ -1,11 +1,11 @@
 //! The Keyword Hits tree (Autopsy `datamodel/KeywordHits`): hits grouped
 //! by list › keyword (or regular expression) › matched text.
 //!
-//! Grouping rules, as Autopsy's: a hit without `TSK_SET_NAME` (an ad-hoc
+//! Grouping rules, as Autopsy's: a hit without `KAAMOS_SET_NAME` (an ad-hoc
 //! search) is listed under "Single Literal Keyword Search" or "Single
-//! Regular Expression Search". Exact and substring hits (`TSK_KEYWORD_REGEXP`
+//! Regular Expression Search". Exact and substring hits (`KAAMOS_KEYWORD_REGEXP`
 //! absent, or search type 1) are grouped by the original term, which
-//! substring hits keep in `TSK_KEYWORD_REGEXP`; regular-expression hits are
+//! substring hits keep in `KAAMOS_KEYWORD_REGEXP`; regular-expression hits are
 //! grouped by the expression and then by the matched text.
 
 use rusqlite::params;
@@ -59,11 +59,11 @@ const GROUPED: &str = "WITH raw AS (\
 fn keyword_hit_params() -> [i64; 5] {
     let attr = |n: &str| attribute_type_id(n).unwrap_or(-1);
     [
-        artifact_type_id("TSK_KEYWORD_HIT").unwrap_or(9),
-        attr("TSK_SET_NAME"),
-        attr("TSK_KEYWORD_SEARCH_TYPE"),
-        attr("TSK_KEYWORD_REGEXP"),
-        attr("TSK_KEYWORD"),
+        artifact_type_id("KAAMOS_KEYWORD_HIT").unwrap_or(9),
+        attr("KAAMOS_SET_NAME"),
+        attr("KAAMOS_KEYWORD_SEARCH_TYPE"),
+        attr("KAAMOS_KEYWORD_REGEXP"),
+        attr("KAAMOS_KEYWORD"),
     ]
 }
 

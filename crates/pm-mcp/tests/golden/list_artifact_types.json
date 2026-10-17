@@ -2,56 +2,56 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "artifactType": "TSK_WEB_HISTORY",
+      "artifactType": "KAAMOS_WEB_HISTORY",
       "displayName": "Web History",
       "category": "data_artifact",
       "count": 1,
       "queryWith": "query_data_artifacts"
     },
     {
-      "artifactType": "TSK_KEYWORD_HIT",
+      "artifactType": "KAAMOS_KEYWORD_HIT",
       "displayName": "Keyword Hits",
       "category": "analysis_result",
       "count": 12,
       "queryWith": "query_analysis_results"
     },
     {
-      "artifactType": "TSK_CONTACT",
+      "artifactType": "KAAMOS_CONTACT",
       "displayName": "Contacts",
       "category": "data_artifact",
       "count": 1,
       "queryWith": "query_data_artifacts"
     },
     {
-      "artifactType": "TSK_MESSAGE",
+      "artifactType": "KAAMOS_MESSAGE",
       "displayName": "Messages",
       "category": "data_artifact",
       "count": 1,
       "queryWith": "query_data_artifacts"
     },
     {
-      "artifactType": "TSK_GPS_BOOKMARK",
+      "artifactType": "KAAMOS_GPS_BOOKMARK",
       "displayName": "GPS Bookmarks",
       "category": "data_artifact",
       "count": 1,
       "queryWith": "query_data_artifacts"
     },
     {
-      "artifactType": "TSK_METADATA",
+      "artifactType": "KAAMOS_METADATA",
       "displayName": "Metadata",
       "category": "data_artifact",
       "count": 1,
       "queryWith": "query_data_artifacts"
     },
     {
-      "artifactType": "TSK_INTERESTING_ITEM",
+      "artifactType": "KAAMOS_INTERESTING_ITEM",
       "displayName": "Interesting Items",
       "category": "analysis_result",
       "count": 1,
       "queryWith": "query_analysis_results"
     },
     {
-      "artifactType": "PM_EVENT_LOG",
+      "artifactType": "KAAMOS_EVENT_LOG",
       "displayName": "Event Log Entries",
       "category": "data_artifact",
       "count": 2,

@@ -1,8 +1,8 @@
 //! Hash sets (Autopsy's hash databases).
 //!
-//! Every format Autopsy reads through TSK is supported: the TSK SQLite
+//! Every format Autopsy reads through Autopsy is supported: the Autopsy SQLite
 //! `.kdb` (read and write), NSRL RDS v2 text and RDS v3 SQLite, `md5sum`,
-//! HashKeeper, EnCase and bare TSK `.idx` indexes. Non-`kdb` sets are
+//! HashKeeper, EnCase and bare Autopsy `.idx` indexes. Non-`kdb` sets are
 //! looked up through a sorted on-disk index built once
 //! ([`HashDb::build_index`]), so even the full NSRL costs a few hundred
 //! kilobytes of RAM and two positional reads per lookup.
@@ -282,7 +282,7 @@ impl HashDb {
         let Some(src) = source else {
             return Ok((None, None));
         };
-        if matches!(self.format, Format::EnCase | Format::TskIdx) {
+        if matches!(self.format, Format::EnCase | Format::HfindIdx) {
             return Ok((None, None));
         }
         // Read the line starting at `loc`.

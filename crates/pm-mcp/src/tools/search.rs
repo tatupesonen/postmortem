@@ -502,7 +502,7 @@ fn lookup_hash(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
         cursor.as_ref(),
         limit + 1,
     )?;
-    let set_name = ctx.attribute_type("TSK_SET_NAME")?.map(|t| t.0);
+    let set_name = ctx.attribute_type("KAAMOS_SET_NAME")?.map(|t| t.0);
     let page = Page::from_items(files, limit, |file| {
         let hits = ctx.db().mcp_artifacts(
             &ArtifactFilter {

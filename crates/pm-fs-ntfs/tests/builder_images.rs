@@ -1,5 +1,5 @@
 //! NTFS parser tests on volumes from `pm_testkit::ntfs::NtfsBuilder`,
-//! cross-checked against TSK (`fls`, when installed) and the `ntfs` crate.
+//! cross-checked against the reference tools (`fls`, when installed) and the `ntfs` crate.
 #![allow(
     clippy::unwrap_used,
     clippy::expect_used,
@@ -283,11 +283,11 @@ fn unallocated_clusters_include_gaps() {
 }
 
 #[test]
-fn matches_tsk_fls() {
+fn matches_reference_fls() {
     let dir = tempfile::tempdir().unwrap();
     let path = dir.path().join("ntfs.dd");
     std::fs::write(&path, &*IMAGE).unwrap();
-    let Some(theirs) = pm_testkit::tsk::fls(&path, 0) else {
+    let Some(theirs) = pm_testkit::reftools::fls(&path, 0) else {
         eprintln!("fls not available; skipping");
         return;
     };
@@ -315,7 +315,7 @@ fn matches_tsk_fls() {
     for o in fs.orphans().unwrap() {
         ours.push((format!("$OrphanFiles/{}", o.name), true));
     }
-    // TSK lists $Secure's named stream as the file itself; normalise both.
+    // Autopsy lists $Secure's named stream as the file itself; normalise both.
     let normalise = |mut v: Vec<(String, bool)>| {
         v.retain(|(p, _)| !p.starts_with("$Secure"));
         v.sort();

@@ -1,4 +1,4 @@
-//! Generated reports recorded in the case (TSK `addReport`), listed by the
+//! Generated reports recorded in the case (Autopsy `addReport`), listed by the
 //! Reports node.
 
 use rusqlite::params;

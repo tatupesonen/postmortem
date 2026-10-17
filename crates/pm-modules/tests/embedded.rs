@@ -392,20 +392,20 @@ fn zip_bombs_and_encryption_are_reported() {
     assert_eq!(
         names,
         [
-            ("/bombs/DepthTriggerZipBomb.zip", "TSK_INTERESTING_ITEM"),
-            ("/bombs/RatioTriggerZipBomb.zip", "TSK_INTERESTING_ITEM"),
-            ("/enc/header.7z", "TSK_ENCRYPTION_DETECTED"),
-            ("/enc/partly_protected.zip", "TSK_ENCRYPTION_DETECTED"),
-            ("/enc/password_protected.zip", "TSK_ENCRYPTION_DETECTED"),
+            ("/bombs/DepthTriggerZipBomb.zip", "KAAMOS_INTERESTING_ITEM"),
+            ("/bombs/RatioTriggerZipBomb.zip", "KAAMOS_INTERESTING_ITEM"),
+            ("/enc/header.7z", "KAAMOS_ENCRYPTION_DETECTED"),
+            ("/enc/partly_protected.zip", "KAAMOS_ENCRYPTION_DETECTED"),
+            ("/enc/password_protected.zip", "KAAMOS_ENCRYPTION_DETECTED"),
         ]
     );
     let attrs = |path: &str| &flagged.iter().find(|x| x.0 == path).unwrap().2;
 
     let depth = attrs("/bombs/DepthTriggerZipBomb.zip");
-    assert_eq!(depth["TSK_SET_NAME"], ZIP_BOMB_SET);
-    assert_eq!(depth["TSK_DESCRIPTION"], "Zip Bomb Detected d4.zip");
+    assert_eq!(depth["KAAMOS_SET_NAME"], ZIP_BOMB_SET);
+    assert_eq!(depth["KAAMOS_DESCRIPTION"], "Zip Bomb Detected d4.zip");
     assert_eq!(
-        depth["TSK_COMMENT"],
+        depth["KAAMOS_COMMENT"],
         "The archive is 4 levels deep, skipping processing of _bombs_DepthTriggerZipBomb.zip"
     );
     // d1..d4 were extracted, d4 itself was not.
@@ -415,17 +415,17 @@ fn zip_bombs_and_encryption_are_reported() {
     assert!(all.contains_key("/bombs/ok_depth.zip/d1.zip/d2.zip/d3.zip/leaf.txt"));
 
     let ratio = attrs("/bombs/RatioTriggerZipBomb.zip");
-    assert_eq!(ratio["TSK_SET_NAME"], ZIP_BOMB_SET);
+    assert_eq!(ratio["KAAMOS_SET_NAME"], ZIP_BOMB_SET);
     assert_eq!(
-        ratio["TSK_DESCRIPTION"],
+        ratio["KAAMOS_DESCRIPTION"],
         "Zip Bomb Detected RatioTriggerZipBomb.zip"
     );
     assert!(
-        ratio["TSK_COMMENT"].starts_with("Compression ratio is ")
-            && ratio["TSK_COMMENT"]
+        ratio["KAAMOS_COMMENT"].starts_with("Compression ratio is ")
+            && ratio["KAAMOS_COMMENT"]
                 .ends_with(", skipping items in _bombs_RatioTriggerZipBomb.zip."),
         "{}",
-        ratio["TSK_COMMENT"]
+        ratio["KAAMOS_COMMENT"]
     );
     // Autopsy checks every item before extracting anything.
     assert!(
@@ -439,14 +439,14 @@ fn zip_bombs_and_encryption_are_reported() {
     assert!(deleted_member.is_some(), "{:?}", derived_paths(&all));
 
     assert_eq!(
-        attrs("/enc/password_protected.zip")["TSK_COMMENT"],
+        attrs("/enc/password_protected.zip")["KAAMOS_COMMENT"],
         ENCRYPTION_FULL
     );
     assert_eq!(
-        attrs("/enc/partly_protected.zip")["TSK_COMMENT"],
+        attrs("/enc/partly_protected.zip")["KAAMOS_COMMENT"],
         ENCRYPTION_FILE_LEVEL
     );
-    assert_eq!(attrs("/enc/header.7z")["TSK_COMMENT"], ENCRYPTION_FULL);
+    assert_eq!(attrs("/enc/header.7z")["KAAMOS_COMMENT"], ENCRYPTION_FULL);
     // Encrypted members are listed without content and not hashed; the
     // readable member is extracted.
     let secret = f.file("/enc/password_protected.zip/secret.txt");

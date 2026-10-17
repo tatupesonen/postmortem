@@ -1,7 +1,7 @@
 //! Filesystem abstraction.
 //!
 //! Every filesystem parser (`pm-fs-fat`, `pm-fs-ntfs`, …) implements
-//! [`FileSystem`]. The model follows The Sleuth Kit's split between *names*
+//! [`FileSystem`]. The model follows Autopsy's split between *names*
 //! (directory entries, which may be deleted) and *metadata* (inodes / MFT
 //! records), because forensic analysis needs both views:
 //!
@@ -102,13 +102,13 @@ pub trait FileSystem: Send + Sync + std::fmt::Debug {
     /// Whether a name's expectations (e.g. NTFS sequence number) match the
     /// metadata it points at. When they do not, the metadata belongs to a
     /// later file that reused the entry, and the name is shown without it
-    /// (TSK detaches the metadata).
+    /// (Autopsy detaches the metadata).
     fn name_matches_meta(&self, _entry: &DirEntry, _meta: &Metadata) -> bool {
         true
     }
 
     /// Names whose parent directory is no longer reachable, plus metadata
-    /// with no name at all (TSK's `$OrphanFiles` virtual directory).
+    /// with no name at all (Autopsy's `$OrphanFiles` virtual directory).
     ///
     /// May be expensive (scans unallocated space); callers should call it
     /// once per filesystem and cache the result.
@@ -117,7 +117,7 @@ pub trait FileSystem: Send + Sync + std::fmt::Debug {
     }
 }
 
-/// Metadata for a directory entry with TSK's rules applied: a deleted name
+/// Metadata for a directory entry with Autopsy's rules applied: a deleted name
 /// with metadata address 0 has none, and metadata whose identity does not
 /// match the name ([`FileSystem::name_matches_meta`]) is not used.
 pub fn entry_metadata(fs: &dyn FileSystem, entry: &DirEntry) -> Result<Metadata> {
@@ -132,8 +132,8 @@ pub fn entry_metadata(fs: &dyn FileSystem, entry: &DirEntry) -> Result<Metadata>
     }
 }
 
-/// Whether a directory walk descends into `entry` (TSK
-/// `tsk_fs_dir_walk_recursive`): the metadata is a directory, and either
+/// Whether a directory walk descends into `entry` (Autopsy
+/// ): the metadata is a directory, and either
 /// the name is allocated or both name and metadata are deleted. A deleted
 /// name whose directory has been reallocated is not followed, so it cannot
 /// stand in for the directory's real path.

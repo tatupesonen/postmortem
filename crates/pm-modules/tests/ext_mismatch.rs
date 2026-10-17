@@ -72,7 +72,7 @@ fn run(c: &DemoCase, settings: &ExtMismatchSettings) -> Arc<pm_ingest::Inbox> {
 /// Paths with a mismatch result, and the result for one of them.
 fn flagged(c: &DemoCase) -> Vec<String> {
     let mut v: Vec<String> = c
-        .artifacts("TSK_EXT_MISMATCH_DETECTED")
+        .artifacts("KAAMOS_EXT_MISMATCH_DETECTED")
         .into_iter()
         .map(|(a, _)| {
             c.case
@@ -114,7 +114,7 @@ fn default_settings_flag_media_and_documents() {
     // known files, deleted names.
     assert_eq!(flagged(&c), ["/f/photo.txt", "/f/report.doc"]);
 
-    let hits = c.artifacts("TSK_EXT_MISMATCH_DETECTED");
+    let hits = c.artifacts("KAAMOS_EXT_MISMATCH_DETECTED");
     let (a, attrs) = hits
         .iter()
         .find(|(a, _)| a.file_id == Some(c.file("/f/report.doc").id))
@@ -143,7 +143,7 @@ fn default_settings_flag_media_and_documents() {
 
     // Re-ingest adds nothing.
     run(&c, &ExtMismatchSettings::default());
-    assert_eq!(c.artifacts("TSK_EXT_MISMATCH_DETECTED").len(), 2);
+    assert_eq!(c.artifacts("KAAMOS_EXT_MISMATCH_DETECTED").len(), 2);
 }
 
 #[test]

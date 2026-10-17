@@ -162,7 +162,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 ### M0 — Foundations ✅
 - [x] Workspace, toolchain pin, lints, loop protocol
 - [x] `pm-core`: ReadAt sources, Bytes decoding, timestamps, units
-- [x] `pm-volume`: MBR/EBR + GPT with TSK-style layout
+- [x] `pm-volume`: MBR/EBR + GPT with Autopsy-style layout
 - [x] `pm-image`: raw + split raw, format sniffing
 - [x] `pm-fs`: trait, ExtentSource, walker
 - [x] `pm-fs-fat`: FAT12/16/32 with deleted-file recovery
@@ -171,10 +171,10 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [x] `fuzz/` crate with targets for volume, FAT; smoke script `scripts/fuzz-smoke.sh` (seeds in `fuzz/seeds/`)
 - [x] `pm-image` EWF v1 (E01/s01): segments (E01…ZZZ), zlib/stored chunks, >2 GiB offset overflow, stored MD5/SHA-1, header2/header metadata, error2; verified against ewfacquire (9 format variants, multi-segment) + fuzz target
 - [ ] `pm-image` EWF2 (Ex01/Lx01) and L01 logical evidence (file tree in `ltree`)
-- [x] `pm-fs-ntfs`: boot, MFT (incl. fragmented $MFT via attribute list), fixups (torn-tolerant), runlists, resident/non-resident, LZNT1, sparse, init size, ADS, $SI+$FN times, deleted via parent map, $I30 slack, orphans, unallocated clusters. In-house `NtfsBuilder` (pm-testkit) validated by TSK; differential vs `fls` + `ntfs` crate oracle; fuzz target
+- [x] `pm-fs-ntfs`: boot, MFT (incl. fragmented $MFT via attribute list), fixups (torn-tolerant), runlists, resident/non-resident, LZNT1, sparse, init size, ADS, $SI+$FN times, deleted via parent map, $I30 slack, orphans, unallocated clusters. In-house `NtfsBuilder` (pm-testkit) validated by Autopsy; differential vs `fls` + `ntfs` crate oracle; fuzz target
 - [ ] NTFS extras: $Secure/owner SIDs, reparse points/junctions, $UsnJrnl/$LogFile parsing, EFS flagging, WOF/compact compression, hard-link enumeration, bulk MFT enumeration fast path
 - [ ] `pm-evidence`: probe chain (image → VS → FS registry), unallocated-space virtual files, partitions with unknown FS, "no VS" fallback, logical files & folders DSP, local disk DSP (read-only)
-- [x] `pm-fs-exfat`: entry sets with checksum validation, deleted sets, NoFatChain/valid-length, UTC offsets (TSK gets these wrong), alloc bitmap, orphan scan; macOS-generated fixture + fls differential + fuzz
+- [x] `pm-fs-exfat`: entry sets with checksum validation, deleted sets, NoFatChain/valid-length, UTC offsets (Autopsy gets these wrong), alloc bitmap, orphan scan; macOS-generated fixture + fls differential + fuzz
 - [x] `pm-fs-ext` (ext2/3/4): extents (any depth, uninit), indirect blocks, inline data, fast symlinks, dirent-slack deleted names, bitmaps incl. uninit groups, nanosecond/crtime times; fixtures via `fstool` (pinned dev-dep) + fls differential
 - [ ] `pm-fs-hfs` (HFS+), `pm-fs-apfs`
 - [ ] `pm-fs-iso` (ISO9660/Joliet/RR, UDF)
@@ -204,7 +204,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [x] Query API for UI: tree children, views (file types by extension/MIME, deleted, size buckets, recent), results by type, tags, keyset pagination, counts with caching
 - [ ] `pm-case`: create/open/close/delete, `case.pmcase`, case properties, data source add/remove, event bus (in-process), settings store, logging setup — done except the event bus (ADR-023) and a case log file
 - [ ] Golden-dump harness (`pm-testkit::golden`): normalised DB dump → insta snapshot
-- [ ] Autopsy-case importer (stretch; TSK SQLite → pm schema)
+- [ ] Autopsy-case importer (stretch; SQLite → pm schema)
 
 ### M3 — UI shell and browsing (first usable release)
 - [x] First visible slice (evidence-backed, pre-case-DB): eframe app, menus/toolbar/status bar, data-source tree (volumes, dirs, $OrphanFiles), virtualised sortable table with keyboard nav + context menu (pop out, extract, copy path), viewers Hex/Strings/Text/Application(picture)/File Metadata with auto tab choice, deferred-viewport pop-out windows, back/forward, drag-and-drop, themes, local/UTC time, persisted settings; `pm-testkit::demo` disk

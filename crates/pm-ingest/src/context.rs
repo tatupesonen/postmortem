@@ -35,7 +35,7 @@ pub(crate) enum WriteOp {
 }
 
 /// A communication artifact (e-mail, message, call, contact) posted with
-/// the accounts it involves (TSK `createAccountFileInstance` +
+/// the accounts it involves (Autopsy `createAccountFileInstance` +
 /// `addRelationships`). The writer inserts the artifact, registers each
 /// account on the artifact's file, and relates the participants through
 /// the artifact, all in one transaction; nothing is added when the file

@@ -70,13 +70,13 @@ fn run(c: &DemoCase, s: &InterestingFilesSettings) -> Arc<pm_ingest::Inbox> {
 /// `(path, set, rule)` of every hit, sorted.
 fn hits(c: &DemoCase) -> Vec<(String, String, String)> {
     let mut v: Vec<_> = c
-        .artifacts("TSK_INTERESTING_ITEM")
+        .artifacts("KAAMOS_INTERESTING_ITEM")
         .into_iter()
         .map(|(a, attrs)| {
             assert_eq!(a.significance, Some(Significance::LikelyNotable));
             assert_eq!(
                 a.configuration.as_deref(),
-                Some(attrs["TSK_SET_NAME"].as_str())
+                Some(attrs["KAAMOS_SET_NAME"].as_str())
             );
             let path = c
                 .case
@@ -87,8 +87,8 @@ fn hits(c: &DemoCase) -> Vec<(String, String, String)> {
                 .path();
             (
                 path,
-                attrs["TSK_SET_NAME"].clone(),
-                attrs["TSK_CATEGORY"].clone(),
+                attrs["KAAMOS_SET_NAME"].clone(),
+                attrs["KAAMOS_CATEGORY"].clone(),
             )
         })
         .collect();
