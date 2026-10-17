@@ -1,0 +1,26 @@
+[package]
+name = "pm-filetype"
+description = "File type identification: Apache Tika 3.0.0 detection ported to Rust, plus Autopsy's FileTypeDetector rules"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# Fixture builders (compound files, ZIPs) for other crates' tests.
+builder = []
+
+[dependencies]
+pm-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+serde.workspace = true
+regex.workspace = true
+flate2.workspace = true
+
+[dev-dependencies]
+serde_json.workspace = true
+proptest.workspace = true
+
+[lints]
+workspace = true
