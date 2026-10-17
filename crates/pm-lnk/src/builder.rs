@@ -475,8 +475,10 @@ pub fn dest_list(entries: &[DestEntry<'_>], win10: bool) -> Vec<u8> {
         let mut r = vec![0u8; fixed];
         r[0x48..0x48 + e.hostname.len()].copy_from_slice(e.hostname.as_bytes());
         r[0x58..0x5C].copy_from_slice(&e.entry_number.to_le_bytes());
-        r[0x60..0x68].copy_from_slice(&e.last_access.to_le_bytes());
-        r[0x68..0x6C].copy_from_slice(&(if e.pinned { 0i32 } else { -1 }).to_le_bytes());
+        // Version 3+ has a 4-byte float before the time (libyal docs).
+        let t = if win10 { 0x64 } else { 0x60 };
+        r[t..t + 8].copy_from_slice(&e.last_access.to_le_bytes());
+        r[t + 8..t + 12].copy_from_slice(&(if e.pinned { 0i32 } else { -1 }).to_le_bytes());
         if win10 {
             r[0x74..0x78].copy_from_slice(&e.access_count.to_le_bytes());
         }

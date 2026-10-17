@@ -126,6 +126,11 @@ pub fn parse_dest_list(b: &[u8]) -> (Option<u32>, Vec<DestListEntry>) {
     } else {
         (0x70, 0x72, 0)
     };
+    // Version 3+ (Windows 10) adds a 4-byte float before the time:
+    // entry number 0x58, float 0x60, FILETIME 0x64, pin status 0x6C,
+    // access count 0x74, path size 0x80. Version 1 (Windows 7): float
+    // 0x5C, FILETIME 0x60, pin status 0x68, path size 0x70.
+    let time_at = if win10 { 0x64 } else { 0x60 };
     let mut out = Vec::new();
     let mut at = 32usize;
     while out.len() < count.min(MAX_DEST) {
@@ -146,8 +151,8 @@ pub fn parse_dest_list(b: &[u8]) -> (Option<u32>, Vec<DestListEntry>) {
                         .collect()
                 })
                 .unwrap_or_default(),
-            last_access: e.u64_le(0x60).unwrap_or(0),
-            pinned: e.i32_le(0x68).is_ok_and(|p| p >= 0),
+            last_access: e.u64_le(time_at).unwrap_or(0),
+            pinned: e.i32_le(time_at + 8).is_ok_and(|p| p >= 0),
             access_count: if win10 { e.u32_le(0x74).ok() } else { None },
             path: utf16le_lossy(path),
             droid_volume: e.get(0x08..0x18).and_then(guid_string),

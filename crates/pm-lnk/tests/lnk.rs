@@ -289,3 +289,35 @@ proptest! {
         let _ = parse_automatic(&cf);
     }
 }
+
+/// A Windows 10 (version 4) `DestList` entry as Windows wrote it on
+/// DESKTOP-SDN1RPT: a float at 0x60 before the FILETIME at 0x64.
+#[test]
+fn windows10_dest_list_times() {
+    let mut entry = vec![0u8; 0x82];
+    entry[0x48..0x57].copy_from_slice(b"desktop-sdn1rpt");
+    entry[0x58..0x80].copy_from_slice(&[
+        0x05, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0x80, 0x3F, 0xD5, 0xBC, 0x28, 0x84, 0x10, 0x8E, 0xD6,
+        0x01, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0x01, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+        0,
+    ]);
+    let path = "C:\\Users\\mortysmith\\Documents\\Portal_gun.png";
+    entry[0x80..0x82].copy_from_slice(&(path.len() as u16).to_le_bytes());
+    for c in path.encode_utf16() {
+        entry.extend(c.to_le_bytes());
+    }
+    entry.extend([0u8; 4]);
+    let mut stream = vec![0u8; 32];
+    stream[..4].copy_from_slice(&4u32.to_le_bytes());
+    stream[4..8].copy_from_slice(&1u32.to_le_bytes());
+    stream.extend(entry);
+    let (version, entries) = pm_lnk::jumplist::parse_dest_list(&stream);
+    assert_eq!(version, Some(4));
+    let e = &entries[0];
+    assert_eq!(e.entry_number, 5);
+    assert_eq!(e.path, path);
+    assert!(!e.pinned);
+    assert_eq!(e.access_count, Some(1));
+    // 2020-09-18T23:07:44Z
+    assert_eq!(e.last_access_unix(), Some(1_600_470_464));
+}
