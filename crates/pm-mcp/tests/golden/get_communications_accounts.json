@@ -1,0 +1,25 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "account:1",
+      "accountType": "Phone",
+      "accountTypeName": "PHONE",
+      "relationshipCount": 1,
+      "evidence": {
+        "accountId": "+358401234567"
+      }
+    },
+    {
+      "ref": "account:2",
+      "accountType": "Phone",
+      "accountTypeName": "PHONE",
+      "relationshipCount": 1,
+      "evidence": {
+        "accountId": "+358409876543"
+      }
+    }
+  ],
+  "next_cursor": null,
+  "truncated": false
+}

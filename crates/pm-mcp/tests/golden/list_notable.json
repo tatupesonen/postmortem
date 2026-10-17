@@ -1,0 +1,303 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "file:30",
+      "significance": "Notable",
+      "object": {
+        "ref": "file:30",
+        "objectId": 30,
+        "dataSourceId": 1,
+        "size": 51,
+        "isDirectory": false,
+        "deleted": false,
+        "mimeType": "text/plain",
+        "modifiedTime": "2021-05-30T23:41:00Z",
+        "md5Hash": "09318c057437d8bbad4ab0edb2b85709",
+        "evidence": {
+          "name": "passwords.txt",
+          "path": "/Users/alice/Documents/passwords.txt"
+        }
+      },
+      "reasons": [
+        {
+          "ref": "result:6",
+          "objectId": 6,
+          "sourceFileId": 30,
+          "sourceRef": "file:30",
+          "artifactType": "TSK_INTERESTING_ITEM",
+          "artifactTypeDisplayName": "Interesting Items",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Credentials"
+              },
+              {
+                "type": "TSK_COMMENT",
+                "value": "password file"
+              }
+            ]
+          }
+        }
+      ],
+      "tags": [
+        "Notable Item"
+      ]
+    },
+    {
+      "ref": "file:9",
+      "significance": "Likely Notable",
+      "object": {
+        "ref": "file:9",
+        "objectId": 9,
+        "dataSourceId": 1,
+        "size": 131072,
+        "isDirectory": false,
+        "deleted": false,
+        "mimeType": "application/octet-stream",
+        "modifiedTime": "2021-03-04T10:20:30Z",
+        "md5Hash": "d096d0267307b7d453c1d832de6f5263",
+        "evidence": {
+          "name": "$MFT",
+          "path": "/$MFT"
+        }
+      },
+      "reasons": [
+        {
+          "ref": "result:2",
+          "objectId": 2,
+          "sourceFileId": 9,
+          "sourceRef": "file:9",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "bob@example.com"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": "n friday\n- contact: «bob@example.com«, +358 40 123 4567\nf"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        }
+      ],
+      "tags": []
+    },
+    {
+      "ref": "file:29",
+      "significance": "Likely Notable",
+      "object": {
+        "ref": "file:29",
+        "objectId": 29,
+        "dataSourceId": 1,
+        "size": 118,
+        "isDirectory": false,
+        "deleted": false,
+        "mimeType": "text/plain",
+        "modifiedTime": "2021-03-04T11:47:00Z",
+        "md5Hash": "5b3562942821c78f38deec492152fa50",
+        "evidence": {
+          "name": "meeting notes.txt",
+          "path": "/Users/alice/Documents/meeting notes.txt"
+        }
+      },
+      "reasons": [
+        {
+          "ref": "result:1",
+          "objectId": 1,
+          "sourceFileId": 29,
+          "sourceRef": "file:29",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "bob@example.com"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": " friday\r\n- contact: «bob@example.com«, +358 40 123 4567\r\n"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        }
+      ],
+      "tags": []
+    },
+    {
+      "ref": "file:94",
+      "significance": "Likely Notable",
+      "object": {
+        "ref": "file:94",
+        "objectId": 94,
+        "dataSourceId": 2,
+        "size": 81920,
+        "isDirectory": false,
+        "deleted": false,
+        "mimeType": "application/octet-stream",
+        "modifiedTime": "2021-03-04T10:20:30Z",
+        "md5Hash": "8eeb115b2e01f312cfb6dff9f6f0fa5b",
+        "evidence": {
+          "name": "$MFT",
+          "path": "/$MFT"
+        }
+      },
+      "reasons": [
+        {
+          "ref": "result:4",
+          "objectId": 4,
+          "sourceFileId": 94,
+          "sourceRef": "file:94",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 2,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "mallory@example.com"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": "tion-marker\ncontact «mallory@example.com«\n"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        }
+      ],
+      "tags": []
+    },
+    {
+      "ref": "file:103",
+      "significance": "Likely Notable",
+      "object": {
+        "ref": "file:103",
+        "objectId": 103,
+        "dataSourceId": 2,
+        "size": 195,
+        "isDirectory": false,
+        "deleted": false,
+        "mimeType": "text/plain",
+        "modifiedTime": "2021-03-04T10:20:30Z",
+        "md5Hash": "85bf8a9d34656c48f2205e3c9dad7d83",
+        "evidence": {
+          "name": "readme.txt",
+          "path": "/Users/mallory/readme.txt"
+        }
+      },
+      "reasons": [
+        {
+          "ref": "result:3",
+          "objectId": 3,
+          "sourceFileId": 103,
+          "sourceRef": "file:103",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 2,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "mallory@example.com"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": "tion-marker\ncontact «mallory@example.com«\n\n\n-----------------"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        }
+      ],
+      "tags": [
+        "Follow Up"
+      ]
+    }
+  ],
+  "next_cursor": null,
+  "truncated": false
+}

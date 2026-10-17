@@ -1,0 +1,16 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "objectId": 30,
+    "ref": "file:30",
+    "fileSize": 51,
+    "offset": 0,
+    "bytesRead": 51,
+    "truncated": false,
+    "eof": true,
+    "evidence": {
+      "fileName": "passwords.txt",
+      "content": "router: hunter2\nwifi: correct-horse-battery-staple\n"
+    }
+  }
+}

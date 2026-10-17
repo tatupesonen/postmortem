@@ -1,0 +1,67 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "file:25",
+      "objectId": 25,
+      "dataSourceId": 1,
+      "size": 4200,
+      "isDirectory": false,
+      "deleted": false,
+      "mimeType": "application/zip",
+      "modifiedTime": "2021-05-30T18:00:00Z",
+      "md5Hash": "074f93e3fdfe2b23b819d36fa48ba3a1",
+      "evidence": {
+        "name": "holiday.zip",
+        "path": "/Users/alice/Downloads/holiday.zip"
+      }
+    },
+    {
+      "ref": "file:26",
+      "objectId": 26,
+      "dataSourceId": 1,
+      "size": 8107,
+      "isDirectory": false,
+      "deleted": false,
+      "mimeType": "application/x-dosexec",
+      "modifiedTime": "2021-05-31T23:58:00Z",
+      "md5Hash": "7856410df03095179a0b591ffd88826c",
+      "evidence": {
+        "name": "setup.exe",
+        "path": "/Users/alice/Downloads/setup.exe"
+      }
+    },
+    {
+      "ref": "file:27",
+      "objectId": 27,
+      "dataSourceId": 1,
+      "size": 99,
+      "isDirectory": false,
+      "deleted": false,
+      "mimeType": "text/plain",
+      "modifiedTime": "2021-05-31T23:58:00Z",
+      "md5Hash": "c7c8499b87a828c4d9726190c80d2901",
+      "evidence": {
+        "name": "setup.exe:Zone.Identifier",
+        "path": "/Users/alice/Downloads/setup.exe:Zone.Identifier"
+      }
+    },
+    {
+      "ref": "file:28",
+      "objectId": 28,
+      "dataSourceId": 1,
+      "size": 50,
+      "isDirectory": false,
+      "deleted": true,
+      "mimeType": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      "modifiedTime": "2021-05-31T23:50:00Z",
+      "md5Hash": "9f3b8c2bacbf082c6986f4bda5a21555",
+      "evidence": {
+        "name": "secret_plan.docx",
+        "path": "/Users/alice/Downloads/secret_plan.docx"
+      }
+    }
+  ],
+  "next_cursor": null,
+  "truncated": false
+}

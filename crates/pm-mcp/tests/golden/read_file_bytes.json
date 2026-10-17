@@ -1,0 +1,15 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "ref": "file:30",
+    "offset": 0,
+    "offsetHex": "0x0",
+    "length": 16,
+    "fileSize": 51,
+    "eof": false,
+    "format": "hex",
+    "evidence": {
+      "data": "726f757465723a2068756e746572320a"
+    }
+  }
+}

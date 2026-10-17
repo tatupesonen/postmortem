@@ -8,6 +8,7 @@ license.workspace = true
 
 [dependencies]
 pm-ui.workspace = true
+pm-mcp.workspace = true
 tracing-subscriber.workspace = true
 tracing.workspace = true
 

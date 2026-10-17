@@ -1,0 +1,22 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "file:30",
+      "objectId": 30,
+      "dataSourceId": 1,
+      "size": 51,
+      "isDirectory": false,
+      "deleted": false,
+      "mimeType": "text/plain",
+      "modifiedTime": "2021-05-30T23:41:00Z",
+      "md5Hash": "09318c057437d8bbad4ab0edb2b85709",
+      "evidence": {
+        "name": "passwords.txt",
+        "path": "/Users/alice/Documents/passwords.txt"
+      }
+    }
+  ],
+  "next_cursor": null,
+  "truncated": false
+}

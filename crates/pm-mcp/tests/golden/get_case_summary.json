@@ -1,0 +1,41 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "caseName": "MCP demo",
+    "caseNumber": "2026-001",
+    "examiner": "Examiner One",
+    "caseUuid": "<redacted>",
+    "created": "<redacted>",
+    "readOnly": true,
+    "dataSources": 2,
+    "totalFiles": 104,
+    "totalArtifacts": 11,
+    "timeZones": "<redacted>",
+    "timeSpan": {
+      "start": "2020-01-02T10:00:00Z",
+      "startEpoch": 1577959200,
+      "end": "2022-05-10T18:30:00Z",
+      "endEpoch": 1652207400
+    },
+    "dataSourceList": [
+      {
+        "ref": "ds:1",
+        "objectId": 1,
+        "name": "demo.dd",
+        "timezone": "<redacted>"
+      },
+      {
+        "ref": "ds:2",
+        "objectId": 2,
+        "name": "bait.dd",
+        "timezone": "<redacted>"
+      }
+    ],
+    "keywordIndex": {
+      "available": true,
+      "objects": 91,
+      "chunks": 74
+    },
+    "notes": "Times are UTC. Data-source time zones only matter for FAT and other local-time file systems."
+  }
+}

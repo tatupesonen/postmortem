@@ -1,0 +1,40 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "file:94",
+      "objectId": 94,
+      "objectType": "file",
+      "page": 1,
+      "dataSourceId": 2,
+      "mimeType": "application/octet-stream",
+      "size": 81920,
+      "evidence": {
+        "path": "/$MFT",
+        "preview": "tion-marker\ncontact «mallory@example.com«\n",
+        "hits": [
+          "mallory@example.com"
+        ]
+      }
+    },
+    {
+      "ref": "file:103",
+      "objectId": 103,
+      "objectType": "file",
+      "page": 1,
+      "dataSourceId": 2,
+      "mimeType": "text/plain",
+      "size": 195,
+      "evidence": {
+        "path": "/Users/mallory/readme.txt",
+        "preview": "tion-marker\ncontact «mallory@example.com«\n\n\n-----------------",
+        "hits": [
+          "mallory@example.com"
+        ]
+      }
+    }
+  ],
+  "next_cursor": null,
+  "truncated": false,
+  "searchType": "exact"
+}

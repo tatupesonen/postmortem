@@ -1,0 +1,22 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "ref": "file:30",
+    "indexed": true,
+    "page": 1,
+    "pages": 1,
+    "overlapStartByte": 123,
+    "hitPages": [
+      1
+    ],
+    "hitRanges": [
+      [
+        8,
+        15
+      ]
+    ],
+    "evidence": {
+      "text": "router: hunter2\nwifi: correct-horse-battery-staple\n\n\n------------------------------METADATA------------------------------\n\n"
+    }
+  }
+}

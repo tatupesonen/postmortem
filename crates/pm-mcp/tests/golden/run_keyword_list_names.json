@@ -1,0 +1,32 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "lists": [
+      {
+        "list": "Phone Numbers",
+        "keywords": 1,
+        "builtIn": true
+      },
+      {
+        "list": "IP Addresses",
+        "keywords": 1,
+        "builtIn": true
+      },
+      {
+        "list": "Email Addresses",
+        "keywords": 1,
+        "builtIn": true
+      },
+      {
+        "list": "URLs",
+        "keywords": 1,
+        "builtIn": true
+      },
+      {
+        "list": "Credit Card Numbers",
+        "keywords": 1,
+        "builtIn": true
+      }
+    ]
+  }
+}

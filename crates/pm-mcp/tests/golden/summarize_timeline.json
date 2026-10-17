@@ -1,0 +1,15 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "startTime": "2020-01-02T10:00:00Z",
+    "startEpoch": 1577959200,
+    "endTime": "2022-05-10T18:30:00Z",
+    "endEpoch": 1652207400,
+    "totalEvents": 359,
+    "byCategory": {
+      "File System": 358,
+      "Web Activity": 1,
+      "Other": 0
+    }
+  }
+}

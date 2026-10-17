@@ -20,6 +20,8 @@ pub const DB_FILE: &str = "case.db";
 /// Sub-folders created in every case (as in Autopsy).
 pub const SUBDIRS: &[&str] = &["Export", "Reports", "ModuleOutput", "Temp", "Log"];
 
+mod read_only;
+
 const FORMAT: &str = "postmortem-case";
 const FORMAT_VERSION: u32 = 1;
 

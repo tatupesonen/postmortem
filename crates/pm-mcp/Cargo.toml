@@ -1,0 +1,42 @@
+[package]
+name = "pm-mcp"
+description = "postmortem MCP server: case query tools for AI assistants (stdio and streamable HTTP)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+pm-case.workspace = true
+pm-casedb.workspace = true
+pm-search.workspace = true
+pm-text.workspace = true
+pm-registry.workspace = true
+rmcp.workspace = true
+tokio.workspace = true
+base64.workspace = true
+image.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+jiff.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+parking_lot.workspace = true
+uuid = { workspace = true, features = ["v4"] }
+hyper = { version = "=1.11.1", features = ["server", "http1"] }
+hyper-util = { version = "=0.1.21", features = ["tokio"] }
+http-body-util = "=0.1.5"
+bytes = "1.12.1"
+tokio-util = "0.7.20"
+tower-service = "0.3.3"
+
+[dev-dependencies]
+pm-testkit.workspace = true
+pm-ingest.workspace = true
+pm-modules.workspace = true
+tempfile.workspace = true
+tokio = { workspace = true, features = ["macros"] }
+
+[lints]
+workspace = true

@@ -17,6 +17,7 @@ mod derived;
 pub mod events;
 pub mod file_search;
 mod hosts;
+pub mod mcp;
 mod model;
 pub mod os_accounts;
 mod scores;

@@ -1,0 +1,124 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "ref": "ds:1",
+    "objectId": 1,
+    "name": "demo.dd",
+    "type": "Image",
+    "size": 69206016,
+    "timezone": "<redacted>",
+    "addedDate": "<redacted>",
+    "imageType": "raw",
+    "sectorSize": 512,
+    "paths": "<redacted>",
+    "md5": null,
+    "sha1": null,
+    "sha256": null,
+    "volumeSystems": [
+      {
+        "objectId": 1,
+        "type": "VolumeSystem",
+        "vsType": "DOS",
+        "blockSize": 512,
+        "volumes": [
+          {
+            "objectId": 1,
+            "type": "Volume",
+            "addr": 0,
+            "startSector": 0,
+            "lengthSectors": 1,
+            "size": 512,
+            "flags": "Meta",
+            "fileSystems": [],
+            "evidence": {
+              "description": "Primary Table (#0)"
+            }
+          },
+          {
+            "objectId": 2,
+            "type": "Volume",
+            "addr": 1,
+            "startSector": 0,
+            "lengthSectors": 2048,
+            "size": 1048576,
+            "flags": "Unallocated",
+            "fileSystems": [],
+            "evidence": {
+              "description": "Unallocated"
+            }
+          },
+          {
+            "objectId": 3,
+            "type": "Volume",
+            "addr": 2,
+            "startSector": 2048,
+            "lengthSectors": 49152,
+            "size": 25165824,
+            "flags": "Allocated",
+            "fileSystems": [
+              {
+                "objectId": 1,
+                "type": "FileSystem",
+                "fsType": "NTFS",
+                "imageOffset": 1048576,
+                "blockSize": 4096,
+                "blockCount": 6143,
+                "rootInum": 5,
+                "rootRef": "file:1",
+                "evidence": {
+                  "label": "WINDOWS",
+                  "serial": "123456789ABCDEF0"
+                }
+              }
+            ],
+            "evidence": {
+              "description": "NTFS / exFAT (0x07)"
+            }
+          },
+          {
+            "objectId": 4,
+            "type": "Volume",
+            "addr": 3,
+            "startSector": 51200,
+            "lengthSectors": 81920,
+            "size": 41943040,
+            "flags": "Allocated",
+            "fileSystems": [
+              {
+                "objectId": 2,
+                "type": "FileSystem",
+                "fsType": "FAT32",
+                "imageOffset": 26214400,
+                "blockSize": 512,
+                "blockCount": 81920,
+                "rootInum": 2,
+                "rootRef": "file:74",
+                "evidence": {
+                  "label": "USB STICK",
+                  "serial": "1234-5678"
+                }
+              }
+            ],
+            "evidence": {
+              "description": "Win95 FAT32 (0x0c)"
+            }
+          },
+          {
+            "objectId": 5,
+            "type": "Volume",
+            "addr": 4,
+            "startSector": 133120,
+            "lengthSectors": 2048,
+            "size": 1048576,
+            "flags": "Unallocated",
+            "fileSystems": [],
+            "evidence": {
+              "description": "Unallocated"
+            }
+          }
+        ]
+      }
+    ],
+    "fileSystems": []
+  }
+}

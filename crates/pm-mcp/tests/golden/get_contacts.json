@@ -1,0 +1,29 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "artifact:8",
+      "objectId": 8,
+      "sourceFileId": 103,
+      "sourceRef": "file:103",
+      "artifactType": "TSK_CONTACT",
+      "artifactTypeDisplayName": "Contacts",
+      "analysisResult": false,
+      "dataSourceId": 2,
+      "evidence": {
+        "attributes": [
+          {
+            "type": "TSK_NAME",
+            "value": "Mallory INJECTION-MARKER"
+          },
+          {
+            "type": "TSK_PHONE_NUMBER",
+            "value": "+358409876543"
+          }
+        ]
+      }
+    }
+  ],
+  "next_cursor": null,
+  "truncated": false
+}
