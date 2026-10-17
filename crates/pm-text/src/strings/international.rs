@@ -56,7 +56,8 @@ fn decode_utf16(buf: &[u8], start: usize, big_endian: bool, cfg: &StringsConfig)
         r.bytes += 2;
         r.chars += 1;
         // Surrogate units are never accepted (the table maps them to NONE).
-        r.text.push(char::from_u32(cp).unwrap_or(char::REPLACEMENT_CHARACTER));
+        r.text
+            .push(char::from_u32(cp).unwrap_or(char::REPLACEMENT_CHARACTER));
     }
     r
 }
@@ -77,7 +78,6 @@ fn decode_utf8(buf: &[u8], start: usize, cfg: &StringsConfig) -> Run {
         let rest = buf.len() - off;
         let (len, cp) = match b0 {
             0x00..=0x7F => (1, u32::from(b0)),
-            0x80..=0xC1 => break,
             0xC2..=0xDF => {
                 if rest < 2 {
                     r.hit_end = true;
@@ -86,7 +86,10 @@ fn decode_utf8(buf: &[u8], start: usize, cfg: &StringsConfig) -> Run {
                 if !cont(off + 1, 0x80, 0xBF) {
                     break;
                 }
-                (2, (u32::from(b0 & 0x1F) << 6) | u32::from(at(off + 1) & 0x3F))
+                (
+                    2,
+                    (u32::from(b0 & 0x1F) << 6) | u32::from(at(off + 1) & 0x3F),
+                )
             }
             0xE0..=0xEF => {
                 if rest < 3 {
@@ -114,7 +117,9 @@ fn decode_utf8(buf: &[u8], start: usize, cfg: &StringsConfig) -> Run {
                     break;
                 }
                 let lo = if b0 == 0xF0 { 0x90 } else { 0x80 };
-                if !(cont(off + 1, lo, 0xBF) && cont(off + 2, 0x80, 0xBF) && cont(off + 3, 0x80, 0xBF))
+                if !(cont(off + 1, lo, 0xBF)
+                    && cont(off + 2, 0x80, 0xBF)
+                    && cont(off + 3, 0x80, 0xBF))
                 {
                     break;
                 }
@@ -129,7 +134,8 @@ fn decode_utf8(buf: &[u8], start: usize, cfg: &StringsConfig) -> Run {
         }
         r.bytes += len;
         r.chars += 1;
-        r.text.push(char::from_u32(cp).unwrap_or(char::REPLACEMENT_CHARACTER));
+        r.text
+            .push(char::from_u32(cp).unwrap_or(char::REPLACEMENT_CHARACTER));
     }
     r
 }
@@ -181,7 +187,11 @@ fn scan(buf: &[u8], abs: u64, cfg: &StringsConfig, last: bool, out: &mut String)
     len
 }
 
-pub(super) fn extract(src: &dyn ReadAt, cfg: &StringsConfig, sink: &mut dyn TextSink) -> Result<(), TextError> {
+pub(super) fn extract(
+    src: &dyn ReadAt,
+    cfg: &StringsConfig,
+    sink: &mut dyn TextSink,
+) -> Result<(), TextError> {
     let size = src.size();
     let mut buf: Vec<u8> = Vec::with_capacity(FILE_BUF_SIZE * 2);
     let mut buf_abs = 0u64; // absolute offset of buf[0]
@@ -260,7 +270,10 @@ mod tests {
     #[test]
     fn utf16_big_endian_and_han() {
         let c = cfg(&[Script::Han]);
-        let data: Vec<u8> = "中文字符串".encode_utf16().flat_map(u16::to_be_bytes).collect();
+        let data: Vec<u8> = "中文字符串"
+            .encode_utf16()
+            .flat_map(u16::to_be_bytes)
+            .collect();
         assert_eq!(extract_bytes(&data, &c), "中文字符串\n");
     }
 

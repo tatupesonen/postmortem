@@ -67,7 +67,7 @@ pub(super) fn extract(cf: &mut Cfb<'_>, sink: &mut dyn TextSink) -> Result<(), T
                 if dt == 0x0010 {
                     in_sheet = true;
                     if let Some(name) = sheet_names.get(&r.pos) {
-                        out.line(name)?;
+                        out.line(name);
                     }
                 }
             }
@@ -133,7 +133,14 @@ pub(super) fn extract(cf: &mut Cfb<'_>, sink: &mut dyn TextSink) -> Result<(), T
                 if res.get(6..8) == Some(&[0xFF, 0xFF]) {
                     match res.first() {
                         Some(0) => pending_string = true,
-                        Some(1) => out.cell_at(row, if res.get(2) == Some(&1) { "TRUE" } else { "FALSE" })?,
+                        Some(1) => out.cell_at(
+                            row,
+                            if res.get(2) == Some(&1) {
+                                "TRUE"
+                            } else {
+                                "FALSE"
+                            },
+                        )?,
                         _ => {}
                     }
                 } else {
@@ -152,11 +159,14 @@ pub(super) fn extract(cf: &mut Cfb<'_>, sink: &mut dyn TextSink) -> Result<(), T
                 let row = out.cur_row.unwrap_or(0);
                 out.cell_at(row, &text)?;
             }
-            BOOLERR if in_sheet
-                && r.data.get(7) == Some(&0) => {
-                    let v = if r.data.get(6) == Some(&1) { "TRUE" } else { "FALSE" };
-                    out.cell(r.data, v)?;
-                }
+            BOOLERR if in_sheet && r.data.get(7) == Some(&0) => {
+                let v = if r.data.get(6) == Some(&1) {
+                    "TRUE"
+                } else {
+                    "FALSE"
+                };
+                out.cell(r.data, v)?;
+            }
             _ => {}
         }
         i += 1;
@@ -206,7 +216,11 @@ fn chars(b: &[u8], n: usize, high: bool) -> String {
         utf16le(b.get(..n * 2).unwrap_or(b))
     } else {
         // "Compressed": the low bytes of UTF-16 (Latin-1).
-        b.get(..n).unwrap_or(b).iter().map(|&c| char::from(c)).collect()
+        b.get(..n)
+            .unwrap_or(b)
+            .iter()
+            .map(|&c| char::from(c))
+            .collect()
     }
 }
 
@@ -214,7 +228,11 @@ fn chars(b: &[u8], n: usize, high: bool) -> String {
 /// records (strings may cross record boundaries; the remainder of a
 /// string's characters then starts with a new flags byte).
 fn parse_sst(segs: &[&[u8]]) -> Vec<String> {
-    let mut r = SegReader { segs, seg: 0, pos: 8 };
+    let mut r = SegReader {
+        segs,
+        seg: 0,
+        pos: 8,
+    };
     let unique = le32(segs.first().copied().unwrap_or_default(), 4).unwrap_or(0) as usize;
     let mut out = Vec::new();
     let mut total = 0usize;
@@ -223,8 +241,16 @@ fn parse_sst(segs: &[&[u8]]) -> Vec<String> {
         let Some(flags) = r.u8() else { break };
         let rich = flags & 0x08 != 0;
         let ext = flags & 0x04 != 0;
-        let runs = if rich { usize::from(r.u16().unwrap_or(0)) } else { 0 };
-        let ext_len = if ext { r.u32().unwrap_or(0) as usize } else { 0 };
+        let runs = if rich {
+            usize::from(r.u16().unwrap_or(0))
+        } else {
+            0
+        };
+        let ext_len = if ext {
+            r.u32().unwrap_or(0) as usize
+        } else {
+            0
+        };
         let mut s = String::new();
         let mut high = flags & 1 != 0;
         let mut left = usize::from(cch);
@@ -343,10 +369,9 @@ impl<'a> Out<'a> {
         }
     }
 
-    fn line(&mut self, s: &str) -> Result<(), Stop> {
+    fn line(&mut self, s: &str) {
         self.buf.push_str(s);
         self.buf.push('\n');
-        Ok(())
     }
 
     fn end_row(&mut self) -> Result<(), Stop> {
@@ -473,10 +498,10 @@ mod tests {
 
     #[test]
     fn rk_values() {
-        assert_eq!(rk((42u32 << 2) | 2), 42.0);
-        assert_eq!(rk((1234u32 << 2) | 3), 12.34);
+        assert_eq!(rk((42u32 << 2) | 2).to_bits(), 42.0f64.to_bits());
+        assert_eq!(rk((1234u32 << 2) | 3).to_bits(), 12.34f64.to_bits());
         let bits = (1.5f64.to_bits() >> 32) as u32 & 0xFFFF_FFFC;
-        assert_eq!(rk(bits), 1.5);
+        assert_eq!(rk(bits).to_bits(), 1.5f64.to_bits());
         assert_eq!(number(42.0), "42");
         assert_eq!(number(2.25), "2.25");
     }
@@ -490,6 +515,9 @@ mod tests {
         let data = cfb_file(&[("/Workbook", &s)]);
         let src = pm_core::io::MemSource::new(data);
         let mut sink = StringSink::default();
-        assert!(matches!(crate::ole::extract(&src, &mut sink), Err(TextError::Encrypted)));
+        assert!(matches!(
+            crate::ole::extract(&src, &mut sink),
+            Err(TextError::Encrypted)
+        ));
     }
 }

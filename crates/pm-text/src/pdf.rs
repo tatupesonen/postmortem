@@ -71,7 +71,9 @@ fn info(doc: &Document) -> Metadata {
             Object::Reference(id) => doc.get_object(*id).ok(),
             o => Some(o),
         };
-        let Some(Object::String(bytes, _)) = v else { continue };
+        let Some(Object::String(bytes, _)) = v else {
+            continue;
+        };
         let mut s = pdf_string(bytes);
         if key.ends_with("Date") {
             match pdf_date(&s) {
@@ -91,9 +93,12 @@ fn info(doc: &Document) -> Metadata {
 /// `PDFDocEncoding`.
 pub(crate) fn pdf_string(b: &[u8]) -> String {
     if let Some(rest) = b.strip_prefix(&[0xFE, 0xFF]) {
-        let units = rest
-            .chunks_exact(2)
-            .map(|c| u16::from_be_bytes([c.first().copied().unwrap_or(0), c.get(1).copied().unwrap_or(0)]));
+        let units = rest.chunks_exact(2).map(|c| {
+            u16::from_be_bytes([
+                c.first().copied().unwrap_or(0),
+                c.get(1).copied().unwrap_or(0),
+            ])
+        });
         return char::decode_utf16(units)
             .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
             .collect();
@@ -106,8 +111,8 @@ pub(crate) fn pdf_string(b: &[u8]) -> String {
 
 fn pdf_doc_char(c: u8) -> char {
     const HIGH: [char; 33] = [
-        '•', '†', '‡', '…', '—', '–', 'ƒ', '⁄', '‹', '›', '−', '‰', '„', '“', '”', '‘', '’', '‚', '™',
-        'ﬁ', 'ﬂ', 'Ł', 'Œ', 'Š', 'Ÿ', 'Ž', 'ı', 'ł', 'œ', 'š', 'ž', '\u{FFFD}', '€',
+        '•', '†', '‡', '…', '—', '–', 'ƒ', '⁄', '‹', '›', '−', '‰', '„', '“', '”', '‘', '’', '‚',
+        '™', 'ﬁ', 'ﬂ', 'Ł', 'Œ', 'Š', 'Ÿ', 'Ž', 'ı', 'ł', 'œ', 'š', 'ž', '\u{FFFD}', '€',
     ];
     match c {
         0x18 => '˘',
@@ -118,7 +123,10 @@ fn pdf_doc_char(c: u8) -> char {
         0x1D => '˛',
         0x1E => '˚',
         0x1F => '˜',
-        0x80..=0xA0 => HIGH.get(usize::from(c - 0x80)).copied().unwrap_or('\u{FFFD}'),
+        0x80..=0xA0 => HIGH
+            .get(usize::from(c - 0x80))
+            .copied()
+            .unwrap_or('\u{FFFD}'),
         _ => char::from(c),
     }
 }
@@ -127,7 +135,11 @@ fn pdf_doc_char(c: u8) -> char {
 pub(crate) fn pdf_date(s: &str) -> Option<String> {
     let s = s.trim();
     let s = s.strip_prefix("D:").unwrap_or(s);
-    let digits: String = s.chars().take_while(char::is_ascii_digit).take(14).collect();
+    let digits: String = s
+        .chars()
+        .take_while(char::is_ascii_digit)
+        .take(14)
+        .collect();
     if digits.len() < 4 {
         return None;
     }
@@ -139,7 +151,13 @@ pub(crate) fn pdf_date(s: &str) -> Option<String> {
     let rest = s.get(digits.len()..).unwrap_or_default();
     let mut offset_min = 0i64;
     if let Some(sign) = rest.chars().next().filter(|c| *c == '+' || *c == '-') {
-        let tz: String = rest.get(1..).unwrap_or_default().chars().filter(char::is_ascii_digit).take(4).collect();
+        let tz: String = rest
+            .get(1..)
+            .unwrap_or_default()
+            .chars()
+            .filter(char::is_ascii_digit)
+            .take(4)
+            .collect();
         let oh: i64 = tz.get(0..2).and_then(|x| x.parse().ok()).unwrap_or(0);
         let om: i64 = tz.get(2..4).and_then(|x| x.parse().ok()).unwrap_or(0);
         offset_min = (oh * 60 + om) * if sign == '-' { -1 } else { 1 };
@@ -283,7 +301,7 @@ pub(crate) mod tests {
     pub(crate) fn simple_pdf(lines: &[&str]) -> Vec<u8> {
         let mut content = String::from("BT /F1 12 Tf 72 720 Td 14 TL\n");
         for l in lines {
-            content.push_str(&format!("({l}) Tj T*\n"));
+            content.push_str(&["(", l, ") Tj T*\n"].concat());
         }
         content.push_str("ET\n");
         let objs = [
@@ -332,17 +350,28 @@ pub(crate) mod tests {
     #[test]
     fn dates_and_strings() {
         assert_eq!(pdf_date("D:2021").as_deref(), Some("2021-01-01T00:00:00Z"));
-        assert_eq!(pdf_date("D:20211231235959Z").as_deref(), Some("2021-12-31T23:59:59Z"));
+        assert_eq!(
+            pdf_date("D:20211231235959Z").as_deref(),
+            Some("2021-12-31T23:59:59Z")
+        );
         assert_eq!(pdf_date("garbage"), None);
         assert_eq!(pdf_string(b"caf\xE9 \x80"), "café •");
     }
 
     #[test]
     fn broken_pdfs_fail_cleanly() {
-        for data in [&b"%PDF-1.4\n"[..], b"%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF"] {
+        for data in [
+            &b"%PDF-1.4\n"[..],
+            b"%PDF-1.4\n1 0 obj << /Type /Catalog >> endobj\ntrailer << /Root 1 0 R >>\n%%EOF",
+        ] {
             let src = pm_core::io::MemSource::new(data.to_vec());
             let mut sink = StringSink::default();
-            let _ = crate::extract(crate::Kind::Pdf, &src, &mut sink, &crate::ExtractOptions::default());
+            let _ = crate::extract(
+                crate::Kind::Pdf,
+                &src,
+                &mut sink,
+                &crate::ExtractOptions::default(),
+            );
         }
     }
 }

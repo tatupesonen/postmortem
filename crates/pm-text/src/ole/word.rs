@@ -26,13 +26,20 @@ pub(super) fn extract(cf: &mut Cfb<'_>, sink: &mut dyn TextSink) -> Result<(), T
     let n_fib = le16(&doc, 2).unwrap_or(0);
     if n_fib < 101 {
         // Word 6/95: not supported (no piece table in this form).
-        return Err(TextError::malformed("Word", format!("unsupported nFib {n_fib}")));
+        return Err(TextError::malformed(
+            "Word",
+            format!("unsupported nFib {n_fib}"),
+        ));
     }
     let flags = le16(&doc, 0x0A).unwrap_or(0);
     if flags & 0x0100 != 0 {
         return Err(TextError::Encrypted);
     }
-    let table_name = if flags & 0x0200 != 0 { "/1Table" } else { "/0Table" };
+    let table_name = if flags & 0x0200 != 0 {
+        "/1Table"
+    } else {
+        "/0Table"
+    };
     let table = read_stream(cf, table_name)?;
     // FIB: base (32) | csw | fibRgW | cslw | fibRgLw | cbRgFcLcb | fibRgFcLcb.
     let csw = usize::from(le16(&doc, 32).unwrap_or(0));
@@ -56,7 +63,9 @@ pub(super) fn extract(cf: &mut Cfb<'_>, sink: &mut dyn TextSink) -> Result<(), T
         let count = usize::try_from(count).unwrap_or(0);
         if p.compressed {
             let start = p.fc as usize / 2;
-            let bytes = doc.get(start..start.saturating_add(count)).unwrap_or_default();
+            let bytes = doc
+                .get(start..start.saturating_add(count))
+                .unwrap_or_default();
             out.text(&cp1252(bytes))?;
         } else {
             let start = p.fc as usize;
@@ -149,9 +158,8 @@ impl<'a> Writer<'a> {
                 }
                 _ if !self.visible() => {}
                 '\r' | '\u{B}' | '\u{C}' | '\u{E}' => self.buf.push('\n'),
-                '\u{7}' => self.buf.push('\t'),
+                '\u{7}' | '\t' => self.buf.push('\t'),
                 '\u{1E}' => self.buf.push('-'),
-                '\t' => self.buf.push('\t'),
                 c if (c as u32) < 0x20 => {}
                 c => self.buf.push(c),
             }
@@ -232,8 +240,14 @@ pub(crate) mod tests {
 
     #[test]
     fn unicode_and_compressed_pieces() {
-        assert_eq!(run(word_doc("Grüße\rzwei\u{7}x", false, false)).unwrap(), "Grüße\nzwei\tx");
-        assert_eq!(run(word_doc("plain text\r", true, false)).unwrap(), "plain text\n");
+        assert_eq!(
+            run(word_doc("Grüße\rzwei\u{7}x", false, false)).unwrap(),
+            "Grüße\nzwei\tx"
+        );
+        assert_eq!(
+            run(word_doc("plain text\r", true, false)).unwrap(),
+            "plain text\n"
+        );
     }
 
     #[test]

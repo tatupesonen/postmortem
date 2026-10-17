@@ -82,7 +82,9 @@ impl<'a> Archive<'a> {
     fn read_part(&mut self, name: &str, limit: u64) -> Option<Vec<u8>> {
         let file = self.zip.by_name(name).ok()?;
         let mut out = Vec::new();
-        file.take(limit.min(self.budget)).read_to_end(&mut out).ok()?;
+        file.take(limit.min(self.budget))
+            .read_to_end(&mut out)
+            .ok()?;
         self.budget = self.budget.saturating_sub(out.len() as u64);
         Some(out)
     }
@@ -134,7 +136,7 @@ impl<'a> Out<'a> {
         if self.buf.ends_with('\t') {
             self.buf.pop();
         }
-        self.newline()
+        self.newline();
     }
 
     fn flush(&mut self) -> Result<(), Stop> {
@@ -207,7 +209,10 @@ fn numbered(names: &[String], prefix: &str, suffix: &str) -> Vec<String> {
     v.into_iter().map(|(_, n)| n).collect()
 }
 
-pub(crate) fn extract_ooxml(src: &dyn ReadAt, sink: &mut dyn TextSink) -> Result<Metadata, TextError> {
+pub(crate) fn extract_ooxml(
+    src: &dyn ReadAt,
+    sink: &mut dyn TextSink,
+) -> Result<Metadata, TextError> {
     let mut z = Archive::open(src, "OOXML")?;
     let names = z.names();
     let mut out = Out::new(sink);
@@ -217,7 +222,11 @@ pub(crate) fn extract_ooxml(src: &dyn ReadAt, sink: &mut dyn TextSink) -> Result
             walk_run_text(&mut z, &part, &mut out)?;
         }
         walk_run_text(&mut z, "word/document.xml", &mut out)?;
-        for part in ["word/footnotes.xml", "word/endnotes.xml", "word/comments.xml"] {
+        for part in [
+            "word/footnotes.xml",
+            "word/endnotes.xml",
+            "word/comments.xml",
+        ] {
             walk_run_text(&mut z, part, &mut out)?;
         }
         for part in numbered(&names, "word/footer", ".xml") {
@@ -321,21 +330,27 @@ fn sheet_targets(z: &mut Archive<'_>) -> HashMap<String, String> {
     let mut m = HashMap::new();
     let _ = z.walk_part("xl/_rels/workbook.xml.rels", |ev| {
         if let Ev::Start(b"Relationship", s) = ev
-            && let (Some(id), Some(target)) = (attr(s, b"Id"), attr(s, b"Target")) {
-                let target = target.trim_start_matches('/');
-                let full = if target.starts_with("xl/") {
-                    target.to_owned()
-                } else {
-                    format!("xl/{target}")
-                };
-                m.insert(id, full);
-            }
+            && let (Some(id), Some(target)) = (attr(s, b"Id"), attr(s, b"Target"))
+        {
+            let target = target.trim_start_matches('/');
+            let full = if target.starts_with("xl/") {
+                target.to_owned()
+            } else {
+                format!("xl/{target}")
+            };
+            m.insert(id, full);
+        }
         Ok(())
     });
     m
 }
 
-fn sheet(z: &mut Archive<'_>, part: &str, shared: &[String], out: &mut Out<'_>) -> Result<(), Stop> {
+fn sheet(
+    z: &mut Archive<'_>,
+    part: &str,
+    shared: &[String],
+    out: &mut Out<'_>,
+) -> Result<(), Stop> {
     let mut cell_type = String::new();
     let mut in_v = false;
     let mut in_is = false;
@@ -376,7 +391,8 @@ fn sheet(z: &mut Archive<'_>, part: &str, shared: &[String], out: &mut Out<'_>) 
         }
         Ok(())
     })?;
-    out.newline()
+    out.newline();
+    Ok(())
 }
 
 /// Simple text of the elements of a small XML part, by local name.
@@ -454,7 +470,10 @@ fn ooxml_app(z: &mut Archive<'_>, meta: &mut Metadata) {
     }
 }
 
-pub(crate) fn extract_odf(src: &dyn ReadAt, sink: &mut dyn TextSink) -> Result<Metadata, TextError> {
+pub(crate) fn extract_odf(
+    src: &dyn ReadAt,
+    sink: &mut dyn TextSink,
+) -> Result<Metadata, TextError> {
     let mut z = Archive::open(src, "ODF")?;
     let mut out = Out::new(sink);
     let mut in_body = 0u32;
@@ -464,7 +483,9 @@ pub(crate) fn extract_odf(src: &dyn ReadAt, sink: &mut dyn TextSink) -> Result<M
             Ev::Start(name, s) => match name {
                 b"body" => in_body += 1,
                 b"s" if in_body > 0 => {
-                    let n = attr(s, b"c").and_then(|c| c.parse::<usize>().ok()).unwrap_or(1);
+                    let n = attr(s, b"c")
+                        .and_then(|c| c.parse::<usize>().ok())
+                        .unwrap_or(1);
                     out.push(&" ".repeat(n.min(1000)))?;
                 }
                 b"tab" if in_body > 0 => out.ch('\t'),
@@ -516,22 +537,28 @@ pub(crate) fn extract_odf(src: &dyn ReadAt, sink: &mut dyn TextSink) -> Result<M
     Ok(meta)
 }
 
-pub(crate) fn extract_epub(src: &dyn ReadAt, sink: &mut dyn TextSink) -> Result<Metadata, TextError> {
+pub(crate) fn extract_epub(
+    src: &dyn ReadAt,
+    sink: &mut dyn TextSink,
+) -> Result<Metadata, TextError> {
     let mut z = Archive::open(src, "EPUB")?;
     let names = z.names();
     // META-INF/container.xml → the package document.
     let mut opf: Option<String> = None;
     let _ = z.walk_part("META-INF/container.xml", |ev| {
         if let Ev::Start(b"rootfile", s) = ev
-            && opf.is_none() {
-                opf = attr(s, b"full-path");
-            }
+            && opf.is_none()
+        {
+            opf = attr(s, b"full-path");
+        }
         Ok(())
     });
     let mut meta = Metadata::new();
     let mut order: Vec<String> = Vec::new();
     if let Some(opf) = &opf {
-        let base = opf.rsplit_once('/').map_or(String::new(), |(d, _)| format!("{d}/"));
+        let base = opf
+            .rsplit_once('/')
+            .map_or(String::new(), |(d, _)| format!("{d}/"));
         let mut manifest: HashMap<String, String> = HashMap::new();
         let mut spine: Vec<String> = Vec::new();
         let _ = z.walk_part(opf, |ev| {
@@ -550,7 +577,10 @@ pub(crate) fn extract_epub(src: &dyn ReadAt, sink: &mut dyn TextSink) -> Result<
             }
             Ok(())
         });
-        order = spine.iter().filter_map(|id| manifest.get(id).cloned()).collect();
+        order = spine
+            .iter()
+            .filter_map(|id| manifest.get(id).cloned())
+            .collect();
         for (k, v) in collect_simple(&mut z, opf) {
             let key = match k.as_str() {
                 "title" => "Title",
@@ -567,8 +597,10 @@ pub(crate) fn extract_epub(src: &dyn ReadAt, sink: &mut dyn TextSink) -> Result<
         order = names
             .iter()
             .filter(|n| {
-                let l = n.to_ascii_lowercase();
-                l.ends_with(".xhtml") || l.ends_with(".html") || l.ends_with(".htm")
+                let ext = n.rsplit_once('.').map_or("", |(_, e)| e);
+                ["xhtml", "html", "htm"]
+                    .iter()
+                    .any(|x| ext.eq_ignore_ascii_case(x))
             })
             .cloned()
             .collect();
@@ -603,7 +635,10 @@ pub(crate) mod tests {
         w.finish().unwrap().into_inner()
     }
 
-    fn run(f: fn(&dyn ReadAt, &mut dyn TextSink) -> Result<Metadata, TextError>, data: Vec<u8>) -> (String, Metadata) {
+    fn run(
+        f: fn(&dyn ReadAt, &mut dyn TextSink) -> Result<Metadata, TextError>,
+        data: Vec<u8>,
+    ) -> (String, Metadata) {
         let src = pm_core::io::MemSource::new(data);
         let mut sink = StringSink::default();
         let m = f(&src, &mut sink).unwrap();
@@ -687,7 +722,11 @@ pub(crate) mod tests {
              </table:table-cell></table:table-row></table:table></office:text></office:body></office:document-content>";
         let meta = "<office:document-meta><office:meta><meta:initial-creator>Ann</meta:initial-creator>\
                     <dc:title>Doc</dc:title><meta:generator>LibreOffice</meta:generator></office:meta></office:document-meta>";
-        let data = zip(&[("mimetype", "application/vnd.oasis.opendocument.text"), ("content.xml", content), ("meta.xml", meta)]);
+        let data = zip(&[
+            ("mimetype", "application/vnd.oasis.opendocument.text"),
+            ("content.xml", content),
+            ("meta.xml", meta),
+        ]);
         let (t, m) = run(extract_odf, data);
         assert_eq!(t, "Title\na   b\tc\nd\nx\n");
         assert_eq!(m["Author"], "Ann");

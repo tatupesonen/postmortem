@@ -101,7 +101,9 @@ fn section(b: &[u8]) -> Vec<(u32, String)> {
                 utf16le(raw).trim_end_matches('\0').to_owned()
             }
             VT_FILETIME => {
-                let Some(ft) = le64(sec, po + 4) else { continue };
+                let Some(ft) = le64(sec, po + 4) else {
+                    continue;
+                };
                 // Edit time (PID 10) is a duration, not a date.
                 if id == 10 {
                     continue;
@@ -111,8 +113,12 @@ fn section(b: &[u8]) -> Vec<(u32, String)> {
                     None => continue,
                 }
             }
-            VT_I4 => le32(sec, po + 4).map(|v| (v as i32).to_string()).unwrap_or_default(),
-            VT_I2 => le16(sec, po + 4).map(|v| (v as i16).to_string()).unwrap_or_default(),
+            VT_I4 => le32(sec, po + 4)
+                .map(|v| (v as i32).to_string())
+                .unwrap_or_default(),
+            VT_I2 => le16(sec, po + 4)
+                .map(|v| (v as i16).to_string())
+                .unwrap_or_default(),
             _ => continue,
         };
         let v = v.trim().to_owned();
@@ -161,7 +167,10 @@ pub(crate) mod tests {
         let mut b = vec![0xFE, 0xFF, 0, 0, 5, 1, 2, 0];
         b.extend([0u8; 16]);
         b.extend(1u32.to_le_bytes());
-        b.extend([0xE0, 0x85, 0x9F, 0xF2, 0xF9, 0x4F, 0x68, 0x10, 0xAB, 0x91, 0x08, 0x00, 0x2B, 0x27, 0xB3, 0xD9]);
+        b.extend([
+            0xE0, 0x85, 0x9F, 0xF2, 0xF9, 0x4F, 0x68, 0x10, 0xAB, 0x91, 0x08, 0x00, 0x2B, 0x27,
+            0xB3, 0xD9,
+        ]);
         b.extend(48u32.to_le_bytes());
         b.extend(sec);
         b

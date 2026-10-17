@@ -12,7 +12,7 @@ use crate::util::SrcReader;
 use crate::{Metadata, Stop, TextError, TextSink};
 
 /// One XML event, reduced to what the extractors need.
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) enum Ev<'a> {
     /// Start tag (also emitted for empty elements, followed by `End`):
     /// local name and the raw start tag for attribute lookups.
@@ -103,7 +103,10 @@ fn resolve_ref(r: &BytesRef<'_>) -> Option<char> {
 pub(crate) fn attr(s: &quick_xml::events::BytesStart<'_>, name: &[u8]) -> Option<String> {
     for a in s.attributes().with_checks(false).flatten() {
         if a.key.local_name().as_ref() == name {
-            return a.decoded_and_normalized_value(quick_xml::XmlVersion::default(), s.decoder()).ok().map(std::borrow::Cow::into_owned);
+            return a
+                .decoded_and_normalized_value(quick_xml::XmlVersion::default(), s.decoder())
+                .ok()
+                .map(std::borrow::Cow::into_owned);
         }
     }
     None
@@ -173,9 +176,11 @@ fn detect(src: &dyn ReadAt) -> Result<&'static Encoding, TextError> {
             .take(40)
             .collect();
         if let Some(enc) = Encoding::for_label(&label)
-            && enc != encoding_rs::UTF_16LE && enc != encoding_rs::UTF_16BE {
-                return Ok(enc);
-            }
+            && enc != encoding_rs::UTF_16LE
+            && enc != encoding_rs::UTF_16BE
+        {
+            return Ok(enc);
+        }
     }
     Ok(UTF_8)
 }

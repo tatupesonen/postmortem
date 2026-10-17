@@ -86,7 +86,11 @@ impl std::fmt::Debug for LimitSink<'_> {
 }
 
 impl<'a> LimitSink<'a> {
-    pub fn new(inner: &'a mut dyn TextSink, cancelled: &'a dyn Fn() -> bool, max_bytes: u64) -> Self {
+    pub fn new(
+        inner: &'a mut dyn TextSink,
+        cancelled: &'a dyn Fn() -> bool,
+        max_bytes: u64,
+    ) -> Self {
         Self {
             inner,
             cancelled,

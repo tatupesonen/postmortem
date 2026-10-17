@@ -72,7 +72,7 @@ pub enum TextError {
 }
 
 impl TextError {
-    pub(crate) fn malformed(format: &'static str, msg: impl ToString) -> Self {
+    pub(crate) fn malformed(format: &'static str, msg: impl std::fmt::Display) -> Self {
         Self::Malformed {
             format,
             msg: msg.to_string(),
@@ -135,7 +135,9 @@ fn extract_at_depth(
         Kind::Rtf => rtf::extract(src, sink),
         Kind::Email => email::extract(src, sink, depth),
     });
-    if let Ok(r) = catch_unwind(run) { r } else {
+    if let Ok(r) = catch_unwind(run) {
+        r
+    } else {
         tracing::warn!(?kind, "text extractor panicked");
         Err(TextError::Panicked(kind.name()))
     }
@@ -162,7 +164,7 @@ pub(crate) fn extract_nested(
         return Ok(());
     }
     let src = pm_core::io::MemSource::new(data);
-    nested_result(extract_at_depth(
+    nested_result(&extract_at_depth(
         kind,
         &src,
         sink,
@@ -172,7 +174,7 @@ pub(crate) fn extract_nested(
 }
 
 /// A nested extraction's outcome: only a stop matters to the caller.
-pub(crate) fn nested_result(r: Result<Metadata, TextError>) -> Result<(), Stop> {
+pub(crate) fn nested_result(r: &Result<Metadata, TextError>) -> Result<(), Stop> {
     match r {
         Err(TextError::Stopped) => Err(Stop),
         _ => Ok(()),

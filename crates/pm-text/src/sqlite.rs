@@ -20,7 +20,9 @@ pub(crate) fn extract(
 ) -> Result<Metadata, TextError> {
     let dir = opts.temp_dir.clone().unwrap_or_else(std::env::temp_dir);
     std::fs::create_dir_all(&dir)?;
-    let tmp = tempfile::Builder::new().prefix("pm-sqlite-").tempdir_in(&dir)?;
+    let tmp = tempfile::Builder::new()
+        .prefix("pm-sqlite-")
+        .tempdir_in(&dir)?;
     let db_path = tmp.path().join("db.sqlite");
     copy(src, &db_path)?;
     if let Some(wal) = &opts.sqlite_wal {

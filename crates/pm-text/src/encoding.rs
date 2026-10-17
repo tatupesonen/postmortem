@@ -139,7 +139,8 @@ mod tests {
         // Cut-off multi-byte sequence at the end of the sample.
         assert_eq!(detect(b"abc \xC3"), UTF_8);
         // Latin-1 text with umlauts is not UTF-8.
-        let latin = b"Gr\xFC\xDFe aus K\xF6ln, sch\xF6ne Gr\xFC\xDFe und viele W\xFCnsche f\xFCr dich";
+        let latin =
+            b"Gr\xFC\xDFe aus K\xF6ln, sch\xF6ne Gr\xFC\xDFe und viele W\xFCnsche f\xFCr dich";
         let enc = detect(latin);
         assert_ne!(enc, UTF_8);
         assert_eq!(decode_bytes(latin, enc).chars().nth(2), Some('ü'));

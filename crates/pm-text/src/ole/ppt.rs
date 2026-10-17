@@ -107,7 +107,10 @@ mod tests {
 
     #[test]
     fn text_atoms_in_containers() {
-        let chars: Vec<u8> = "Título\rdos".encode_utf16().flat_map(u16::to_le_bytes).collect();
+        let chars: Vec<u8> = "Título\rdos"
+            .encode_utf16()
+            .flat_map(u16::to_le_bytes)
+            .collect();
         let mut inner = rec(0, super::TEXT_CHARS_ATOM, &chars);
         inner.extend(rec(0, super::TEXT_BYTES_ATOM, b"bytes atom"));
         let mut doc = rec(0x000F, 0x03E8, &inner);

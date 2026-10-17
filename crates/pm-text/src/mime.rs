@@ -375,11 +375,20 @@ mod tests {
     #[test]
     fn factory_order() {
         assert_eq!(kind_for_mime("text/plain", 10), Some(Kind::Plain));
-        assert_eq!(kind_for_mime("Text/HTML; charset=utf-8", 10), Some(Kind::Html));
+        assert_eq!(
+            kind_for_mime("Text/HTML; charset=utf-8", 10),
+            Some(Kind::Html)
+        );
         assert_eq!(kind_for_mime("application/json", 10), Some(Kind::Html));
         assert_eq!(kind_for_mime("application/json", HTML_MAX_SIZE + 1), None);
-        assert_eq!(kind_for_mime("text/html", HTML_MAX_SIZE + 1), Some(Kind::Html));
-        assert_eq!(kind_for_mime("application/x-sqlite3", 10), Some(Kind::Sqlite));
+        assert_eq!(
+            kind_for_mime("text/html", HTML_MAX_SIZE + 1),
+            Some(Kind::Html)
+        );
+        assert_eq!(
+            kind_for_mime("application/x-sqlite3", 10),
+            Some(Kind::Sqlite)
+        );
         assert_eq!(kind_for_mime("application/pdf", 10), Some(Kind::Pdf));
         assert_eq!(kind_for_mime("application/msword", 10), Some(Kind::Ole));
         assert_eq!(
@@ -414,14 +423,20 @@ mod tests {
     fn sniffing() {
         assert_eq!(sniff_mime(b"%PDF-1.7", "a"), "application/pdf");
         assert_eq!(sniff_mime(b"{\\rtf1\\ansi", "a"), "application/rtf");
-        assert_eq!(sniff_mime(b"SQLite format 3\0", "a"), "application/x-sqlite3");
+        assert_eq!(
+            sniff_mime(b"SQLite format 3\0", "a"),
+            "application/x-sqlite3"
+        );
         assert_eq!(
             sniff_mime(&[0xD0, 0xCF, 0x11, 0xE0, 0xA1, 0xB1, 0x1A, 0xE1], "x.doc"),
             "application/msword"
         );
         assert_eq!(sniff_mime(b"hello world\n", "a.txt"), "text/plain");
         assert_eq!(sniff_mime(b"  <!DOCTYPE html><html>", "a"), "text/html");
-        assert_eq!(sniff_mime(b"<?xml version=\"1.0\"?><a/>", "a"), "application/xml");
+        assert_eq!(
+            sniff_mime(b"<?xml version=\"1.0\"?><a/>", "a"),
+            "application/xml"
+        );
         assert_eq!(
             sniff_mime(b"From: a@b.c\nTo: d@e.f\nSubject: hi\n\nbody", "m"),
             "message/rfc822"
@@ -434,7 +449,10 @@ mod tests {
         odt.extend(8u16.to_le_bytes());
         odt.extend(0u16.to_le_bytes());
         odt.extend(b"mimetypeapplication/vnd.oasis.opendocument.text");
-        assert_eq!(sniff_mime(&odt, "noext"), "application/vnd.oasis.opendocument.text");
+        assert_eq!(
+            sniff_mime(&odt, "noext"),
+            "application/vnd.oasis.opendocument.text"
+        );
         assert_eq!(
             sniff_mime(b"PK\x03\x04", "a.docx"),
             "application/vnd.openxmlformats-officedocument.wordprocessingml.document"

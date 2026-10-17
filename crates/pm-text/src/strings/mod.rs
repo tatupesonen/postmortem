@@ -206,7 +206,8 @@ impl StringsConfig {
     /// (Latin-Basic is implied by Latin-Extended).
     fn enabled(&self, ordinal: u8) -> bool {
         if ordinal == Script::Latin1.ordinal() {
-            return self.scripts.contains(&Script::Latin1) || self.scripts.contains(&Script::Latin2);
+            return self.scripts.contains(&Script::Latin1)
+                || self.scripts.contains(&Script::Latin2);
         }
         self.scripts.iter().any(|s| s.ordinal() == ordinal)
     }
@@ -214,7 +215,11 @@ impl StringsConfig {
 
 /// Extracts strings from `src` into `sink`. Nothing is extracted when both
 /// UTF-8 and UTF-16 are off (the extractor is "unsupported" then).
-pub fn extract(src: &dyn ReadAt, cfg: &StringsConfig, sink: &mut dyn TextSink) -> Result<(), TextError> {
+pub fn extract(
+    src: &dyn ReadAt,
+    cfg: &StringsConfig,
+    sink: &mut dyn TextSink,
+) -> Result<(), TextError> {
     if !cfg.utf8 && !cfg.utf16 {
         return Ok(());
     }

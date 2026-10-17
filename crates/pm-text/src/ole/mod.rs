@@ -32,7 +32,8 @@ pub(crate) fn extract_depth(
     sink: &mut dyn TextSink,
     depth: u32,
 ) -> Result<Metadata, TextError> {
-    let mut cf = cfb::CompoundFile::open(cursor(src)).map_err(|e| TextError::malformed("OLE", e))?;
+    let mut cf =
+        cfb::CompoundFile::open(cursor(src)).map_err(|e| TextError::malformed("OLE", e))?;
     if cf.is_stream("/EncryptedPackage") || cf.is_stream("/EncryptionInfo") {
         // Encrypted OOXML (agile or standard encryption).
         return Err(TextError::Encrypted);
@@ -55,7 +56,9 @@ pub(crate) fn extract_depth(
 
 /// Reads a whole stream (capped).
 pub(crate) fn read_stream(cf: &mut Cfb<'_>, path: &str) -> Result<Vec<u8>, TextError> {
-    let s = cf.open_stream(path).map_err(|e| TextError::malformed("OLE", e))?;
+    let s = cf
+        .open_stream(path)
+        .map_err(|e| TextError::malformed("OLE", e))?;
     let len = s.len();
     if len > MAX_STREAM {
         return Err(TextError::TooLarge {
@@ -70,7 +73,12 @@ pub(crate) fn read_stream(cf: &mut Cfb<'_>, path: &str) -> Result<Vec<u8>, TextE
 
 /// The text encoding of a Windows code page.
 pub(crate) fn codepage(cp: u32) -> &'static encoding_rs::Encoding {
-    use encoding_rs::{WINDOWS_874, SHIFT_JIS, GBK, EUC_KR, BIG5, UTF_16LE, UTF_16BE, WINDOWS_1250, WINDOWS_1251, WINDOWS_1253, WINDOWS_1254, WINDOWS_1255, WINDOWS_1256, WINDOWS_1257, WINDOWS_1258, MACINTOSH, KOI8_R, KOI8_U, ISO_8859_2, ISO_8859_5, ISO_8859_7, ISO_8859_8, ISO_2022_JP, EUC_JP, GB18030, UTF_8, WINDOWS_1252};
+    use encoding_rs::{
+        BIG5, EUC_JP, EUC_KR, GB18030, GBK, ISO_2022_JP, ISO_8859_2, ISO_8859_5, ISO_8859_7,
+        ISO_8859_8, KOI8_R, KOI8_U, MACINTOSH, SHIFT_JIS, UTF_8, UTF_16BE, UTF_16LE, WINDOWS_874,
+        WINDOWS_1250, WINDOWS_1251, WINDOWS_1252, WINDOWS_1253, WINDOWS_1254, WINDOWS_1255,
+        WINDOWS_1256, WINDOWS_1257, WINDOWS_1258,
+    };
     match cp {
         874 => WINDOWS_874,
         932 => SHIFT_JIS,
@@ -111,9 +119,11 @@ pub(crate) mod tests {
         let mut cf = cfb::CompoundFile::create(std::io::Cursor::new(Vec::new())).unwrap();
         for (path, data) in streams {
             if let Some((dir, _)) = path.rsplit_once('/')
-                && !dir.is_empty() && !cf.exists(dir) {
-                    cf.create_storage_all(dir).unwrap();
-                }
+                && !dir.is_empty()
+                && !cf.exists(dir)
+            {
+                cf.create_storage_all(dir).unwrap();
+            }
             let mut s = cf.create_stream(path).unwrap();
             s.write_all(data).unwrap();
         }

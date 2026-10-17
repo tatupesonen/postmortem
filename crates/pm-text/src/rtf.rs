@@ -31,7 +31,11 @@ pub(crate) fn extract(src: &dyn ReadAt, sink: &mut dyn TextSink) -> Result<Metad
 }
 
 /// Extracts RTF held in memory (Outlook compressed-RTF bodies).
-pub(crate) fn extract_bytes(data: &[u8], sink: &mut dyn TextSink, meta: &mut Metadata) -> Result<(), Stop> {
+pub(crate) fn extract_bytes(
+    data: &[u8],
+    sink: &mut dyn TextSink,
+    meta: &mut Metadata,
+) -> Result<(), Stop> {
     let mut p = Parser::new(sink, meta);
     p.run(&mut std::io::Cursor::new(data))?;
     p.flush()
@@ -107,7 +111,11 @@ impl<'a, 'm> Parser<'a, 'm> {
     }
 
     fn encoding(&self) -> &'static Encoding {
-        let cp = if self.st.cp != 0 { self.st.cp } else { self.ansi_cp };
+        let cp = if self.st.cp != 0 {
+            self.st.cp
+        } else {
+            self.ansi_cp
+        };
         codepage(cp)
     }
 
@@ -139,10 +147,9 @@ impl<'a, 'm> Parser<'a, 'm> {
     fn emit(&mut self, c: char) {
         match self.st.dest {
             Dest::Text => self.out.push(c),
-            Dest::Info(_)
-                if self.info_text.len() < 64 * 1024 => {
-                    self.info_text.push(c);
-                }
+            Dest::Info(_) if self.info_text.len() < 64 * 1024 => {
+                self.info_text.push(c);
+            }
             _ => {}
         }
     }
@@ -237,7 +244,10 @@ impl<'a, 'm> Parser<'a, 'm> {
                         let n: Option<i32> = if param.is_empty() || param == "-" {
                             None
                         } else {
-                            param.parse::<i64>().ok().map(|v| v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32)
+                            param
+                                .parse::<i64>()
+                                .ok()
+                                .map(|v| v.clamp(i64::from(i32::MIN), i64::from(i32::MAX)) as i32)
                         };
                         if word == "bin" {
                             let skip = n.unwrap_or(0).max(0) as u64;
@@ -436,7 +446,11 @@ impl<'a, 'm> Parser<'a, 'm> {
                 } else {
                     self.flush_pending();
                     self.st.font = f;
-                    self.st.cp = self.fonts.iter().find(|(id, _)| *id == f).map_or(0, |&(_, cp)| cp);
+                    self.st.cp = self
+                        .fonts
+                        .iter()
+                        .find(|(id, _)| *id == f)
+                        .map_or(0, |&(_, cp)| cp);
                 }
             }
             "fcharset" if self.st.dest == Dest::FontTable => {
@@ -465,9 +479,11 @@ impl<'a, 'm> Parser<'a, 'm> {
             }
             "cpg" if self.st.dest == Dest::FontTable => {
                 if let (Some(f), Some(cp)) = (self.cur_font, n)
-                    && cp > 0 && self.fonts.len() < 4096 {
-                        self.fonts.push((f, cp as u32));
-                    }
+                    && cp > 0
+                    && self.fonts.len() < 4096
+                {
+                    self.fonts.push((f, cp as u32));
+                }
             }
             "uc" => self.st.uc = n.unwrap_or(1).clamp(0, 16) as u32,
             "u" => {
@@ -481,7 +497,9 @@ impl<'a, 'm> Parser<'a, 'm> {
                         self.emit(c.unwrap_or(char::REPLACEMENT_CHARACTER));
                     }
                     (_, u) => {
-                        self.emit(char::from_u32(u32::from(u)).unwrap_or(char::REPLACEMENT_CHARACTER));
+                        self.emit(
+                            char::from_u32(u32::from(u)).unwrap_or(char::REPLACEMENT_CHARACTER),
+                        );
                     }
                 }
                 self.skip_chars = self.st.uc;
@@ -576,7 +594,13 @@ mod tests {
         let src = pm_core::io::MemSource::new(b"hello".to_vec());
         let mut sink = StringSink::default();
         assert!(extract(&src, &mut sink).is_err());
-        for g in [&b"{\\rtf"[..], b"{\\rtf\\", b"{\\rtf\\'", b"{\\rtf}}}}}{{{", b"{\\rtf\\u-99999999999"] {
+        for g in [
+            &b"{\\rtf"[..],
+            b"{\\rtf\\",
+            b"{\\rtf\\'",
+            b"{\\rtf}}}}}{{{",
+            b"{\\rtf\\u-99999999999",
+        ] {
             let _ = run(g);
         }
     }

@@ -66,7 +66,10 @@ mod tests {
 
     #[test]
     fn printable_runs() {
-        assert_eq!(run(b"\x01\x02hello\x03ab\x04world wide\x05"), "hello\nworld wide\n");
+        assert_eq!(
+            run(b"\x01\x02hello\x03ab\x04world wide\x05"),
+            "hello\nworld wide\n"
+        );
         assert_eq!(run(b"abc"), "");
         assert_eq!(run(b"\xFFtail"), "tail");
         assert_eq!(run(b"tab\there\x00\x00"), "tab\there\n");

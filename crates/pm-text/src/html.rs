@@ -8,6 +8,8 @@
 //! numbered lists of `Scripts`, `Links`, `Images`, `Comments` and every
 //! `Others` tag that has attributes.
 
+use std::fmt::Write as _;
+
 use encoding_rs::Encoding;
 use pm_core::ReadAt;
 
@@ -39,7 +41,10 @@ pub(crate) fn extract(src: &dyn ReadAt, sink: &mut dyn TextSink) -> Result<Metad
         off += n as u64;
         let last = n == 0;
         let input = raw.get(..n).unwrap_or_default();
-        pending.reserve(dec.max_utf8_buffer_length(input.len()).unwrap_or(input.len() * 3));
+        pending.reserve(
+            dec.max_utf8_buffer_length(input.len())
+                .unwrap_or(input.len() * 3),
+        );
         let _ = dec.decode_to_string(input, &mut pending, last);
         let used = r.feed(&pending, last)?;
         pending.drain(..used);
@@ -60,7 +65,8 @@ pub(crate) fn render_str(html: &str, sink: &mut dyn TextSink) -> Result<Metadata
 
 /// BOM, then a `charset` in the first 1024 bytes, then content detection.
 fn detect(src: &dyn ReadAt) -> Result<&'static Encoding, TextError> {
-    let mut head = vec![0u8; usize::try_from(src.size().min(encoding::DETECT_BYTES as u64)).unwrap_or(0)];
+    let mut head =
+        vec![0u8; usize::try_from(src.size().min(encoding::DETECT_BYTES as u64)).unwrap_or(0)];
     let n = src.read_at(0, &mut head)?;
     head.truncate(n);
     if let Some((enc, _)) = Encoding::for_bom(&head) {
@@ -290,7 +296,8 @@ impl<'a> Renderer<'a> {
                             cut -= 1;
                         }
                         if self.raw_content.len() < MAX_META {
-                            self.raw_content.push_str(buf.get(i..cut).unwrap_or_default());
+                            self.raw_content
+                                .push_str(buf.get(i..cut).unwrap_or_default());
                         }
                         return Ok(cut);
                     }
@@ -303,9 +310,11 @@ impl<'a> Renderer<'a> {
                 let mut cut = rest.len();
                 if !last
                     && let Some(amp) = rest.rfind('&')
-                        && rest.len() - amp < 40 && !rest.get(amp..).unwrap_or_default().contains(';') {
-                            cut = amp;
-                        }
+                    && rest.len() - amp < 40
+                    && !rest.get(amp..).unwrap_or_default().contains(';')
+                {
+                    cut = amp;
+                }
                 self.text(rest.get(..cut).unwrap_or_default());
                 return Ok(i + cut);
             };
@@ -314,7 +323,9 @@ impl<'a> Renderer<'a> {
             }
             let at = i + lt;
             let tail = buf.get(at..).unwrap_or_default();
-            if let Some(used) = self.markup(tail, last) { i = at + used } else {
+            if let Some(used) = self.markup(tail, last) {
+                i = at + used;
+            } else {
                 if !last && tail.len() < MAX_PENDING {
                     return Ok(at);
                 }
@@ -376,7 +387,7 @@ impl<'a> Renderer<'a> {
         match name {
             "script" => {
                 self.scripts.0 += 1;
-                self.script_tag = content.to_owned();
+                content.clone_into(&mut self.script_tag);
             }
             "a" => add(&mut self.links, content),
             "img" => add(&mut self.images, content),
@@ -385,7 +396,7 @@ impl<'a> Renderer<'a> {
                     self.others.0 += 1;
                     if self.others.1.len() < MAX_META {
                         let n = self.others.0;
-                        self.others.1.push_str(&format!("{n}) {name}:{content}\n"));
+                        let _ = writeln!(self.others.1, "{n}) {name}:{content}");
                     }
                 }
             }
@@ -468,7 +479,7 @@ fn add(list: &mut (usize, String), content: &str) {
     list.0 += 1;
     if list.1.len() < MAX_META {
         let n = list.0;
-        list.1.push_str(&format!("{n}) {content}\n"));
+        let _ = writeln!(list.1, "{n}) {content}");
     }
 }
 
@@ -490,10 +501,9 @@ fn tag_end(s: &str) -> Option<usize> {
     for (i, c) in s.char_indices() {
         match quote {
             Some(q) if c == q => quote = None,
-            Some(_) => {}
             None if c == '"' || c == '\'' => quote = Some(c),
             None if c == '>' => return Some(i),
-            None => {}
+            Some(_) | None => {}
         }
         if i > MAX_PENDING {
             // A runaway quote: give up on quoting.
@@ -752,7 +762,16 @@ mod tests {
 
     #[test]
     fn garbage_does_not_panic() {
-        for s in ["<", "<<<>>>", "</", "<a href='", "<!--", "<script>", "&#xFFFFFFFF;", "&"] {
+        for s in [
+            "<",
+            "<<<>>>",
+            "</",
+            "<a href='",
+            "<!--",
+            "<script>",
+            "&#xFFFFFFFF;",
+            "&",
+        ] {
             let _ = render(s);
         }
     }

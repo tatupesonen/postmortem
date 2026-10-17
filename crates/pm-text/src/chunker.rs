@@ -60,7 +60,6 @@ struct Sizes {
 #[derive(Debug, Default)]
 pub struct Chunker {
     queue: VecDeque<char>,
-    input_done: bool,
     eof: bool,
     chunks: usize,
 }
@@ -76,6 +75,8 @@ impl Chunker {
     }
 
     /// Adds text; emits every chunk that can be cut without seeing more.
+    /// The queue never runs dry here ([`LOOKAHEAD`] exceeds the characters
+    /// one chunk consumes), so only [`Chunker::finish`] sees the end.
     pub fn push(
         &mut self,
         text: &str,
@@ -93,7 +94,6 @@ impl Chunker {
     /// Ends the input and emits the remaining chunks. Like Autopsy, empty
     /// input still yields one (empty) chunk.
     pub fn finish(&mut self, emit: &mut dyn FnMut(Chunk) -> Result<(), Stop>) -> Result<(), Stop> {
-        self.input_done = true;
         while !self.eof {
             let c = self.next_chunk();
             self.chunks += 1;
@@ -395,7 +395,9 @@ mod tests {
 
     #[test]
     fn streaming_equals_whole() {
-        let text: String = (0..60_000).map(|i| if i % 7 == 0 { ' ' } else { 'x' }).collect();
+        let text: String = (0..60_000)
+            .map(|i| if i % 7 == 0 { ' ' } else { 'x' })
+            .collect();
         let whole = Chunker::split(&text);
         let mut got = Vec::new();
         let mut sink = ChunkingSink::new(|c| {

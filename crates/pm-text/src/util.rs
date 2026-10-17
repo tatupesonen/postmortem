@@ -87,7 +87,8 @@ impl Read for SrcReader<'_> {
 impl BufRead for SrcReader<'_> {
     fn fill_buf(&mut self) -> io::Result<&[u8]> {
         if self.start >= self.filled && self.pos < self.end {
-            let want = usize::try_from((self.end - self.pos).min(self.buf.len() as u64)).unwrap_or(0);
+            let want =
+                usize::try_from((self.end - self.pos).min(self.buf.len() as u64)).unwrap_or(0);
             let n = self
                 .src
                 .read_at(self.pos, self.buf.get_mut(..want).unwrap_or_default())?;
@@ -132,9 +133,12 @@ pub(crate) fn lef64(b: &[u8], off: usize) -> Option<f64> {
 
 /// Decodes UTF-16LE (lossy).
 pub(crate) fn utf16le(b: &[u8]) -> String {
-    let units = b
-        .chunks_exact(2)
-        .map(|c| u16::from_le_bytes([c.first().copied().unwrap_or(0), c.get(1).copied().unwrap_or(0)]));
+    let units = b.chunks_exact(2).map(|c| {
+        u16::from_le_bytes([
+            c.first().copied().unwrap_or(0),
+            c.get(1).copied().unwrap_or(0),
+        ])
+    });
     char::decode_utf16(units)
         .map(|r| r.unwrap_or(char::REPLACEMENT_CHARACTER))
         .collect()
@@ -205,12 +209,13 @@ mod tests {
         assert_eq!(java_double_to_string(0.001), "0.001");
         assert_eq!(java_double_to_string(0.0001), "1.0E-4");
         assert_eq!(java_double_to_string(0.0), "0.0");
-        assert_eq!(java_double_to_string(3.14), "3.14");
+        assert_eq!(java_double_to_string(3.25), "3.25");
     }
 
     #[test]
     fn src_reader_reads_all() {
-        let src = pm_core::io::MemSource::new((0..=255u8).cycle().take(100_000).collect::<Vec<_>>());
+        let src =
+            pm_core::io::MemSource::new((0..=255u8).cycle().take(100_000).collect::<Vec<_>>());
         let mut r = SrcReader::with_capacity(&src, 1000);
         let mut out = Vec::new();
         r.read_to_end(&mut out).unwrap_or_default();

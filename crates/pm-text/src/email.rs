@@ -13,17 +13,27 @@ const MAX_EMAIL: u64 = 64 * 1024 * 1024;
 /// Attachments examined at most.
 const MAX_ATTACHMENTS: usize = 256;
 
-pub(crate) fn extract(src: &dyn ReadAt, sink: &mut dyn TextSink, depth: u32) -> Result<Metadata, TextError> {
+pub(crate) fn extract(
+    src: &dyn ReadAt,
+    sink: &mut dyn TextSink,
+    depth: u32,
+) -> Result<Metadata, TextError> {
     let data = read_all(src, MAX_EMAIL)?;
     extract_bytes(&data, sink, depth)
 }
 
-pub(crate) fn extract_bytes(data: &[u8], sink: &mut dyn TextSink, depth: u32) -> Result<Metadata, TextError> {
+pub(crate) fn extract_bytes(
+    data: &[u8],
+    sink: &mut dyn TextSink,
+    depth: u32,
+) -> Result<Metadata, TextError> {
     let msg = MessageParser::default()
         .parse(data)
         .ok_or_else(|| TextError::malformed("e-mail", "no message"))?;
     for part in msg.text_bodies() {
-        let Some(text) = part.text_contents() else { continue };
+        let Some(text) = part.text_contents() else {
+            continue;
+        };
         if part.is_text_html() {
             crate::html::render_str(text, sink)?;
         } else {
@@ -39,7 +49,7 @@ pub(crate) fn extract_bytes(data: &[u8], sink: &mut dyn TextSink, depth: u32) ->
         if let Some(inner) = att.message() {
             if depth < crate::MAX_NESTING {
                 let raw = inner.raw_message().to_vec();
-                crate::nested_result(extract_bytes(&raw, sink, depth + 1))?;
+                crate::nested_result(&extract_bytes(&raw, sink, depth + 1))?;
             }
         } else {
             crate::extract_nested(att.contents().to_vec(), &name, sink, depth)?;
@@ -66,9 +76,10 @@ pub(crate) fn extract_bytes(data: &[u8], sink: &mut dyn TextSink, depth: u32) ->
     put("Message-Bcc", msg.bcc().map(addresses).unwrap_or_default());
     put("Title", msg.subject().unwrap_or_default().to_owned());
     if let Some(d) = msg.date()
-        && let Some(s) = crate::util::unix_iso(d.to_timestamp()) {
-            put("Creation-Date", s);
-        }
+        && let Some(s) = crate::util::unix_iso(d.to_timestamp())
+    {
+        put("Creation-Date", s);
+    }
     if let Some(id) = msg.message_id() {
         put("Message-ID", id.to_owned());
     }
@@ -129,7 +140,10 @@ c2VjcmV0IHBsYW5z\r\n\
         assert_eq!(m["Title"], "Hällö");
         assert_eq!(m["Message-From"], "Alice Smith <alice@example.com>");
         assert_eq!(m["Author"], "Alice Smith");
-        assert_eq!(m["Message-To"], "bob@example.com, Carol <carol@example.com>");
+        assert_eq!(
+            m["Message-To"],
+            "bob@example.com, Carol <carol@example.com>"
+        );
         assert_eq!(m["Creation-Date"], "2020-01-02T01:04:05Z");
     }
 

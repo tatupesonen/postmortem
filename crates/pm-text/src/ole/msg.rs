@@ -71,7 +71,13 @@ pub(super) fn extract(
         head.push_str(&subject);
         head.push('\n');
     }
-    for (label, v) in [("From", &from), ("To", &to), ("Cc", &cc), ("Bcc", &bcc), ("Subject", &subject)] {
+    for (label, v) in [
+        ("From", &from),
+        ("To", &to),
+        ("Cc", &cc),
+        ("Bcc", &bcc),
+        ("Subject", &subject),
+    ] {
         if !v.is_empty() {
             head.push_str(label);
             head.push_str(": ");
@@ -117,9 +123,11 @@ pub(super) fn extract(
     }
 
     if let Ok(props) = read_stream(cf, "/__properties_version1.0")
-        && let Some(t) = time_prop(&props, 32, 0x0039_0040).or_else(|| time_prop(&props, 32, 0x0E06_0040)) {
-            meta.insert("Creation-Date".into(), t);
-        }
+        && let Some(t) =
+            time_prop(&props, 32, 0x0039_0040).or_else(|| time_prop(&props, 32, 0x0E06_0040))
+    {
+        meta.insert("Creation-Date".into(), t);
+    }
     let mut put = |k: &str, v: &str| {
         if !v.is_empty() {
             meta.insert(k.into(), v.into());
@@ -204,16 +212,25 @@ mod tests {
             ("/__substg1.0_0C1F001F", &u16s("alice@example.com")),
             ("/__substg1.0_0E04001F", &u16s("Bob")),
             ("/__substg1.0_1000001F", &u16s("See the attachment.")),
-            ("/__attach_version1.0_#00000000/__substg1.0_3707001F", &u16s("notes.txt")),
+            (
+                "/__attach_version1.0_#00000000/__substg1.0_3707001F",
+                &u16s("notes.txt"),
+            ),
             ("/__attach_version1.0_#00000000/__substg1.0_37010102", &att),
         ]);
         let src = pm_core::io::MemSource::new(data);
         let mut sink = StringSink::default();
         let m = crate::ole::extract(&src, &mut sink).unwrap();
         let t = sink.text;
-        assert!(t.starts_with("Quarterly numbers\nFrom: Alice <alice@example.com>\nTo: Bob\n"), "{t:?}");
+        assert!(
+            t.starts_with("Quarterly numbers\nFrom: Alice <alice@example.com>\nTo: Bob\n"),
+            "{t:?}"
+        );
         assert!(t.contains("See the attachment."));
-        assert!(t.contains("Attachment: notes.txt\nattached plain text"), "{t:?}");
+        assert!(
+            t.contains("Attachment: notes.txt\nattached plain text"),
+            "{t:?}"
+        );
         assert_eq!(m["Title"], "Quarterly numbers");
         assert_eq!(m["Message-From"], "Alice <alice@example.com>");
     }
@@ -222,10 +239,11 @@ mod tests {
     fn lzfu_spec_example() {
         // [MS-OXRTFCP] 3.1.1: "{\rtf1\ansi\ansicpg1252\pard hello world}\r\n".
         let comp: [u8; 61] = [
-            0x2d, 0x00, 0x00, 0x00, 0x2b, 0x00, 0x00, 0x00, 0x4c, 0x5a, 0x46, 0x75, 0xf1, 0xc5, 0xc7, 0xa7,
-            0x03, 0x00, 0x0a, 0x00, 0x72, 0x63, 0x70, 0x67, 0x31, 0x32, 0x35, 0x42, 0x32, 0x0a, 0xf3, 0x20,
-            0x68, 0x65, 0x6c, 0x09, 0x00, 0x20, 0x62, 0x77, 0x05, 0xb0, 0x6c, 0x64, 0x7d, 0x0a, 0x80, 0x0f,
-            0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x2d, 0x00, 0x00, 0x00, 0x2b, 0x00, 0x00, 0x00, 0x4c, 0x5a, 0x46, 0x75, 0xf1, 0xc5,
+            0xc7, 0xa7, 0x03, 0x00, 0x0a, 0x00, 0x72, 0x63, 0x70, 0x67, 0x31, 0x32, 0x35, 0x42,
+            0x32, 0x0a, 0xf3, 0x20, 0x68, 0x65, 0x6c, 0x09, 0x00, 0x20, 0x62, 0x77, 0x05, 0xb0,
+            0x6c, 0x64, 0x7d, 0x0a, 0x80, 0x0f, 0xa0, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+            0x00, 0x00, 0x00, 0x00, 0x00,
         ];
         let out = decompress_rtf(&comp).unwrap();
         assert_eq!(out, b"{\\rtf1\\ansi\\ansicpg1252\\pard hello world}\r\n");
