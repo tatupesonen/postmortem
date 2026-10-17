@@ -1641,6 +1641,7 @@ dependencies = [
  "jiff",
  "parking_lot",
  "pm-core",
+ "ruzstd",
  "thiserror 2.0.21",
  "tracing",
 ]

@@ -33,7 +33,7 @@ fn rss_kib() -> u64 {
         .unwrap_or(0)
 }
 
-fn time_read(src: &dyn ReadAt) -> (f64, u64) {
+fn time_read(src: &dyn ReadAt) -> (f64, u64, u64) {
     let mut buf = vec![0u8; MIB];
     let before = rss_kib();
     let t = Instant::now();
@@ -42,14 +42,16 @@ fn time_read(src: &dyn ReadAt) -> (f64, u64) {
     while off < src.size() {
         let n = src.read_at(off, &mut buf).unwrap();
         assert!(n > 0);
-        sum = sum.wrapping_add(u64::from(buf[n - 1]));
+        for w in buf[..n].chunks(8) {
+            sum = sum.rotate_left(5) ^ u64::from_le_bytes(w.try_into().unwrap_or([0; 8]));
+        }
         off += n as u64;
     }
     let secs = t.elapsed().as_secs_f64();
-    std::hint::black_box(sum);
     (
         src.size() as f64 / MIB as f64 / secs,
         rss_kib().saturating_sub(before),
+        sum,
     )
 }
 
@@ -75,7 +77,7 @@ fn sequential_read_throughput() {
         std::fs::write(&raw_path, &data).unwrap();
     }
     let raw = pm_image::open(&raw_path).unwrap();
-    let (mbps, rss) = time_read(&*raw.source());
+    let (mbps, rss, want) = time_read(&*raw.source());
     eprintln!("raw file                  {mbps:8.0} MiB/s  rss +{rss} KiB");
     let cases: &[(&str, &str, &[&str])] = &[
         (
@@ -98,7 +100,8 @@ fn sequential_read_throughput() {
     for (label, fmt, opts) in cases {
         let p = convert(&raw_path, dir.path(), &format!("{label}.img"), fmt, opts);
         let img = pm_image::open(&p).unwrap();
-        let (mbps, rss) = time_read(&*img.source());
+        let (mbps, rss, got) = time_read(&*img.source());
+        assert_eq!(got, want, "{label}: content differs from raw");
         eprintln!("{label:25} {mbps:8.0} MiB/s  rss +{rss} KiB");
         std::fs::remove_file(&p).ok();
     }
@@ -117,7 +120,8 @@ fn sequential_read_throughput() {
             p.to_str().unwrap(),
         ]);
         let img = pm_image::open(&p).unwrap();
-        let (mbps, rss) = time_read(&*img.source());
+        let (mbps, rss, got) = time_read(&*img.source());
+        assert_eq!(got, want, "{kind}: content differs from raw");
         eprintln!("qcow2-compressed-{kind:8} {mbps:8.0} MiB/s  rss +{rss} KiB");
     }
 }

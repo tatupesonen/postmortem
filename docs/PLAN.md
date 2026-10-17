@@ -174,7 +174,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [x] `pm-fs-ext` (ext2/3/4): extents (any depth, uninit), indirect blocks, inline data, fast symlinks, dirent-slack deleted names, bitmaps incl. uninit groups, nanosecond/crtime times; fixtures via `fstool` (pinned dev-dep) + fls differential
 - [ ] `pm-fs-hfs` (HFS+), `pm-fs-apfs`
 - [ ] `pm-fs-iso` (ISO9660/Joliet/RR, UDF)
-- [ ] `pm-image` VMDK (sparse + flat + descriptor), VHD (fixed/dynamic/diff), VHDX, QCOW2, DMG (UDIF)
+- [ ] `pm-image` VMDK (sparse + flat + descriptor), VHD (fixed/dynamic/diff), VHDX, QCOW2 (done, image-formats track), DMG (UDIF)
 - [ ] `pm-volume` APM, BSD disklabel; detect-only for LVM, BitLocker, LUKS, Core Storage
 - [ ] slack-space content for FAT/NTFS (Autopsy "-slack" files)
 - [ ] XFS, Btrfs, YAFFS2 (lower priority; may move to M13)
