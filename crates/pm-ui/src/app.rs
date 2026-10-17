@@ -2855,6 +2855,7 @@ impl PostmortemApp {
                     pm_casedb::Known::Notable => "Notable".into(),
                     pm_casedb::Known::Unknown => "Unknown".into(),
                 },
+                mime: f.mime,
             })
         };
         self.viewer

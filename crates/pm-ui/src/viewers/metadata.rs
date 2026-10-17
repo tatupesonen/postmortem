@@ -46,6 +46,14 @@ pub(super) fn ui(
                     row(ui, "Name", &r.name);
                     row(ui, "Path", &r.path);
                     row(ui, "Type", format!("{:?}", r.kind));
+                    // Autopsy's "MIME Type" (from File Type Identification).
+                    match hashes.and_then(|h| h.mime.as_deref()) {
+                        Some(m) => row(ui, "MIME Type", m),
+                        None if hashes.is_some() => {
+                            row(ui, "MIME Type", egui::RichText::new("Not detected").weak());
+                        }
+                        None => {}
+                    }
                     row(ui, "Size", size_long(r.size));
                     // Hashes from the case database (computed by Hash Lookup),
                     // right after the size as in Autopsy.
@@ -129,11 +137,6 @@ pub(super) fn ui(
                     }
                     if let Some((_, f)) = c.case_file() {
                         row(ui, "Object ID", f.id.to_string());
-                        row(
-                            ui,
-                            "MIME Type",
-                            f.mime.as_deref().unwrap_or("Not calculated"),
-                        );
                         row(ui, "Origin", format!("{:?}", f.origin));
                     }
                 });

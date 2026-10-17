@@ -100,6 +100,8 @@ pub(crate) struct FileHashes {
     pub(crate) sha1: Option<String>,
     pub(crate) sha256: Option<String>,
     pub(crate) known: String,
+    /// Detected by File Type Identification.
+    pub(crate) mime: Option<String>,
 }
 
 type ResolveFn = dyn Fn(&Content) -> Option<FileHashes> + Send + Sync;
@@ -132,7 +134,11 @@ pub(crate) struct ViewerPanel {
     query: Option<pm_search::TextQuery>,
     image: ImageView,
     hash_resolver: Option<HashResolver>,
-    hashes: Option<FileHashes>,
+    /// Loaded in the background (the case database is never read on the
+    /// UI thread); `None` until requested.
+    hashes: Option<crate::task::Task<Option<FileHashes>>>,
+    /// The shown file's hashes must be (re)loaded.
+    hashes_stale: bool,
 }
 
 impl Default for ViewerPanel {
@@ -152,6 +158,7 @@ impl Default for ViewerPanel {
             image: ImageView::default(),
             hash_resolver: None,
             hashes: None,
+            hashes_stale: false,
         }
     }
 }
@@ -170,8 +177,19 @@ impl ViewerPanel {
 
     /// Re-reads the shown file's hashes (e.g. after analysis finished).
     pub(crate) fn refresh_hashes(&mut self) {
+        self.hashes_stale = true;
+    }
+
+    /// Starts loading the hashes when they are stale.
+    fn load_hashes(&mut self, ctx: &egui::Context) {
+        if !std::mem::take(&mut self.hashes_stale) {
+            return;
+        }
         self.hashes = match (&self.hash_resolver, &self.content) {
-            (Some(r), Some(c)) => (r.0)(c),
+            (Some(r), Some(c)) => {
+                let (r, c) = (r.clone(), c.clone());
+                Some(crate::task::Task::spawn(ctx, move || (r.0)(&c)))
+            }
             _ => None,
         };
     }
@@ -251,6 +269,7 @@ impl ViewerPanel {
     }
 
     pub(crate) fn ui(&mut self, ui: &mut egui::Ui, prefs: &DisplayPrefs) {
+        self.load_hashes(ui.ctx());
         ui.horizontal(|ui| {
             for tab in Tab::ALL {
                 let enabled = self.supports(tab);
@@ -283,7 +302,12 @@ impl ViewerPanel {
         let src = self.source.as_ref().and_then(|s| s.as_ref().ok()).cloned();
         match (self.tab, src) {
             (Tab::Metadata, _) => {
-                metadata::ui(ui, &content, self.fs.as_ref(), prefs, self.hashes.as_ref());
+                let hashes = self
+                    .hashes
+                    .as_mut()
+                    .and_then(crate::task::Task::poll)
+                    .and_then(Option::as_ref);
+                metadata::ui(ui, &content, self.fs.as_ref(), prefs, hashes);
             }
             (Tab::Hex, Some(src)) => self.hex.ui(ui, &src),
             (Tab::Strings, Some(src)) => self.strings.ui(ui, &src),

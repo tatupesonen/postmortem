@@ -562,6 +562,8 @@ fn file_metadata_shows_hashes_after_analysis() {
     settle(&mut h, |h| h.query_by_label(&md5).is_some());
     h.get_by_label("SHA-1");
     h.get_by_label("SHA-256");
+    h.get_by_label("MIME Type");
+    h.get_by_label("application/x-dosexec");
     shot(&mut h, "metadata-hashes");
 }
 
