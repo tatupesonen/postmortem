@@ -559,7 +559,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Health Monitor (metrics DB, dashboard) | `A/healthmonitor/*` | Missing | — |
 | Command-line ingest (create case, add DS, run ingest w/ profile, list DS, reports, list profiles, JSON outputs) | `A/commandlineingest/*` | Missing | The `postmortem` binary only accepts `[CASE] [IMAGE…]` to open in the GUI. |
 | Open case from command line (positional `.aut`) | `CommandLineOpenCaseManager` | Done | `postmortem/src/main.rs`. |
-| MCP server (17 read-only tools: case summary, files, artifacts, analysis results, data sources, hosts, DS tree, tags, timeline, OS accounts, comms accounts/relationships, file content, children, reports) + stdio bridge | `A/mcp/*`, `Tools/autopsy-mcp-stdio` | Missing | — |
+| MCP server (17 read-only tools: case summary, files, artifacts, analysis results, data sources, hosts, DS tree, tags, timeline, OS accounts, comms accounts/relationships, file content, children, reports) + stdio bridge | `A/mcp/*`, `Tools/autopsy-mcp-stdio` | Missing | Design (parity set plus extensions) in `docs/BEYOND-AUTOPSY.md` §8. |
 | Feature access / admin gating | `A/featureaccess`, auto-ingest admin markers | Missing | — |
 
 ## 31. Acquisition & triage tools

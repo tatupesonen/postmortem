@@ -132,3 +132,150 @@ All of them become Timeline events.
 macOS (KnowledgeC, FSEvents, unified log, quarantine events, Biome),
 Linux (bash/zsh history, auth.log, wtmp/btmp, journald, cron, systemd
 units), iOS beyond iLEAPP-equivalents.
+
+## 8. MCP server for AI assistants — **[next]**
+
+Autopsy 4.23 has an MCP server: 17 read-only query tools served over HTTP
+on localhost with a token, plus a stdio bridge. That set is a parity item
+(`docs/PARITY.md` §30, WP-18), and its tool names stay the same so existing
+client setups keep working. postmortem goes further: it gives an assistant
+the analyst's real search and pivot tools, lets it cite each claim back to
+the evidence, and can optionally let it record findings.
+
+### Transport and lifecycle
+
+- **stdio** is the main transport: `postmortem mcp --case <dir>`. It opens
+  the case read-only, using the case database's WAL mode, so it can run
+  next to the GUI or after the GUI has closed. It needs no network.
+- **Streamable HTTP**, the Autopsy-compatible mode, runs while the GUI has
+  a case open.
+  - It binds to `127.0.0.1` only. Clients send a bearer token, which is
+    regenerated each session and stored in the user's settings folder with
+    `0600` permissions.
+  - Options › "AI: MCP Server" turns it on and off, sets the port, copies
+    the token, and shows a ready-made client config snippet.
+- It is a crate of its own, `pm-mcp`, built on the official Rust SDK
+  (`rmcp`). It uses only `pm-case`, `pm-casedb`, `pm-search` and
+  `pm-text`, and never the UI.
+
+### Conventions for every tool
+
+- **Stable references**: `file:123`, `artifact:45`, `result:46`,
+  `account:7`, `os_account:3`, `event:900`, `ds:1`. Every row carries its
+  reference, data source, path and, where it applies, a byte offset. An
+  assistant can then cite "file:123 @ 0x4000", and the GUI's
+  "Go to reference" box can open it.
+- **Paging**: keyset cursors (`next_cursor`), a default page of 50 rows
+  and a maximum of 500. Each response is capped at 256 KiB, and anything
+  cut is marked with `truncated: true` and what to call for the rest. The
+  server never runs an O(files) scan inside a request (ADR-014).
+- **Times**: ISO 8601 in UTC plus Unix seconds. The case time zone comes
+  with `get_case_summary`.
+- **Evidence is untrusted input.** Text taken from the evidence (file
+  contents, names, registry values, messages) is returned only inside
+  `evidence` fields, and the server instructions tell the model that this
+  data is never instructions to follow. This defends against prompt
+  injection planted in a suspect's files.
+- **Audit**: each call (tool, arguments, row count, client name) is
+  appended to the case's `Logs/mcp-audit.jsonl`, so the examiner can see
+  what the assistant looked at.
+
+### Tools
+
+**Autopsy-compatible**: `get_case_summary`, `query_data_sources`,
+`get_hosts`, `get_data_source_tree`, `get_object_children`,
+`query_files`, `get_file_content`, `query_data_artifacts`,
+`query_analysis_results`, `query_tags`, `query_timeline`,
+`summarize_timeline`, `get_os_accounts`, `get_communications_accounts`,
+`get_account_relationships`, `list_reports`, `get_report_content`.
+
+**Search**, the main addition:
+
+| Tool | What it does |
+|---|---|
+| `search_text` | Content index search: exact, substring or regex, with Autopsy's keyword semantics. Optional keyword list, data source and MIME filters. Returns hits with snippets and chunk offsets. |
+| `search_file_names` | File-name index: substring, prefix or exact on the name or full path. Filters: extension, size, deleted, data source. |
+| `find_files` | Structured filters: File Search by Attributes, plus MIME, score, tag, hash-set hit, extension mismatch and an "inside this folder" option. |
+| `lookup_hash` | MD5/SHA-1/SHA-256 against the case, the configured hash sets and NSRL. Reports known status and where the hash occurs. |
+| `run_keyword_list` | Runs a saved keyword list (or the built-in phone/e-mail/IP/URL/card lists) over the index and returns grouped hit counts. |
+
+**Content**:
+
+| Tool | What it does |
+|---|---|
+| `get_file_metadata` | The full File Metadata tab: every timestamp (`$SI` and `$FN`), MFT entry and sequence, ADS list, hashes, MIME type, extension mismatch, score with its reasons, tags, comments, OS account owner, and the derived-from chain. |
+| `read_file_text` | Extracted text by page (the Extracted Text viewer's pages), optionally starting at a search hit. |
+| `read_file_bytes` | Hex or base64 at an offset, at most 64 KiB per call. |
+| `get_file_strings` | Autopsy's strings extraction over a byte range, with a script choice. |
+| `get_image_preview` | A downscaled PNG thumbnail of an image or a video frame, returned as MCP image content so vision models can look at it. Off by default (see below). |
+
+**Artifacts and pivots**:
+
+| Tool | What it does |
+|---|---|
+| `list_artifact_types` | Data artifact and analysis result types with their counts: the result tree, so the model can see what exists. |
+| `get_artifact` | All attributes, the source file, linked artifacts and the score of one artifact. |
+| `get_related` | From any reference: the same hash elsewhere, other files in the same folder, artifacts from the file, accounts on the artifact, and events from the artifact. |
+| `list_notable` | The Score tree: bad and suspicious items with the reason each was scored. |
+
+**Timeline and activity** (built on the analyses in §2–§6):
+
+| Tool | What it does |
+|---|---|
+| `timeline_events` | Filters: event types, a time window, data source, text and "tagged/hash hits only". Paged, oldest first or newest first. |
+| `timeline_histogram` | Bucketed counts per event super-type, to find the busy periods. |
+| `events_around` | Events within ±N minutes of a time or a reference ("what happened around this download?"). |
+| `user_activity` | For one OS account: logons and sessions, program execution, recent documents, LNK files and jump lists, browser history and USB use, merged in time order. |
+| `program_execution` | One row per executable: first run, last run, run count, and the evidence for each (Prefetch, Amcache, ShimCache, UserAssist, BAM, SRUM). |
+| `usb_devices` | The combined USB device story from §6. |
+| `query_event_logs` | Channel, event ID, provider, time window and text. Uses the EvtxECmd-style field maps from §2. |
+| `read_registry_key` | Hive plus key path, giving values and subkeys with last-write time. Reads hives in the image, read-only. |
+
+**Communications and places**: `get_messages` (one thread between
+accounts, paged), `get_contacts`, `geolocation_points` (bounding box and
+time window).
+
+**Coverage**: `list_ingest_jobs` reports the modules that ran per data
+source, their settings, errors and skipped files. The assistant can then
+say "no keyword search was run" instead of "no hits".
+
+### Writing to the case (opt-in)
+
+The server is read-only unless the examiner enables "Allow the assistant
+to tag and comment" in the options, or starts it with `--allow-writes`.
+
+| Tool | What it does |
+|---|---|
+| `add_tag` / `remove_tag` | Tag files or results with an existing tag name and a comment. The examiner is recorded as `mcp:<client name>` so these tags can be filtered and reviewed. |
+| `set_comment` | Sets the central-repository-style comment on a file or result. |
+| `save_search_results` | Stores a `search_text` result as keyword-hit analysis results, like Autopsy's "Save search results". |
+
+Ingest, deleting data sources and generating reports stay with the
+examiner and are never exposed.
+
+### Privacy switches
+
+These are in the Options panel and are all off by default:
+- `get_image_preview`: sending pictures to a cloud model can be
+  unacceptable, for example for CSAM cases.
+- Showing the raw bytes and text of files tagged "Child Abuse Material"
+  (Project VIC CAM). With this off, those files are withheld from every
+  content tool, and their metadata is still returned.
+
+### Prompts (MCP prompts)
+
+Canned workflows the client can offer:
+- "Triage this data source": OS info, users, notable items, top
+  programs, USB devices, last activity.
+- "Account activity for <user>".
+- "What happened around <time / reference>".
+- "Summarise this communication thread".
+
+### Tests
+
+- Golden JSON responses for each tool, run against the demo case.
+- A conformance run with the MCP inspector.
+- Tests that cursors return every row exactly once.
+- A prompt-injection fixture: a file whose text says "ignore previous
+  instructions…" must come back only inside `evidence`.
+- Write tools must fail while writes are disabled.
