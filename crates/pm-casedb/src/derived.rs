@@ -197,6 +197,22 @@ impl CaseDb {
         })
     }
 
+    /// Which of `ids` have children (archives with extracted members,
+    /// files with derived files), for showing them as openable.
+    pub fn with_children(&self, ids: &[i64]) -> Result<std::collections::HashSet<i64>> {
+        self.read(|c| {
+            let mut st =
+                c.prepare_cached("SELECT EXISTS (SELECT 1 FROM files WHERE parent_id = ?1)")?;
+            let mut out = std::collections::HashSet::new();
+            for id in ids {
+                if st.query_row([id], |r| r.get::<_, bool>(0))? {
+                    out.insert(*id);
+                }
+            }
+            Ok(out)
+        })
+    }
+
     /// Number of files whose parent is `parent_id` (e.g. carved files in
     /// a `$CarvedFiles/<n>` folder).
     pub fn count_children(&self, parent_id: i64) -> Result<u64> {

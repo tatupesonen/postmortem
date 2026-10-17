@@ -182,7 +182,8 @@ pub(crate) fn remove_menu(ui: &mut egui::Ui, label: &str, tags: &[RowTag]) -> Op
     out
 }
 
-/// Fills the S and C columns of case rows (call in the listing task).
+/// Fills the S and C columns and the open-as-folder flag of case rows
+/// (call in the listing task).
 pub(crate) fn annotate(case: &Case, rows: &mut [FileRow]) -> Result<(), String> {
     let db = case.db();
     let ids: Vec<i64> = rows.iter().filter_map(FileRow::file_id).collect();
@@ -190,8 +191,15 @@ pub(crate) fn annotate(case: &Case, rows: &mut [FileRow]) -> Result<(), String> 
         .scores(pm_casedb::ObjKind::File, &ids)
         .map_err(|e| e.to_string())?;
     let tags = db.file_tags_of(&ids).map_err(|e| e.to_string())?;
+    let files_only: Vec<i64> = rows
+        .iter()
+        .filter(|r| !r.is_dir())
+        .filter_map(FileRow::file_id)
+        .collect();
+    let parents = db.with_children(&files_only).map_err(|e| e.to_string())?;
     for r in rows.iter_mut() {
         let Some(id) = r.file_id() else { continue };
+        r.has_children = parents.contains(&id);
         let score = scores
             .iter()
             .find(|(f, _)| *f == id)
