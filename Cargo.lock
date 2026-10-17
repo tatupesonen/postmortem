@@ -5188,6 +5188,7 @@ dependencies = [
  "pm-case",
  "pm-casedb",
  "pm-core",
+ "pm-hashdb",
  "pm-ingest",
  "pm-modules",
  "pm-testkit",

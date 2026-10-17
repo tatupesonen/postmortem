@@ -6,11 +6,13 @@
 //! The table reports share [`table::TableReportModule`], fed by a port of
 //! Autopsy's `TableReportGenerator` (same tables, order and columns).
 
+pub mod bodyfile;
 mod columns;
 pub mod excel;
 pub mod files_text;
 pub mod html;
 pub mod table;
+pub mod tagged_hashes;
 
 use std::path::{Path, PathBuf};
 
@@ -106,10 +108,18 @@ pub enum ReportKind {
     Html,
     Excel,
     FilesText,
+    BodyFile,
+    TaggedHashes,
 }
 
 impl ReportKind {
-    pub const ALL: [Self; 3] = [Self::Html, Self::Excel, Self::FilesText];
+    pub const ALL: [Self; 5] = [
+        Self::Html,
+        Self::Excel,
+        Self::FilesText,
+        Self::BodyFile,
+        Self::TaggedHashes,
+    ];
 
     /// Autopsy's module name (shown in the wizard and the Reports node).
     pub fn name(self) -> &'static str {
@@ -117,6 +127,8 @@ impl ReportKind {
             Self::Html => "HTML Report",
             Self::Excel => "Excel Report",
             Self::FilesText => "Files - Text",
+            Self::BodyFile => "TSK Body File",
+            Self::TaggedHashes => "Save Tagged Hashes",
         }
     }
 
@@ -127,12 +139,16 @@ impl ReportKind {
             Self::FilesText => {
                 "A tab delimited text file containing information about individual files in the case."
             }
+            Self::BodyFile => {
+                "Body file format report with MAC times for every file. This format can be used for a timeline view."
+            }
+            Self::TaggedHashes => "Adds hashes of tagged files to a hash set.",
         }
     }
 
     /// Whether the report uses the result/tag selection.
     pub fn is_table_report(self) -> bool {
-        !matches!(self, Self::FilesText)
+        matches!(self, Self::Html | Self::Excel)
     }
 }
 
@@ -146,11 +162,18 @@ pub struct Generated {
 
 /// Writes a report into a new folder below `<case>/Reports` (Autopsy's
 /// `<case name> <date time>/<module>/`) and records it in the case.
+/// Settings of the reports that are not table reports.
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+pub struct OtherSettings {
+    pub files: files_text::FileReportSettings,
+    pub tagged_hashes: tagged_hashes::TaggedHashesSettings,
+}
+
 pub fn generate(
     case: &Case,
     kind: ReportKind,
     settings: &ReportSettings,
-    files: &files_text::FileReportSettings,
+    other: &OtherSettings,
     progress: &dyn Progress,
 ) -> Result<Generated, ReportError> {
     let stamp = jiff::Zoned::now().strftime("%m-%d-%Y-%H-%M-%S");
@@ -178,11 +201,23 @@ pub fn generate(
                 summary,
             }
         }
-        ReportKind::FilesText => {
-            let path = files_text::write(case, &dir, settings, files, progress)?;
+        ReportKind::FilesText => Generated {
+            path: files_text::write(case, &dir, settings, &other.files, progress)?,
+            summary: TableSummary::default(),
+        },
+        ReportKind::BodyFile => Generated {
+            path: bodyfile::write(case, &dir, settings, progress)?,
+            summary: TableSummary::default(),
+        },
+        ReportKind::TaggedHashes => {
+            let (path, added) =
+                tagged_hashes::write(case, settings, &other.tagged_hashes, progress)?;
             Generated {
                 path,
-                summary: TableSummary::default(),
+                summary: TableSummary {
+                    rows: usize::try_from(added).unwrap_or(usize::MAX),
+                    ..TableSummary::default()
+                },
             }
         }
     };

@@ -11,7 +11,7 @@ use std::io::Read as _;
 use std::sync::Arc;
 
 use pm_case::{Case, CaseDetails, LoadOptions, LoadProgress, add_image};
-use pm_report::{NoProgress, ReportKind, ReportSettings, files_text::FileReportSettings};
+use pm_report::{NoProgress, ReportKind, ReportSettings};
 
 /// The demo disk, analysed with every default module plus Keyword Search,
 /// with one file and one result tagged.
@@ -95,7 +95,7 @@ fn html_report_has_autopsys_layout_and_tables() {
         &case,
         ReportKind::Html,
         &ReportSettings::default(),
-        &FileReportSettings::default(),
+        &pm_report::OtherSettings::default(),
         &NoProgress,
     )
     .unwrap();
@@ -150,7 +150,7 @@ fn tag_filter_limits_results() {
         &case,
         ReportKind::Html,
         &settings,
-        &FileReportSettings::default(),
+        &pm_report::OtherSettings::default(),
         &NoProgress,
     )
     .unwrap();
@@ -169,7 +169,7 @@ fn excel_report_has_a_sheet_per_data_type() {
         &case,
         ReportKind::Excel,
         &ReportSettings::default(),
-        &FileReportSettings::default(),
+        &pm_report::OtherSettings::default(),
         &NoProgress,
     )
     .unwrap();
@@ -194,7 +194,7 @@ fn files_text_lists_every_file() {
         &case,
         ReportKind::FilesText,
         &ReportSettings::default(),
-        &FileReportSettings::default(),
+        &pm_report::OtherSettings::default(),
         &NoProgress,
     )
     .unwrap();
@@ -212,4 +212,70 @@ fn files_text_lists_every_file() {
         pw.contains("\".txt\"") && pw.contains("/demo.dd/Users/alice/Documents/passwords.txt"),
         "{pw}"
     );
+}
+
+#[test]
+fn body_file_lists_file_system_files_for_mactime() {
+    let (_d, case) = case();
+    let g = pm_report::generate(
+        &case,
+        ReportKind::BodyFile,
+        &ReportSettings::default(),
+        &pm_report::OtherSettings::default(),
+        &NoProgress,
+    )
+    .unwrap();
+    assert!(g.path.ends_with("TSK Body File/BodyFile.txt"));
+    let text = read(&g.path);
+    let line = text
+        .lines()
+        .find(|l| l.contains("/demo.dd/Users/alice/Documents/passwords.txt|"))
+        .expect("passwords.txt line");
+    let fields: Vec<&str> = line.split('|').collect();
+    assert_eq!(fields.len(), 11, "{line}");
+    assert_eq!(fields[0].len(), 32, "MD5 from Hash Lookup: {line}");
+    assert!(fields[3].starts_with("r/r"), "{line}");
+    assert_ne!(fields[8], "0", "mtime: {line}");
+}
+
+#[test]
+fn tagged_hashes_go_into_a_hash_set() {
+    let (d, case) = case();
+    let set = d.path().join("tagged.kdb");
+    let other = pm_report::OtherSettings {
+        tagged_hashes: pm_report::tagged_hashes::TaggedHashesSettings {
+            tag_names: vec!["Notable Item".into()],
+            hash_set: set.clone(),
+        },
+        ..pm_report::OtherSettings::default()
+    };
+    let g = pm_report::generate(
+        &case,
+        ReportKind::TaggedHashes,
+        &ReportSettings::default(),
+        &other,
+        &NoProgress,
+    )
+    .unwrap();
+    assert_eq!(g.summary.rows, 1);
+    let db = case.db();
+    let pw = db
+        .query_files(
+            &pm_casedb::FileQuery {
+                name_contains: Some("passwords".into()),
+                ..Default::default()
+            },
+            0,
+            10,
+        )
+        .unwrap()
+        .remove(0);
+    let md5: [u8; 16] = pw.md5.unwrap().try_into().unwrap();
+    let hit = pm_hashdb::HashDb::open(&set, true)
+        .unwrap()
+        .lookup(&md5)
+        .unwrap()
+        .expect("hash added");
+    assert_eq!(hit.comments, ["Demo <Case>"]);
+    assert_eq!(hit.names, ["passwords.txt"]);
 }

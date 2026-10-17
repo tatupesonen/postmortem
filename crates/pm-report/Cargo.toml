@@ -10,6 +10,7 @@ license.workspace = true
 pm-case.workspace = true
 pm-casedb.workspace = true
 pm-core.workspace = true
+pm-hashdb.workspace = true
 thiserror.workspace = true
 jiff.workspace = true
 rust_xlsxwriter = { version = "=0.99.1", default-features = false }

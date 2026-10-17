@@ -10,6 +10,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use parking_lot::Mutex;
 use pm_case::Case;
 use pm_report::files_text::{FileColumn, FileReportSettings};
+use pm_report::tagged_hashes::TaggedHashesSettings;
 use pm_report::{ReportKind, ReportSettings};
 
 /// Wizard pages.
@@ -104,6 +105,8 @@ pub(crate) struct ReportWizard {
     types: BTreeSet<String>,
     columns: Vec<FileColumn>,
     delimiter: String,
+    /// Save Tagged Hashes: the hash set to add to.
+    hash_set: String,
     shared: Arc<Shared>,
     timezone: jiff::tz::TimeZone,
     reported: bool,
@@ -120,6 +123,7 @@ impl ReportWizard {
             tagged_only: false,
             columns: FileColumn::ALL.to_vec(),
             delimiter: "\t".into(),
+            hash_set: String::new(),
             choices,
             shared: Arc::new(Shared::default()),
             timezone,
@@ -152,14 +156,20 @@ impl ReportWizard {
         self.page = Page::Running;
         let (case, shared, ctx) = (Arc::clone(case), Arc::clone(&self.shared), ctx.clone());
         let (kind, settings) = (self.kind, self.settings());
-        let files = FileReportSettings {
-            columns: self.columns.clone(),
-            delimiter: self.delimiter.clone(),
+        let other = pm_report::OtherSettings {
+            files: FileReportSettings {
+                columns: self.columns.clone(),
+                delimiter: self.delimiter.clone(),
+            },
+            tagged_hashes: TaggedHashesSettings {
+                tag_names: self.tags.iter().cloned().collect(),
+                hash_set: self.hash_set.trim().into(),
+            },
         };
         let spawned = std::thread::Builder::new()
             .name("pm-report".into())
             .spawn(move || {
-                let r = pm_report::generate(&case, kind, &settings, &files, shared.as_ref())
+                let r = pm_report::generate(&case, kind, &settings, &other, shared.as_ref())
                     .map(|g| g.path)
                     .map_err(|e| e.to_string());
                 *shared.result.lock() = Some(r);
@@ -216,10 +226,16 @@ impl ReportWizard {
                         self.page = n;
                     }
                     let ready = !self.data_sources.is_empty()
-                        && (!self.kind.is_table_report()
-                            || !self.tagged_only
-                            || !self.tags.is_empty())
-                        && (self.kind.is_table_report() || !self.columns.is_empty());
+                        && match self.kind {
+                            ReportKind::Html | ReportKind::Excel => {
+                                !self.tagged_only || !self.tags.is_empty()
+                            }
+                            ReportKind::FilesText => !self.columns.is_empty(),
+                            ReportKind::BodyFile => true,
+                            ReportKind::TaggedHashes => {
+                                !self.tags.is_empty() && !self.hash_set.trim().is_empty()
+                            }
+                        };
                     if ui
                         .add_enabled(
                             self.page == Page::Contents && ready,
@@ -267,7 +283,45 @@ impl ReportWizard {
             });
     }
 
+    fn tag_checkboxes(&mut self, ui: &mut egui::Ui) {
+        if self.choices.tag_names.is_empty() {
+            ui.weak("No tags in the case.");
+        }
+        for t in &self.choices.tag_names {
+            let mut on = self.tags.contains(t);
+            if ui.checkbox(&mut on, t).changed() {
+                if on {
+                    self.tags.insert(t.clone());
+                } else {
+                    self.tags.remove(t);
+                }
+            }
+        }
+    }
+
     fn contents_page(&mut self, ui: &mut egui::Ui) {
+        if self.kind == ReportKind::BodyFile {
+            ui.label("Every file system file is listed with its MAC times; no options.");
+            return;
+        }
+        if self.kind == ReportKind::TaggedHashes {
+            ui.label("Add the hashes of files with these tags:");
+            self.tag_checkboxes(ui);
+            ui.horizontal(|ui| {
+                ui.label("Hash set (.kdb):");
+                ui.text_edit_singleline(&mut self.hash_set);
+                if ui.button("Browse…").clicked()
+                    && let Some(p) = rfd::FileDialog::new()
+                        .add_filter("Hash set", &["kdb"])
+                        .set_file_name("tagged.kdb")
+                        .save_file()
+                {
+                    self.hash_set = p.display().to_string();
+                }
+            });
+            ui.weak("A new hash set is created when the file does not exist.");
+            return;
+        }
         if !self.kind.is_table_report() {
             ui.label("Select items to include in File Report:");
             egui::Grid::new("file-columns")
@@ -305,21 +359,7 @@ impl ReportWizard {
         ui.radio_value(&mut self.tagged_only, false, "All Results");
         ui.radio_value(&mut self.tagged_only, true, "Specific Tagged Results");
         if self.tagged_only {
-            ui.indent("tags", |ui| {
-                if self.choices.tag_names.is_empty() {
-                    ui.weak("No tags in the case.");
-                }
-                for t in &self.choices.tag_names {
-                    let mut on = self.tags.contains(t);
-                    if ui.checkbox(&mut on, t).changed() {
-                        if on {
-                            self.tags.insert(t.clone());
-                        } else {
-                            self.tags.remove(t);
-                        }
-                    }
-                }
-            });
+            ui.indent("tags", |ui| self.tag_checkboxes(ui));
         }
         egui::CollapsingHeader::new(format!(
             "Result types ({} of {})",

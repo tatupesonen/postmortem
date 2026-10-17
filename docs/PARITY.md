@@ -484,10 +484,10 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | HTML report | `report/modules/html` | Partial | Autopsy's frameset layout, tables and columns; tagged-image thumbnails page missing. |
 | Excel report | `report/modules/excel` | Done | xlsx (rust_xlsxwriter): Summary + one sheet per data type. |
 | Files – Text (TSV/CSV of files) | `report/modules/file` | Done | All 13 columns, delimiter choice, UTF-8 with BOM. |
-| TSK body file | `report/modules/bodyfile` | Missing | — |
+| TSK body file | `report/modules/bodyfile` | Done | For mactime; file-system files. |
 | Google Earth KML | `report/modules/kml` | Missing | — |
 | CASE-UCO JSON-LD | `report/modules/caseuco` | Missing | — |
-| Save Tagged Hashes to hash set | `report/modules/taggedhashes` | Missing | — |
+| Save Tagged Hashes to hash set | `report/modules/taggedhashes` | Done | Into a new or existing .kdb set. |
 | Data Source Summary report (XLSX) | `report/modules/datasourcesummaryexport` | Missing | — |
 | Portable Case (subset case, tags/interesting items, 7z/zip chunking) | `report/modules/portablecase` | Missing | — |
 | Report branding (agency logo, title, footer) | `ReportBranding`, Application options | Missing | — |
