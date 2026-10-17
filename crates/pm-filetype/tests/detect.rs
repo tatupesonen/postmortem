@@ -210,6 +210,13 @@ fn bench_detect_throughput() {
         })
         .collect();
     corpus.push(("blob.bin".into(), noise));
+    // `PM_FILETYPE_CORPUS_DIR` saves the corpus (to time other detectors,
+    // e.g. Apache Tika, on the same files).
+    if let Ok(dir) = std::env::var("PM_FILETYPE_CORPUS_DIR") {
+        for (n, d) in &corpus {
+            std::fs::write(std::path::Path::new(&dir).join(n), d).unwrap();
+        }
+    }
     let srcs: Vec<(String, String, MemSource)> = corpus
         .into_iter()
         .map(|(n, d)| {
@@ -218,6 +225,11 @@ fn bench_detect_throughput() {
         })
         .collect();
     let d = FileTypeDetector::default();
+    if std::env::var_os("PM_FILETYPE_CORPUS_DIR").is_some() {
+        for (n, e, src) in &srcs {
+            eprintln!("{n}\t{:?}", d.detect(FileClass::File, n, e, src));
+        }
+    }
     // Warm up (database parse).
     let _ = d.detect(FileClass::File, "a", "", &srcs[0].2);
     let rounds = 300;

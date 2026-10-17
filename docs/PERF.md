@@ -17,3 +17,16 @@ builds. Re-measure when touching the paths below. Each benchmark is an
 | Zip extraction, 20 000 small members | — | 406 k members/s (Linux) | same | 2026-10-17 |
 | gzip, 256 MiB decoded | — | 377 MiB/s (Linux) | same | 2026-10-17 |
 | File type detection (`FileTypeDetector::detect`, mixed synthetic corpus: text, HTML, XML, PDF, PNG, JPEG, EXE, noise, OOXML/ODF/JAR/DOC/XLS) | — | 25.2 k files/s/thread, 177 MB/s (Linux VM, 8 vCPU) | `cargo test -p pm-filetype --release --test detect -- --ignored bench --nocapture` | 2026-10-17 |
+| Same corpus through Apache Tika 3.0.0 (`tika-app`, Autopsy's `FileTypeDetector` call pattern: detect, then detect again with the name; JIT warmed up) | — | 1 177 files/s/thread, 8.3 MB/s (stream, Autopsy's path); 1 292 files/s, 9.1 MB/s (byte[]). pm-filetype on the same run: 27.6 k files/s, 194 MB/s, about 23× faster | corpus via `PM_FILETYPE_CORPUS_DIR=… cargo test -p pm-filetype --release --test detect -- --ignored bench`; Java harness in the PERF notes below | 2026-10-17 |
+
+## Tika comparison harness
+
+`TikaBench.java` (run with `java -cp tika-app-3.0.0.jar TikaBench.java <corpus dir>`)
+loads the corpus into memory and, per file, calls `Tika.detect(TikaInputStream)` and,
+unless the result is `application/octet-stream`, `Tika.detect(stream, name)` again,
+exactly as Autopsy's `FileTypeDetector.getMIMEType` does. 300 warm-up rounds precede
+the 300 timed rounds. Autopsy's own signature table (checked before Tika, a cheap
+prefix match) is left out, so the harness times Tika alone. Both detectors gave all
+14 corpus files the same MIME type except `data.xml`. Tika says `application/xml`
+and pm-filetype says `text/xml`, which is what Autopsy reports because its own
+`text/xml` signature wins over Tika.
