@@ -159,6 +159,15 @@ impl AttrValue {
     }
 }
 
+/// Which results a result view lists.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(crate) enum ResultKey {
+    /// Every result of a type.
+    Type(i64),
+    /// A Keyword Hits list, keyword or match.
+    Keyword(pm_casedb::keyword_hits::KeywordHitFilter),
+}
+
 /// The results of one type.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct ResultRows {
@@ -170,11 +179,13 @@ pub(crate) struct ResultRows {
 
 /// Loads up to [`MAX_ROWS`] results of `type_id` with their attributes
 /// and source files.
-pub(crate) fn load_rows(case: &Case, type_id: i64) -> Result<ResultRows, String> {
+pub(crate) fn load_rows(case: &Case, key: &ResultKey) -> Result<ResultRows, String> {
     let db = case.db();
-    let arts = db
-        .artifacts_of_type(type_id, None, 0, MAX_ROWS + 1)
-        .map_err(|e| e.to_string())?;
+    let arts = match key {
+        ResultKey::Type(type_id) => db.artifacts_of_type(*type_id, None, 0, MAX_ROWS + 1),
+        ResultKey::Keyword(f) => db.keyword_hits_in(f, 0, MAX_ROWS + 1),
+    }
+    .map_err(|e| e.to_string())?;
     let truncated = arts.len() > MAX_ROWS;
     let mut out = ResultRows {
         truncated,

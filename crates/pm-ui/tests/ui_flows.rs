@@ -1106,4 +1106,15 @@ fn keyword_search_from_the_toolbar() {
             .is_some_and(|n| !format!("{:?}", n.accesskit_node().label()).contains("(2)"))
     });
     shot(&mut h, "keyword_search_saved");
+
+    // The tree groups hits like Autopsy: list › keyword › match.
+    click(&mut h, "Keyword Hits (");
+    click(&mut h, "Single Literal Keyword Search (2)");
+    click(&mut h, "hunter (2)");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Keyword Hits › Single Literal Keyword Search › hunter")
+            .is_some()
+    });
+    click(&mut h, "Email Addresses (");
+    shot(&mut h, "keyword_hits_tree");
 }

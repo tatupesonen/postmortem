@@ -494,3 +494,99 @@ fn v1_cases_migrate_to_v2() {
     );
     assert_eq!(db.event_types().unwrap().len(), 60);
 }
+
+/// Keyword Hits tree grouping follows Autopsy's `KeywordHits` rules.
+#[test]
+fn keyword_hits_group_like_autopsy() {
+    use pm_casedb::keyword_hits::{KeywordHitFilter, SINGLE_LITERAL, SINGLE_REGEX};
+    let (_d, db) = new_db();
+    let (ds, a, b) = populate(&db);
+    let attr = |n: &str| catalog::attribute_type_id(n).unwrap();
+    let hit = |file: i64, list: &str, st: i64, re: Option<&str>, kw: &str| {
+        let mut art = data_artifact(ds, file, "TSK_KEYWORD_HIT");
+        let mut attrs = vec![
+            (
+                attr("TSK_KEYWORD"),
+                Value::Text(kw.into()),
+                "Keyword Search".into(),
+            ),
+            (
+                attr("TSK_KEYWORD_SEARCH_TYPE"),
+                Value::Int(st),
+                "Keyword Search".into(),
+            ),
+        ];
+        if !list.is_empty() {
+            attrs.push((
+                attr("TSK_SET_NAME"),
+                Value::Text(list.into()),
+                "Keyword Search".into(),
+            ));
+        }
+        if let Some(re) = re {
+            attrs.push((
+                attr("TSK_KEYWORD_REGEXP"),
+                Value::Text(re.into()),
+                "Keyword Search".into(),
+            ));
+        }
+        art.attributes = attrs;
+        db.add_artifact(&art).unwrap()
+    };
+    hit(a, "", 0, None, "budget");
+    hit(a, "", 1, Some("hunt"), "hunter2");
+    hit(b, "", 1, Some("hunt"), "hunting");
+    hit(a, "", 2, Some("\\d{4}"), "2021");
+    hit(
+        b,
+        "Email Addresses",
+        2,
+        Some("[a-z]+@[a-z.]+"),
+        "bob@example.com",
+    );
+    hit(
+        a,
+        "Email Addresses",
+        2,
+        Some("[a-z]+@[a-z.]+"),
+        "bob@example.com",
+    );
+    let groups: Vec<(String, String, Option<String>, u64)> = db
+        .keyword_hit_groups()
+        .unwrap()
+        .into_iter()
+        .map(|g| (g.list, g.term, g.instance, g.count))
+        .collect();
+    let s = |x: &str| x.to_owned();
+    assert_eq!(
+        groups,
+        [
+            (s(SINGLE_LITERAL), s("budget"), None, 1),
+            (s(SINGLE_LITERAL), s("hunt"), None, 2),
+            (s(SINGLE_REGEX), s("\\d{4}"), Some(s("2021")), 1),
+            (
+                s("Email Addresses"),
+                s("[a-z]+@[a-z.]+"),
+                Some(s("bob@example.com")),
+                2
+            ),
+        ]
+    );
+    let in_list = |list: &str, term: Option<&str>| {
+        db.keyword_hits_in(
+            &KeywordHitFilter {
+                list: list.into(),
+                term: term.map(Into::into),
+                instance: None,
+            },
+            0,
+            10,
+        )
+        .unwrap()
+        .len()
+    };
+    assert_eq!(in_list(SINGLE_LITERAL, None), 3);
+    assert_eq!(in_list(SINGLE_LITERAL, Some("hunt")), 2);
+    assert_eq!(in_list("Email Addresses", None), 2);
+    assert_eq!(in_list("Nope", None), 0);
+}

@@ -105,7 +105,11 @@ pub struct PostmortemApp {
     progress_closed: Arc<AtomicBool>,
     case_wizard: Option<NewCaseWizard>,
     result_counts: crate::results::Counts,
-    result_rows: HashMap<i64, Task<Result<Arc<crate::results::ResultRows>, String>>>,
+    result_rows:
+        HashMap<crate::results::ResultKey, Task<Result<Arc<crate::results::ResultRows>, String>>>,
+    /// Keyword Hits groups, and the hit count they were loaded for.
+    keyword_groups: crate::task::Cached<Vec<pm_casedb::keyword_hits::KeywordHitGroup>>,
+    keyword_groups_for: u64,
     result_selected: Option<usize>,
     result_table: crate::results::ResultTable,
     /// Analysis was running last frame (refresh results when it stops).
@@ -185,6 +189,8 @@ impl PostmortemApp {
             case_wizard: None,
             result_counts: crate::results::Counts::default(),
             result_rows: HashMap::new(),
+            keyword_groups: crate::task::Cached::default(),
+            keyword_groups_for: 0,
             result_selected: None,
             result_table: crate::results::ResultTable::default(),
             was_analysing: false,
@@ -1420,14 +1426,15 @@ impl PostmortemApp {
         for t in counts.iter() {
             let stale = self
                 .result_rows
-                .get_mut(&t.type_id)
+                .get_mut(&crate::results::ResultKey::Type(t.type_id))
                 .and_then(Task::poll)
                 .and_then(|r| r.as_ref().ok())
                 .is_some_and(|rows| {
                     rows.rows.len() < (t.count as usize).min(crate::results::MAX_ROWS)
                 });
             if stale {
-                self.result_rows.remove(&t.type_id);
+                self.result_rows
+                    .remove(&crate::results::ResultKey::Type(t.type_id));
             }
         }
         for (icon, heading, cat) in [
@@ -1464,12 +1471,93 @@ impl PostmortemApp {
                 let icon =
                     icons::artifact(&t.name, cat == pm_casedb::catalog::Category::AnalysisResult);
                 let label = format!("{icon} {} ({})", t.display, crate::format::grouped(t.count));
-                self.tree_node(ui, &node, &label, false, |_, _| {});
+                if t.name == "TSK_KEYWORD_HIT" {
+                    self.keyword_hits_node(ui, &node, &label, case.as_ref(), t.count);
+                } else {
+                    self.tree_node(ui, &node, &label, false, |_, _| {});
+                }
             }
             if analysis {
                 self.os_accounts_node(ui, case.as_ref());
             }
         }
+    }
+
+    /// Keyword Hits › list › keyword › match (Autopsy `KeywordHits`).
+    fn keyword_hits_node(
+        &mut self,
+        ui: &mut egui::Ui,
+        node: &NodeId,
+        label: &str,
+        case: Option<&Arc<pm_case::Case>>,
+        total: u64,
+    ) {
+        use pm_casedb::keyword_hits::{KeywordHitFilter, SINGLE_LITERAL, SINGLE_REGEX};
+        let Some(case) = case else {
+            return;
+        };
+        if total != self.keyword_groups_for {
+            self.keyword_groups_for = total;
+            self.keyword_groups.refresh();
+            self.result_rows
+                .retain(|k, _| !matches!(k, crate::results::ResultKey::Keyword(_)));
+        }
+        let loader = Arc::clone(case);
+        let groups = self
+            .keyword_groups
+            .get(ui.ctx(), move || {
+                loader.db().keyword_hit_groups().map_err(|e| e.to_string())
+            })
+            .unwrap_or_default();
+        self.tree_node(ui, node, label, true, |app, ui| {
+            // The two ad-hoc groups are always listed first.
+            let mut lists: Vec<&str> = vec![SINGLE_LITERAL, SINGLE_REGEX];
+            for g in groups.iter() {
+                if !lists.contains(&g.list.as_str()) {
+                    lists.push(&g.list);
+                }
+            }
+            for list in lists {
+                let of_list: Vec<_> = groups.iter().filter(|g| g.list == list).collect();
+                let n: u64 = of_list.iter().map(|g| g.count).sum();
+                let list_node = NodeId::KeywordHits(KeywordHitFilter {
+                    list: list.to_owned(),
+                    ..KeywordHitFilter::default()
+                });
+                let label = format!("{list} ({})", crate::format::grouped(n));
+                app.tree_node(ui, &list_node, &label, !of_list.is_empty(), |app, ui| {
+                    let mut terms: Vec<&str> = Vec::new();
+                    for g in &of_list {
+                        if !terms.contains(&g.term.as_str()) {
+                            terms.push(&g.term);
+                        }
+                    }
+                    for term in terms {
+                        let of_term: Vec<_> = of_list.iter().filter(|g| g.term == term).collect();
+                        let n: u64 = of_term.iter().map(|g| g.count).sum();
+                        let term_node = NodeId::KeywordHits(KeywordHitFilter {
+                            list: list.to_owned(),
+                            term: Some(term.to_owned()),
+                            instance: None,
+                        });
+                        let label = format!("{term} ({})", crate::format::grouped(n));
+                        let regex = of_term.iter().any(|g| g.instance.is_some());
+                        app.tree_node(ui, &term_node, &label, regex, |app, ui| {
+                            for g in &of_term {
+                                let Some(inst) = &g.instance else { continue };
+                                let node = NodeId::KeywordHits(KeywordHitFilter {
+                                    list: list.to_owned(),
+                                    term: Some(term.to_owned()),
+                                    instance: Some(inst.clone()),
+                                });
+                                let label = format!("{inst} ({})", crate::format::grouped(g.count));
+                                app.tree_node(ui, &node, &label, false, |_, _| {});
+                            }
+                        });
+                    }
+                });
+            }
+        });
     }
 
     /// The OS Accounts node (its count comes with the case summary).
@@ -1919,7 +2007,12 @@ impl PostmortemApp {
             NodeId::Host(h) => self.host_view(ui, *h),
             NodeId::Volume { ds, volume } => self.volume_summary(ui, *ds, *volume),
             NodeId::Dir { .. } => self.file_table(ui, &node),
-            NodeId::Results { type_id } => self.results_view(ui, *type_id),
+            NodeId::Results { type_id } => {
+                self.results_view(ui, &crate::results::ResultKey::Type(*type_id));
+            }
+            NodeId::KeywordHits(f) => {
+                self.results_view(ui, &crate::results::ResultKey::Keyword(f.clone()));
+            }
             NodeId::TagFiles(_)
             | NodeId::TagResults(_)
             | NodeId::Score { .. }
@@ -1930,14 +2023,14 @@ impl PostmortemApp {
         }
     }
 
-    fn results_view(&mut self, ui: &mut egui::Ui, type_id: i64) {
+    fn results_view(&mut self, ui: &mut egui::Ui, key: &crate::results::ResultKey) {
         let Some(case) = self.analysis.lock().case().cloned() else {
             return;
         };
-        let task = self.result_rows.entry(type_id).or_insert_with(|| {
-            let case = Arc::clone(&case);
+        let task = self.result_rows.entry(key.clone()).or_insert_with(|| {
+            let (case, key) = (Arc::clone(&case), key.clone());
             Task::spawn(ui.ctx(), move || {
-                crate::results::load_rows(&case, type_id).map(Arc::new)
+                crate::results::load_rows(&case, &key).map(Arc::new)
             })
         });
         let rows = match task.poll() {
@@ -1955,13 +2048,23 @@ impl PostmortemApp {
             Some(Ok(r)) => Arc::clone(r),
         };
         // The title comes from the cached counts (no IO on the UI thread).
-        let title = self
-            .result_counts
-            .get(ui.ctx(), Some(&case), false)
-            .iter()
-            .find(|t| t.type_id == type_id)
-            .map(|t| t.display.clone())
-            .unwrap_or_default();
+        let title = match key {
+            crate::results::ResultKey::Type(type_id) => self
+                .result_counts
+                .get(ui.ctx(), Some(&case), false)
+                .iter()
+                .find(|t| t.type_id == *type_id)
+                .map(|t| t.display.clone())
+                .unwrap_or_default(),
+            crate::results::ResultKey::Keyword(f) => {
+                let mut t = format!("Keyword Hits › {}", f.list);
+                for part in [&f.term, &f.instance].into_iter().flatten() {
+                    t.push_str(" › ");
+                    t.push_str(part);
+                }
+                t
+            }
+        };
         let tags = self.tagging.catalog.get(ui.ctx(), Some(&case));
         let ev = self.result_table.ui(
             ui,
@@ -2191,7 +2294,7 @@ impl PostmortemApp {
             let result = match (&self.selected, self.result_selected) {
                 (Some(NodeId::Results { type_id }), Some(i)) => self
                     .result_rows
-                    .get_mut(type_id)
+                    .get_mut(&crate::results::ResultKey::Type(*type_id))
                     .and_then(Task::poll)
                     .and_then(|r| r.as_ref().ok())
                     .and_then(|rows| rows.rows.get(i))
