@@ -10,6 +10,7 @@
     reason = "test-only fixture builders: panics on misuse are intended, style lints relaxed"
 )]
 
+pub mod archives;
 pub mod demo;
 pub mod disk;
 pub mod evt;
