@@ -5,7 +5,7 @@ use jiff::tz::TimeZone;
 
 /// Display preferences (later persisted in Options).
 #[derive(Debug, Clone)]
-pub struct DisplayPrefs {
+pub(crate) struct DisplayPrefs {
     pub timezone: TimeZone,
 }
 
@@ -18,7 +18,7 @@ impl Default for DisplayPrefs {
 }
 
 impl DisplayPrefs {
-    pub fn time(&self, ts: Option<Timestamp>) -> String {
+    pub(crate) fn time(&self, ts: Option<Timestamp>) -> String {
         ts.map_or_else(String::new, |t| {
             if self.timezone == TimeZone::UTC {
                 pm_core::time::format_utc(t)

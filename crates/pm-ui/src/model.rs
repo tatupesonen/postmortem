@@ -52,6 +52,15 @@ pub enum NodeId {
     },
     /// A node of the Views tree (file types, deleted files, sizes).
     View(crate::views::View),
+    /// Tags › `<tag name>` › File Tags.
+    TagFiles(i64),
+    /// Tags › `<tag name>` › Result Tags.
+    TagResults(i64),
+    /// Score › Bad Items (`true`) / Suspicious Items.
+    Score {
+        bad: bool,
+    },
+    OsAccounts,
 }
 
 impl NodeId {
@@ -59,7 +68,12 @@ impl NodeId {
     pub fn ds(&self) -> Option<i64> {
         match self {
             Self::DataSource(ds) | Self::Volume { ds, .. } | Self::Dir { ds, .. } => Some(*ds),
-            Self::Results { .. } | Self::View(_) => None,
+            Self::Results { .. }
+            | Self::View(_)
+            | Self::TagFiles(_)
+            | Self::TagResults(_)
+            | Self::Score { .. }
+            | Self::OsAccounts => None,
         }
     }
 }
@@ -80,6 +94,45 @@ pub struct FileRow {
     pub path: String,
     /// The case-database row, for rows listed from the case.
     pub file: Option<Arc<FileRecord>>,
+    /// Score and tags (Autopsy's S and C columns), for case rows.
+    pub annotations: Option<Arc<Annotations>>,
+}
+
+/// A tag on a listed item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RowTag {
+    pub id: i64,
+    pub tag_name_id: i64,
+    pub name: String,
+    pub comment: String,
+}
+
+/// Aggregate score and tags of a listed item.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Annotations {
+    pub score: pm_casedb::Significance,
+    pub tags: Vec<RowTag>,
+}
+
+impl Annotations {
+    /// Autopsy's C column: tags exist, and one has a comment.
+    pub fn comment_status(&self) -> CommentStatus {
+        if self.tags.is_empty() {
+            CommentStatus::None
+        } else if self.tags.iter().any(|t| !t.comment.trim().is_empty()) {
+            CommentStatus::TagComment
+        } else {
+            CommentStatus::TagNoComment
+        }
+    }
+}
+
+/// Autopsy `HasCommentStatus` (without the Central Repository states yet).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CommentStatus {
+    None,
+    TagNoComment,
+    TagComment,
 }
 
 impl FileRow {
@@ -103,6 +156,7 @@ impl FileRow {
             meta,
             path: path.to_owned(),
             file: None,
+            annotations: None,
         }
     }
 

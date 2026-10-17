@@ -709,3 +709,59 @@ fn result_table_scrolls_to_last_column() {
     shot(&mut h, "results-scrolled");
     assert!(fully_visible(&h, "Path"));
 }
+
+/// Tagging: Ctrl+B bookmarks the selected file; the Add File Tag menu
+/// applies a notable tag; the Tags and Score nodes list the results.
+#[test]
+fn tagging_files_feeds_tags_and_score_nodes() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    // Room for the Tags and Score nodes below the expanded tree.
+    h.set_size(egui::vec2(1400.0, 1500.0));
+    wait_analysed(&mut h);
+    settle(&mut h, |h| !h.state().data_sources().is_empty());
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Pictures"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    click(&mut h, "sunset.bmp");
+    h.event(egui::Event::Key {
+        key: egui::Key::B,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::COMMAND,
+    });
+    h.run_steps(2);
+    // The Tags tree gains Bookmark with one file tag.
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Bookmark (1)").is_some()
+    });
+    click(&mut h, "Bookmark (1)");
+    click(&mut h, "File Tags (1)");
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("sunset.bmp").count() >= 1
+            && h.query_by_label_contains("File Path").is_some()
+    });
+
+    // Notable Item from the file table's context menu scores the file.
+    click_exact(&mut h, "🗀 Pictures");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("🗋 sunset.bmp").is_some()
+    });
+    h.query_by_label_contains("🗋 sunset.bmp")
+        .unwrap()
+        .click_secondary();
+    h.run_steps(2);
+    click(&mut h, "Add File Tag");
+    click(&mut h, "Notable Item (Notable)");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Bad Items (1)").is_some()
+    });
+    click(&mut h, "Bad Items (1)");
+    // The Score view lists the file with Autopsy's "File" type.
+    settle(&mut h, |h| h.query_all_by_label("File").next().is_some());
+    shot(&mut h, "tags_and_score");
+}

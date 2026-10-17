@@ -18,6 +18,17 @@ pub(crate) const DELETED: &str = "🗑";
 pub(crate) const FILE_SIZE: &str = "⚖";
 pub(crate) const DATA_ARTIFACTS: &str = "📚";
 pub(crate) const ANALYSIS_RESULTS: &str = "📊";
+pub(crate) const TAGS: &str = "🏷";
+pub(crate) const SCORE: &str = "⚠";
+/// S column / Score tree: notable ("Bad Items").
+pub(crate) const SCORE_NOTABLE: &str = "🔴";
+/// S column / Score tree: likely notable ("Suspicious Items").
+pub(crate) const SCORE_SUSPICIOUS: &str = "🔶";
+/// C column: tagged, with a comment.
+pub(crate) const COMMENT: &str = "💬";
+/// C column: tagged, no comment.
+pub(crate) const TAGGED: &str = "🏷";
+pub(crate) const OS_ACCOUNTS: &str = "👥";
 
 /// By Extension groups (`views::EXT_GROUPS` / `DOC_GROUPS` names).
 pub(crate) fn file_group(name: &str) -> &'static str {
@@ -135,6 +146,13 @@ mod tests {
             FILE_SIZE,
             DATA_ARTIFACTS,
             ANALYSIS_RESULTS,
+            TAGS,
+            SCORE,
+            SCORE_NOTABLE,
+            SCORE_SUSPICIOUS,
+            COMMENT,
+            TAGGED,
+            OS_ACCOUNTS,
         ];
         for (name, _) in crate::views::EXT_GROUPS
             .iter()

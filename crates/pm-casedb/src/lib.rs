@@ -32,7 +32,7 @@ pub use derived::{DerivedUpdate, FileIds};
 pub use hosts::{Host, Person, default_host_name};
 pub use model::*;
 pub use scores::{ObjKind, Score};
-pub use tags::{ArtifactTag, NewTagName, TagSet};
+pub use tags::{ArtifactTag, NewTagName, PROJECT_VIC, TagSet};
 
 /// Current schema version written by this build.
 pub const SCHEMA_VERSION: i64 = 2;
@@ -480,6 +480,16 @@ impl CaseDb {
             ))?;
             let rows = st.query_map(params![type_id, ds_id, after_id], ArtifactRecord::from_row)?.collect::<rusqlite::Result<Vec<_>>>()?;
             Ok(rows)
+        })
+    }
+
+    pub fn artifact(&self, id: i64) -> Result<Option<ArtifactRecord>> {
+        self.read(|c| {
+            Ok(c.prepare_cached(&format!(
+                "SELECT {ARTIFACT_COLS} FROM artifacts WHERE id = ?1"
+            ))?
+            .query_row([id], ArtifactRecord::from_row)
+            .optional()?)
         })
     }
 
