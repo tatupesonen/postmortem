@@ -24,6 +24,8 @@ runs the ingest modules on it. Sources:
   --logical PATH,..   logical file set: files and folders, read in place
                       (--times records their modified/created/accessed times)
   --unalloc FILE      unallocated space image file, in 2 GB chunks
+  --xry FOLDER        XRY text export
+  --imager FOLDER     Autopsy logical imager results (copied into the case)
 Without sources the case is only opened.
 Module ids: postmortem ingest --list-modules";
 
@@ -65,6 +67,12 @@ fn parse(args: &[OsString]) -> Result<Args, String> {
                 path: it.next().ok_or("--unalloc needs a file")?.into(),
                 chunk: Some(pm_case::RAW_CHUNK),
             }),
+            Some("--imager") => a.sources.push(pm_case::DataSourceSpec::LogicalImager(
+                it.next().ok_or("--imager needs a folder")?.into(),
+            )),
+            Some("--xry") => a.sources.push(pm_case::DataSourceSpec::XryFolder(
+                it.next().ok_or("--xry needs a folder")?.into(),
+            )),
             Some("--logical") => {
                 let v = it.next().ok_or("--logical needs paths")?;
                 a.sources.push(pm_case::DataSourceSpec::LogicalFiles {
@@ -256,19 +264,33 @@ fn ingest_one(
             return false;
         }
     };
-    eprintln!(
-        "[{}] {}: {} rows added, {} warnings",
-        clock(t.elapsed()),
-        source.label(),
-        loaded.files,
-        loaded.warnings.len()
-    );
+    let mut ok = true;
+    for l in &loaded {
+        eprintln!(
+            "[{}] {}: {} rows added, {} warnings",
+            clock(t.elapsed()),
+            source.label(),
+            l.files,
+            l.warnings.len()
+        );
+        ok &= ingest_ds(case, l.ds_id, settings, modules, t);
+    }
+    ok
+}
+
+/// Runs the ingest modules on data source `ds`, printing progress.
+fn ingest_ds(
+    case: &Arc<Case>,
+    ds: i64,
+    settings: &pm_ingest::JobSettings,
+    modules: &[Arc<dyn pm_ingest::ModuleFactory>],
+    t: Instant,
+) -> bool {
     let progress = Arc::new(IngestProgress::default());
     let inbox = Arc::new(Inbox::default());
     let job = {
         let (case, settings, modules) = (Arc::clone(case), settings.clone(), modules.to_vec());
         let (p, inbox) = (Arc::clone(&progress), Arc::clone(&inbox));
-        let ds = loaded.ds_id;
         std::thread::spawn(move || pm_ingest::run_job(&case, ds, &settings, &modules, &p, &inbox))
     };
     while !job.is_finished() {

@@ -194,14 +194,32 @@ fn run(
     };
     *job.stage.lock() = Stage::Analysing;
     let modules = crate::plugins::modules();
-    match pm_ingest::run_job(case, loaded.ds_id, settings, &modules, &job.ingest, inbox) {
-        Ok(s) => Stage::Done {
-            files: s.files,
-            artifacts: s.artifacts,
-            errors: s.errors.len(),
-            cancelled: s.cancelled,
-        },
-        Err(e) => Stage::Failed(e.to_string()),
+    let (mut files, mut artifacts, mut errors) = (0, 0, 0);
+    // Several data sources (logical imager drive images) are analysed in
+    // turn, each its own ingest job.
+    for l in &loaded {
+        match pm_ingest::run_job(case, l.ds_id, settings, &modules, &job.ingest, inbox) {
+            Ok(s) => {
+                files += s.files;
+                artifacts += s.artifacts;
+                errors += s.errors.len();
+                if s.cancelled {
+                    return Stage::Done {
+                        files,
+                        artifacts,
+                        errors,
+                        cancelled: true,
+                    };
+                }
+            }
+            Err(e) => return Stage::Failed(e.to_string()),
+        }
+    }
+    Stage::Done {
+        files,
+        artifacts,
+        errors,
+        cancelled: false,
     }
 }
 

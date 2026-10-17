@@ -223,3 +223,213 @@ fn local_disk_is_recorded_as_such() {
         eprintln!("{} {:?}", d.path.display(), d.size);
     }
 }
+
+fn utf16_report(text: &str) -> Vec<u8> {
+    let mut v = vec![0xFF, 0xFE];
+    for u in text.encode_utf16() {
+        v.extend_from_slice(&u.to_le_bytes());
+    }
+    v
+}
+
+/// Autopsy "XRY Text Export": the folder becomes a file set and the
+/// reports' calls and messages become artifacts with related accounts.
+#[test]
+fn xry_text_export_is_parsed() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("xry");
+    std::fs::create_dir(&src).unwrap();
+    let header = |kind: &str| format!("XRY export\r\nPhone\r\n{kind}\r\nCase 1\r\n\r\n");
+    std::fs::write(
+        src.join("Calls.txt"),
+        utf16_report(&format!(
+            "{}Call # 1\r\nType:\tDialed\r\nTime:\t5/28/2021 8:30:00 AM (Network)\r\nTo\r\nTel:\t0401111111\r\n",
+            header("Calls")
+        )),
+    )
+    .unwrap();
+    std::fs::write(
+        src.join("Messages.txt"),
+        utf16_report(&format!(
+            "{}Message # 1\r\nType:\tIncoming\r\nFrom\r\nTel:\t0401111111\r\nText:\tsee you at the pier\r\n",
+            header("Messages/SMS")
+        )),
+    )
+    .unwrap();
+    std::fs::write(src.join("attachment.jpg"), b"\xFF\xD8\xFF").unwrap();
+
+    let case = Case::create(tmp.path().join("case"), CaseDetails::default()).unwrap();
+    let s = pm_case::add_data_source(
+        &case,
+        &pm_case::DataSourceSpec::XryFolder(src.clone()),
+        &pm_case::LoadOptions::default(),
+        &LoadProgress::default(),
+    )
+    .unwrap()
+    .remove(0);
+    let db = case.db();
+    assert_eq!(
+        db.data_source(s.ds_id).unwrap().unwrap().name,
+        "XRY Text Export"
+    );
+    assert_eq!(s.files, 3, "the reports and the other files");
+    let ty = |n| pm_casedb::catalog::artifact_type_id(n).unwrap();
+    let calls = db
+        .artifacts_of_type(ty("KAAMOS_CALLLOG"), Some(s.ds_id), 0, 100)
+        .unwrap();
+    assert_eq!(calls.len(), 1);
+    let msgs = db
+        .artifacts_of_type(ty("KAAMOS_MESSAGE"), Some(s.ds_id), 0, 100)
+        .unwrap();
+    assert_eq!(msgs.len(), 1);
+    let text = db.attributes(msgs[0].id).unwrap();
+    assert!(
+        text.iter()
+            .any(|a| a.value == pm_casedb::Value::Text("see you at the pier".into()))
+    );
+    let phone = db
+        .account("PHONE", "0401111111")
+        .unwrap()
+        .expect("phone account");
+    let related = db
+        .related_accounts(phone.id, &pm_casedb::communications::CommsFilter::default())
+        .unwrap();
+    assert_eq!(related.len(), 1, "related to the device");
+    assert_eq!(related[0].1, 2, "a call and a message");
+}
+
+const RESULTS_HEADER: &str = "VHD file\tFile system offset\tFile metadata address\tExtraction status\tRule set name\tRule name\tDescription\tFilename\tPath\tExtractFilePath\tcrtime\tmtime\tatime\tctime\n";
+
+/// Autopsy "Logical Imager Results" without drive images: the extracted
+/// files become a logical file set and every hit an Interesting Item.
+#[test]
+fn logical_imager_extracted_files() {
+    let tmp = tempfile::tempdir().unwrap();
+    let src = tmp.path().join("Logical_Imager_HOST_20210528");
+    write(&src, "root/f-1.txt", b"secret plan");
+    write(&src, "HOST_users.txt", b"bob\n");
+    write(
+        &src,
+        "SearchResults.txt",
+        format!("{RESULTS_HEADER}sparse_image.vhd\t0\t77\t0\tSet A\tPlans\td\tplan.txt\t/Users/bob/Desktop\troot/f-1.txt\t1600000000\t1600000100\t1600000200\t1600000300\n").as_bytes(),
+    );
+    let case = Case::create(tmp.path().join("case"), CaseDetails::default()).unwrap();
+    let added = pm_case::add_data_source(
+        &case,
+        &pm_case::DataSourceSpec::LogicalImager(src.clone()),
+        &pm_case::LoadOptions::default(),
+        &LoadProgress::default(),
+    )
+    .unwrap();
+    assert_eq!(added.len(), 1);
+    let db = case.db();
+    let ds = db.data_source(added[0].ds_id).unwrap().unwrap();
+    assert_eq!(ds.name, "Logical_Imager_HOST_20210528");
+    assert!(
+        case.module_output_dir()
+            .join("LogicalImager/Logical_Imager_HOST_20210528/root/f-1.txt")
+            .is_file(),
+        "copied into the case"
+    );
+    assert_eq!(db.reports().unwrap().len(), 2, "search results and users");
+    let files = db
+        .query_files(
+            &FileQuery {
+                ds_id: Some(ds.id),
+                ..FileQuery::default()
+            },
+            0,
+            100,
+        )
+        .unwrap();
+    let plan = files.iter().find(|f| f.name == "plan.txt").unwrap();
+    assert_eq!(
+        plan.parent_path,
+        "/root/sparse_image.vhd/Users/bob/Desktop/"
+    );
+    assert_eq!(plan.size, 11);
+    assert_eq!(plan.times[0], Some((1_600_000_100, 0)), "mtime");
+    assert_eq!(plan.times[3], Some((1_600_000_000, 0)), "crtime");
+    let content = case.content(plan).unwrap();
+    assert_eq!(content.read_vec_at(0, 6).unwrap(), b"secret");
+    let hits = db
+        .artifacts_of_type(
+            pm_casedb::catalog::artifact_type_id("KAAMOS_INTERESTING_ITEM").unwrap(),
+            Some(ds.id),
+            0,
+            10,
+        )
+        .unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].file_id, Some(plan.id));
+}
+
+/// Logical imager results with a sparse drive image: the VHD is added as a
+/// disk image and hits are found by metadata address and name.
+#[test]
+fn logical_imager_sparse_vhd() {
+    let tmp = tempfile::tempdir().unwrap();
+    // Find a file of the demo disk to name in the results.
+    let probe = Case::create(tmp.path().join("probe"), CaseDetails::default()).unwrap();
+    let p = pm_case::add_image(
+        &probe,
+        pm_testkit::demo::demo_disk_file(),
+        &pm_case::LoadOptions::default(),
+        &LoadProgress::default(),
+    )
+    .unwrap();
+    let target = probe
+        .db()
+        .query_files(
+            &FileQuery {
+                ds_id: Some(p.ds_id),
+                ..FileQuery::default()
+            },
+            0,
+            1000,
+        )
+        .unwrap()
+        .into_iter()
+        .find(|f| {
+            f.kind == FileKindCode::Regular && f.origin == Origin::FileSystem && f.inode.is_some()
+        })
+        .unwrap();
+    let src = tmp.path().join("imager");
+    write(
+        &src,
+        "sparse_image.vhd",
+        &pm_testkit::vdisk::vhd_dynamic(&pm_testkit::demo::demo_disk(), 2 << 20),
+    );
+    write(
+        &src,
+        "SearchResults.txt",
+        format!(
+            "{RESULTS_HEADER}sparse_image.vhd\t0\t{}\t0\tSet A\tAny\td\t{}\t{}\t\t0\t0\t0\t0\n",
+            target.inode.unwrap(),
+            target.name,
+            target.parent_path
+        )
+        .as_bytes(),
+    );
+    let case = Case::create(tmp.path().join("case"), CaseDetails::default()).unwrap();
+    let added = pm_case::add_data_source(
+        &case,
+        &pm_case::DataSourceSpec::LogicalImager(src),
+        &pm_case::LoadOptions::default(),
+        &LoadProgress::default(),
+    )
+    .unwrap();
+    assert_eq!(added.len(), 1);
+    let db = case.db();
+    let hits = db
+        .artifacts_of_type(
+            pm_casedb::catalog::artifact_type_id("KAAMOS_INTERESTING_ITEM").unwrap(),
+            Some(added[0].ds_id),
+            0,
+            10,
+        )
+        .unwrap();
+    assert_eq!(hits.len(), 1);
+    let f = db.file(hits[0].file_id.unwrap()).unwrap().unwrap();
+    assert_eq!(f.name, target.name);
+}

@@ -26,6 +26,10 @@ pub enum DataSourceSpec {
     /// "Unallocated Space Image File": a raw file without file-system
     /// analysis; `chunk` splits it (`None`: one piece).
     UnallocatedImage { path: PathBuf, chunk: Option<u64> },
+    /// "XRY Text Export": a folder of XRY text reports.
+    XryFolder(PathBuf),
+    /// "Autopsy Logical Imager Results": the imager's output folder.
+    LogicalImager(PathBuf),
 }
 
 impl DataSourceSpec {
@@ -36,6 +40,8 @@ impl DataSourceSpec {
             Self::LocalDisk(_) => "Local Disk",
             Self::LogicalFiles { .. } => "Logical Files",
             Self::UnallocatedImage { .. } => "Unallocated Space Image File",
+            Self::XryFolder(_) => "XRY Text Export",
+            Self::LogicalImager(_) => "Autopsy Logical Imager Results",
         }
     }
 
@@ -48,9 +54,11 @@ impl DataSourceSpec {
             )
         };
         match self {
-            Self::DiskImage(p) | Self::LocalDisk(p) | Self::UnallocatedImage { path: p, .. } => {
-                name(p)
-            }
+            Self::DiskImage(p)
+            | Self::LocalDisk(p)
+            | Self::XryFolder(p)
+            | Self::LogicalImager(p)
+            | Self::UnallocatedImage { path: p, .. } => name(p),
             Self::LogicalFiles { paths, .. } => match paths.as_slice() {
                 [one] => name(one),
                 many => format!("{} logical files and folders", many.len()),
@@ -59,9 +67,23 @@ impl DataSourceSpec {
     }
 }
 
-/// Adds `spec` to the case. `load` supplies the name, time zone, host and
-/// (for disk images and local disks) the loader options.
+/// Adds `spec` to the case and returns the data sources added (one, but
+/// for logical imager results with several drive images). `load` supplies
+/// the name, time zone, host and (for disk images and local disks) the
+/// loader options.
 pub fn add_data_source(
+    case: &Case,
+    spec: &DataSourceSpec,
+    load: &LoadOptions,
+    progress: &LoadProgress,
+) -> Result<Vec<LoadSummary>> {
+    if let DataSourceSpec::LogicalImager(p) = spec {
+        return crate::logical_imager::add_logical_imager(case, p, load, progress);
+    }
+    add_one(case, spec, load, progress).map(|s| vec![s])
+}
+
+fn add_one(
     case: &Case,
     spec: &DataSourceSpec,
     load: &LoadOptions,
@@ -70,6 +92,13 @@ pub fn add_data_source(
     match spec {
         DataSourceSpec::DiskImage(p) => add_image(case, p, load, progress),
         DataSourceSpec::LocalDisk(p) => add_local_disk(case, p, load, progress),
+        DataSourceSpec::XryFolder(p) => crate::xry::add_xry_folder(case, p, load, progress),
+        DataSourceSpec::LogicalImager(p) => {
+            crate::logical_imager::add_logical_imager(case, p, load, progress)?
+                .into_iter()
+                .next()
+                .ok_or_else(|| crate::CaseError::NotFound("logical imager data source".into()))
+        }
         DataSourceSpec::LogicalFiles {
             paths,
             modified,

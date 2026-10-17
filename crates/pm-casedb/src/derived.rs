@@ -260,6 +260,22 @@ impl CaseDb {
         })
     }
 
+    /// Files of a data source's file systems with metadata address `inode`
+    /// and name `name` (Autopsy's `meta_addr` + `name` lookup).
+    pub fn files_by_inode(&self, ds_id: i64, inode: u64, name: &str) -> Result<Vec<i64>> {
+        let inode = i64::try_from(inode).unwrap_or(i64::MAX);
+        self.read(|c| {
+            let mut st = c.prepare_cached(
+                "SELECT f.id FROM file_systems s JOIN files f ON f.fs_id = s.id \
+                 WHERE s.ds_id = ?1 AND f.inode = ?2 AND f.name = ?3 ORDER BY f.id",
+            )?;
+            let ids = st
+                .query_map(params![ds_id, inode, name], |r| r.get(0))?
+                .collect::<rusqlite::Result<Vec<i64>>>()?;
+            Ok(ids)
+        })
+    }
+
     /// Updates a re-extracted derived file.
     pub fn update_derived_file(&self, file_id: i64, u: &DerivedUpdate) -> Result<()> {
         let split = |x: Option<(i64, u32)>| (x.map(|v| v.0), x.map(|v| v.1));

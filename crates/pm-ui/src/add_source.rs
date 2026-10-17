@@ -112,14 +112,18 @@ pub(crate) enum SourceKind {
     LocalDisk,
     LogicalFiles,
     Unallocated,
+    LogicalImager,
+    Xry,
 }
 
 impl SourceKind {
-    const ALL: [Self; 4] = [
+    const ALL: [Self; 6] = [
         Self::DiskImage,
         Self::LocalDisk,
         Self::LogicalFiles,
         Self::Unallocated,
+        Self::LogicalImager,
+        Self::Xry,
     ];
 
     fn name(self) -> &'static str {
@@ -128,6 +132,8 @@ impl SourceKind {
             Self::LocalDisk => "Local Disk",
             Self::LogicalFiles => "Logical Files",
             Self::Unallocated => "Unallocated Space Image File",
+            Self::LogicalImager => "Autopsy Logical Imager Results",
+            Self::Xry => "XRY Text Export",
         }
     }
 
@@ -140,6 +146,12 @@ impl SourceKind {
             Self::LogicalFiles => "Files and folders of this computer, read in place.",
             Self::Unallocated => {
                 "A raw file of unallocated space, carved and searched without file-system analysis."
+            }
+            Self::LogicalImager => {
+                "The output folder of the logical imager: sparse drive images or extracted files, with search hits."
+            }
+            Self::Xry => {
+                "A folder of XRY text reports: calls, messages, contacts, device information and bookmarks."
             }
         }
     }
@@ -229,6 +241,29 @@ impl AddSourceWizard {
                 path: self.check_file("an unallocated space image file")?,
                 chunk: self.chunked.then_some(pm_case::RAW_CHUNK),
             },
+            SourceKind::LogicalImager => {
+                let p = PathBuf::from(self.path.trim());
+                if self.path.trim().is_empty() {
+                    return Err("Choose the logical imager results folder.".into());
+                }
+                if !pm_case::is_logical_imager_folder(&p) {
+                    return Err(format!("Cannot find SearchResults.txt in {}.", p.display()));
+                }
+                S::LogicalImager(p)
+            }
+            SourceKind::Xry => {
+                let p = PathBuf::from(self.path.trim());
+                if self.path.trim().is_empty() {
+                    return Err("Choose the XRY export folder.".into());
+                }
+                match pm_case::xry_files(&p) {
+                    Ok(v) if !v.is_empty() => S::XryFolder(p),
+                    Ok(_) => {
+                        return Err("Selected folder did not contain any XRY text files.".into());
+                    }
+                    Err(e) => return Err(e.to_string()),
+                }
+            }
         })
     }
 
@@ -335,6 +370,20 @@ impl AddSourceWizard {
             SourceKind::LocalDisk => self.disk_page(ui),
             SourceKind::LogicalFiles => self.logical_page(ui),
             SourceKind::Unallocated => self.unalloc_page(ui),
+            SourceKind::Xry => {
+                self.folder_page(ui, "Select an XRY folder to process:", "Select XRY Folder");
+            }
+            SourceKind::LogicalImager => {
+                self.folder_page(
+                    ui,
+                    "Select the logical imager results folder:",
+                    "Select Folder",
+                );
+                egui::Grid::new("imager-tz")
+                    .num_columns(2)
+                    .show(ui, |ui| self.timezone_row(ui));
+                ui.weak("The folder is copied into the case before it is added.");
+            }
         }
     }
 
@@ -544,6 +593,28 @@ impl AddSourceWizard {
             );
         });
         ui.weak("NOTE: Time stamps may have changed when the files were copied to the current location.");
+    }
+
+    fn folder_page(&mut self, ui: &mut egui::Ui, label: &str, title: &str) {
+        ui.label(label);
+        ui.horizontal(|ui| {
+            if ui
+                .add(
+                    egui::TextEdit::singleline(&mut self.path)
+                        .hint_text("Folder")
+                        .desired_width(400.0),
+                )
+                .changed()
+            {
+                self.error = None;
+            }
+            if ui.button("Browse…").clicked()
+                && let Some(p) = rfd::FileDialog::new().set_title(title).pick_folder()
+            {
+                self.path = p.display().to_string();
+                self.error = None;
+            }
+        });
     }
 
     fn unalloc_page(&mut self, ui: &mut egui::Ui) {

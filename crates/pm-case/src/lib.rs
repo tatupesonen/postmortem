@@ -18,8 +18,10 @@ mod content;
 pub mod derived;
 pub mod load;
 pub mod logical;
+mod logical_imager;
 pub mod raw_sources;
 pub mod spec;
+mod xry;
 
 pub use case::{
     CASE_FILE, Case, CaseDetails, CaseKind, DB_FILE, Examiner, SUBDIRS, delete_case_folder,
@@ -27,10 +29,12 @@ pub use case::{
 pub use content::{layout_json, parse_layout};
 pub use load::{LoadOptions, LoadProgress, LoadSummary, add_evidence, add_image};
 pub use logical::{LogicalOptions, add_logical_files};
+pub use logical_imager::{add_logical_imager, is_logical_imager_folder};
 pub use raw_sources::{
     LocalDisk, RAW_CHUNK, RawOptions, add_local_disk, add_unallocated_image, local_disks,
 };
 pub use spec::{DataSourceSpec, add_data_source};
+pub use xry::{XRY_SOURCE_NAME, add_xry_folder, is_xry_file, xry_files};
 
 use std::path::PathBuf;
 
@@ -61,6 +65,9 @@ pub enum CaseError {
     NotFound(String),
     #[error("cancelled")]
     Cancelled,
+    /// Evidence that is not what the data source type expects.
+    #[error("{0}")]
+    Invalid(String),
     #[error(transparent)]
     Search(#[from] pm_search::SearchError),
 }
