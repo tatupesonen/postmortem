@@ -14,6 +14,7 @@ pub mod interesting_files;
 pub mod keyword_search;
 pub mod photorec;
 pub mod picture_analyzer;
+pub mod plugin_host;
 pub mod recent_activity;
 mod util;
 

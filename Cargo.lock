@@ -4349,6 +4349,7 @@ dependencies = [
  "pm-hashdb",
  "pm-ingest",
  "pm-lnk",
+ "pm-plugin-api",
  "pm-prefetch",
  "pm-registry",
  "pm-rules",

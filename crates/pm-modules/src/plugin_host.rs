@@ -1,0 +1,471 @@
+//! Runs modules written against `pm-plugin-api` (ADR-021) inside the
+//! ingest framework: [`PluginModule`] turns any [`Plugin`] — a built-in
+//! parser or a WebAssembly plugin loaded by `pm-plugin-wasm` — into a
+//! [`ModuleFactory`], and [`JobHost`] implements the plugin's [`Host`]
+//! over the job context.
+//!
+//! The host applies the plugin's file filter before calling it, posts
+//! results through the job's batched writer (idempotent on re-runs) and
+//! keeps the last opened content source, so the many small reads a parser
+//! makes do not reopen the file.
+
+use std::cell::RefCell;
+use std::collections::HashSet;
+use std::sync::{Arc, LazyLock};
+
+use parking_lot::Mutex;
+use pm_casedb::catalog::{artifact_type_id, attribute_type_id};
+use pm_casedb::{FileKindCode, FileQuery, FileRecord, NewArtifact, Origin, Priority};
+use pm_core::SharedSource;
+use pm_ingest::{
+    DataSourceModule, DsProgress, FileModule, IngestFile, IngestMessage, JobContext, MessageKind,
+    ModuleError, ModuleFactory, ModuleInfo, ModuleJob,
+};
+use pm_plugin_api as api;
+use pm_plugin_api::{FileFilter, Host, Plugin};
+
+/// Module output folder of a plugin's derived files.
+fn output_folder(id: &str) -> String {
+    format!("plugin-{id}")
+}
+
+/// `ModuleInfo` holds `&'static str`s; plugin infos are owned. Each
+/// distinct string is leaked once (plugins are few and loaded once).
+fn intern(s: &str) -> &'static str {
+    static STRINGS: LazyLock<Mutex<HashSet<&'static str>>> =
+        LazyLock::new(|| Mutex::new(HashSet::new()));
+    let mut set = STRINGS.lock();
+    if let Some(&s) = set.get(s) {
+        return s;
+    }
+    let leaked: &'static str = Box::leak(s.to_owned().into_boxed_str());
+    set.insert(leaked);
+    leaked
+}
+
+/// A [`Plugin`] as an ingest module.
+pub struct PluginModule {
+    plugin: Arc<dyn Plugin>,
+    info: api::PluginInfo,
+}
+
+impl std::fmt::Debug for PluginModule {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PluginModule")
+            .field("id", &self.info.id)
+            .finish_non_exhaustive()
+    }
+}
+
+impl PluginModule {
+    pub fn new(plugin: Arc<dyn Plugin>) -> Self {
+        let info = plugin.info();
+        Self { plugin, info }
+    }
+}
+
+impl ModuleFactory for PluginModule {
+    fn info(&self) -> ModuleInfo {
+        ModuleInfo {
+            id: intern(&self.info.id),
+            name: intern(&self.info.name),
+            description: intern(&self.info.description),
+            version: intern(&self.info.version),
+            enabled_by_default: self.info.enabled_by_default,
+        }
+    }
+
+    fn default_settings(&self) -> serde_json::Value {
+        self.plugin.default_settings()
+    }
+
+    fn start(
+        &self,
+        _ctx: &JobContext,
+        settings: &serde_json::Value,
+    ) -> Result<Arc<dyn ModuleJob>, ModuleError> {
+        self.plugin
+            .validate(settings)
+            .map_err(|e| ModuleError(e.0))?;
+        Ok(Arc::new(PluginJob {
+            plugin: Arc::clone(&self.plugin),
+            info: self.info.clone(),
+            settings: settings.clone(),
+        }))
+    }
+}
+
+struct PluginJob {
+    plugin: Arc<dyn Plugin>,
+    info: api::PluginInfo,
+    settings: serde_json::Value,
+}
+
+impl ModuleJob for PluginJob {
+    fn file_module(&self) -> Option<Box<dyn FileModule>> {
+        let filter = self.info.file_filter.clone()?;
+        match self.plugin.file_ingest(&self.settings) {
+            Ok(Some(inner)) => Some(Box::new(FileAdapter {
+                inner,
+                filter,
+                info: self.info.clone(),
+            })),
+            Ok(None) => None,
+            Err(e) => {
+                tracing::error!(plugin = %self.info.id, "file ingest did not start: {e}");
+                None
+            }
+        }
+    }
+
+    fn data_source_module(&self) -> Option<(u32, Box<dyn DataSourceModule>)> {
+        let stage = self.info.data_source_stage?;
+        match self.plugin.data_source_ingest(&self.settings) {
+            Ok(Some(inner)) => Some((
+                stage,
+                Box::new(DsAdapter {
+                    inner,
+                    info: self.info.clone(),
+                }),
+            )),
+            Ok(None) => None,
+            Err(e) => {
+                tracing::error!(plugin = %self.info.id, "data source ingest did not start: {e}");
+                None
+            }
+        }
+    }
+}
+
+struct FileAdapter {
+    inner: Box<dyn api::FileIngest>,
+    filter: FileFilter,
+    info: api::PluginInfo,
+}
+
+impl FileModule for FileAdapter {
+    fn process(&mut self, ctx: &JobContext, file: &mut IngestFile) -> Result<(), ModuleError> {
+        let mut info = file_info(&file.rec);
+        // Values set earlier in this job (File Type, Hash Lookup).
+        info.mime = file.mime().map(str::to_owned);
+        info.md5 = file.md5().map(pm_core::decode::to_hex);
+        if !self.filter.matches(&info) {
+            return Ok(());
+        }
+        let host = JobHost::new(ctx, &self.info);
+        if let Ok(src) = file.content() {
+            host.remember(file.rec.id, src);
+        }
+        self.inner
+            .process(&host, &info)
+            .map_err(|e| ModuleError(e.0))
+    }
+
+    fn shut_down(&mut self, ctx: &JobContext) {
+        self.inner.finish(&JobHost::new(ctx, &self.info));
+    }
+}
+
+struct DsAdapter {
+    inner: Box<dyn api::DataSourceIngest>,
+    info: api::PluginInfo,
+}
+
+impl DataSourceModule for DsAdapter {
+    fn process(&mut self, ctx: &JobContext, _progress: &DsProgress<'_>) -> Result<(), ModuleError> {
+        self.inner
+            .process(&JobHost::new(ctx, &self.info))
+            .map_err(|e| ModuleError(e.0))
+    }
+}
+
+/// A file as the plugin API describes it.
+pub fn file_info(f: &FileRecord) -> api::FileInfo {
+    let kind = match (f.kind, f.origin) {
+        (FileKindCode::Directory, _) => api::FileKind::Directory,
+        (_, Origin::UnallocBlocks | Origin::Slack) => api::FileKind::Unallocated,
+        (FileKindCode::Regular, Origin::Carved) => api::FileKind::Carved,
+        (FileKindCode::Regular, Origin::Derived) => api::FileKind::Derived,
+        (FileKindCode::Regular, _) => api::FileKind::File,
+        _ => api::FileKind::Other,
+    };
+    let t = |i: usize| f.times.get(i).copied().flatten().map(|(s, _)| s);
+    let mut parent_path = f.parent_path.clone();
+    if !parent_path.ends_with('/') {
+        parent_path.push('/');
+    }
+    api::FileInfo {
+        id: f.id,
+        ds_id: f.ds_id,
+        name: f.name.clone(),
+        parent_path,
+        extension: f.extension.to_lowercase(),
+        size: f.size,
+        kind,
+        deleted: f.deleted(),
+        mime: f.mime.clone(),
+        md5: f.md5.as_deref().map(pm_core::decode::to_hex),
+        modified: t(0),
+        accessed: t(1),
+        changed: t(2),
+        created: t(3),
+    }
+}
+
+/// The plugin's view of a job.
+#[allow(missing_debug_implementations, reason = "holds the job context")]
+pub struct JobHost<'c> {
+    ctx: &'c JobContext,
+    info: &'c api::PluginInfo,
+    /// The last opened content (parsers read one file many times).
+    open: RefCell<Option<(i64, SharedSource)>>,
+}
+
+impl<'c> JobHost<'c> {
+    pub fn new(ctx: &'c JobContext, info: &'c api::PluginInfo) -> Self {
+        Self {
+            ctx,
+            info,
+            open: RefCell::new(None),
+        }
+    }
+
+    fn remember(&self, id: i64, src: SharedSource) {
+        *self.open.borrow_mut() = Some((id, src));
+    }
+
+    fn source(&self, id: i64) -> api::Result<SharedSource> {
+        if let Some((open, src)) = &*self.open.borrow()
+            && *open == id
+        {
+            return Ok(src.clone());
+        }
+        let rec = self.record(id)?;
+        let src = self.ctx.case.content(&rec).map_err(err)?;
+        self.remember(id, src.clone());
+        Ok(src)
+    }
+
+    fn record(&self, id: i64) -> api::Result<FileRecord> {
+        self.ctx
+            .case
+            .db()
+            .file(id)
+            .map_err(err)?
+            .ok_or_else(|| api::PluginError(format!("no file {id} in the case")))
+    }
+}
+
+fn err(e: impl std::fmt::Display) -> api::PluginError {
+    api::PluginError(e.to_string())
+}
+
+fn value(v: api::Value) -> pm_casedb::Value {
+    match v {
+        api::Value::Text(s) => pm_casedb::Value::Text(s),
+        api::Value::Int(i) => pm_casedb::Value::Int(i),
+        api::Value::Double(d) => pm_casedb::Value::Double(d),
+        api::Value::Bytes(b) => pm_casedb::Value::Bytes(b),
+        api::Value::Time(t) => pm_casedb::Value::DateTime(t),
+    }
+}
+
+fn significance(s: api::Significance) -> pm_casedb::Significance {
+    match s {
+        api::Significance::Unknown => pm_casedb::Significance::Unknown,
+        api::Significance::LikelyNone => pm_casedb::Significance::LikelyNone,
+        api::Significance::LikelyNotable => pm_casedb::Significance::LikelyNotable,
+        api::Significance::None => pm_casedb::Significance::None,
+        api::Significance::Notable => pm_casedb::Significance::Notable,
+    }
+}
+
+impl Host for JobHost<'_> {
+    fn data_source(&self) -> api::DataSourceInfo {
+        let ds = self
+            .ctx
+            .case
+            .db()
+            .data_source(self.ctx.ds_id)
+            .ok()
+            .flatten();
+        api::DataSourceInfo {
+            id: self.ctx.ds_id,
+            name: ds.as_ref().map(|d| d.name.clone()).unwrap_or_default(),
+            timezone: ds
+                .as_ref()
+                .map_or_else(|| "UTC".into(), |d| d.timezone.clone()),
+            size: ds.map_or(0, |d| d.size),
+        }
+    }
+
+    fn read(&self, file_id: i64, offset: u64, buf: &mut [u8]) -> api::Result<usize> {
+        let src = self.source(file_id)?;
+        if offset >= src.size() {
+            return Ok(0);
+        }
+        src.read_at(offset, buf).map_err(err)
+    }
+
+    fn file(&self, file_id: i64) -> api::Result<Option<api::FileInfo>> {
+        Ok(self
+            .ctx
+            .case
+            .db()
+            .file(file_id)
+            .map_err(err)?
+            .as_ref()
+            .map(file_info))
+    }
+
+    fn find_files(&self, q: &api::FindFiles) -> api::Result<Vec<api::FileInfo>> {
+        let limit = q
+            .limit
+            .unwrap_or(api::MAX_FIND_FILES)
+            .min(api::MAX_FIND_FILES) as usize;
+        let query = FileQuery {
+            ds_id: Some(self.ctx.ds_id),
+            regular_only: true,
+            name_contains: q.name.clone(),
+            extensions: q.extension.iter().cloned().collect(),
+            mime: q.mime.clone(),
+            ..FileQuery::default()
+        };
+        let path = q.path_contains.as_deref().map(str::to_lowercase);
+        let mut out = Vec::new();
+        let mut after = 0;
+        while out.len() < limit {
+            let page = self
+                .ctx
+                .case
+                .db()
+                .query_files(&query, after, 5_000)
+                .map_err(err)?;
+            let Some(last) = page.last() else { break };
+            after = last.id;
+            out.extend(
+                page.iter()
+                    .filter(|f| {
+                        f.size > 0
+                            && f.stream.is_none()
+                            && q.name
+                                .as_deref()
+                                .is_none_or(|n| f.name.eq_ignore_ascii_case(n))
+                            && path
+                                .as_deref()
+                                .is_none_or(|p| f.parent_path.to_lowercase().contains(p))
+                    })
+                    .map(file_info),
+            );
+        }
+        out.truncate(limit);
+        Ok(out)
+    }
+
+    fn children(&self, file_id: i64) -> api::Result<Vec<api::FileInfo>> {
+        Ok(self
+            .ctx
+            .case
+            .db()
+            .children(file_id)
+            .map_err(err)?
+            .iter()
+            .map(file_info)
+            .collect())
+    }
+
+    fn post(&self, r: api::NewResult) -> api::Result<()> {
+        let type_id = artifact_type_id(&r.artifact_type).ok_or_else(|| {
+            api::PluginError(format!("unknown artifact type {}", r.artifact_type))
+        })?;
+        let source = self.info.name.clone();
+        let attributes = r
+            .attributes
+            .into_iter()
+            .map(|a| {
+                let id = attribute_type_id(&a.kind).ok_or_else(|| {
+                    api::PluginError(format!("unknown attribute type {}", a.kind))
+                })?;
+                Ok((id, value(a.value), source.clone()))
+            })
+            .collect::<api::Result<Vec<_>>>()?;
+        // Re-running the module must not duplicate results: every
+        // attribute takes part in the identity.
+        let key: Vec<i64> = attributes.iter().map(|a| a.0).collect();
+        self.ctx.post_artifact(
+            NewArtifact {
+                type_id,
+                ds_id: self.ctx.ds_id,
+                file_id: r.file_id,
+                source_artifact_id: None,
+                score: r.significance.map(|s| (significance(s), Priority::Normal)),
+                conclusion: r.conclusion,
+                configuration: r.configuration,
+                justification: r.justification,
+                created_at: self.ctx.now(),
+                attributes,
+            },
+            &key,
+        );
+        Ok(())
+    }
+
+    fn add_derived(&self, parent_id: i64, files: Vec<api::DerivedFile>) -> api::Result<Vec<i64>> {
+        if let Some(f) = files.iter().find(|f| f.data.len() > api::MAX_DERIVED_FILE) {
+            return Err(api::PluginError(format!(
+                "derived file {} is larger than {} bytes",
+                f.name,
+                api::MAX_DERIVED_FILE
+            )));
+        }
+        let parent = self.record(parent_id)?;
+        let mut readers: Vec<std::io::Cursor<Vec<u8>>> = Vec::with_capacity(files.len());
+        let mut meta = Vec::with_capacity(files.len());
+        for f in files {
+            let times = crate::derive::Times {
+                modified: f.modified,
+                accessed: f.accessed,
+                created: f.created,
+            };
+            meta.push((f.name, times));
+            readers.push(std::io::Cursor::new(f.data));
+        }
+        let streams = meta
+            .into_iter()
+            .zip(readers.iter_mut())
+            .map(|((name, times), data)| crate::derive::Stream { name, times, data });
+        let ids =
+            crate::derive::add_children(self.ctx, &parent, &output_folder(&self.info.id), streams)
+                .map_err(|e| api::PluginError(e.0))?;
+        // `None`: not added (empty name, cancelled, or added by an earlier
+        // run of the module).
+        Ok(ids.into_iter().map(|i| i.unwrap_or(0)).collect())
+    }
+
+    fn log(&self, level: api::Level, message: &str) {
+        let id = &self.info.id;
+        match level {
+            api::Level::Debug => tracing::debug!(plugin = %id, "{message}"),
+            api::Level::Info => tracing::info!(plugin = %id, "{message}"),
+            api::Level::Warn => tracing::warn!(plugin = %id, "{message}"),
+            api::Level::Error => tracing::error!(plugin = %id, "{message}"),
+        }
+    }
+
+    fn message(&self, m: api::Message) {
+        let kind = match m.level {
+            api::Level::Debug | api::Level::Info => MessageKind::Info,
+            api::Level::Warn => MessageKind::Warning,
+            api::Level::Error => MessageKind::Error,
+        };
+        let mut msg = IngestMessage::new(kind, &self.info.name, m.subject).details(m.details);
+        if let Some(id) = m.file_id {
+            msg = msg.file(id);
+        }
+        self.ctx.post_message(msg);
+    }
+
+    fn is_cancelled(&self) -> bool {
+        self.ctx.is_cancelled()
+    }
+}
