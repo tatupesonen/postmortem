@@ -188,7 +188,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] NTFS bulk MFT enumeration (sequential chunked scan, parallel record parsing) feeding the loader
 - [ ] Loader: deferred secondary-index creation, ≥ 200 k files/s, bounded memory (streaming parent-id resolution)
 - [ ] DB-backed views replace `pm-index`: tree, File Types, Deleted, Discovery, Gallery, Data Source Summary via indexed SQL + precomputed aggregate tables
-- [ ] File-name/path search index in Tantivy (n-gram tokenizer) with sub-second substring search over 100 M names (shared `pm-search` crate with the M5 content index)
+- [x] File-name/path search index in Tantivy (n-gram tokenizer) with sub-second substring search over 100 M names (shared `pm-search` crate with the M5 content index) — `pm_search::names` (positional trigrams, exact substring/prefix/name/path queries, keyset paging, `catch_up`); 10 M names: 4–25 ms per selective query (docs/PERF.md); UI hook pending (coordinator)
 - [ ] Timeline: events table + pre-aggregated per-unit counts; counts view never scans events
 - [ ] Huge directory UX: keyset-paged listings, cached child counts
 - [ ] Memory/latency regression tests in CI for the 10 M-file synthetic case
@@ -230,9 +230,9 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Ingest UI: module config panels, progress panel, inbox, snapshot/diagnostics
 
 ### M5 — Text extraction and keyword search
-- [ ] `pm-text`: plain text with encoding detection, HTML, PDF, Office (OOXML, legacy OLE), RTF, SQLite, strings fallback, artifact text, language detection
-- [ ] `pm-search`: Tantivy schema, chunking (Autopsy parity), analyzers (CJK), exact/substring/regex, inline search during ingest, hit artifacts, highlighting
-- [ ] Keyword lists (built-ins with exact regexes, import/export incl. EnCase), credit-card validation (Luhn, BIN DB), account artifacts
+- [x] `pm-text`: plain text with encoding detection, HTML, PDF, Office (OOXML, legacy OLE), RTF, SQLite, strings fallback, artifact text, language detection — done except language detection (gap, docs/agents/search.md)
+- [x] `pm-search`: Tantivy schema, chunking (Autopsy parity), analyzers (CJK), exact/substring/regex, inline search during ingest, hit artifacts, highlighting
+- [x] Keyword lists (built-ins with exact regexes, import/export incl. EnCase), credit-card validation (Luhn, BIN DB), account artifacts
 - [ ] Ad-hoc keyword search UI, extracted-text viewer with hit navigation
 - [ ] OCR (pure-Rust `ocrs` or optional external Tesseract), machine translation provider interface
 

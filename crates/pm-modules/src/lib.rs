@@ -10,6 +10,7 @@ pub mod ext_mismatch;
 pub mod file_type;
 pub mod hash_lookup;
 pub mod interesting_files;
+pub mod keyword_search;
 pub mod photorec;
 pub mod picture_analyzer;
 pub mod recent_activity;
@@ -31,6 +32,7 @@ pub fn core_modules() -> Vec<Arc<dyn ModuleFactory>> {
         Arc::new(file_type::FileTypeFactory),
         Arc::new(embedded::EmbeddedFileExtractorFactory),
         Arc::new(picture_analyzer::PictureAnalyzerFactory),
+        Arc::new(keyword_search::KeywordSearchFactory),
         Arc::new(ext_mismatch::ExtMismatchFactory),
         Arc::new(interesting_files::InterestingFilesFactory),
         Arc::new(photorec::PhotoRecCarverFactory),

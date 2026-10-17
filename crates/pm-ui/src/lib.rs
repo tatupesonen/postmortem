@@ -19,6 +19,7 @@ mod hosts_ui;
 mod icons;
 mod index;
 mod model;
+mod options_ui;
 mod results;
 mod sortable;
 mod summary;
@@ -38,6 +39,7 @@ use std::path::PathBuf;
 pub use add_source::IngestPrefs;
 pub use app::{Persisted, PostmortemApp};
 pub use model::{Content, DataSource, FileRow, NodeId};
+pub use tags_ui::TagDefinition;
 
 /// Starts the GUI, optionally opening the given images immediately.
 /// App icon (512 px PNG rendered from `assets/brand/postmortem-icon.svg`).

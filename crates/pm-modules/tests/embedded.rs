@@ -22,6 +22,7 @@ use pm_ingest::{
 use pm_modules::embedded::{
     ENCRYPTION_FILE_LEVEL, ENCRYPTION_FULL, EmbeddedFileExtractorFactory, NAME, ZIP_BOMB_SET,
 };
+use pm_modules::file_type::FileTypeFactory;
 use pm_modules::hash_lookup::HashLookupFactory;
 use pm_testkit::archives::{self as ak, Method, ZipBuilder, ZipEntry};
 use pm_testkit::ntfs::{Deleted, FileOpts, NtfsBuilder};
@@ -56,16 +57,26 @@ fn fixture(b: &NtfsBuilder) -> Fixture {
 
 impl Fixture {
     fn run_with(&self, settings: &JobSettings) -> (JobSummary, Arc<Inbox>) {
-        let modules: Vec<Arc<dyn ModuleFactory>> = vec![
-            Arc::new(HashLookupFactory),
-            Arc::new(EmbeddedFileExtractorFactory),
-        ];
+        self.run_modules(
+            settings,
+            &[
+                Arc::new(HashLookupFactory),
+                Arc::new(EmbeddedFileExtractorFactory),
+            ],
+        )
+    }
+
+    fn run_modules(
+        &self,
+        settings: &JobSettings,
+        modules: &[Arc<dyn ModuleFactory>],
+    ) -> (JobSummary, Arc<Inbox>) {
         let inbox = Arc::new(Inbox::default());
         let s = run_job(
             &self.case,
             self.ds_id,
             settings,
-            &modules,
+            modules,
             &Arc::new(IngestProgress::default()),
             &inbox,
         )
@@ -583,4 +594,34 @@ fn disk_images_are_opt_in() {
     };
     f.run_with(&settings);
     assert_eq!(md5_hex(&f.file("/disc.iso/disc/readme.txt")), TEST_MD5);
+}
+
+/// In Autopsy's pipeline File Type Identification runs first and the
+/// extractor dispatches on the MIME types it sets.
+#[test]
+fn mime_types_from_file_type_identification_drive_extraction() {
+    let f = fixture(&archives_volume());
+    f.run_modules(
+        &JobSettings {
+            threads: 4,
+            ..JobSettings::default()
+        },
+        &[
+            Arc::new(HashLookupFactory),
+            Arc::new(FileTypeFactory),
+            Arc::new(EmbeddedFileExtractorFactory),
+        ],
+    );
+    let zip = f.file("/ZIP/embedded/level3.zip");
+    assert_eq!(zip.mime.as_deref(), Some("application/zip"));
+    for p in [
+        "/ZIP/embedded/level3.zip/level2.zip/level1.zip/level1.txt",
+        "/ZIP/extension/zipFileWithTxtExtension.txt/file.txt",
+        "/ZIP/big/big.zip/big folder/file1000.txt",
+        "/ZIP/other/archive.tgz/archive.tar/t/in_tar.txt",
+        "/ZIP/other/solid.7z/in7z.txt",
+        "/ZIP/other/v5.rar/inrar.txt",
+    ] {
+        assert_eq!(md5_hex(&f.file(p)), TEST_MD5, "{p}");
+    }
 }

@@ -242,6 +242,25 @@ fn notable_tags_score_and_tag_sets_are_exclusive() {
     db.tag_file(b, cat4, "", "alice", 4).unwrap();
     db.update_tag_name(cat4, "", "NONE", true).unwrap();
     assert_eq!(db.file_score(b).unwrap(), Significance::Notable);
+
+    // A user tag definition updates the existing name in place.
+    let def = |notable| NewTagName {
+        name: "CAT-4: Other".into(),
+        description: "edited".into(),
+        color: "NONE".into(),
+        notable,
+    };
+    assert_eq!(db.add_or_update_tag_name(&def(false)).unwrap(), cat4);
+    assert_ne!(db.file_score(b).unwrap(), Significance::Notable);
+    let new = db
+        .add_or_update_tag_name(&NewTagName {
+            name: "Mine".into(),
+            ..def(true)
+        })
+        .unwrap();
+    let mine = db.tag_names().unwrap();
+    let mine = mine.iter().find(|t| t.id == new).unwrap();
+    assert!(mine.notable && mine.description == "edited");
 }
 
 #[test]

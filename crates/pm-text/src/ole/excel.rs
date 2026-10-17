@@ -50,15 +50,16 @@ pub(super) fn extract(cf: &mut Cfb<'_>, sink: &mut dyn TextSink) -> Result<(), T
     } else {
         read_stream(cf, "/Book")?
     };
-    let recs: Vec<Rec<'_>> = records(&stream).collect();
+    // Records are walked lazily: a stream of empty records would
+    // otherwise cost 32 bytes of memory per 4 bytes of input.
+    let mut recs = records(&stream).peekable();
     let mut sheet_names: HashMap<usize, String> = HashMap::new();
     let mut sst: Vec<String> = Vec::new();
     let mut biff8 = true;
     let mut out = Out::new(sink);
-    let mut i = 0usize;
     let mut in_sheet = false;
     let mut pending_string = false;
-    while let Some(r) = recs.get(i) {
+    while let Some(r) = recs.next() {
         match r.ty {
             BOF => {
                 let vers = le16(r.data, 0).unwrap_or(0);
@@ -91,9 +92,8 @@ pub(super) fn extract(cf: &mut Cfb<'_>, sink: &mut dyn TextSink) -> Result<(), T
             }
             SST => {
                 let mut segs = vec![r.data];
-                while let Some(c) = recs.get(i + 1).filter(|c| c.ty == CONTINUE) {
+                while let Some(c) = recs.next_if(|c| c.ty == CONTINUE) {
                     segs.push(c.data);
-                    i += 1;
                 }
                 sst = parse_sst(&segs);
             }
@@ -150,10 +150,9 @@ pub(super) fn extract(cf: &mut Cfb<'_>, sink: &mut dyn TextSink) -> Result<(), T
             STRING if in_sheet && pending_string => {
                 pending_string = false;
                 let mut data = r.data.to_vec();
-                while let Some(c) = recs.get(i + 1).filter(|c| c.ty == CONTINUE) {
+                while let Some(c) = recs.next_if(|c| c.ty == CONTINUE) {
                     // A continued string restarts with a flags byte.
                     data.extend(c.data.get(1..).unwrap_or_default());
-                    i += 1;
                 }
                 let text = unicode_string(&data);
                 let row = out.cur_row.unwrap_or(0);
@@ -169,7 +168,6 @@ pub(super) fn extract(cf: &mut Cfb<'_>, sink: &mut dyn TextSink) -> Result<(), T
             }
             _ => {}
         }
-        i += 1;
     }
     out.finish()?;
     Ok(())

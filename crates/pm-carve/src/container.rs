@@ -93,13 +93,14 @@ pub(crate) fn zip(w: &mut Window<'_>, src: &dyn ReadAt, start: u64) -> Verdict {
         if (cd_size == 0xFFFF_FFFF || cd_off == 0xFFFF_FFFF)
             && at >= 20
             && w.get(at - 20, 4) == Some(b"PK\x06\x07")
-            && let Some(rec64) = w.u64le(at - 20 + 8)
-            && w.get(start + rec64, 4) == Some(b"PK\x06\x06")
-            && let (Some(s), Some(o)) = (w.u64le(start + rec64 + 40), w.u64le(start + rec64 + 48))
+            && let Some(rec64) = w.u64le(at - 20 + 8).and_then(|r| start.checked_add(r))
+            && rec64 < at
+            && w.get(rec64, 4) == Some(b"PK\x06\x06")
+            && let (Some(s), Some(o)) = (w.u64le(rec64 + 40), w.u64le(rec64 + 48))
         {
             cd_size = s;
             cd_off = o;
-            record = start + rec64;
+            record = rec64;
         }
         if start
             .checked_add(cd_off)

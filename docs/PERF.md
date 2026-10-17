@@ -18,3 +18,25 @@ builds. Re-measure when touching the paths below. Each benchmark is an
 | gzip, 256 MiB decoded | — | 377 MiB/s (Linux) | same | 2026-10-17 |
 | File type detection (`FileTypeDetector::detect`, mixed synthetic corpus: text, HTML, XML, PDF, PNG, JPEG, EXE, noise, OOXML/ODF/JAR/DOC/XLS) | — | 25.2 k files/s/thread, 177 MB/s (Linux VM, 8 vCPU) | `cargo test -p pm-filetype --release --test detect -- --ignored bench --nocapture` | 2026-10-17 |
 | Byte entropy (Encryption Detection, 256 MiB in memory) | — | 3.6 GB/s (Linux VM) | `cargo test -p pm-encryption --release --test bench -- --ignored --nocapture` | 2026-10-17 |
+| Same corpus through Apache Tika 3.0.0 (`tika-app`, Autopsy's `FileTypeDetector` call pattern: detect, then detect again with the name; JIT warmed up) | — | 1 177 files/s/thread, 8.3 MB/s (stream, Autopsy's path); 1 292 files/s, 9.1 MB/s (byte[]). pm-filetype on the same run: 27.6 k files/s, 194 MB/s, about 23× faster | corpus via `PM_FILETYPE_CORPUS_DIR=… cargo test -p pm-filetype --release --test detect -- --ignored bench`; Java harness in the PERF notes below | 2026-10-17 |
+| File-name index build, 10 M synthetic names (name + path positional trigrams) | — | 195 k names/s (51 s), 1.59 GB index (Linux, 8 cores shared with 2 other agents' builds) | `cargo test -p pm-search --release --test bench -- --ignored name_index_scale --nocapture` | 2026-10-17 |
+| Name search over 10 M names, first page of 100 (rare substring / prefix / exact name / path substring / 2 chars) | < 1 s | 34 / 46 / 27 / 206 / 34 ms | same | 2026-10-17 |
+| Name search, 700 k-match substring `secret_`: first page / next page / count | < 1 s | 225 / 152 / 102 ms | same | 2026-10-17 |
+| Name search, extension + not deleted + size filter (651 k matches): first page / count | < 1 s | 102 / 66 ms | same | 2026-10-17 |
+| Content index add (31 KB chunks, words + trigrams + stored text), 256 MB | — | 14.9 MB/s, index 1.7× text | `cargo test -p pm-search --release --test bench -- --ignored content_index_throughput --nocapture` | 2026-10-17 |
+| Ad-hoc search, 8 456 chunks: exact common / rare word, substring, regex (first 100 objects, verified) | < 1 s | 426 / 39 / 4.5 / 5.4 ms | same | 2026-10-17 |
+| Inline matcher (5 built-in lists + 101 keywords), one thread | — | 38.9 MB/s | `cargo test -p pm-search --release --test bench -- --ignored matcher_throughput --nocapture` | 2026-10-17 |
+| Chunker (NFKC, lower-casing, Autopsy size rules), one thread | — | 132 MB/s (was 32.5 before the NFKC quick check and byte-buffer queue) | `cargo test -p pm-text --release --test bench -- --ignored --nocapture` | 2026-10-17 |
+| String extraction, 64 MiB binary: English-only / international (LATIN_2 + CYRILLIC) | — | 346 / 31 MB/s | same | 2026-10-17 |
+
+## Tika comparison harness
+
+`TikaBench.java` (run with `java -cp tika-app-3.0.0.jar TikaBench.java <corpus dir>`)
+loads the corpus into memory and, per file, calls `Tika.detect(TikaInputStream)` and,
+unless the result is `application/octet-stream`, `Tika.detect(stream, name)` again,
+exactly as Autopsy's `FileTypeDetector.getMIMEType` does. 300 warm-up rounds precede
+the 300 timed rounds. Autopsy's own signature table (checked before Tika, a cheap
+prefix match) is left out, so the harness times Tika alone. Both detectors gave all
+14 corpus files the same MIME type except `data.xml`. Tika says `application/xml`
+and pm-filetype says `text/xml`, which is what Autopsy reports because its own
+`text/xml` signature wins over Tika.

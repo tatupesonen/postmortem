@@ -76,9 +76,13 @@ Streaming container readers behind one `extract(format, src, opts, sink)`
 `DerivedTree::new(case_dir, module_folder, &source)`, `child`/`path`,
 `create` (XOR1 writer) / `write_file(node, local_name, reader, times)`,
 `set`, `commit(ctx, &Existing, on_id)`; `Existing::load`, `split_path`,
-`escape_file_name` (Autopsy `FileUtil.escapeFileName`). The e-mail track
-can turn attachments into derived files with `DerivedTree::write_file` +
-`commit` (see the module docs).
+`escape_file_name` (Autopsy `FileUtil.escapeFileName`).
+For the e-mail track: `add_children(ctx, &parent, "EmailParser",
+streams)` stores a flat list of `Stream { name, times, data: &mut dyn
+Read }` as derived children (duplicate names kept as separate files,
+local copies `ModuleOutput/<folder>/<parent id>/<n>`), schedules them,
+returns each stream's file id, and is a no-op on re-ingest. Tested in
+`pm-modules/tests/derive.rs`.
 
 ### `pm-carve` (new crate) and PhotoRec Carver (`pm-modules/src/photorec.rs`)
 * One pass over the source in 4 MiB aligned chunks; headers checked at
@@ -123,9 +127,19 @@ can turn attachments into derived files with `DerivedTree::write_file` +
   `$CarvedFiles`, layout, hashing and EFE of carved files, re-ingest;
   extension filter; start-up refusal), unit tests for texts/settings.
 * `pm-ingest/tests/derived.rs`: +1 (`insert_derived_files`).
-* Fuzz targets: `archive_extract`, `archive_detect`, `carve_scan`
-  (type-checked with `cargo +nightly check`; no `cargo-fuzz` binary on
-  this machine, so no smoke run yet).
+* Fuzz targets: `archive_extract`, `archive_detect`, `carve_scan`.
+  Smoke runs (`cargo +nightly fuzz run <t> -- -max_total_time=…`,
+  2026-10-17): `archive_extract` 8 min (≈1.5 M execs after the fix),
+  `carve_scan` 8 min (≈4.2 M execs after the fix), `archive_detect` 2 min
+  (2.9 M execs). Two crashes found and fixed, inputs kept under
+  `fuzz/regressions/{archive_extract,carve_scan}/` and replayed by
+  `cargo test` (`fuzz_regressions` in each crate's `never_panics.rs`):
+  a subtraction overflow in the zip local-header walk on a truncated
+  header, and an addition overflow on a hostile ZIP64 locator in the zip
+  length finder.
+* `pm-modules/tests/embedded.rs` also runs the real pipeline order (Hash
+  Lookup → File Type Identification → EFE) so dispatch on Tika MIME types
+  is covered.
 
 ### Benchmarks (`docs/PERF.md`)
 Carving 512 MiB: 4.8 GiB/s in memory, 3.3 GiB/s from a file in the page
@@ -152,6 +166,16 @@ cache (I/O bound in practice). Zip deflate 475 MiB/s, stored 11 GiB/s,
   opt-in ISO extraction.
 
 ## Notes for the coordinator
+* **Gate flake (pm-ui, not this track)**: after merging master d627a89
+  the gate failed 3 times in a row, each time with exactly one failure in
+  `pm-ui/tests/ui_flows.rs` and a different test each run
+  (`hosts_and_persons` assertion at line 945 twice — its context menu
+  closes between `settle` and the final query; `tagging_files_feeds_tags_and_score_nodes`
+  / `deleted_files_and_metadata_tab` "UI did not settle" under load).
+  Each passes in isolation and the whole binary passes with
+  `--test-threads=1` when the machine is idle; all other 654 tests pass.
+  The last commit of this track (fuzz fixes, helper API, pipeline-order
+  test) was made after these runs; please re-run the gate when merging.
 * `core_modules()` now includes the Embedded File Extractor (after Hash
   Lookup; File Type Identification belongs before it) and the PhotoRec
   Carver (enabled by default, as in Autopsy; it refuses to start when the

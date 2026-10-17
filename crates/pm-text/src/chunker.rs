@@ -13,10 +13,10 @@
 //!
 //! Every block is sanitised: NFKC, then each UTF-16 unit that Solr cannot
 //! store becomes `^`. Unlike Autopsy, the chunker is push-based (text
-//! arrives from a streaming extractor) and a block never ends inside a
-//! surrogate pair (Rust strings have none).
-
-use std::collections::VecDeque;
+//! arrives from a streaming extractor), a block never ends inside a
+//! surrogate pair (Rust strings have none), and the overlap window is
+//! re-read from the original text rather than its sanitised copy (the
+//! same text except where NFKC composes across a block boundary).
 
 use unicode_normalization::UnicodeNormalization;
 
@@ -28,10 +28,11 @@ const MAXIMUM_BASE_CHUNK_SIZE: usize = 31 * 1024;
 const WHITE_SPACE_BUFFER_SIZE: usize = 512;
 const READ_CHARS_BUFFER_SIZE: usize = 512;
 const MAX_CHAR_SIZE_INCREASE_IN_BYTES: usize = 10;
-/// Characters that must be queued before a chunk is cut while more text
-/// may follow: one chunk reads at most ≈ 32 760 characters plus one
-/// pushed-back block.
-const LOOKAHEAD: usize = 40_000;
+/// Bytes that must be buffered before a chunk is cut while more text may
+/// follow. One chunk reads at most about 32 760 sanitised bytes; NFKC can
+/// shrink text about threefold (Hangul jamo), so this leaves a wide
+/// margin.
+const LOOKAHEAD: usize = 1024 * 1024;
 
 /// One chunk of text.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -57,9 +58,16 @@ struct Sizes {
 }
 
 /// Push-based chunker; see the module documentation.
+///
+/// Unread text sits in `buf` from `pos` on. Reads look ahead and only
+/// advance `pos` when the text is taken, so Autopsy's push-backs are
+/// position resets; the overlap window is re-read from the raw text.
 #[derive(Debug, Default)]
 pub struct Chunker {
-    queue: VecDeque<char>,
+    buf: String,
+    pos: usize,
+    /// No more input will come.
+    finished: bool,
     eof: bool,
     chunks: usize,
 }
@@ -75,15 +83,19 @@ impl Chunker {
     }
 
     /// Adds text; emits every chunk that can be cut without seeing more.
-    /// The queue never runs dry here ([`LOOKAHEAD`] exceeds the characters
-    /// one chunk consumes), so only [`Chunker::finish`] sees the end.
+    /// At least [`LOOKAHEAD`] bytes stay buffered, more than one chunk
+    /// can consume, so only [`Chunker::finish`] sees the end.
     pub fn push(
         &mut self,
         text: &str,
         emit: &mut dyn FnMut(Chunk) -> Result<(), Stop>,
     ) -> Result<(), Stop> {
-        self.queue.extend(text.chars());
-        while !self.eof && self.queue.len() >= LOOKAHEAD {
+        if self.pos > 0 && self.pos >= self.buf.len() / 2 {
+            self.buf.drain(..self.pos);
+            self.pos = 0;
+        }
+        self.buf.push_str(text);
+        while !self.eof && self.buf.len() - self.pos >= LOOKAHEAD {
             let c = self.next_chunk();
             self.chunks += 1;
             emit(c)?;
@@ -94,6 +106,7 @@ impl Chunker {
     /// Ends the input and emits the remaining chunks. Like Autopsy, empty
     /// input still yields one (empty) chunk.
     pub fn finish(&mut self, emit: &mut dyn FnMut(Chunk) -> Result<(), Stop>) -> Result<(), Stop> {
+        self.finished = true;
         while !self.eof {
             let c = self.next_chunk();
             self.chunks += 1;
@@ -115,6 +128,22 @@ impl Chunker {
         out
     }
 
+    fn rest(&self) -> &str {
+        self.buf.get(self.pos..).unwrap_or_default()
+    }
+
+    /// Nothing left to read (sets `eof` only once the input is finished;
+    /// while pushing, [`LOOKAHEAD`] keeps the buffer from running dry).
+    fn at_end(&mut self) -> bool {
+        if self.pos < self.buf.len() {
+            return false;
+        }
+        if self.finished {
+            self.eof = true;
+        }
+        true
+    }
+
     fn next_chunk(&mut self) -> Chunk {
         let mut sizes = Sizes::default();
         let mut text = String::new();
@@ -124,23 +153,21 @@ impl Chunker {
         let mut base_units = utf16_len(&text);
         let mut base_bytes = text.len();
         let mut base_lower_bytes = lower.len();
-        let mut window = String::new();
+        let window_start = self.pos;
         self.read_helper(
             MAX_TOTAL_CHUNK_SIZE - WHITE_SPACE_BUFFER_SIZE,
-            &mut window,
+            &mut text,
             &mut lower,
             &mut sizes,
         );
-        self.read_to_white_space(MAX_TOTAL_CHUNK_SIZE, &mut window, &mut lower, &mut sizes);
-        text.push_str(&window);
+        self.read_to_white_space(MAX_TOTAL_CHUNK_SIZE, &mut text, &mut lower, &mut sizes);
         if self.eof {
             base_units = utf16_len(&text);
             base_bytes = text.len();
             base_lower_bytes = lower.len();
         } else {
-            for c in window.chars().rev() {
-                self.queue.push_front(c);
-            }
+            // The window starts the next chunk.
+            self.pos = window_start;
         }
         Chunk {
             text,
@@ -151,47 +178,35 @@ impl Chunker {
         }
     }
 
-    /// Up to 512 UTF-16 units; `None` at the end of the text.
-    fn read_block(&mut self) -> Option<Vec<char>> {
-        if self.queue.is_empty() {
-            return None;
-        }
+    /// The end (in `buf`) of the next block of up to 512 UTF-16 units.
+    fn block_end(&self) -> usize {
+        let rest = self.rest();
         let mut units = 0;
-        let mut out = Vec::with_capacity(READ_CHARS_BUFFER_SIZE);
-        while let Some(&c) = self.queue.front() {
-            let u = c.len_utf16();
-            if units + u > READ_CHARS_BUFFER_SIZE {
-                break;
+        for (i, c) in rest.char_indices() {
+            units += c.len_utf16();
+            if units > READ_CHARS_BUFFER_SIZE {
+                return self.pos + i;
             }
-            units += u;
-            out.push(c);
-            self.queue.pop_front();
         }
-        Some(out)
-    }
-
-    fn unread(&mut self, chars: &[char]) {
-        for &c in chars.iter().rev() {
-            self.queue.push_front(c);
-        }
+        self.buf.len()
     }
 
     fn read_helper(&mut self, max: usize, seg: &mut String, lower: &mut String, s: &mut Sizes) {
         while s.bytes < max && s.lower < max && !self.eof {
-            let Some(block) = self.read_block() else {
-                self.eof = true;
+            if self.at_end() {
                 return;
-            };
-            let raw: String = block.iter().collect();
-            let clean = sanitize(&raw);
+            }
+            let end = self.block_end();
+            let raw = self.buf.get(self.pos..end).unwrap_or_default();
+            let clean = sanitize(raw);
             let low = clean.to_lowercase();
             if s.bytes + clean.len() < max && s.lower + low.len() < max {
                 seg.push_str(&clean);
                 lower.push_str(&low);
                 s.bytes += clean.len();
                 s.lower += low.len();
+                self.pos = end;
             } else {
-                self.unread(&block);
                 return;
             }
         }
@@ -207,15 +222,17 @@ impl Chunker {
         let limit = max - MAX_CHAR_SIZE_INCREASE_IN_BYTES;
         let mut white = false;
         while s.bytes < limit && s.lower < limit && !white && !self.eof {
-            let Some(c) = self.queue.pop_front() else {
-                self.eof = true;
+            if self.at_end() {
+                return;
+            }
+            let Some(c) = self.rest().chars().next() else {
                 return;
             };
             // Autopsy counts the raw character's size here, not the
             // sanitised one.
             let raw_size = c.len_utf8();
-            let mut buf = [0u8; 4];
-            let clean = sanitize(c.encode_utf8(&mut buf));
+            let mut b = [0u8; 4];
+            let clean = sanitize(c.encode_utf8(&mut b));
             let low = clean.to_lowercase();
             if s.bytes + raw_size < limit && s.lower + low.len() < limit {
                 seg.push_str(&clean);
@@ -223,8 +240,8 @@ impl Chunker {
                 s.bytes += raw_size;
                 s.lower += low.len();
                 white = clean.chars().next().is_some_and(java_is_whitespace);
+                self.pos += raw_size;
             } else {
-                self.queue.push_front(c);
                 return;
             }
         }
@@ -240,6 +257,13 @@ fn utf16_len(s: &str) -> usize {
 pub fn sanitize(s: &str) -> String {
     if s.is_ascii() {
         // NFKC is the identity on ASCII.
+        return s
+            .chars()
+            .map(|c| if is_valid_solr_char(c) { c } else { '^' })
+            .collect();
+    }
+    if unicode_normalization::is_nfkc_quick(s.chars()) == unicode_normalization::IsNormalized::Yes {
+        // Already normalised (most text): skip the decomposition.
         return s
             .chars()
             .map(|c| if is_valid_solr_char(c) { c } else { '^' })
@@ -408,6 +432,36 @@ mod tests {
             sink.push(std::str::from_utf8(piece).unwrap()).unwrap();
         }
         assert_eq!(sink.finish().unwrap(), whole.len());
+        assert_eq!(got, whole);
+    }
+
+    #[test]
+    fn streaming_large_input_equals_whole() {
+        // Several lookahead buffers' worth, pushed in uneven pieces.
+        let text: String = (0..3_200_000u32)
+            .map(|i| match i % 11 {
+                0 => ' ',
+                5 => 'ä',
+                _ => 'x',
+            })
+            .collect();
+        let whole = Chunker::split(&text);
+        let mut got = Vec::new();
+        let mut sink = ChunkingSink::new(|c| {
+            got.push(c);
+            Ok(())
+        });
+        let mut i = 0;
+        while i < text.len() {
+            let mut j = (i + 40_009).min(text.len());
+            while !text.is_char_boundary(j) {
+                j -= 1;
+            }
+            sink.push(&text[i..j]).unwrap();
+            i = j;
+        }
+        assert_eq!(sink.finish().unwrap(), whole.len());
+        assert!(whole.len() > 100);
         assert_eq!(got, whole);
     }
 

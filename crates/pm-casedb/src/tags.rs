@@ -72,6 +72,25 @@ fn tag_name_info(c: &Connection, tag_name_id: i64) -> Result<(bool, Option<i64>)
     )
 }
 
+/// Recomputes the scores of everything tagged with a tag name.
+fn rescore_tagged(tx: &Connection, tag_name_id: i64) -> Result<()> {
+    let files: Vec<i64> = tx
+        .prepare("SELECT DISTINCT file_id FROM file_tags WHERE tag_name_id = ?1")?
+        .query_map([tag_name_id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    for f in files {
+        rescore(tx, ObjKind::File, f)?;
+    }
+    let arts: Vec<i64> = tx
+        .prepare("SELECT DISTINCT artifact_id FROM artifact_tags WHERE tag_name_id = ?1")?
+        .query_map([tag_name_id], |r| r.get(0))?
+        .collect::<rusqlite::Result<_>>()?;
+    for a in arts {
+        rescore(tx, ObjKind::Artifact, a)?;
+    }
+    Ok(())
+}
+
 impl CaseDb {
     pub fn tag_names(&self) -> Result<Vec<TagName>> {
         self.read(|c| {
@@ -109,21 +128,37 @@ impl CaseDb {
                 "UPDATE tag_names SET description = ?2, color = ?3, notable = ?4 WHERE id = ?1",
                 params![id, description, color, notable],
             )?;
-            let files: Vec<i64> = tx
-                .prepare("SELECT DISTINCT file_id FROM file_tags WHERE tag_name_id = ?1")?
-                .query_map([id], |r| r.get(0))?
-                .collect::<rusqlite::Result<_>>()?;
-            for f in files {
-                rescore(tx, ObjKind::File, f)?;
+            rescore_tagged(tx, id)
+        })
+    }
+
+    /// Adds a tag name, or updates the description, colour and notable
+    /// flag of the one with that name (TSK `addOrUpdateTagName`, used for
+    /// the user's tag definitions); scores follow a notable change.
+    pub fn add_or_update_tag_name(&self, t: &NewTagName) -> Result<i64> {
+        self.write(|tx| {
+            let old: Option<(i64, bool)> = tx
+                .query_row(
+                    "SELECT id, notable FROM tag_names WHERE name = ?1",
+                    [&t.name],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()?;
+            let Some((id, was_notable)) = old else {
+                tx.execute(
+                    "INSERT INTO tag_names (name, description, color, notable) VALUES (?1, ?2, ?3, ?4)",
+                    params![t.name, t.description, t.color, t.notable],
+                )?;
+                return Ok(tx.last_insert_rowid());
+            };
+            tx.execute(
+                "UPDATE tag_names SET description = ?2, color = ?3, notable = ?4 WHERE id = ?1",
+                params![id, t.description, t.color, t.notable],
+            )?;
+            if was_notable != t.notable {
+                rescore_tagged(tx, id)?;
             }
-            let arts: Vec<i64> = tx
-                .prepare("SELECT DISTINCT artifact_id FROM artifact_tags WHERE tag_name_id = ?1")?
-                .query_map([id], |r| r.get(0))?
-                .collect::<rusqlite::Result<_>>()?;
-            for a in arts {
-                rescore(tx, ObjKind::Artifact, a)?;
-            }
-            Ok(())
+            Ok(id)
         })
     }
 

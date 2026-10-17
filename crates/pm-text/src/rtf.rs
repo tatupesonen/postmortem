@@ -202,7 +202,9 @@ impl<'a, 'm> Parser<'a, 'm> {
     fn run<R: BufRead>(&mut self, r: &mut R) -> Result<(), Stop> {
         let mut word = String::new();
         loop {
-            if self.out.len() >= FLUSH {
+            // Code-page bytes waiting for decoding are bounded too (a
+            // double-byte character split at this point is the price).
+            if self.out.len() >= FLUSH || self.pending.len() >= FLUSH {
                 self.flush()?;
             }
             let Some(b) = next_byte(r) else {
