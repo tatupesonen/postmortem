@@ -1031,3 +1031,79 @@ fn user_tags_are_added_to_new_cases() {
         case_tag_names(h).contains(&("Reviewed".to_owned(), false))
     });
 }
+
+/// Toolbar Keyword Search: an exact term lists the file with its
+/// preview; "Save search results" adds keyword hits to the tree.
+#[test]
+fn keyword_search_from_the_toolbar() {
+    let mut h = harness_full(
+        vec![DEMO.1.clone()],
+        true,
+        pm_ui::IngestPrefs {
+            enabled: vec!["keyword_search".into()],
+            ..Default::default()
+        },
+    );
+    wait_analysed(&mut h);
+    click(&mut h, "🔍 Keyword Search");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Files Indexed: ").is_some()
+    });
+    let field = h
+        .query_all(egui_kittest::kittest::by().role(egui::accesskit::Role::TextInput))
+        .next()
+        .expect("term field");
+    field.focus();
+    field.type_text("migration");
+    h.run_steps(2);
+    click_exact(&mut h, "Search");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Keyword search 1 - migration")
+            .is_some()
+    });
+    // The note itself, and $MFT, which holds its resident data.
+    settle(&mut h, |h| h.query_by_label_contains("2 files").is_some());
+    h.get_by_label_contains("meeting notes.txt");
+    assert!(
+        h.query_all_by_label_contains("«migration«")
+            .next()
+            .is_some()
+    );
+    shot(&mut h, "keyword_search");
+
+    // A saved substring search feeds Analysis Results › Keyword Hits.
+    click(&mut h, "🔍 Keyword Search");
+    let field = h
+        .query_all(egui_kittest::kittest::by().role(egui::accesskit::Role::TextInput))
+        .next()
+        .expect("term field");
+    field.focus();
+    h.run_steps(1);
+    h.event(egui::Event::Key {
+        key: egui::Key::A,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::COMMAND,
+    });
+    h.run_steps(1);
+    h.query_all(egui_kittest::kittest::by().role(egui::accesskit::Role::TextInput))
+        .next()
+        .unwrap()
+        .type_text("hunter");
+    h.run_steps(2);
+    click_exact(&mut h, "Substring Match");
+    click_exact(&mut h, "Save search results");
+    click_exact(&mut h, "Search");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Keyword search 2 - hunter")
+            .is_some()
+            && h.query_by_label_contains("keyword hits saved").is_some()
+    });
+    // The default Email Addresses list found 2 hits during ingest.
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Keyword Hits (")
+            .is_some_and(|n| !format!("{:?}", n.accesskit_node().label()).contains("(2)"))
+    });
+    shot(&mut h, "keyword_search_saved");
+}

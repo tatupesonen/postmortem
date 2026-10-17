@@ -7,6 +7,7 @@ rust-version.workspace = true
 license.workspace = true
 
 [dependencies]
+pm-search.workspace = true
 pm-core.workspace = true
 pm-fs.workspace = true
 pm-image.workspace = true

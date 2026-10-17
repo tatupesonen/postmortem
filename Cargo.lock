@@ -4480,6 +4480,7 @@ dependencies = [
  "pm-index",
  "pm-ingest",
  "pm-modules",
+ "pm-search",
  "pm-testkit",
  "pm-timeline",
  "pm-volume",

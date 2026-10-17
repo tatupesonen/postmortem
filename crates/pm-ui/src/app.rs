@@ -1,6 +1,7 @@
 //! The postmortem main window.
 
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -126,6 +127,11 @@ pub struct PostmortemApp {
     /// Details of the selected OS account.
     account_details: Option<(i64, crate::task::Cached<crate::case_nodes::Details>)>,
     file_search: Option<crate::file_search_ui::FileSearchWindow>,
+    /// The toolbar's Keyword Search panel, when open.
+    keyword_panel: Option<crate::keyword_search_ui::KeywordSearchPanel>,
+    /// "Files Indexed" for the panel.
+    keyword_indexed: crate::task::Cached<u64>,
+    keyword_searches: Vec<crate::keyword_search_ui::KeywordResults>,
     run_ingest: Option<crate::add_source::RunIngestDialog>,
     hosts_ui: crate::hosts_ui::HostsUi,
     options: Option<crate::options_ui::OptionsWindow>,
@@ -194,6 +200,9 @@ impl PostmortemApp {
             node_grid: crate::grid::Grid::default(),
             account_details: None,
             file_search: None,
+            keyword_panel: None,
+            keyword_indexed: crate::task::Cached::default(),
+            keyword_searches: Vec::new(),
             run_ingest: None,
             hosts_ui: crate::hosts_ui::HostsUi::default(),
             options: None,
@@ -396,6 +405,9 @@ impl PostmortemApp {
         self.file_search = None;
         self.mime_types.clear();
         self.searches.clear();
+        self.keyword_panel = None;
+        self.keyword_indexed.clear();
+        self.keyword_searches.clear();
         ctx.send_viewport_cmd(egui::ViewportCommand::Title("postmortem".into()));
     }
 
@@ -999,6 +1011,24 @@ impl PostmortemApp {
             {
                 self.open_popout(c);
             }
+            ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                let open = self.keyword_panel.is_some();
+                if ui
+                    .add_enabled(
+                        self.has_case(),
+                        egui::Button::selectable(open, "🔍 Keyword Search"),
+                    )
+                    .on_hover_text("Search the text of indexed files for a word, substring or regular expression")
+                    .clicked()
+                {
+                    if open {
+                        self.keyword_panel = None;
+                    } else {
+                        self.keyword_panel = Some(crate::keyword_search_ui::KeywordSearchPanel::default());
+                        self.keyword_indexed.refresh();
+                    }
+                }
+            });
         });
     }
 
@@ -1895,6 +1925,7 @@ impl PostmortemApp {
             | NodeId::Score { .. }
             | NodeId::OsAccounts => self.node_view(ui, &node),
             NodeId::FileSearch(n) => self.search_view(ui, *n),
+            NodeId::KeywordSearch(n) => self.keyword_view(ui, *n),
             NodeId::View(v) => self.view_table(ui, v),
         }
     }
@@ -2299,6 +2330,134 @@ impl PostmortemApp {
         }
     }
 
+    /// The toolbar's Keyword Search panel.
+    fn keyword_panel(&mut self, ctx: &egui::Context) {
+        use crate::keyword_search_ui::PanelAction;
+        if self.keyword_panel.is_none() {
+            return;
+        }
+        let (case, ingesting) = {
+            let a = self.analysis.lock();
+            (a.case().cloned(), a.any_active())
+        };
+        let Some(case) = case else {
+            self.keyword_panel = None;
+            return;
+        };
+        let tree = self.case_sources.get(ctx, Some(&case), false);
+        let sources: Vec<(i64, String)> =
+            tree.iter().map(|t| (t.ds.id, t.ds.name.clone())).collect();
+        let loader = Arc::clone(&case);
+        let indexed = self
+            .keyword_indexed
+            .get(ctx, move || {
+                crate::keyword_search_ui::indexed_count(&loader)
+            })
+            .map(|n| *n);
+        let Some(panel) = self.keyword_panel.as_mut() else {
+            return;
+        };
+        match panel.ui(ctx, &sources, indexed, ingesting) {
+            PanelAction::None => {}
+            PanelAction::Close => self.keyword_panel = None,
+            PanelAction::Search(req) => {
+                // Autopsy's dropdown closes once the search starts.
+                self.keyword_panel = None;
+                let number = self.keyword_searches.len() + 1;
+                self.keyword_searches
+                    .push(crate::keyword_search_ui::KeywordResults {
+                        number,
+                        request: Arc::new(req),
+                        rows: crate::task::Cached::default(),
+                        reported: false,
+                    });
+                self.navigate(NodeId::KeywordSearch(number));
+            }
+        }
+    }
+
+    /// "Keyword search {n} - {term}".
+    fn keyword_view(&mut self, ui: &mut egui::Ui, number: usize) {
+        let ctx = ui.ctx().clone();
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        let Some(s) = self
+            .keyword_searches
+            .iter_mut()
+            .find(|s| s.number == number)
+        else {
+            return;
+        };
+        ui.heading(s.title());
+        let (loader, req) = (Arc::clone(&case), Arc::clone(&s.request));
+        let Some(data) = s.rows.get(&ctx, move || {
+            crate::keyword_search_ui::run(&loader, &req, &|| false)
+        }) else {
+            if let Some(e) = s.rows.error() {
+                ui.colored_label(ui.visuals().error_fg_color, e.to_owned());
+            } else {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Searching…");
+                });
+            }
+            return;
+        };
+        if !s.reported && data.saved > 0 {
+            // Saved hits appear under Analysis Results › Keyword Hits.
+            s.reported = true;
+            self.result_counts.invalidate();
+            self.result_rows.clear();
+            self.case_summary.refresh();
+        }
+        if data.rows.is_empty() {
+            ui.weak("No results found.");
+            return;
+        }
+        let mut summary = if data.more {
+            format!(
+                "{} files shown; there are more. Narrow the search.",
+                crate::format::grouped(data.rows.len() as u64)
+            )
+        } else {
+            format!("{} files", crate::format::grouped(data.rows.len() as u64))
+        };
+        if data.saved > 0 {
+            let _ = write!(
+                summary,
+                " · {} keyword hits saved",
+                crate::format::grouped(data.saved as u64)
+            );
+        }
+        ui.weak(summary);
+        let rows = &data.rows;
+        let tags = self.tagging.catalog.get(&ctx, Some(&case));
+        let ev = self.table.ui_with(
+            ui,
+            rows,
+            &self.prefs,
+            Some(&tags),
+            Some(("Keyword Preview", &data.previews)),
+        );
+        if let Some((i, req)) = ev.tag
+            && let Some(id) = rows.get(i).and_then(FileRow::file_id)
+        {
+            self.tagging
+                .request(&ctx, &case, crate::tags_ui::TagTarget::Files(vec![id]), req);
+        }
+        let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
+        if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {
+            self.viewer.set_content(Some(content(r)));
+        }
+        if let Some(r) = ev.activated.or(ev.popout).and_then(|i| rows.get(i)) {
+            self.open_popout(content(r));
+        }
+        if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
+            self.export(&ctx, content(r));
+        }
+    }
+
     /// "File Search Results {n}".
     fn search_view(&mut self, ui: &mut egui::Ui, number: usize) {
         let ctx = ui.ctx().clone();
@@ -2359,6 +2518,7 @@ impl PostmortemApp {
 
     fn dialogs(&mut self, ctx: &egui::Context) {
         self.file_search_window(ctx);
+        self.keyword_panel(ctx);
         let case = self.analysis.lock().case().cloned();
         let tree = self.case_sources.get(ctx, case.as_ref(), false);
         let errors = self.hosts_ui.ui(ctx, case.as_ref(), &tree);
@@ -2593,6 +2753,9 @@ impl PostmortemApp {
             self.case_summary.refresh();
             self.node_views.clear();
             for s in &mut self.searches {
+                s.rows.refresh();
+            }
+            for s in &mut self.keyword_searches {
                 s.rows.refresh();
             }
         }

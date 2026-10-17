@@ -183,6 +183,19 @@ impl TableState {
         prefs: &DisplayPrefs,
         tags: Option<&TagCatalog>,
     ) -> TableEvents {
+        self.ui_with(ui, rows, prefs, tags, None)
+    }
+
+    /// [`Self::ui`] with an extra text column after Name (e.g. Autopsy's
+    /// "Keyword Preview"); `extra.1[i]` belongs to `rows[i]`.
+    pub(crate) fn ui_with(
+        &mut self,
+        ui: &mut egui::Ui,
+        rows: &[FileRow],
+        prefs: &DisplayPrefs,
+        tags: Option<&TagCatalog>,
+        extra: Option<(&str, &[String])>,
+    ) -> TableEvents {
         let mut ev = TableEvents::default();
         let key = rows.as_ptr() as usize;
         let stale = !matches!(&self.order, Some((k, c, a, _)) if *k == key && *c == self.sort && *a == self.ascending);
@@ -238,7 +251,11 @@ impl TableState {
                 .resizable(true)
                 .sense(egui::Sense::click())
                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
-                .column(Column::initial(250.0).at_least(80.0).clip(true))
+                .column(Column::initial(250.0).at_least(80.0).clip(true));
+            if extra.is_some() {
+                table = table.column(Column::initial(300.0).at_least(80.0).clip(true));
+            }
+            table = table
                 .columns(Column::initial(26.0).at_least(22.0), 2)
                 .columns(Column::initial(150.0).clip(true), 4)
                 .column(Column::initial(100.0))
@@ -250,14 +267,25 @@ impl TableState {
             }
             table
                 .header(text_h + 2.0, |mut header| {
+                    // Header index of `Col::ALL[i]` (the extra column is
+                    // second and not sortable).
+                    let at = |i: usize| if extra.is_some() && i > 0 { i + 1 } else { i };
                     let sort = Col::ALL
                         .iter()
                         .position(|c| *c == self.sort)
                         .map(|col| Sort {
-                            col,
+                            col: at(col),
                             ascending: self.ascending,
                         });
                     for (i, col) in Col::ALL.into_iter().enumerate() {
+                        if i == 1
+                            && let Some((title, _)) = extra
+                        {
+                            header.col(|ui| {
+                                ui.strong(title);
+                            });
+                        }
+                        let i = at(i);
                         header.col(|ui| {
                             if crate::sortable::header(ui, col.title(), sort, i) {
                                 if self.sort == col {
@@ -304,6 +332,11 @@ impl TableState {
                                     .color(color(ui)),
                             );
                         });
+                        if let Some((_, cells)) = extra {
+                            row.col(|ui| {
+                                ui.label(cells.get(i).map_or("", String::as_str));
+                            });
+                        }
                         row.col(|ui| score_cell(ui, r));
                         row.col(|ui| comment_cell(ui, r));
                         let times = r.meta.as_ref().map(|m| m.times).unwrap_or_default();

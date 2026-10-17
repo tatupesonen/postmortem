@@ -18,6 +18,7 @@ mod grid;
 mod hosts_ui;
 mod icons;
 mod index;
+mod keyword_search_ui;
 mod model;
 mod options_ui;
 mod results;

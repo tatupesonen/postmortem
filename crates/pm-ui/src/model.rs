@@ -65,6 +65,8 @@ pub enum NodeId {
     OsAccounts,
     /// The results of file search number `n` (File Search by Attributes).
     FileSearch(usize),
+    /// The results of ad-hoc keyword search number `n`.
+    KeywordSearch(usize),
 }
 
 impl NodeId {
@@ -79,7 +81,8 @@ impl NodeId {
             | Self::TagResults(_)
             | Self::Score { .. }
             | Self::OsAccounts
-            | Self::FileSearch(_) => None,
+            | Self::FileSearch(_)
+            | Self::KeywordSearch(_) => None,
         }
     }
 }
