@@ -226,6 +226,35 @@ Gaps open:
   the system's (Pacific); warn after Recent Activity reads the registry.
 - Peak memory 3 GB during the file phase; find out how much is heap.
 
+## 8b. Gaps against Magnet AXIOM (2026-10-18)
+
+Beyond Autopsy parity, what a commercial suite like AXIOM offers that we
+lack, most important first. Suggested order after the architecture
+cleanup and §8: chat apps + Dynamic App Finder, then the mobile
+foundation.
+
+1. **Mobile**: iOS/Android extractions (Cellebrite UFDR, iTunes and
+   encrypted backups, full-file-system zips/tars), APFS/HFS+, app parsers
+   (native LEAPP-equivalents).
+2. **Chat and social apps** on desktop and mobile: WhatsApp, Signal,
+   Telegram, Discord, Teams, Slack, Skype, browser messengers.
+3. **Artifact-first review**: categories (Chat, Email, Web, Media,
+   Documents, Cloud, OS) with unified columns and filters.
+4. **Connections**: graph of files, users, devices, URLs and messages
+   linked by shared attributes (extends the §8 pivot page).
+5. **Media intelligence**: image/video categorisation, Project VIC/CAID
+   import/export, Griffeye export, OCR, video frame extraction.
+6. **Dynamic App Finder**: scan every SQLite database for chat-, geo- and
+   URL-like tables of unknown apps.
+7. **Decryption**: BitLocker, FileVault, APFS, keychains.
+8. **Cloud and warrant returns**: Google Takeout, Meta, iCloud exports.
+9. **Reviewer handoff**: portable case / review package.
+10. Memory forensics (out of scope, DIRECTION.md) and remote endpoint
+    collection (a new product area).
+
+Ahead of AXIOM: ingest speed, no Java, open source, MCP with cited
+answers, sandboxed plugins, database-first scale.
+
 ## 9. MCP server for AI assistants — **[done]**
 
 Autopsy 4.23 has an MCP server: 17 read-only query tools served over HTTP
