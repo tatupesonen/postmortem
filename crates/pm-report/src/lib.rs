@@ -110,15 +110,17 @@ pub enum ReportKind {
     FilesText,
     BodyFile,
     TaggedHashes,
+    Kml,
 }
 
 impl ReportKind {
-    pub const ALL: [Self; 5] = [
+    pub const ALL: [Self; 6] = [
         Self::Html,
         Self::Excel,
         Self::FilesText,
         Self::BodyFile,
         Self::TaggedHashes,
+        Self::Kml,
     ];
 
     /// Autopsy's module name (shown in the wizard and the Reports node).
@@ -129,6 +131,7 @@ impl ReportKind {
             Self::FilesText => "Files - Text",
             Self::BodyFile => "TSK Body File",
             Self::TaggedHashes => "Save Tagged Hashes",
+            Self::Kml => "Google Earth KML",
         }
     }
 
@@ -143,6 +146,9 @@ impl ReportKind {
                 "Body file format report with MAC times for every file. This format can be used for a timeline view."
             }
             Self::TaggedHashes => "Adds hashes of tagged files to a hash set.",
+            Self::Kml => {
+                "KML format report with coordinates for relevant files. This format can be used for google earth views."
+            }
         }
     }
 
@@ -209,6 +215,27 @@ pub fn generate(
             path: bodyfile::write(case, &dir, settings, progress)?,
             summary: TableSummary::default(),
         },
+        ReportKind::Kml => {
+            let geo = pm_geo::load(
+                db,
+                &pm_geo::GeoFilter {
+                    data_sources: settings.data_sources.clone(),
+                    ..pm_geo::GeoFilter::default()
+                },
+            )?;
+            let path = dir.join("ReportKML.kml");
+            let kml = pm_geo::kml::write(&geo, &format!("{} KML Report", case.details().name));
+            std::fs::write(&path, kml).map_err(io_err(&path))?;
+            let style = dir.join("style.kml");
+            std::fs::write(&style, pm_geo::kml::STYLE_KML).map_err(io_err(&style))?;
+            Generated {
+                path,
+                summary: TableSummary {
+                    rows: geo.all_points().count(),
+                    ..TableSummary::default()
+                },
+            }
+        }
         ReportKind::TaggedHashes => {
             let (path, added) =
                 tagged_hashes::write(case, settings, &other.tagged_hashes, progress)?;

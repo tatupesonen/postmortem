@@ -63,7 +63,7 @@
         "deleted": false,
         "mimeType": "application/octet-stream",
         "modifiedTime": "2021-03-04T10:20:30Z",
-        "md5Hash": "d096d0267307b7d453c1d832de6f5263",
+        "md5Hash": "34b69583d5086bad053e33187ffc6524",
         "evidence": {
           "name": "$MFT",
           "path": "/$MFT"
@@ -174,11 +174,11 @@
       "tags": []
     },
     {
-      "ref": "file:94",
+      "ref": "file:95",
       "significance": "Likely Notable",
       "object": {
-        "ref": "file:94",
-        "objectId": 94,
+        "ref": "file:95",
+        "objectId": 95,
         "dataSourceId": 2,
         "size": 81920,
         "isDirectory": false,
@@ -195,8 +195,8 @@
         {
           "ref": "result:4",
           "objectId": 4,
-          "sourceFileId": 94,
-          "sourceRef": "file:94",
+          "sourceFileId": 95,
+          "sourceRef": "file:95",
           "artifactType": "TSK_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
@@ -235,11 +235,11 @@
       "tags": []
     },
     {
-      "ref": "file:103",
+      "ref": "file:104",
       "significance": "Likely Notable",
       "object": {
-        "ref": "file:103",
-        "objectId": 103,
+        "ref": "file:104",
+        "objectId": 104,
         "dataSourceId": 2,
         "size": 195,
         "isDirectory": false,
@@ -256,8 +256,8 @@
         {
           "ref": "result:3",
           "objectId": 3,
-          "sourceFileId": 103,
-          "sourceRef": "file:103",
+          "sourceFileId": 104,
+          "sourceRef": "file:104",
           "artifactType": "TSK_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,

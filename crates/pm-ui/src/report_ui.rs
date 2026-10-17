@@ -231,7 +231,7 @@ impl ReportWizard {
                                 !self.tagged_only || !self.tags.is_empty()
                             }
                             ReportKind::FilesText => !self.columns.is_empty(),
-                            ReportKind::BodyFile => true,
+                            ReportKind::BodyFile | ReportKind::Kml => true,
                             ReportKind::TaggedHashes => {
                                 !self.tags.is_empty() && !self.hash_set.trim().is_empty()
                             }
@@ -302,6 +302,10 @@ impl ReportWizard {
     fn contents_page(&mut self, ui: &mut egui::Ui) {
         if self.kind == ReportKind::BodyFile {
             ui.label("Every file system file is listed with its MAC times; no options.");
+            return;
+        }
+        if self.kind == ReportKind::Kml {
+            ui.label("Every located result (GPS, EXIF) of the chosen data sources; no options.");
             return;
         }
         if self.kind == ReportKind::TaggedHashes {

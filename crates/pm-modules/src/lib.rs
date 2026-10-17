@@ -10,6 +10,7 @@ pub mod event_logs;
 mod exif;
 pub mod ext_mismatch;
 pub mod file_type;
+pub mod gpx_parser;
 pub mod hash_lookup;
 pub mod interesting_files;
 pub mod keyword_search;
@@ -45,5 +46,9 @@ pub fn core_modules() -> Vec<Arc<dyn ModuleFactory>> {
         Arc::new(photorec::PhotoRecCarverFactory),
         Arc::new(encryption::EncryptionFactory),
         Arc::new(data_source_integrity::IntegrityFactory),
+        // Autopsy's internal Python modules run after the Java ones.
+        Arc::new(plugin_host::PluginModule::new(Arc::new(
+            gpx_parser::GpxParser,
+        ))),
     ]
 }

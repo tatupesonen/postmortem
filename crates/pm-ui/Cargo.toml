@@ -9,6 +9,8 @@ license.workspace = true
 [dependencies]
 pm-search.workspace = true
 pm-report.workspace = true
+pm-geo.workspace = true
+walkers = "=0.60.0"
 pm-text.workspace = true
 pm-core.workspace = true
 pm-fs.workspace = true

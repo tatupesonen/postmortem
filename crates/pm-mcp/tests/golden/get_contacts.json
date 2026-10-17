@@ -4,8 +4,8 @@
     {
       "ref": "artifact:8",
       "objectId": 8,
-      "sourceFileId": 103,
-      "sourceRef": "file:103",
+      "sourceFileId": 104,
+      "sourceRef": "file:104",
       "artifactType": "TSK_CONTACT",
       "artifactTypeDisplayName": "Contacts",
       "analysisResult": false,

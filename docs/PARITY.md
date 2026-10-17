@@ -358,7 +358,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Email threading (JWZ) | `TB/EmailMessageThreader` | Done | Union of Message-ID / In-Reply-To / References; deterministic thread ids (Autopsy: random UUIDs). |
 | Email accounts & relationships (CommunicationsManager) | `TB/ThunderbirdMboxFileIngestModule` | Done | EMAIL/PHONE/DEVICE accounts and MESSAGE/CONTACT relationships via post_communication. |
 | Android Analyzer, 22 app parsers (contacts, call log, SMS, Tango, WWF, Google Maps, browser/cache location, IMO, Xender, Zapya, SHAREit, LINE, WhatsApp, TextNow, Skype, Viber, FB Messenger, Samsung Internet/Opera, OruxMaps, installed apps) | `IPM/android/*.py` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
-| GPX Parser | `IPM/GPX_Module` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| GPX Parser | `IPM/GPX_Module` | Done | On pm-plugin-api (pm-geo GPX parser): bookmarks, track segments, routes. |
 | DJI Drone Analyzer | `A/modules/drones` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
 | YARA Analyzer + YARA options panel (rule sets) | `A/modules/yara`, `yara/ui/*` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
 | Virtual Machine Extractor (VMDK/VHD in DS → new data sources + ingest) | `A/modules/vmextractor` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
@@ -407,11 +407,11 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Map window with waypoints (bookmark, last known, search, trackpoint, EXIF, custom), routes, tracks, areas | `GeolocationTopComponent`, `MapPanel`, `geolocation/datamodel/*` | Missing | GPS artifacts will come from the email-mobile and Picture Analyzer work. |
-| Tile sources: online OSM, custom OSM server, offline zip, MBTiles (Options › Geolocation) | `GeolocationSettingsPanel`, `MBTilesFileConnector` | Missing | — |
-| Filters (data sources, artifact types, time window, untimed waypoints) | `GeoFilterPanel` | Missing | — |
-| Waypoint details panel, KdTree selection | `WaypointDetailPanel`, `KdTree` | Missing | — |
-| KML export from map / KML report | `report/modules/kml` | Missing | — |
+| Map window with waypoints (bookmark, last known, search, trackpoint, EXIF, custom), routes, tracks, areas | `GeolocationTopComponent`, `MapPanel`, `geolocation/datamodel/*` | Done | walkers + OSM tiles (disk-cached): all waypoint kinds, tracks, routes, areas. |
+| Tile sources: online OSM, custom OSM server, offline zip, MBTiles (Options › Geolocation) | `GeolocationSettingsPanel`, `MBTilesFileConnector` | Partial | Online OSM only; custom server, offline zip and MBTiles missing. |
+| Filters (data sources, artifact types, time window, untimed waypoints) | `GeoFilterPanel` | Partial | Data sources, most recent N days, untimed waypoints; per-artifact-type filter missing. |
+| Waypoint details panel, KdTree selection | `WaypointDetailPanel`, `KdTree` | Done | Click picks the nearest marker (no KdTree needed at this scale; only visible markers are tested). |
+| KML export from map / KML report | `report/modules/kml` | Partial | KML report done; export from the map window missing. |
 
 ## 21. Discovery (`A/discovery`)
 
@@ -485,7 +485,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Excel report | `report/modules/excel` | Done | xlsx (rust_xlsxwriter): Summary + one sheet per data type. |
 | Files – Text (TSV/CSV of files) | `report/modules/file` | Done | All 13 columns, delimiter choice, UTF-8 with BOM. |
 | TSK body file | `report/modules/bodyfile` | Done | For mactime; file-system files. |
-| Google Earth KML | `report/modules/kml` | Missing | — |
+| Google Earth KML | `report/modules/kml` | Done | ReportKML.kml + style.kml, Autopsy folders and colours. |
 | CASE-UCO JSON-LD | `report/modules/caseuco` | Missing | — |
 | Save Tagged Hashes to hash set | `report/modules/taggedhashes` | Done | Into a new or existing .kdb set. |
 | Data Source Summary report (XLSX) | `report/modules/datasourcesummaryexport` | Missing | — |

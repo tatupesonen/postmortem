@@ -11,6 +11,7 @@ pm-core.workspace = true
 pm-plugin-api.workspace = true
 pm-plugin-wasm.workspace = true
 pm-email.workspace = true
+pm-geo.workspace = true
 pm-casedb.workspace = true
 pm-ingest.workspace = true
 pm-hashdb.workspace = true

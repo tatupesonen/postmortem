@@ -127,6 +127,25 @@ fn ntfs_volume() -> Vec<u8> {
             ..Default::default()
         },
     );
+    // A GPS track (GPX Parser → Geolocation): a walk in Helsinki.
+    b.file_with(
+        "Users/alice/Documents/walk.gpx",
+        br#"<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="demo" xmlns="http://www.topografix.com/GPX/1/1">
+  <wpt lat="60.1699" lon="24.9384"><name>Senate Square</name></wpt>
+  <trk><name>Walk</name><trkseg>
+    <trkpt lat="60.1699" lon="24.9384"><time>2021-05-29T10:00:00Z</time></trkpt>
+    <trkpt lat="60.1680" lon="24.9450"><time>2021-05-29T10:10:00Z</time></trkpt>
+    <trkpt lat="60.1655" lon="24.9520"><time>2021-05-29T10:20:00Z</time></trkpt>
+  </trkseg></trk>
+</gpx>
+"#,
+        opts(times(
+            ft(2021, 5, 29, 12, 0),
+            ft(2021, 5, 29, 12, 0),
+            ft(2021, 5, 29, 12, 0),
+        )),
+    );
     // An archive: the Embedded File Extractor turns its members into
     // derived files (a picture and a text file in a sub-folder).
     b.file_with(

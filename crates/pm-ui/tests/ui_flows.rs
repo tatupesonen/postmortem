@@ -1214,3 +1214,16 @@ fn generate_html_report_from_the_toolbar() {
         .any(|d| d.path().join("HTML Report/report.html").is_file());
     assert!(found, "report.html under {}", dir.display());
 }
+
+/// Tools › Geolocation shows the demo's GPX bookmark and track.
+#[test]
+fn geolocation_window_lists_located_results() {
+    let mut h = harness(vec![demo()]);
+    wait_analysed(&mut h);
+    click(&mut h, "🌍 Geolocation");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("1 waypoints, 1 tracks").is_some()
+    });
+    h.get_by_label("GPS Bookmark");
+    shot(&mut h, "geolocation");
+}

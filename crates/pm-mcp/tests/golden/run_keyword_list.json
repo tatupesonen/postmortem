@@ -10,8 +10,8 @@
         "firstRefs": [
           "file:9",
           "file:29",
-          "file:94",
-          "file:103"
+          "file:95",
+          "file:104"
         ],
         "error": null,
         "keyword": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"

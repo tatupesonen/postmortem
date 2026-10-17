@@ -14,6 +14,7 @@ mod discovery;
 mod file_search_ui;
 mod format;
 mod gallery;
+mod geo_ui;
 mod grid;
 mod hosts_ui;
 mod icons;

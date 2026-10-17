@@ -161,6 +161,8 @@ pub struct PostmortemApp {
     /// Generate Report: the case's choices loading, then the wizard.
     report_choices: Option<Task<Result<crate::report_ui::Choices, String>>>,
     report_wizard: Option<crate::report_ui::ReportWizard>,
+    /// Tools › Geolocation.
+    geo: Option<crate::geo_ui::GeoWindow>,
     /// A data source awaiting removal confirmation `(id, name)`.
     confirm_remove: Option<(i64, String)>,
     removing: Option<Task<Result<(), String>>>,
@@ -241,6 +243,7 @@ impl PostmortemApp {
             plugins_open: false,
             report_choices: None,
             report_wizard: None,
+            geo: None,
             confirm_remove: None,
             removing: None,
             mime_types: crate::task::Cached::default(),
@@ -946,6 +949,13 @@ impl PostmortemApp {
                     self.open_report_wizard(ui.ctx());
                     ui.close();
                 }
+                if ui
+                    .add_enabled(self.has_case(), egui::Button::new("🌍 Geolocation"))
+                    .clicked()
+                {
+                    self.open_geolocation(ui.ctx());
+                    ui.close();
+                }
                 if ui.button("🧩 Plugins").clicked() {
                     self.plugins_open = true;
                     ui.close();
@@ -1059,6 +1069,13 @@ impl PostmortemApp {
                 && let Some(c) = self.viewer.content().cloned()
             {
                 self.open_popout(c);
+            }
+            if ui
+                .add_enabled(self.has_case(), egui::Button::new("🌍 Geolocation"))
+                .on_hover_text("Show located results on a map (Tools › Geolocation)")
+                .clicked()
+            {
+                self.open_geolocation(ui.ctx());
             }
             if ui
                 .add_enabled(self.has_case(), egui::Button::new("📄 Generate Report"))
@@ -1783,6 +1800,27 @@ impl PostmortemApp {
         }
         if remove.is_some() {
             self.case_summary.refresh();
+        }
+    }
+
+    /// Tools › Geolocation.
+    fn open_geolocation(&mut self, ctx: &egui::Context) {
+        let case = self.analysis.lock().case().cloned();
+        let tree = self.case_sources.get(ctx, case.as_ref(), false);
+        let sources = tree.iter().map(|t| (t.ds.id, t.ds.name.clone())).collect();
+        self.geo = Some(crate::geo_ui::GeoWindow::new(sources));
+    }
+
+    fn geolocation(&mut self, ctx: &egui::Context) {
+        let Some(w) = &mut self.geo else {
+            return;
+        };
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            self.geo = None;
+            return;
+        };
+        if !w.ui(ctx, &case, &self.prefs) {
+            self.geo = None;
         }
     }
 
@@ -3086,6 +3124,7 @@ impl PostmortemApp {
             self.plugins_open = crate::plugins::window(&ctx);
         }
         self.report_wizard(&ctx);
+        self.geolocation(&ctx);
         self.persisted.table = self.table.clone();
     }
 }
