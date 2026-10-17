@@ -197,6 +197,17 @@ impl CaseDb {
         })
     }
 
+    /// Number of files whose parent is `parent_id` (e.g. carved files in
+    /// a `$CarvedFiles/<n>` folder).
+    pub fn count_children(&self, parent_id: i64) -> Result<u64> {
+        self.read(|c| {
+            let n: i64 = c
+                .prepare_cached("SELECT COUNT(*) FROM files WHERE parent_id = ?1")?
+                .query_row([parent_id], |r| r.get(0))?;
+            Ok(u64::try_from(n).unwrap_or(0))
+        })
+    }
+
     /// The child of `parent_id` called `name` (exact match).
     pub fn child_named(&self, parent_id: i64, name: &str) -> Result<Option<FileRecord>> {
         self.read(|c| {

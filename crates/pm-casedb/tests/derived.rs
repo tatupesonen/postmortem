@@ -93,6 +93,8 @@ fn derived_files_round_trip() {
     assert_eq!(x.extension, "txt");
     assert!(db.has_children(zip.id).unwrap());
     assert!(!db.has_children(x.id).unwrap());
+    assert_eq!(db.count_children(x.id).unwrap(), 0);
+    assert!(db.count_children(zip.id).unwrap() >= 1);
     assert_eq!(
         db.child_named(zip.id, "dir").unwrap().unwrap().id,
         recs[0].id

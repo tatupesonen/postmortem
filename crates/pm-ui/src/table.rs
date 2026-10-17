@@ -5,13 +5,19 @@ use std::cmp::Ordering;
 use egui_extras::{Column, TableBuilder};
 
 use crate::format::DisplayPrefs;
-use crate::model::FileRow;
+use crate::icons;
+use crate::model::{CommentStatus, FileRow};
 use crate::sortable::{Sort, cmp_text};
+use crate::tags_ui::{TagCatalog, TagRequest};
 
 /// Sortable columns.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub enum Col {
     Name,
+    /// Autopsy "S": aggregate score.
+    Score,
+    /// Autopsy "C": tags / comments.
+    Comment,
     Modified,
     Changed,
     Accessed,
@@ -24,8 +30,10 @@ pub enum Col {
 }
 
 impl Col {
-    pub const ALL: [Self; 10] = [
+    pub const ALL: [Self; 12] = [
         Self::Name,
+        Self::Score,
+        Self::Comment,
         Self::Modified,
         Self::Changed,
         Self::Accessed,
@@ -40,6 +48,8 @@ impl Col {
     pub fn title(self) -> &'static str {
         match self {
             Self::Name => "Name",
+            Self::Score => "S",
+            Self::Comment => "C",
             Self::Modified => "Modified Time",
             Self::Changed => "Change Time",
             Self::Accessed => "Access Time",
@@ -59,6 +69,8 @@ fn compare(a: &FileRow, b: &FileRow, col: Col) -> Ordering {
     };
     match col {
         Col::Name => cmp_text(&a.name, &b.name),
+        Col::Score => score(a).cmp(&score(b)),
+        Col::Comment => comment(a).cmp(&comment(b)),
         Col::Modified => t(a, |t| t.modified).cmp(&t(b, |t| t.modified)),
         Col::Changed => t(a, |t| t.changed).cmp(&t(b, |t| t.changed)),
         Col::Accessed => t(a, |t| t.accessed).cmp(&t(b, |t| t.accessed)),
@@ -68,6 +80,42 @@ fn compare(a: &FileRow, b: &FileRow, col: Col) -> Ordering {
         Col::FlagsMeta => a.meta_allocated().cmp(&b.meta_allocated()),
         Col::Extension => cmp_text(a.extension(), b.extension()),
         Col::Inode => (a.inode, a.stream).cmp(&(b.inode, b.stream)),
+    }
+}
+
+fn score(r: &FileRow) -> Option<pm_casedb::Significance> {
+    r.annotations.as_ref().map(|a| a.score)
+}
+
+fn comment(r: &FileRow) -> Option<CommentStatus> {
+    r.annotations.as_ref().map(|a| a.comment_status())
+}
+
+/// The S cell: Autopsy shows an icon for notable and likely-notable
+/// scores, with "Has an {significance} analysis result score".
+fn score_cell(ui: &mut egui::Ui, r: &FileRow) {
+    let Some(s) = score(r) else { return };
+    let icon = match s {
+        pm_casedb::Significance::Notable => icons::SCORE_NOTABLE,
+        pm_casedb::Significance::LikelyNotable => icons::SCORE_SUSPICIOUS,
+        _ => return,
+    };
+    ui.label(icon)
+        .on_hover_text(format!("Has an {} analysis result score", s.name()));
+}
+
+/// The C cell: tags without / with a comment.
+fn comment_cell(ui: &mut egui::Ui, r: &FileRow) {
+    match comment(r) {
+        Some(CommentStatus::TagComment) => {
+            ui.label(icons::COMMENT)
+                .on_hover_text("Has a tag with a comment");
+        }
+        Some(CommentStatus::TagNoComment) => {
+            ui.label(icons::TAGGED)
+                .on_hover_text("Has tags without comments");
+        }
+        _ => {}
     }
 }
 
@@ -88,12 +136,14 @@ pub(crate) fn sorted_indices(rows: &[FileRow], col: Col, ascending: bool) -> Vec
 
 /// Table interaction results for the caller.
 #[derive(Debug, Default)]
-pub struct TableEvents {
-    pub selected: Option<usize>,
-    pub activated: Option<usize>,
-    pub popout: Option<usize>,
-    pub export: Option<usize>,
-    pub timeline: Option<usize>,
+pub(crate) struct TableEvents {
+    pub(crate) selected: Option<usize>,
+    pub(crate) activated: Option<usize>,
+    pub(crate) popout: Option<usize>,
+    pub(crate) export: Option<usize>,
+    pub(crate) timeline: Option<usize>,
+    /// A tag menu choice for a row.
+    pub(crate) tag: Option<(usize, TagRequest)>,
 }
 
 /// Persistent table state.
@@ -125,7 +175,14 @@ impl TableState {
         self.order = None;
     }
 
-    pub fn ui(&mut self, ui: &mut egui::Ui, rows: &[FileRow], prefs: &DisplayPrefs) -> TableEvents {
+    /// Draws the table; `tags` enables the Add/Remove File Tag menus.
+    pub(crate) fn ui(
+        &mut self,
+        ui: &mut egui::Ui,
+        rows: &[FileRow],
+        prefs: &DisplayPrefs,
+        tags: Option<&TagCatalog>,
+    ) -> TableEvents {
         let mut ev = TableEvents::default();
         let key = rows.as_ptr() as usize;
         let stale = !matches!(&self.order, Some((k, c, a, _)) if *k == key && *c == self.sort && *a == self.ascending);
@@ -182,6 +239,7 @@ impl TableState {
                 .sense(egui::Sense::click())
                 .cell_layout(egui::Layout::left_to_right(egui::Align::Center))
                 .column(Column::initial(250.0).at_least(80.0).clip(true))
+                .columns(Column::initial(26.0).at_least(22.0), 2)
                 .columns(Column::initial(150.0).clip(true), 4)
                 .column(Column::initial(100.0))
                 .columns(Column::initial(95.0), 2)
@@ -244,6 +302,8 @@ impl TableState {
                                     .color(color(ui)),
                             );
                         });
+                        row.col(|ui| score_cell(ui, r));
+                        row.col(|ui| comment_cell(ui, r));
                         let times = r.meta.as_ref().map(|m| m.times).unwrap_or_default();
                         for t in [times.modified, times.changed, times.accessed, times.created] {
                             row.col(|ui| {
@@ -321,6 +381,22 @@ impl TableState {
                                 ui.ctx().copy_text(r.path.clone());
                                 ui.close();
                             }
+                            if let Some(cat) = tags.filter(|_| r.file_id().is_some()) {
+                                ui.separator();
+                                if let Some(t) = crate::tags_ui::add_menu(ui, "Add File Tag", cat) {
+                                    ev.tag = Some((i, t));
+                                }
+                                let on_row = r
+                                    .annotations
+                                    .as_ref()
+                                    .map(|a| a.tags.as_slice())
+                                    .unwrap_or_default();
+                                if let Some(t) =
+                                    crate::tags_ui::remove_menu(ui, "Remove File Tag", on_row)
+                                {
+                                    ev.tag = Some((i, t));
+                                }
+                            }
                         });
                     });
                 });
@@ -356,6 +432,8 @@ mod tests {
             )),
             size,
             path: format!("/{name}"),
+            file: None,
+            annotations: None,
         }
     }
 

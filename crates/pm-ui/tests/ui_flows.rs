@@ -709,3 +709,154 @@ fn result_table_scrolls_to_last_column() {
     shot(&mut h, "results-scrolled");
     assert!(fully_visible(&h, "Path"));
 }
+
+/// Tagging: Ctrl+B bookmarks the selected file; the Add File Tag menu
+/// applies a notable tag; the Tags and Score nodes list the results.
+#[test]
+fn tagging_files_feeds_tags_and_score_nodes() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    // Room for the Tags and Score nodes below the expanded tree.
+    h.set_size(egui::vec2(1400.0, 1500.0));
+    wait_analysed(&mut h);
+    settle(&mut h, |h| !h.state().data_sources().is_empty());
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Pictures"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    click(&mut h, "sunset.bmp");
+    h.event(egui::Event::Key {
+        key: egui::Key::B,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::COMMAND,
+    });
+    h.run_steps(2);
+    // The Tags tree gains Bookmark with one file tag.
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Bookmark (1)").is_some()
+    });
+    click(&mut h, "Bookmark (1)");
+    click(&mut h, "File Tags (1)");
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("sunset.bmp").count() >= 1
+            && h.query_by_label_contains("File Path").is_some()
+    });
+
+    // Notable Item from the file table's context menu scores the file.
+    click_exact(&mut h, "🗀 Pictures");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("🗋 sunset.bmp").is_some()
+    });
+    h.query_by_label_contains("🗋 sunset.bmp")
+        .unwrap()
+        .click_secondary();
+    h.run_steps(2);
+    click(&mut h, "Add File Tag");
+    click(&mut h, "Notable Item (Notable)");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Bad Items (1)").is_some()
+    });
+    click(&mut h, "Bad Items (1)");
+    // The Score view lists the file with Autopsy's "File" type.
+    settle(&mut h, |h| h.query_all_by_label("File").next().is_some());
+    shot(&mut h, "tags_and_score");
+}
+
+/// Result tags: the result table's Add Result Tag menu tags the
+/// artifact; the Tags tree lists it under Result Tags.
+#[test]
+fn tagging_results_from_the_result_table() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    h.set_size(egui::vec2(1400.0, 1500.0));
+    wait_analysed(&mut h);
+    click(&mut h, "Web Downloads (1)");
+    settle(&mut h, |h| h.query_by_label_contains("1 results").is_some());
+    // The result row's source file cell.
+    let src = "setup.exe:Zone.Identifier";
+    settle(&mut h, |h| h.query_all_by_label(src).next().is_some());
+    h.query_all_by_label(src).next().unwrap().click_secondary();
+    h.run_steps(2);
+    click(&mut h, "Add Result Tag");
+    click_exact(&mut h, "Follow Up");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Follow Up (1)").is_some()
+    });
+    click(&mut h, "Follow Up (1)");
+    click(&mut h, "Result Tags (1)");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Source File Path").is_some()
+    });
+    // The row's Result Type cell (besides the tree node).
+    assert!(h.query_all_by_label("Web Downloads").count() >= 1);
+    shot(&mut h, "result_tags");
+}
+
+/// File Search by Attributes: a name search lists the matching file.
+#[test]
+fn file_search_by_name() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
+    click(&mut h, "Tools");
+    click(&mut h, "File Search by Attributes");
+    click_exact(&mut h, "Name:");
+    // The name field is the first text edit in the window.
+    let field = h
+        .query_all(egui_kittest::kittest::by().role(egui::accesskit::Role::TextInput))
+        .next()
+        .expect("name field");
+    field.focus();
+    field.type_text("SUNSET");
+    h.run_steps(2);
+    click_exact(&mut h, "Search");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("File Search Results 1").is_some()
+    });
+    settle(&mut h, |h| h.query_by_label_contains("1 matches").is_some());
+    h.get_by_label_contains("sunset.bmp");
+    shot(&mut h, "file_search");
+}
+
+/// The data source menu runs ingest again and removes the data source.
+#[test]
+fn data_source_menu_runs_ingest_and_removes() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
+    settle(&mut h, |h| {
+        h.query_all_by_label("🖴 demo.dd").next().is_some()
+    });
+    h.query_all_by_label("🖴 demo.dd")
+        .next()
+        .unwrap()
+        .click_secondary();
+    h.run_steps(2);
+    click(&mut h, "Run Ingest Modules");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Configure ingest for demo.dd")
+            .is_some()
+    });
+    click_exact(&mut h, "Finish");
+    // A second job runs and finishes.
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("Analysed demo.dd").count() >= 1
+            && h.query_by_label_contains("Configure ingest").is_none()
+    });
+
+    h.query_all_by_label("🖴 demo.dd")
+        .next()
+        .unwrap()
+        .click_secondary();
+    h.run_steps(2);
+    settle(&mut h, |h| {
+        h.query_by_label("Remove Data Source")
+            .is_some_and(|n| !n.accesskit_node().is_disabled())
+    });
+    click_exact(&mut h, "Remove Data Source");
+    click_exact(&mut h, "Remove");
+    settle(&mut h, |h| {
+        h.query_all_by_label("🖴 demo.dd").next().is_none()
+    });
+}

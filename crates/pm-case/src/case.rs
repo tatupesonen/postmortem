@@ -110,6 +110,7 @@ impl Case {
         write_case_file(&dir, &meta)?;
         let db = CaseDb::create(dir.join(DB_FILE))?;
         db.set_meta("case_id", &meta.id)?;
+        db.ensure_project_vic_tags()?;
         tracing::info!(dir = %dir.display(), "case created");
         Ok(Self {
             dir,
@@ -148,6 +149,7 @@ impl Case {
             return Err(bad(format!("missing {DB_FILE}")));
         }
         let db = CaseDb::open(&db_path)?;
+        db.ensure_project_vic_tags()?;
         for sub in SUBDIRS {
             let p = dir.join(sub);
             std::fs::create_dir_all(&p).map_err(io_err(&p))?;

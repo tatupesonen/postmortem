@@ -222,7 +222,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Hash Lookup (+ `pm-hashdb`: all formats, indexing, known/notable/no-change, Central Repo hash sets)
 - [x] File Type Identification (`pm-filetype` + user-defined types)
 - [x] Extension Mismatch Detector
-- [ ] Embedded File Extractor (zip, 7z, tar, gz/bz2/xz/zstd, rar if feasible, ISO, Office OLE/OOXML, PDF images; zip-bomb limits; password detection)
+- [x] Embedded File Extractor (zip, 7z, tar, gz/bz2/xz/zstd, rar if feasible, ISO, Office OLE/OOXML, PDF images; zip-bomb limits; password detection)
 - [ ] Picture Analyzer (EXIF → metadata + GPS artifacts, HEIC handling)
 - [ ] Encryption Detection (entropy, BitLocker/LUKS/FileVault/VeraCrypt signatures, password-protected Office/PDF/zip)
 - [ ] Interesting Files Identifier (full rule language, rule sets import/export)
@@ -263,7 +263,8 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Report wizard and module API; HTML, XLSX, CSV/TSV, KML, body file, portable case, CASE/UCO, tagged hashes, data source summary; snapshots via insta
 
 ### M10 — Specialised modules
-- [ ] Android analyzer parsers (22 apps; inventory 03 §4) ported to Rust (table-driven query/mapping engine where it fits), GPX, DJI drones, VM extractor, YARA (yara-x), file carving (pure-Rust, PhotoRec-like signatures), LEAPP-equivalent iOS/Android parsers or external aLEAPP/iLEAPP runner, Plaso runner (optional external), object detection (optional), memory-image DSP (Volatility runner, optional)
+- [x] File carving (pure-Rust, PhotoRec-like signatures: `pm-carve` + PhotoRec Carver module)
+- [ ] Android analyzer parsers (22 apps; inventory 03 §4) ported to Rust (table-driven query/mapping engine where it fits), GPX, DJI drones, VM extractor, YARA (yara-x), LEAPP-equivalent iOS/Android parsers or external aLEAPP/iLEAPP runner, Plaso runner (optional external), object detection (optional), memory-image DSP (Volatility runner, optional)
 
 ### M11 — Multi-user and automation
 - [ ] PostgreSQL back end for `pm-casedb` (parity tests run against both back ends)

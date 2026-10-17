@@ -1,0 +1,24 @@
+[package]
+name = "pm-carve"
+description = "Signature-based file carving of unallocated space (PhotoRec-like, pure Rust)"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+pm-archive.workspace = true
+thiserror.workspace = true
+memchr.workspace = true
+crc32fast.workspace = true
+flate2.workspace = true
+
+[dev-dependencies]
+pm-testkit.workspace = true
+proptest.workspace = true
+rusqlite.workspace = true
+tempfile.workspace = true
+
+[lints]
+workspace = true

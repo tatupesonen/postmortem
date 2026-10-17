@@ -7,7 +7,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::Mutex;
 use pm_evidence::OpenOptions;
-use pm_volume::SlotKind;
 
 use crate::analysis::Analysis;
 use crate::case_ui::{NewCaseWizard, WelcomeAction, WizardAction};
@@ -16,7 +15,7 @@ use crate::format::{DisplayPrefs, size_long};
 use crate::gallery::GalleryWindow;
 use crate::icons;
 use crate::index::SharedIndex;
-use crate::model::{Content, DataSource, FileRow, NodeId, list_dir, list_orphans};
+use crate::model::{Content, DataSource, FileRow, NodeId};
 use crate::summary::{self, SummaryState};
 use crate::table::TableState;
 use crate::task::{self, Task};
@@ -113,6 +112,23 @@ pub struct PostmortemApp {
     resolver_key: Option<(PathBuf, usize)>,
     view_counts: crate::views::Counts,
     view_rows: HashMap<crate::views::View, Task<Result<Arc<crate::views::ViewRows>, String>>>,
+    /// The Data Sources tree structure from the case database.
+    case_sources: crate::case_tree::Sources,
+    tagging: crate::tags_ui::Tagging,
+    /// Counts of the OS Accounts, Tags and Score nodes.
+    case_summary: crate::task::Cached<crate::case_nodes::Summary>,
+    /// Rows of the OS Accounts, Tags and Score views.
+    node_views: HashMap<NodeId, crate::task::Cached<crate::case_nodes::ViewData>>,
+    node_grid: crate::grid::Grid,
+    /// Details of the selected OS account.
+    account_details: Option<(i64, crate::task::Cached<crate::case_nodes::Details>)>,
+    file_search: Option<crate::file_search_ui::FileSearchWindow>,
+    run_ingest: Option<crate::add_source::RunIngestDialog>,
+    /// A data source awaiting removal confirmation `(id, name)`.
+    confirm_remove: Option<(i64, String)>,
+    removing: Option<Task<Result<(), String>>>,
+    mime_types: crate::task::Cached<Vec<String>>,
+    searches: Vec<crate::file_search_ui::SearchResults>,
 }
 
 impl PostmortemApp {
@@ -166,6 +182,18 @@ impl PostmortemApp {
             resolver_key: None,
             view_counts: crate::views::Counts::default(),
             view_rows: HashMap::new(),
+            case_sources: crate::case_tree::Sources::default(),
+            tagging: crate::tags_ui::Tagging::default(),
+            case_summary: crate::task::Cached::default(),
+            node_views: HashMap::new(),
+            node_grid: crate::grid::Grid::default(),
+            account_details: None,
+            file_search: None,
+            run_ingest: None,
+            confirm_remove: None,
+            removing: None,
+            mime_types: crate::task::Cached::default(),
+            searches: Vec::new(),
         };
         app.apply_time_pref();
         // Command line: a case (folder or case.pmcase) is opened; images are
@@ -350,6 +378,14 @@ impl PostmortemApp {
         self.result_selected = None;
         self.view_counts.invalidate();
         self.view_rows.clear();
+        self.case_sources.invalidate();
+        self.case_summary.clear();
+        self.node_views.clear();
+        self.account_details = None;
+        self.tagging = crate::tags_ui::Tagging::default();
+        self.file_search = None;
+        self.mime_types.clear();
+        self.searches.clear();
         ctx.send_viewport_cmd(egui::ViewportCommand::Title("postmortem".into()));
     }
 
@@ -387,9 +423,7 @@ impl PostmortemApp {
                     if let Some(tl) = self.timeline.take() {
                         drop(tl); // rebuilt with the new source on next open
                     }
-                    if self.selected.is_none() {
-                        self.navigate(NodeId::DataSource(id));
-                    }
+                    let _ = id;
                 }
                 Some(Err(e)) => self
                     .errors
@@ -408,33 +442,24 @@ impl PostmortemApp {
         });
     }
 
-    /// Directory listing for a node, loaded in the background.
+    /// Directory listing for a node, loaded in the background from the
+    /// case database.
     fn listing(&mut self, ctx: &egui::Context, node: &NodeId) -> Option<&Listing> {
         if !self.listings.contains_key(node) {
-            let fs_and_target = match node {
-                NodeId::Dir {
-                    ds,
-                    fs,
-                    inode,
-                    path,
-                } => self
-                    .sources
-                    .get(*ds)
-                    .and_then(|d| d.fs(*fs))
-                    .map(|f| (Arc::clone(f), Some((*inode, Arc::clone(path))))),
-                NodeId::Orphans { ds, fs } => self
-                    .sources
-                    .get(*ds)
-                    .and_then(|d| d.fs(*fs))
-                    .map(|f| (Arc::clone(f), None)),
-                _ => None,
+            let NodeId::Dir { file, .. } = node else {
+                return None;
             };
-            let (fs, target) = fs_and_target?;
+            let case = self.analysis.lock().case().cloned()?;
+            let dir = *file;
             let task = Task::spawn(ctx, move || {
-                let rows = match target {
-                    Some((inode, path)) => list_dir(&*fs, inode, &path)?,
-                    None => list_orphans(&*fs)?,
-                };
+                let mut rows: Vec<FileRow> = case
+                    .db()
+                    .children(dir)
+                    .map_err(|e| e.to_string())?
+                    .iter()
+                    .map(crate::views::row_of)
+                    .collect();
+                crate::tags_ui::annotate(&case, &mut rows)?;
                 Ok(Arc::new(rows))
             });
             self.listings.insert(node.clone(), task);
@@ -452,6 +477,8 @@ impl PostmortemApp {
         self.forward.clear();
         self.selected = Some(node);
         self.table.reset();
+        self.node_grid.reset();
+        self.account_details = None;
         self.result_selected = None;
         self.result_table = crate::results::ResultTable::default();
     }
@@ -471,15 +498,6 @@ impl PostmortemApp {
                 self.back.push(cur);
             }
             self.table.reset();
-        }
-    }
-
-    fn fs_of(&self, node: &NodeId) -> Option<Arc<dyn pm_fs::FileSystem>> {
-        match node {
-            NodeId::Dir { ds, fs, .. } | NodeId::Orphans { ds, fs } => {
-                self.sources.get(*ds).and_then(|d| d.fs(*fs)).cloned()
-            }
-            _ => None,
         }
     }
 
@@ -816,6 +834,18 @@ impl PostmortemApp {
                     self.progress_open = true;
                     ui.close();
                 }
+                if ui
+                    .add_enabled(
+                        self.has_case(),
+                        egui::Button::new("🔎 File Search by Attributes"),
+                    )
+                    .clicked()
+                {
+                    self.file_search
+                        .get_or_insert_with(crate::file_search_ui::FileSearchWindow::default);
+                    self.mime_types.refresh();
+                    ui.close();
+                }
                 ui.separator();
                 if ui
                     .add_enabled(!self.sources.is_empty(), egui::Button::new("⏱ Timeline"))
@@ -1073,20 +1103,36 @@ impl PostmortemApp {
                     ));
                 });
             }
-            for ds in self.sources.clone() {
-                let node = NodeId::DataSource(ds.id);
-                self.tree_node(
+            let (case, live) = {
+                let a = self.analysis.lock();
+                (a.case().cloned(), a.any_active())
+            };
+            let trees = self.case_sources.get(ui.ctx(), case.as_ref(), live);
+            if let Some(e) = self.case_sources.error() {
+                ui.colored_label(ui.visuals().error_fg_color, e.to_owned());
+            }
+            if trees.is_empty() && self.case_sources.loading() {
+                ui.spinner();
+            }
+            if self.selected.is_none()
+                && let Some(first) = trees.first()
+            {
+                self.navigate(NodeId::DataSource(first.ds.id));
+            }
+            for t in trees.iter() {
+                let node = NodeId::DataSource(t.ds.id);
+                let resp = self.tree_node(
                     ui,
                     &node,
-                    &format!("{} {}", icons::DATA_SOURCE, ds.name),
+                    &format!("{} {}", icons::DATA_SOURCE, t.ds.name),
                     true,
-                    |app, ui| {
-                        app.data_source_children(ui, &ds);
-                    },
+                    |app, ui| app.data_source_children(ui, t),
                 );
+                resp.context_menu(|ui| self.data_source_menu(ui, &t.ds));
             }
             self.views_tree(ui);
             self.results_tree(ui);
+            self.case_nodes_tree(ui);
         });
     }
 
@@ -1245,13 +1291,25 @@ impl PostmortemApp {
                 }
             ));
         });
-        let ev = self.table.ui(ui, &data.rows, &self.prefs);
+        let case = self.analysis.lock().case().cloned();
+        let tags = self.tagging.catalog.get(ui.ctx(), case.as_ref());
+        let ev = self.table.ui(ui, &data.rows, &self.prefs, Some(&tags));
+        if let (Some((i, req)), Some(case)) = (ev.tag, case.as_ref())
+            && let Some(id) = data.rows.get(i).and_then(FileRow::file_id)
+        {
+            self.tagging.request(
+                ui.ctx(),
+                case,
+                crate::tags_ui::TagTarget::Files(vec![id]),
+                req,
+            );
+        }
         if let Some(rec) = ev.selected.and_then(|i| data.records.get(i)) {
-            let content = self.content_for(&case, rec);
+            let content = self.content_for(rec);
             self.viewer.set_content(content);
         }
         if let Some(rec) = ev.activated.and_then(|i| data.records.get(i))
-            && let Some(c) = self.content_for(&case, rec)
+            && let Some(c) = self.content_for(rec)
         {
             self.open_popout(c);
         }
@@ -1276,6 +1334,11 @@ impl PostmortemApp {
             }
             // Hashes were just computed.
             self.viewer.refresh_hashes();
+            // Derived files and data sources may have been added.
+            self.case_sources.refresh();
+            self.listings.clear();
+            self.case_summary.refresh();
+            self.node_views.clear();
         }
         self.was_analysing = live;
         let counts = self.result_counts.get(ui.ctx(), case.as_ref(), live);
@@ -1329,6 +1392,238 @@ impl PostmortemApp {
         }
     }
 
+    /// Autopsy's data source node actions.
+    fn data_source_menu(&mut self, ui: &mut egui::Ui, ds: &pm_casedb::DataSourceRecord) {
+        let busy = self.analysis.lock().any_active();
+        if ui
+            .add_enabled(!busy, egui::Button::new("Run Ingest Modules"))
+            .on_disabled_hover_text("Ingest is running")
+            .clicked()
+        {
+            self.run_ingest = Some(crate::add_source::RunIngestDialog {
+                ds_id: ds.id,
+                ds_name: ds.name.clone(),
+                prefs: self.persisted.ingest.clone(),
+            });
+            ui.close();
+        }
+        if ui.button("Open File Search by Attributes").clicked() {
+            let w = self
+                .file_search
+                .get_or_insert_with(crate::file_search_ui::FileSearchWindow::default);
+            w.preselect_data_source(ds.id);
+            self.mime_types.refresh();
+            ui.close();
+        }
+        ui.separator();
+        if ui
+            .add_enabled(!busy, egui::Button::new("Remove Data Source"))
+            .on_disabled_hover_text("Cannot remove a data source while ingest is running")
+            .clicked()
+        {
+            self.confirm_remove = Some((ds.id, ds.name.clone()));
+            ui.close();
+        }
+    }
+
+    /// OS Accounts, Tags and Score (Autopsy's tree order after the results).
+    fn case_nodes_tree(&mut self, ui: &mut egui::Ui) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        let loader = Arc::clone(&case);
+        let Some(sum) = self
+            .case_summary
+            .get(ui.ctx(), move || crate::case_nodes::load_summary(&loader))
+        else {
+            return;
+        };
+        ui.add_space(8.0);
+        self.tree_node(
+            ui,
+            &NodeId::OsAccounts,
+            &format!(
+                "{} OS Accounts ({})",
+                icons::OS_ACCOUNTS,
+                crate::format::grouped(sum.os_accounts)
+            ),
+            false,
+            |_, _| {},
+        );
+        ui.add_space(8.0);
+        ui.heading(format!("{} Tags", icons::TAGS));
+        if sum.tags.is_empty() {
+            ui.weak("None");
+        }
+        for t in &sum.tags {
+            egui::CollapsingHeader::new(format!("{} ({})", t.label, t.files + t.results))
+                .id_salt(("tag-name", t.id))
+                .show(ui, |ui| {
+                    self.tree_node(
+                        ui,
+                        &NodeId::TagFiles(t.id),
+                        &format!("File Tags ({})", t.files),
+                        false,
+                        |_, _| {},
+                    );
+                    self.tree_node(
+                        ui,
+                        &NodeId::TagResults(t.id),
+                        &format!("Result Tags ({})", t.results),
+                        false,
+                        |_, _| {},
+                    );
+                });
+        }
+        ui.add_space(8.0);
+        ui.heading(format!("{} Score", icons::SCORE));
+        self.tree_node(
+            ui,
+            &NodeId::Score { bad: true },
+            &format!(
+                "{} Bad Items ({})",
+                icons::SCORE_NOTABLE,
+                crate::format::grouped(sum.bad)
+            ),
+            false,
+            |_, _| {},
+        );
+        self.tree_node(
+            ui,
+            &NodeId::Score { bad: false },
+            &format!(
+                "{} Suspicious Items ({})",
+                icons::SCORE_SUSPICIOUS,
+                crate::format::grouped(sum.suspicious)
+            ),
+            false,
+            |_, _| {},
+        );
+    }
+
+    /// The table of an OS Accounts, Tags or Score node.
+    fn node_view(&mut self, ui: &mut egui::Ui, node: &NodeId) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        let ctx = ui.ctx().clone();
+        let loader = Arc::clone(&case);
+        let prefs = self.prefs.clone();
+        let target = node.clone();
+        let data =
+            self.node_views
+                .entry(node.clone())
+                .or_default()
+                .get(&ctx, move || match target {
+                    NodeId::TagFiles(t) => crate::case_nodes::load_tag_files(&loader, t, &prefs),
+                    NodeId::TagResults(t) => crate::case_nodes::load_tag_results(&loader, t),
+                    NodeId::Score { bad } => crate::case_nodes::load_score(&loader, bad),
+                    _ => crate::case_nodes::load_os_accounts(&loader, &prefs),
+                });
+        let Some(data) = data else {
+            if let Some(e) = self.node_views.get(node).and_then(|c| c.error()) {
+                ui.colored_label(ui.visuals().error_fg_color, e.to_owned());
+            } else {
+                ui.spinner();
+            }
+            return;
+        };
+        ui.weak(format!(
+            "{} items",
+            crate::format::grouped(data.refs.len() as u64)
+        ));
+        let mut remove: Option<(crate::tags_ui::TagTarget, i64)> = None;
+        let refs = &data.refs;
+        let details_h = if matches!(node, NodeId::OsAccounts) {
+            220.0
+        } else {
+            0.0
+        };
+        let ev = ui
+            .allocate_ui(
+                egui::vec2(ui.available_width(), ui.available_height() - details_h),
+                |ui| {
+                    self.node_grid.ui(ui, "node-view", &data.grid, |ui, i| {
+                        let (target, tag) = match refs.get(i) {
+                            Some(crate::case_nodes::RowRef::File {
+                                file,
+                                tag_id: Some(t),
+                            }) => (crate::tags_ui::TagTarget::Files(vec![file.id]), *t),
+                            Some(crate::case_nodes::RowRef::Artifact {
+                                artifact_id,
+                                tag_id: Some(t),
+                                ..
+                            }) => (crate::tags_ui::TagTarget::Artifacts(vec![*artifact_id]), *t),
+                            _ => {
+                                ui.weak("No actions");
+                                return;
+                            }
+                        };
+                        if ui.button("Remove Selected Tag(s)").clicked() {
+                            remove = Some((target, tag));
+                            ui.close();
+                        }
+                    })
+                },
+            )
+            .inner;
+        if let Some((target, tag)) = remove {
+            self.tagging
+                .request(&ctx, &case, target, crate::tags_ui::TagRequest::Remove(tag));
+        }
+        let file_of = |r: &crate::case_nodes::RowRef| match r {
+            crate::case_nodes::RowRef::File { file, .. } => Some(file.clone()),
+            crate::case_nodes::RowRef::Artifact { file, .. } => file.clone(),
+            crate::case_nodes::RowRef::OsAccount(_) => None,
+        };
+        if let Some(r) = ev.selected.and_then(|i| refs.get(i)) {
+            if let crate::case_nodes::RowRef::OsAccount(id) = r {
+                self.account_details = Some((*id, crate::task::Cached::default()));
+            } else if let Some(f) = file_of(r) {
+                self.viewer.set_content(Some(Content::from_case(
+                    Arc::clone(&case),
+                    crate::views::row_of(&f),
+                )));
+            }
+        }
+        if let Some(f) = ev.activated.and_then(|i| refs.get(i)).and_then(file_of) {
+            self.open_popout(Content::from_case(
+                Arc::clone(&case),
+                crate::views::row_of(&f),
+            ));
+        }
+        if let Some((id, details)) = &mut self.account_details {
+            let (id, loader, prefs) = (*id, Arc::clone(&case), self.prefs.clone());
+            ui.separator();
+            match details.get(&ctx, move || {
+                crate::case_nodes::account_details(&loader, id, &prefs)
+            }) {
+                None => {
+                    ui.spinner();
+                }
+                Some(sections) => {
+                    egui::ScrollArea::vertical()
+                        .id_salt("account-details")
+                        .show(ui, |ui| {
+                            for (title, rows) in sections.iter() {
+                                ui.strong(*title);
+                                egui::Grid::new(*title).num_columns(2).striped(true).show(
+                                    ui,
+                                    |ui| {
+                                        for (k, v) in rows {
+                                            ui.label(k);
+                                            ui.label(v);
+                                            ui.end_row();
+                                        }
+                                    },
+                                );
+                            }
+                        });
+                }
+            }
+        }
+    }
+
     /// One collapsible tree node with a selectable label; children render lazily.
     fn tree_node(
         &mut self,
@@ -1337,7 +1632,7 @@ impl PostmortemApp {
         label: &str,
         has_children: bool,
         children: impl FnOnce(&mut Self, &mut egui::Ui),
-    ) {
+    ) -> egui::Response {
         let id = ui.make_persistent_id(node);
         let selected = self.selected.as_ref() == Some(node);
         if has_children {
@@ -1363,89 +1658,65 @@ impl PostmortemApp {
             if clicked {
                 self.navigate(node.clone());
             }
+            header.inner
         } else {
             ui.horizontal(|ui| {
                 ui.add_space(18.0);
-                if ui.selectable_label(selected, label).clicked() {
+                let r = ui.selectable_label(selected, label);
+                if r.clicked() {
                     self.navigate(node.clone());
+                }
+                r
+            })
+            .inner
+        }
+    }
+
+    fn data_source_children(&mut self, ui: &mut egui::Ui, t: &crate::case_tree::DsTree) {
+        for v in &t.volumes {
+            let label = format!(
+                "{} {}",
+                if v.unallocated() {
+                    icons::UNALLOCATED
+                } else {
+                    icons::VOLUME
+                },
+                v.label()
+            );
+            let node = NodeId::Volume {
+                ds: t.ds.id,
+                volume: v.volume.id,
+            };
+            self.tree_node(ui, &node, &label, !v.roots.is_empty(), |app, ui| {
+                for r in &v.roots {
+                    app.fs_root_children(ui, r);
                 }
             });
         }
-    }
-
-    fn data_source_children(&mut self, ui: &mut egui::Ui, ds: &DataSource) {
-        if let Some(vs) = &ds.evidence.volume_system {
-            for p in &vs.partitions {
-                if p.kind == SlotKind::Meta {
-                    continue;
-                }
-                let label = format!(
-                    "{} vol{} ({}: {}-{})",
-                    if p.kind == SlotKind::Unallocated {
-                        icons::UNALLOCATED
-                    } else {
-                        icons::VOLUME
-                    },
-                    p.addr,
-                    p.description,
-                    p.start_sector,
-                    p.end_sector().saturating_sub(1)
-                );
-                let fs_idx = ds
-                    .evidence
-                    .filesystems
-                    .iter()
-                    .position(|f| f.partition.as_ref().is_some_and(|fp| fp.addr == p.addr));
-                let node = NodeId::Volume {
-                    ds: ds.id,
-                    addr: p.addr,
-                };
-                self.tree_node(ui, &node, &label, fs_idx.is_some(), |app, ui| {
-                    if let Some(i) = fs_idx {
-                        app.fs_root_children(ui, ds, i);
-                    }
-                });
-            }
-        } else {
-            if ds.evidence.filesystems.is_empty() {
-                ui.weak("No file system found");
-            }
-            for i in 0..ds.evidence.filesystems.len() {
-                self.fs_root_children(ui, ds, i);
-            }
+        if t.volumes.is_empty() && t.loose.is_empty() {
+            ui.weak("No file system found");
+        }
+        for r in &t.loose {
+            self.fs_root_children(ui, r);
         }
     }
 
-    fn fs_root_children(&mut self, ui: &mut egui::Ui, ds: &DataSource, fs_idx: usize) {
-        let Some(fs) = ds.fs(fs_idx) else { return };
+    fn fs_root_children(&mut self, ui: &mut egui::Ui, r: &crate::case_tree::FsRoot) {
         let root = NodeId::Dir {
-            ds: ds.id,
-            fs: fs_idx,
-            inode: fs.root(),
-            path: Arc::from("/"),
+            ds: r.fs.ds_id,
+            file: r.root.id,
         };
-        let label = format!("{} / ({})", icons::FOLDER, fs.info().kind);
+        let label = format!("{} / ({})", icons::FOLDER, r.fs.kind);
         self.tree_node(ui, &root, &label, true, |app, ui| {
             app.dir_children(ui, &root);
-            let orphans = NodeId::Orphans {
-                ds: ds.id,
-                fs: fs_idx,
-            };
-            app.tree_node(
-                ui,
-                &orphans,
-                &format!("{} $OrphanFiles", icons::FOLDER),
-                false,
-                |_, _| {},
-            );
         });
     }
 
     fn dir_children(&mut self, ui: &mut egui::Ui, node: &NodeId) {
-        let NodeId::Dir { ds, fs, .. } = node else {
+        let NodeId::Dir { ds, .. } = node else {
             return;
         };
-        let (ds, fs) = (*ds, *fs);
+        let ds = *ds;
         let ctx = ui.ctx().clone();
         match self.listing(&ctx, node).cloned() {
             None => {
@@ -1461,12 +1732,8 @@ impl PostmortemApp {
                 let mut dirs: Vec<&FileRow> = rows.iter().filter(|r| r.is_dir()).collect();
                 dirs.sort_by_key(|r| r.name.to_lowercase());
                 for r in dirs {
-                    let child = NodeId::Dir {
-                        ds,
-                        fs,
-                        inode: r.inode,
-                        path: Arc::from(r.path.as_str()),
-                    };
+                    let Some(file) = r.file_id() else { continue };
+                    let child = NodeId::Dir { ds, file };
                     let label = if r.deleted() {
                         format!("{} {} ✖", icons::FOLDER, r.name)
                     } else {
@@ -1520,19 +1787,14 @@ impl PostmortemApp {
         };
         match &node {
             NodeId::DataSource(ds) => self.data_source_summary(ui, *ds),
-            NodeId::Volume { ds, addr } => self.volume_summary(ui, *ds, *addr),
-            NodeId::Dir { path, .. } => {
-                ui.horizontal(|ui| {
-                    ui.strong("Listing");
-                    ui.monospace(path.as_ref());
-                });
-                self.file_table(ui, &node);
-            }
-            NodeId::Orphans { .. } => {
-                ui.strong("$OrphanFiles — deleted files whose parent directory is gone");
-                self.file_table(ui, &node);
-            }
+            NodeId::Volume { ds, volume } => self.volume_summary(ui, *ds, *volume),
+            NodeId::Dir { .. } => self.file_table(ui, &node),
             NodeId::Results { type_id } => self.results_view(ui, *type_id),
+            NodeId::TagFiles(_)
+            | NodeId::TagResults(_)
+            | NodeId::Score { .. }
+            | NodeId::OsAccounts => self.node_view(ui, &node),
+            NodeId::FileSearch(n) => self.search_view(ui, *n),
             NodeId::View(v) => self.view_table(ui, v),
         }
     }
@@ -1561,52 +1823,61 @@ impl PostmortemApp {
             }
             Some(Ok(r)) => Arc::clone(r),
         };
-        let title = case
-            .db()
-            .artifact_type_names()
-            .ok()
-            .and_then(|n| n.into_iter().find(|t| t.0 == type_id).map(|t| t.2))
+        // The title comes from the cached counts (no IO on the UI thread).
+        let title = self
+            .result_counts
+            .get(ui.ctx(), Some(&case), false)
+            .iter()
+            .find(|t| t.type_id == type_id)
+            .map(|t| t.display.clone())
             .unwrap_or_default();
-        if let Some(i) = self
-            .result_table
-            .ui(ui, &title, &rows, &self.prefs, self.result_selected)
+        let tags = self.tagging.catalog.get(ui.ctx(), Some(&case));
+        let ev = self.result_table.ui(
+            ui,
+            &title,
+            &rows,
+            &self.prefs,
+            self.result_selected,
+            Some(&tags),
+        );
+        if let Some((i, which, req)) = ev.tag
+            && let Some(r) = rows.rows.get(i)
         {
+            let target = match which {
+                crate::results::TagFor::Result => {
+                    Some(crate::tags_ui::TagTarget::Artifacts(vec![r.artifact.id]))
+                }
+                crate::results::TagFor::SourceFile => r
+                    .file
+                    .as_ref()
+                    .map(|f| crate::tags_ui::TagTarget::Files(vec![f.id])),
+            };
+            if let Some(target) = target {
+                self.tagging.request(ui.ctx(), &case, target, req);
+            }
+        }
+        if let Some(i) = ev.clicked {
             self.result_selected = Some(i);
             let content = rows
                 .rows
                 .get(i)
                 .and_then(|r| r.file.as_ref())
-                .and_then(|f| self.content_for(&case, f));
+                .and_then(|f| self.content_for(f));
             self.viewer.set_content(content);
         }
     }
 
     /// The evidence-backed content of a case file (for the viewers).
-    fn content_for(&self, case: &pm_case::Case, f: &pm_casedb::FileRecord) -> Option<Content> {
-        let ds = case.db().data_source(f.ds_id).ok()??;
-        let fs_rec = case.db().file_system(f.fs_id?).ok()??;
-        let first = PathBuf::from(ds.paths.first()?);
-        let src = self
-            .sources
-            .iter()
-            .find(|s| s.evidence.image.info.paths.first() == Some(&first))?;
-        let found = src
-            .evidence
-            .filesystems
-            .iter()
-            .find(|x| x.offset == fs_rec.byte_offset)?;
-        let mut row = FileRow::from_fs(&*found.fs, f.inode?, &f.path(), f.name_alloc);
-        row.name.clone_from(&f.name);
-        row.stream = f.stream;
-        row.size = f.size;
-        Some(Content {
-            fs: Arc::clone(&found.fs),
-            row,
-        })
+    fn content_for(&self, f: &pm_casedb::FileRecord) -> Option<Content> {
+        let case = self.analysis.lock().case().cloned()?;
+        Some(Content::from_case(case, crate::views::row_of(f)))
     }
 
     fn file_table(&mut self, ui: &mut egui::Ui, node: &NodeId) {
         let ctx = ui.ctx().clone();
+        let NodeId::Dir { ds, .. } = *node else {
+            return;
+        };
         let rows = match self.listing(&ctx, node).cloned() {
             None => {
                 ui.horizontal(|ui| {
@@ -1621,39 +1892,39 @@ impl PostmortemApp {
             }
             Some(Ok(r)) => r,
         };
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        if let Some(dir) = rows.first().and_then(|r| r.file.as_ref()) {
+            ui.horizontal(|ui| {
+                ui.strong("Listing");
+                ui.monospace(&dir.parent_path);
+            });
+        }
         ui.weak(format!("{} items", rows.len()));
-        let ev = self.table.ui(ui, &rows, &self.prefs);
-        let Some(fs) = self.fs_of(node) else { return };
-        if let Some(i) = ev.selected.and_then(|i| rows.get(i)) {
-            self.viewer.set_content(Some(Content {
-                fs: Arc::clone(&fs),
-                row: i.clone(),
-            }));
+        let tags = self.tagging.catalog.get(&ctx, Some(&case));
+        let ev = self.table.ui(ui, &rows, &self.prefs, Some(&tags));
+        if let Some((r, req)) = ev.tag.as_ref().and_then(|(i, q)| Some((rows.get(*i)?, *q)))
+            && let Some(id) = r.file_id()
+        {
+            self.tagging
+                .request(&ctx, &case, crate::tags_ui::TagTarget::Files(vec![id]), req);
+        }
+        let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
+        if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {
+            self.viewer.set_content(Some(content(r)));
         }
         if let Some(r) = ev.activated.and_then(|i| rows.get(i)) {
             if r.is_dir() {
-                let (NodeId::Dir { ds, fs: f, .. } | NodeId::Orphans { ds, fs: f }) = node.clone()
-                else {
-                    return;
-                };
-                self.navigate(NodeId::Dir {
-                    ds,
-                    fs: f,
-                    inode: r.inode,
-                    path: Arc::from(r.path.as_str()),
-                });
+                if let Some(file) = r.file_id() {
+                    self.navigate(NodeId::Dir { ds, file });
+                }
             } else {
-                self.open_popout(Content {
-                    fs: Arc::clone(&fs),
-                    row: r.clone(),
-                });
+                self.open_popout(content(r));
             }
         }
         if let Some(r) = ev.popout.and_then(|i| rows.get(i)) {
-            self.open_popout(Content {
-                fs: Arc::clone(&fs),
-                row: r.clone(),
-            });
+            self.open_popout(content(r));
         }
         if let Some(r) = ev.timeline.and_then(|i| rows.get(i)) {
             let t = r
@@ -1666,12 +1937,29 @@ impl PostmortemApp {
             }
         }
         if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
-            self.export(&ctx, Content { fs, row: r.clone() });
+            self.export(&ctx, content(r));
         }
     }
 
-    fn data_source_summary(&mut self, ui: &mut egui::Ui, ds: usize) {
-        let Some(d) = self.sources.get(ds).cloned() else {
+    /// The opened evidence of a case data source (matched by image path),
+    /// for the tools still on the in-memory index.
+    fn evidence_index(&self, ds_id: i64) -> Option<usize> {
+        let first = self.case_sources.find(ds_id)?.ds.paths.first()?;
+        let first = std::path::Path::new(first);
+        self.sources
+            .iter()
+            .position(|s| s.evidence.image.info.paths.first().map(PathBuf::as_path) == Some(first))
+    }
+
+    fn data_source_summary(&mut self, ui: &mut egui::Ui, ds_id: i64) {
+        let Some(d) = self
+            .evidence_index(ds_id)
+            .and_then(|i| self.sources.get(i).cloned())
+        else {
+            ui.horizontal(|ui| {
+                ui.spinner();
+                ui.weak("Opening the data source…");
+            });
             return;
         };
         let index = self.shared_index(ui.ctx());
@@ -1686,17 +1974,25 @@ impl PostmortemApp {
         }
     }
 
-    fn volume_summary(&mut self, ui: &mut egui::Ui, ds: usize, addr: u32) {
-        let Some(d) = self.sources.get(ds) else {
+    fn volume_summary(&mut self, ui: &mut egui::Ui, ds_id: i64, volume_id: i64) {
+        let Some(t) = self.case_sources.find(ds_id) else {
             return;
         };
-        let Some(vs) = &d.evidence.volume_system else {
+        let Some(v) = t.volumes.iter().find(|v| v.volume.id == volume_id) else {
             return;
         };
-        let Some(p) = vs.partitions.iter().find(|p| p.addr == addr) else {
-            return;
+        let vol = &v.volume;
+        ui.heading(format!("vol{} — {}", vol.addr, vol.description));
+        let bytes = vol.sector_count.saturating_mul(u64::from(vol.sector_size));
+        let fs = if v.roots.is_empty() {
+            "none detected".to_owned()
+        } else {
+            v.roots
+                .iter()
+                .map(|r| r.fs.kind.clone())
+                .collect::<Vec<_>>()
+                .join(", ")
         };
-        ui.heading(format!("vol{} — {}", p.addr, p.description));
         egui::Grid::new("vol-summary")
             .num_columns(2)
             .striped(true)
@@ -1707,22 +2003,23 @@ impl PostmortemApp {
                     ui.label(v);
                     ui.end_row();
                 };
-                kv("Kind", format!("{:?}", p.kind));
-                kv("Start sector", p.start_sector.to_string());
+                kv(
+                    "Kind",
+                    if v.unallocated() {
+                        "Unallocated"
+                    } else {
+                        "Allocated"
+                    }
+                    .to_owned(),
+                );
+                kv("Start sector", vol.start_sector.to_string());
                 kv(
                     "Length",
-                    format!("{} sectors — {}", p.sector_count, size_long(vs.byte_len(p))),
+                    format!("{} sectors — {}", vol.sector_count, size_long(bytes)),
                 );
-                if let Some(n) = &p.name {
+                if let Some(n) = &vol.name {
                     kv("Name", n.clone());
                 }
-                if let Some(u) = &p.unique_id {
-                    kv("Partition GUID", u.to_string());
-                }
-                let fs = d.evidence.fs_for_partition(addr).map_or_else(
-                    || "none detected".to_owned(),
-                    |f| f.fs.info().kind.to_string(),
-                );
                 kv("File system", fs);
             });
     }
@@ -1749,13 +2046,39 @@ impl PostmortemApp {
     }
 
     fn shortcuts(&mut self, ctx: &egui::Context) {
-        let (open, back, fwd) = ctx.input_mut(|i| {
+        let (open, back, fwd, bookmark) = ctx.input_mut(|i| {
             (
                 i.consume_key(egui::Modifiers::COMMAND, egui::Key::O),
                 i.consume_key(egui::Modifiers::ALT, egui::Key::ArrowLeft),
                 i.consume_key(egui::Modifiers::ALT, egui::Key::ArrowRight),
+                i.consume_shortcut(&crate::tags_ui::bookmark_shortcut()),
             )
         });
+        // Ctrl+B: bookmark the selected file (Autopsy tags selected results
+        // instead when the result view has a selection).
+        if bookmark && let Some(case) = self.analysis.lock().case().cloned() {
+            let result = match (&self.selected, self.result_selected) {
+                (Some(NodeId::Results { type_id }), Some(i)) => self
+                    .result_rows
+                    .get_mut(type_id)
+                    .and_then(Task::poll)
+                    .and_then(|r| r.as_ref().ok())
+                    .and_then(|rows| rows.rows.get(i))
+                    .map(|r| r.artifact.id),
+                _ => None,
+            };
+            let target = match result {
+                Some(a) => Some(crate::tags_ui::TagTarget::Artifacts(vec![a])),
+                None => self
+                    .viewer
+                    .content()
+                    .and_then(|c| c.row.file_id())
+                    .map(|f| crate::tags_ui::TagTarget::Files(vec![f])),
+            };
+            if let Some(t) = target {
+                self.tagging.bookmark(ctx, &case, t);
+            }
+        }
         if open && self.has_case() {
             self.pick_image(ctx);
         }
@@ -1785,7 +2108,173 @@ impl PostmortemApp {
         }
     }
 
+    /// The File Search by Attributes window.
+    fn file_search_window(&mut self, ctx: &egui::Context) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            self.file_search = None;
+            return;
+        };
+        if self.file_search.is_none() {
+            return;
+        }
+        let sources: Vec<(i64, String, String)> = self
+            .case_sources
+            .get(ctx, Some(&case), false)
+            .iter()
+            .map(|t| (t.ds.id, t.ds.name.clone(), t.ds.timezone.clone()))
+            .collect();
+        let loader = Arc::clone(&case);
+        let mimes = self
+            .mime_types
+            .get(ctx, move || {
+                loader.db().mime_types().map_err(|e| e.to_string())
+            })
+            .unwrap_or_default();
+        let Some(w) = self.file_search.as_mut() else {
+            return;
+        };
+        match w.ui(ctx, &sources, &mimes) {
+            crate::file_search_ui::SearchAction::None => {}
+            crate::file_search_ui::SearchAction::Close => self.file_search = None,
+            crate::file_search_ui::SearchAction::Search(search) => {
+                let number = self.searches.len() + 1;
+                self.searches.push(crate::file_search_ui::SearchResults {
+                    number,
+                    rows: crate::task::Cached::default(),
+                    search: Arc::from(search),
+                });
+                self.navigate(NodeId::FileSearch(number));
+            }
+        }
+    }
+
+    /// Autopsy's "Remove Data Source" confirmation and the removal task.
+    fn remove_data_source_dialog(&mut self, ctx: &egui::Context) {
+        if let Some(t) = &mut self.removing
+            && let Some(r) = t.poll()
+        {
+            if let Err(e) = r {
+                self.errors.push(e.clone());
+            }
+            self.removing = None;
+            // Everything shown from the case may refer to removed rows.
+            self.case_sources.invalidate();
+            self.listings.clear();
+            self.view_counts.invalidate();
+            self.view_rows.clear();
+            self.result_counts.invalidate();
+            self.result_rows.clear();
+            self.case_summary.refresh();
+            self.node_views.clear();
+            self.selected = None;
+            self.back.clear();
+            self.forward.clear();
+            self.viewer.set_content(None);
+        }
+        let Some((id, name)) = self.confirm_remove.clone() else {
+            return;
+        };
+        let mut close = false;
+        egui::Modal::new(egui::Id::new("remove-ds")).show(ctx, |ui| {
+            ui.heading("Remove Data Source");
+            ui.label(format!(
+                "Are you sure you want to remove {name} from the case?\nThe data source and its analysis results will be removed from the case database; the image file is not deleted."
+            ));
+            ui.horizontal(|ui| {
+                if ui.button("Remove").clicked() {
+                    if let Some(case) = self.analysis.lock().case().cloned() {
+                        self.removing = Some(Task::spawn(ctx, move || {
+                            case.delete_data_source(id).map_err(|e| e.to_string())
+                        }));
+                    }
+                    close = true;
+                }
+                if ui.button("Cancel").clicked() {
+                    close = true;
+                }
+            });
+        });
+        if close {
+            self.confirm_remove = None;
+        }
+    }
+
+    /// "File Search Results {n}".
+    fn search_view(&mut self, ui: &mut egui::Ui, number: usize) {
+        let ctx = ui.ctx().clone();
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        let Some(s) = self.searches.iter_mut().find(|s| s.number == number) else {
+            return;
+        };
+        ui.heading(format!("File Search Results {number}"));
+        let (loader, search) = (Arc::clone(&case), Arc::clone(&s.search));
+        let Some(data) = s
+            .rows
+            .get(&ctx, move || crate::file_search_ui::run(&loader, &search))
+        else {
+            if let Some(e) = s.rows.error() {
+                ui.colored_label(ui.visuals().error_fg_color, e.to_owned());
+            } else {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Performing file search by attributes. Please wait.");
+                });
+            }
+            return;
+        };
+        let (rows, more) = (&data.0, data.1);
+        if rows.is_empty() {
+            ui.weak("No results found.");
+            return;
+        }
+        ui.weak(if more {
+            format!(
+                "{} matches shown; there are more. Narrow the search.",
+                crate::format::grouped(rows.len() as u64)
+            )
+        } else {
+            format!("{} matches", crate::format::grouped(rows.len() as u64))
+        });
+        let tags = self.tagging.catalog.get(&ctx, Some(&case));
+        let ev = self.table.ui(ui, rows, &self.prefs, Some(&tags));
+        if let Some((i, req)) = ev.tag
+            && let Some(id) = rows.get(i).and_then(FileRow::file_id)
+        {
+            self.tagging
+                .request(&ctx, &case, crate::tags_ui::TagTarget::Files(vec![id]), req);
+        }
+        let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
+        if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {
+            self.viewer.set_content(Some(content(r)));
+        }
+        if let Some(r) = ev.activated.or(ev.popout).and_then(|i| rows.get(i)) {
+            self.open_popout(content(r));
+        }
+        if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
+            self.export(&ctx, content(r));
+        }
+    }
+
     fn dialogs(&mut self, ctx: &egui::Context) {
+        self.file_search_window(ctx);
+        if let Some(d) = self.run_ingest.as_mut() {
+            match d.ui(ctx) {
+                crate::add_source::RunAction::None => {}
+                crate::add_source::RunAction::Cancel => self.run_ingest = None,
+                crate::add_source::RunAction::Run(req) => {
+                    let (ds_id, settings, prefs) = *req;
+                    let name = d.ds_name.clone();
+                    self.run_ingest = None;
+                    self.persisted.ingest = prefs;
+                    if let Err(e) = self.analysis.lock().run_ingest(ctx, ds_id, name, settings) {
+                        self.errors.push(e);
+                    }
+                }
+            }
+        }
+        self.remove_data_source_dialog(ctx);
         if let Some(w) = self.add_wizard.as_mut() {
             match w.ui(ctx) {
                 crate::add_source::AddAction::None => {}
@@ -1885,22 +2374,29 @@ impl PostmortemApp {
             })
             .collect();
         let resolver = move |c: &Content| -> Option<crate::viewers::FileHashes> {
-            let same = |a: &Arc<dyn pm_fs::FileSystem>| {
-                std::ptr::addr_eq(Arc::as_ptr(a), Arc::as_ptr(&c.fs))
-            };
-            let (_, path, offset) = fss.iter().find(|(fs, ..)| same(fs))?;
             let db = case.db();
-            let ds = db
-                .data_sources()
-                .ok()?
-                .into_iter()
-                .find(|d| d.paths.first().map(PathBuf::from).as_ref() == Some(path))?;
-            let fs = db
-                .file_systems(ds.id)
-                .ok()?
-                .into_iter()
-                .find(|f| f.byte_offset == *offset)?;
-            let f = db.file_by_inode(fs.id, c.row.inode, c.row.stream).ok()??;
+            let f = match &c.origin {
+                // Re-read the row: hashes may have been computed since it
+                // was listed.
+                crate::model::ContentOrigin::Case(_) => db.file(c.row.file_id()?).ok()??,
+                crate::model::ContentOrigin::Fs(open) => {
+                    let same = |a: &Arc<dyn pm_fs::FileSystem>| {
+                        std::ptr::addr_eq(Arc::as_ptr(a), Arc::as_ptr(open))
+                    };
+                    let (_, path, offset) = fss.iter().find(|(fs, ..)| same(fs))?;
+                    let ds = db
+                        .data_sources()
+                        .ok()?
+                        .into_iter()
+                        .find(|d| d.paths.first().map(PathBuf::from).as_ref() == Some(path))?;
+                    let fs = db
+                        .file_systems(ds.id)
+                        .ok()?
+                        .into_iter()
+                        .find(|f| f.byte_offset == *offset)?;
+                    db.file_by_inode(fs.id, c.row.inode, c.row.stream).ok()??
+                }
+            };
             let hex = |v: Option<Vec<u8>>| v.map(|b| pm_core::decode::to_hex(&b));
             Some(crate::viewers::FileHashes {
                 md5: hex(f.md5),
@@ -1927,6 +2423,20 @@ impl PostmortemApp {
             self.shared_index(&ctx);
         }
         self.shortcuts(&ctx);
+        let case = self.analysis.lock().case().cloned();
+        let errors = self.tagging.ui(&ctx, case.as_ref());
+        self.errors.extend(errors);
+        if self.tagging.take_changed() {
+            // Scores and tag columns changed.
+            self.listings.clear();
+            self.view_rows.clear();
+            self.result_rows.clear();
+            self.case_summary.refresh();
+            self.node_views.clear();
+            for s in &mut self.searches {
+                s.rows.refresh();
+            }
+        }
         egui::Panel::top("menu").show(ui, |ui| {
             self.menu_bar(ui);
             self.toolbar(ui);

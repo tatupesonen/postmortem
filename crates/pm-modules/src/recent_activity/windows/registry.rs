@@ -12,6 +12,7 @@ use pm_registry::Hive;
 use pm_winartifacts::registry::{ntuser, sam, shellbags, shimcache, software, system};
 use pm_winartifacts::usb_ids;
 
+use super::accounts::{self, Account};
 use super::art::{Batch, NewArt, Types, ds_artifact_exists};
 use super::{PathLookup, Visits, files_with_ext, open_hive, user_of};
 
@@ -35,18 +36,6 @@ pub(crate) fn hive_files(ctx: &JobContext, which: &str) -> Result<Vec<FileRecord
         .into_iter()
         .filter(|f| f.stream.is_none() && f.size > 0)
         .collect())
-}
-
-/// What one OS account looks like after all hives were read.
-#[derive(Debug, Default)]
-struct Account {
-    file_id: i64,
-    login: String,
-    full_name: Option<String>,
-    domain: Option<String>,
-    home_dir: Option<String>,
-    sam: Option<sam::SamUser>,
-    groups: Vec<String>,
 }
 
 /// Autopsy's `OSInfo` accumulator, extended.
@@ -96,14 +85,6 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
                     ..Account::default()
                 },
             );
-            if let Some(email) = &u.internet_name {
-                batch.push(
-                    NewArt::std(ctx, "TSK_ACCOUNT", Some(f.id))
-                        .text("TSK_ACCOUNT_TYPE", "EMAIL")
-                        .text("TSK_ID", email.clone())
-                        .key(&["TSK_ACCOUNT_TYPE", "TSK_ID"]),
-                );
-            }
         }
     }
 
@@ -142,7 +123,7 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
                 acc.login.clone_from(&p.user);
             }
             if !local {
-                acc.domain = Some(String::new()); // filled with the domain below
+                acc.domain = true;
             }
             acc.home_dir = home.or(acc.home_dir.take());
         }
@@ -246,100 +227,9 @@ pub(crate) fn extract(ctx: &JobContext, _v: &mut Visits) -> Result<(), ModuleErr
         );
     }
 
-    // OS accounts.
-    let q_types: Vec<(i64, i64)> = (1..=3)
-        .map(|i| {
-            (
-                types.attribute(
-                    ctx,
-                    &format!("RA_SAM_QUESTION_{i}"),
-                    &format!("Security Question {i}"),
-                    ValueType::String,
-                ),
-                types.attribute(
-                    ctx,
-                    &format!("RA_SAM_ANSWER_{i}"),
-                    &format!("Security Answer {i}"),
-                    ValueType::String,
-                ),
-            )
-        })
-        .collect();
-    for (sid, a) in &accounts {
-        let mut art = NewArt::std(ctx, "TSK_OS_ACCOUNT", Some(a.file_id))
-            .text("TSK_USER_ID", sid.clone())
-            .text_opt("TSK_USER_NAME", Some(a.login.clone()))
-            .text_opt("TSK_NAME", a.full_name.clone())
-            .text_opt(
-                "TSK_DOMAIN",
-                a.domain
-                    .as_ref()
-                    .map(|_| domain_name.clone().unwrap_or_default()),
-            )
-            .text(
-                "TSK_REALM",
-                if a.domain.is_some() {
-                    "DOMAIN"
-                } else {
-                    "LOCAL"
-                },
-            )
-            .text_opt("TSK_HOME_DIR", a.home_dir.clone())
-            .text_opt("TSK_GROUPS", Some(a.groups.join(", ")))
-            .key(&["TSK_USER_ID"]);
-        if let Some(u) = &a.sam {
-            art = art
-                .time("TSK_DATETIME_CREATED", u.created)
-                .time("TSK_DATETIME_ACCESSED", u.last_login)
-                .int("TSK_COUNT", i64::from(u.login_count))
-                .text_opt("TSK_DESCRIPTION", u.comment.clone())
-                .text_opt("TSK_EMAIL", u.internet_name.clone())
-                .time("TSK_DATETIME_PASSWORD_RESET", u.password_reset)
-                .time("TSK_DATETIME_PASSWORD_FAIL", u.password_fail)
-                .text_opt("TSK_PASSWORD_HINT", u.password_hint.clone())
-                .text_opt(
-                    "TSK_PASSWORD_SETTINGS",
-                    Some(settings(
-                        u,
-                        &["Password does not expire", "Password not required"],
-                    )),
-                )
-                .text_opt(
-                    "TSK_ACCOUNT_SETTINGS",
-                    Some(settings(
-                        u,
-                        &[
-                            "Account auto locked",
-                            "Home directory required",
-                            "Account Disabled",
-                        ],
-                    )),
-                )
-                .text_opt(
-                    "TSK_FLAG",
-                    Some(settings(
-                        u,
-                        &[
-                            "Normal user account",
-                            "Server trust account",
-                            "Workstation trust account",
-                            "Interdomain trust account",
-                            "MNS logon user account",
-                            "Temporary duplicate account",
-                        ],
-                    )),
-                );
-            if u.is_admin() {
-                art = art.int("TSK_IS_ADMIN", 1);
-            }
-            for ((q, an), (qt, at)) in u.security_questions.iter().zip(&q_types) {
-                art = art
-                    .custom(*qt, Some(Value::Text(q.clone())))
-                    .custom(*at, Some(Value::Text(an.clone())));
-            }
-        }
-        batch.push(art);
-    }
+    // OS accounts (not artifacts, as in Autopsy 4.19+).
+    let n_accounts = accounts::record(ctx, &mut types, &accounts, domain_name.as_deref())?;
+    tracing::debug!(accounts = n_accounts, "OS accounts recorded");
 
     if found_any {
         post_os_info(ctx, &mut types, &mut batch, &os);
@@ -359,16 +249,6 @@ fn home_dir(p: &str) -> String {
         p
     };
     s.replace('\\', "/")
-}
-
-/// Comma-joined names of the flags set (Autopsy's `getSettingsFromMap`).
-fn settings(u: &sam::SamUser, keys: &[&str]) -> String {
-    let set = u.flag_names();
-    keys.iter()
-        .filter(|k| set.contains(k))
-        .copied()
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 #[allow(

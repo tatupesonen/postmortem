@@ -90,6 +90,20 @@ impl JobContext {
     /// files so they run through the whole file pipeline, recursively.
     /// Rows without an id get one from the shared allocator.
     pub fn add_derived_files(&self, files: Vec<NewFile>) -> Result<Vec<FileRecord>, ModuleError> {
+        let records = self.insert_derived_files(files)?;
+        self.add_files_to_job(records.clone());
+        Ok(records)
+    }
+
+    /// Inserts derived, carved or local files through the job's writer
+    /// (committed when this returns) **without** scheduling them; the
+    /// module calls [`Self::add_files_to_job`] once it has recorded what
+    /// it needs about them (e.g. the nesting depth of extracted archives,
+    /// which another worker may otherwise look up too early).
+    pub fn insert_derived_files(
+        &self,
+        files: Vec<NewFile>,
+    ) -> Result<Vec<FileRecord>, ModuleError> {
         if files.is_empty() {
             return Ok(Vec::new());
         }
@@ -97,12 +111,10 @@ impl JobContext {
         self.sink
             .send(WriteOp::Files(files, reply))
             .map_err(|_| ModuleError::new("the result writer has stopped"))?;
-        let records = answer
+        answer
             .recv()
             .map_err(|_| ModuleError::new("the result writer has stopped"))?
-            .map_err(ModuleError)?;
-        self.add_files_to_job(records.clone());
-        Ok(records)
+            .map_err(ModuleError)
     }
 
     /// Schedules files that are already in the case database as

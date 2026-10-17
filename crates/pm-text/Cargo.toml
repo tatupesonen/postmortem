@@ -1,0 +1,30 @@
+[package]
+name = "pm-text"
+description = "Streaming text extraction for keyword search: encodings, plain text, Autopsy's strings scanners, HTML, XML, Office (OOXML, ODF, legacy OLE), RTF, PDF, e-mail, SQLite, and Autopsy's chunker"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-core.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+jiff.workspace = true
+rusqlite.workspace = true
+tempfile.workspace = true
+encoding_rs = "=0.8.35"
+chardetng = "=1.0.0"
+quick-xml = "=0.41.0"
+zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+cfb = "=0.15.0"
+pdf-extract = "=0.12.1"
+mail-parser = { version = "=0.11.9", default-features = false, features = ["full_encoding"] }
+unicode-normalization = "=0.1.25"
+memchr = "=2.8.3"
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

@@ -42,6 +42,9 @@ pub struct NewTagName {
     pub notable: bool,
 }
 
+/// Name of the Project VIC tag set (Autopsy Image Gallery categories).
+pub const PROJECT_VIC: &str = "Project VIC";
+
 pub(crate) const TAG_NAME_COLS: &str = "id, name, description, color, notable, tag_set_id, rank";
 
 fn artifact_tag_from_row(r: &rusqlite::Row<'_>) -> rusqlite::Result<ArtifactTag> {
@@ -260,6 +263,63 @@ impl CaseDb {
                 .collect::<rusqlite::Result<Vec<_>>>()?;
             Ok(rows)
         })
+    }
+
+    /// The tags of many files (one listing page), by file.
+    pub fn file_tags_of(&self, file_ids: &[i64]) -> Result<Vec<FileTag>> {
+        self.read(|c| {
+            let mut st = c.prepare_cached(&format!(
+                "{FILE_TAG_SELECT} WHERE ft.file_id = ?1 ORDER BY ft.id"
+            ))?;
+            let mut out = Vec::new();
+            for id in file_ids {
+                for t in st.query_map([id], FileTag::from_row)? {
+                    out.push(t?);
+                }
+            }
+            Ok(out)
+        })
+    }
+
+    /// The tags of many artifacts (one result page).
+    pub fn artifact_tags_of(&self, artifact_ids: &[i64]) -> Result<Vec<ArtifactTag>> {
+        self.read(|c| {
+            let mut st = c.prepare_cached(&format!(
+                "{ARTIFACT_TAG_SELECT} WHERE at.artifact_id = ?1 ORDER BY at.id"
+            ))?;
+            let mut out = Vec::new();
+            for id in artifact_ids {
+                for t in st.query_map([id], artifact_tag_from_row)? {
+                    out.push(t?);
+                }
+            }
+            Ok(out)
+        })
+    }
+
+    /// Creates Autopsy's "Project VIC" tag set unless the case already has
+    /// it (the Image Gallery service does this when a case opens).
+    pub fn ensure_project_vic_tags(&self) -> Result<()> {
+        if self.tag_sets()?.iter().any(|s| s.name == PROJECT_VIC) {
+            return Ok(());
+        }
+        let n = |name: &str, color: &str, notable: bool| NewTagName {
+            name: name.into(),
+            description: String::new(),
+            color: color.into(),
+            notable,
+        };
+        self.add_tag_set(
+            PROJECT_VIC,
+            &[
+                n("Non-Pertinent", "GREEN", false),
+                n("Child Abuse Material - (CAM)", "RED", true),
+                n("Child Exploitive (Non-CAM) Age Difficult", "YELLOW", true),
+                n("CGI/Animation - Child Exploitive", "FUCHSIA", true),
+                n("Comparison Images", "BLUE", false),
+            ],
+        )?;
+        Ok(())
     }
 
     /// One keyset page of the file tags with a tag name.

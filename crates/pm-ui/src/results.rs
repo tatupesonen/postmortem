@@ -11,7 +11,9 @@ use pm_casedb::catalog::Category;
 use pm_casedb::{ArtifactRecord, FileRecord, Significance, Value};
 
 use crate::format::{DisplayPrefs, grouped};
+use crate::model::RowTag;
 use crate::sortable::{Order, Sort, cmp_text};
+use crate::tags_ui::{TagCatalog, TagRequest};
 use crate::task::Task;
 
 /// Rows shown per result type (the table is not paged yet).
@@ -110,6 +112,8 @@ pub(crate) struct ResultRow {
     pub(crate) file: Option<FileRecord>,
     /// Attribute display name → formatted value.
     pub(crate) attrs: Vec<(String, AttrValue)>,
+    /// Tags on the result (Remove Result Tag menu).
+    pub(crate) tags: Vec<RowTag>,
 }
 
 /// An attribute value kept typed so times follow the display preference.
@@ -176,6 +180,8 @@ pub(crate) fn load_rows(case: &Case, type_id: i64) -> Result<ResultRows, String>
         truncated,
         ..ResultRows::default()
     };
+    let ids: Vec<i64> = arts.iter().take(MAX_ROWS).map(|a| a.id).collect();
+    let tags = db.artifact_tags_of(&ids).map_err(|e| e.to_string())?;
     for artifact in arts.into_iter().take(MAX_ROWS) {
         let attrs: Vec<(String, AttrValue)> = db
             .attributes(artifact.id)
@@ -200,10 +206,21 @@ pub(crate) fn load_rows(case: &Case, type_id: i64) -> Result<ResultRows, String>
             Some(id) => db.file(id).map_err(|e| e.to_string())?,
             None => None,
         };
+        let tags = tags
+            .iter()
+            .filter(|t| t.artifact_id == artifact.id)
+            .map(|t| RowTag {
+                id: t.id,
+                tag_name_id: t.tag_name_id,
+                name: t.tag_name.clone(),
+                comment: t.comment.clone(),
+            })
+            .collect();
         out.rows.push(ResultRow {
             artifact,
             file,
             attrs,
+            tags,
         });
     }
     Ok(out)
@@ -297,6 +314,21 @@ fn columns(data: &ResultRows) -> Vec<ResultCol> {
     cols
 }
 
+/// Which item a tag menu choice is for.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum TagFor {
+    Result,
+    SourceFile,
+}
+
+/// What happened in the result table this frame (row indices into
+/// `data.rows`).
+#[derive(Debug, Default)]
+pub(crate) struct ResultEvents {
+    pub(crate) clicked: Option<usize>,
+    pub(crate) tag: Option<(usize, TagFor, TagRequest)>,
+}
+
 /// A sortable, horizontally scrolling table of results.
 #[derive(Debug, Default)]
 pub(crate) struct ResultTable {
@@ -314,7 +346,8 @@ impl ResultTable {
         data: &ResultRows,
         prefs: &DisplayPrefs,
         selected: Option<usize>,
-    ) -> Option<usize> {
+        tags: Option<&TagCatalog>,
+    ) -> ResultEvents {
         ui.style_mut().interaction.selectable_labels = false;
         ui.horizontal(|ui| {
             ui.strong(title);
@@ -338,7 +371,7 @@ impl ResultTable {
                 _ => Ordering::Equal,
             },
         );
-        let mut clicked = None;
+        let mut ev = ResultEvents::default();
         let mut sort = self.sort;
         crate::sortable::hscroll(ui, "results-h", |ui| {
             let mut table = TableBuilder::new(ui)
@@ -375,14 +408,37 @@ impl ResultTable {
                         for c in &cols {
                             row.col(|ui| cell(ui, data, r, *c, prefs));
                         }
-                        if row.response().clicked() {
-                            clicked = Some(i);
+                        let resp = row.response();
+                        if resp.clicked() {
+                            ev.clicked = Some(i);
+                        }
+                        if let Some(cat) = tags {
+                            resp.context_menu(|ui| {
+                                ev.clicked = Some(i);
+                                if let Some(t) = crate::tags_ui::add_menu(ui, "Add Result Tag", cat)
+                                {
+                                    ev.tag = Some((i, TagFor::Result, t));
+                                }
+                                if let Some(t) =
+                                    crate::tags_ui::remove_menu(ui, "Remove Result Tag", &r.tags)
+                                {
+                                    ev.tag = Some((i, TagFor::Result, t));
+                                }
+                                if r.file.is_some() {
+                                    ui.separator();
+                                    if let Some(t) =
+                                        crate::tags_ui::add_menu(ui, "Add File Tag", cat)
+                                    {
+                                        ev.tag = Some((i, TagFor::SourceFile, t));
+                                    }
+                                }
+                            });
                         }
                     });
                 });
         });
         self.sort = sort;
-        clicked
+        ev
     }
 }
 

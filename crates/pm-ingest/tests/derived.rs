@@ -106,6 +106,8 @@ struct Expander {
     cancel: bool,
     /// Only expand roots without children (Autopsy re-extraction check).
     skip_existing: bool,
+    /// Insert with `insert_derived_files` and schedule only regular files.
+    defer: bool,
     added: Mutex<Vec<FileRecord>>,
 }
 
@@ -175,7 +177,18 @@ impl FileModule for ExpanderFile {
             if e.cancel {
                 ctx.cancel_job();
             }
-            let recs = ctx.add_derived_files(new)?;
+            let recs = if e.defer {
+                let recs = ctx.insert_derived_files(new)?;
+                ctx.add_files_to_job(
+                    recs.iter()
+                        .filter(|r| r.kind == FileKindCode::Regular)
+                        .cloned()
+                        .collect(),
+                );
+                recs
+            } else {
+                ctx.add_derived_files(new)?
+            };
             e.added.lock().extend(recs);
         }
         Ok(())
@@ -372,6 +385,43 @@ fn derived_files_are_reinjected_recursively_exactly_once() {
     let snap = progress.snapshot();
     assert_eq!(snap.files_done, snap.files_total);
     assert_eq!(s.files, (before + added.len()) as u64);
+}
+
+/// `insert_derived_files` writes rows without scheduling them; the module
+/// schedules what it wants with `add_files_to_job`.
+#[test]
+fn inserted_files_run_only_when_scheduled() {
+    let (_t, case, ds_id) = case();
+    let roots = roots(&case, ds_id);
+    let expander = Arc::new(Expander {
+        roots: roots.iter().map(|r| r.id).collect(),
+        depth: 2,
+        defer: true,
+        ..Expander::default()
+    });
+    let recorder = Arc::new(Recorder::default());
+    let (s, progress) = run(
+        &case,
+        ds_id,
+        &settings(),
+        vec![
+            Arc::new(ExpF(Arc::clone(&expander))),
+            Arc::new(RecF(Arc::clone(&recorder))),
+        ],
+    );
+    assert!(s.errors.is_empty(), "{:?}", s.errors);
+    let added = expander.added.lock().clone();
+    // Per root: dir, a.bin, child.nest1, then (nest2, leaf1).
+    assert_eq!(added.len(), 2 * 5);
+    let seen: Vec<i64> = recorder.seen.lock().iter().map(|x| x.0).collect();
+    for a in &added {
+        assert!(case.db().file(a.id).unwrap().is_some());
+        let n = seen.iter().filter(|i| **i == a.id).count();
+        let want = usize::from(a.kind == FileKindCode::Regular);
+        assert_eq!(n, want, "{}", a.path());
+    }
+    let snap = progress.snapshot();
+    assert_eq!(snap.files_done, snap.files_total);
 }
 
 #[test]

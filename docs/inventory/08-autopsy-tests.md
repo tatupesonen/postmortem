@@ -1374,19 +1374,19 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [ ] port: IngestFileFiltersTest.testExtAndDirWithTwoRules — OR across rules
 - [ ] port: IngestFileFiltersTest.testFullFileNameRule — full-name rule (case-insensitive)
 - [ ] port: IngestFileFiltersTest.testCarvingWithExtRuleAndUnallocSpace — unallocated space included; carved files filtered; Unalloc_* processed
-- [ ] port: IngestFileFiltersTest.testCarvingNoUnallocatedSpace — carver start-up error when unallocated space is excluded (exactly 1 error, module "PhotoRec Carver")
+- [x] port: IngestFileFiltersTest.testCarvingNoUnallocatedSpace — carver start-up error when unallocated space is excluded (exactly 1 error, module "PhotoRec Carver")
 - [ ] port: IngestFileFiltersTest.testEmbeddedJpg — extracted children obey the filter; derived/local directories typed
 - [ ] port: FilesSet condition semantics — ParentPath substring (case-insensitive, `parent + "/"`), Extension exact (leading dot stripped), FullName exact, meta-type FILES, ignoreUnallocated rejects UNALLOC/SLACK/UNUSED
 - [ ] port: ingest scheduler — `.`/`..` never processed; directories bypass the filter
 - [x] decide: directory MIME-type semantics (section 3 inconsistency), with an ADR (ADR-019: directories get none)
 
 ### Embedded file extraction
-- [ ] port: EmbeddedFileTest.runTestEncryptionAndZipBomb — protected zips → TSK_ENCRYPTION_DETECTED; depth bomb (> MAX_DEPTH 4) and ratio bomb (≥ 600) → TSK_INTERESTING_ITEM set "Possible Zip Bomb"; other files no artefacts
-- [ ] port: EmbeddedFileTest.runTestExtension — zip named .txt is extracted
-- [ ] port: EmbeddedFileTest.runTestBigFolder — 1000 extracted files, names file1..file1000.txt, MD5 098f6bcd4621d373cade4e832627b4f6
-- [ ] port: EmbeddedFileTest.runTestDeepFolder — 25-deep directories inside an archive; name-ordered child listing
-- [ ] port: EmbeddedFileTest.runTestEmbeddedFile — nested zips, paths `/<parent>/<archive>/<entry>`
-- [ ] port: EmbeddedFileTest.runTestContent — all extractable .txt hashed; protected entries not extracted or hashed
+- [x] port: EmbeddedFileTest.runTestEncryptionAndZipBomb — protected zips → TSK_ENCRYPTION_DETECTED; depth bomb (> MAX_DEPTH 4) and ratio bomb (≥ 600) → TSK_INTERESTING_ITEM set "Possible Zip Bomb"; other files no artefacts
+- [x] port: EmbeddedFileTest.runTestExtension — zip named .txt is extracted
+- [x] port: EmbeddedFileTest.runTestBigFolder — 1000 extracted files, names file1..file1000.txt, MD5 098f6bcd4621d373cade4e832627b4f6
+- [x] port: EmbeddedFileTest.runTestDeepFolder — 25-deep directories inside an archive; name-ordered child listing
+- [x] port: EmbeddedFileTest.runTestEmbeddedFile — nested zips, paths `/<parent>/<archive>/<entry>`
+- [x] port: EmbeddedFileTest.runTestContent — all extractable .txt hashed; protected entries not extracted or hashed
 
 ### Encryption detection
 - [ ] port: EncryptionDetectionTest.testBitlockerEncryption — BitLocker volume → TSK_ENCRYPTION_DETECTED, comment exactly "Bitlocker encryption detected."; other volumes none
