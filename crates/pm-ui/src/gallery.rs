@@ -51,10 +51,10 @@ pub(crate) fn self_content(sources: &[DataSource], idx: &FileIndex, i: usize) ->
     let f = idx.files.get(i)?;
     let ds = sources.iter().find(|d| d.id as u32 == f.ds)?;
     let fs = ds.fs(f.fs as usize)?;
-    Some(Content {
-        fs: Arc::clone(fs),
-        row: FileRow::from_fs(&**fs, f.inode, &f.path, f.name_allocated),
-    })
+    Some(Content::from_fs(
+        Arc::clone(fs),
+        FileRow::from_fs(&**fs, f.inode, &f.path, f.name_allocated),
+    ))
 }
 
 impl GalleryWindow {
@@ -106,10 +106,10 @@ impl GalleryWindow {
         let f = idx.files.get(i)?;
         let ds = self.sources.iter().find(|d| d.id as u32 == f.ds)?;
         let fs = ds.fs(f.fs as usize)?;
-        Some(Content {
-            fs: Arc::clone(fs),
-            row: FileRow::from_fs(&**fs, f.inode, &f.path, f.name_allocated),
-        })
+        Some(Content::from_fs(
+            Arc::clone(fs),
+            FileRow::from_fs(&**fs, f.inode, &f.path, f.name_allocated),
+        ))
     }
 
     pub(crate) fn ui(&mut self, ui: &mut egui::Ui) {

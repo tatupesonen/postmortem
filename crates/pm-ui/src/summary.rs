@@ -198,10 +198,10 @@ fn pie(ui: &mut egui::Ui, counts: &[u64; 6]) {
 
 fn content(ds: &DataSource, f: &IndexedFile) -> Option<Content> {
     let fs = ds.fs(f.fs as usize)?;
-    Some(Content {
-        fs: Arc::clone(fs),
-        row: FileRow::from_fs(&**fs, f.inode, &f.path, f.name_allocated),
-    })
+    Some(Content::from_fs(
+        Arc::clone(fs),
+        FileRow::from_fs(&**fs, f.inode, &f.path, f.name_allocated),
+    ))
 }
 
 fn recent(

@@ -113,6 +113,8 @@ impl std::fmt::Debug for HashResolver {
 pub(crate) struct ViewerPanel {
     content: Option<Content>,
     source: Option<Result<SharedSource, String>>,
+    /// File system of the shown file (for live metadata, streams, layout).
+    fs: Option<Arc<dyn pm_fs::FileSystem>>,
     kind: Sniffed,
     tab: Tab,
     /// Tab explicitly chosen by the user (overrides auto-selection).
@@ -130,6 +132,7 @@ impl Default for ViewerPanel {
         Self {
             content: None,
             source: None,
+            fs: None,
             kind: Sniffed::Empty,
             tab: Tab::Hex,
             pinned: None,
@@ -175,6 +178,7 @@ impl ViewerPanel {
             .as_ref()
             .filter(|c| !c.row.is_dir())
             .map(Content::source);
+        self.fs = content.as_ref().and_then(Content::filesystem);
         self.kind = match &self.source {
             Some(Ok(src)) => {
                 let mut head = vec![0u8; 4096];
@@ -245,7 +249,9 @@ impl ViewerPanel {
         }
         let src = self.source.as_ref().and_then(|s| s.as_ref().ok()).cloned();
         match (self.tab, src) {
-            (Tab::Metadata, _) => metadata::ui(ui, &content, prefs, self.hashes.as_ref()),
+            (Tab::Metadata, _) => {
+                metadata::ui(ui, &content, self.fs.as_ref(), prefs, self.hashes.as_ref());
+            }
             (Tab::Hex, Some(src)) => self.hex.ui(ui, &src),
             (Tab::Strings, Some(src)) => self.strings.ui(ui, &src),
             (Tab::Text, Some(src)) => self.text.ui(ui, &src),

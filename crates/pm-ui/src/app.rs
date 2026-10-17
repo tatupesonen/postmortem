@@ -7,7 +7,6 @@ use std::sync::atomic::{AtomicBool, Ordering};
 
 use parking_lot::Mutex;
 use pm_evidence::OpenOptions;
-use pm_volume::SlotKind;
 
 use crate::analysis::Analysis;
 use crate::case_ui::{NewCaseWizard, WelcomeAction, WizardAction};
@@ -16,7 +15,7 @@ use crate::format::{DisplayPrefs, size_long};
 use crate::gallery::GalleryWindow;
 use crate::icons;
 use crate::index::SharedIndex;
-use crate::model::{Content, DataSource, FileRow, NodeId, list_dir, list_orphans};
+use crate::model::{Content, DataSource, FileRow, NodeId};
 use crate::summary::{self, SummaryState};
 use crate::table::TableState;
 use crate::task::{self, Task};
@@ -113,6 +112,8 @@ pub struct PostmortemApp {
     resolver_key: Option<(PathBuf, usize)>,
     view_counts: crate::views::Counts,
     view_rows: HashMap<crate::views::View, Task<Result<Arc<crate::views::ViewRows>, String>>>,
+    /// The Data Sources tree structure from the case database.
+    case_sources: crate::case_tree::Sources,
 }
 
 impl PostmortemApp {
@@ -166,6 +167,7 @@ impl PostmortemApp {
             resolver_key: None,
             view_counts: crate::views::Counts::default(),
             view_rows: HashMap::new(),
+            case_sources: crate::case_tree::Sources::default(),
         };
         app.apply_time_pref();
         // Command line: a case (folder or case.pmcase) is opened; images are
@@ -350,6 +352,7 @@ impl PostmortemApp {
         self.result_selected = None;
         self.view_counts.invalidate();
         self.view_rows.clear();
+        self.case_sources.invalidate();
         ctx.send_viewport_cmd(egui::ViewportCommand::Title("postmortem".into()));
     }
 
@@ -387,9 +390,7 @@ impl PostmortemApp {
                     if let Some(tl) = self.timeline.take() {
                         drop(tl); // rebuilt with the new source on next open
                     }
-                    if self.selected.is_none() {
-                        self.navigate(NodeId::DataSource(id));
-                    }
+                    let _ = id;
                 }
                 Some(Err(e)) => self
                     .errors
@@ -408,33 +409,23 @@ impl PostmortemApp {
         });
     }
 
-    /// Directory listing for a node, loaded in the background.
+    /// Directory listing for a node, loaded in the background from the
+    /// case database.
     fn listing(&mut self, ctx: &egui::Context, node: &NodeId) -> Option<&Listing> {
         if !self.listings.contains_key(node) {
-            let fs_and_target = match node {
-                NodeId::Dir {
-                    ds,
-                    fs,
-                    inode,
-                    path,
-                } => self
-                    .sources
-                    .get(*ds)
-                    .and_then(|d| d.fs(*fs))
-                    .map(|f| (Arc::clone(f), Some((*inode, Arc::clone(path))))),
-                NodeId::Orphans { ds, fs } => self
-                    .sources
-                    .get(*ds)
-                    .and_then(|d| d.fs(*fs))
-                    .map(|f| (Arc::clone(f), None)),
-                _ => None,
+            let NodeId::Dir { file, .. } = node else {
+                return None;
             };
-            let (fs, target) = fs_and_target?;
+            let case = self.analysis.lock().case().cloned()?;
+            let dir = *file;
             let task = Task::spawn(ctx, move || {
-                let rows = match target {
-                    Some((inode, path)) => list_dir(&*fs, inode, &path)?,
-                    None => list_orphans(&*fs)?,
-                };
+                let rows = case
+                    .db()
+                    .children(dir)
+                    .map_err(|e| e.to_string())?
+                    .iter()
+                    .map(crate::views::row_of)
+                    .collect();
                 Ok(Arc::new(rows))
             });
             self.listings.insert(node.clone(), task);
@@ -471,15 +462,6 @@ impl PostmortemApp {
                 self.back.push(cur);
             }
             self.table.reset();
-        }
-    }
-
-    fn fs_of(&self, node: &NodeId) -> Option<Arc<dyn pm_fs::FileSystem>> {
-        match node {
-            NodeId::Dir { ds, fs, .. } | NodeId::Orphans { ds, fs } => {
-                self.sources.get(*ds).and_then(|d| d.fs(*fs)).cloned()
-            }
-            _ => None,
         }
     }
 
@@ -1073,16 +1055,30 @@ impl PostmortemApp {
                     ));
                 });
             }
-            for ds in self.sources.clone() {
-                let node = NodeId::DataSource(ds.id);
+            let (case, live) = {
+                let a = self.analysis.lock();
+                (a.case().cloned(), a.any_active())
+            };
+            let trees = self.case_sources.get(ui.ctx(), case.as_ref(), live);
+            if let Some(e) = self.case_sources.error() {
+                ui.colored_label(ui.visuals().error_fg_color, e.to_owned());
+            }
+            if trees.is_empty() && self.case_sources.loading() {
+                ui.spinner();
+            }
+            if self.selected.is_none()
+                && let Some(first) = trees.first()
+            {
+                self.navigate(NodeId::DataSource(first.ds.id));
+            }
+            for t in trees.iter() {
+                let node = NodeId::DataSource(t.ds.id);
                 self.tree_node(
                     ui,
                     &node,
-                    &format!("{} {}", icons::DATA_SOURCE, ds.name),
+                    &format!("{} {}", icons::DATA_SOURCE, t.ds.name),
                     true,
-                    |app, ui| {
-                        app.data_source_children(ui, &ds);
-                    },
+                    |app, ui| app.data_source_children(ui, t),
                 );
             }
             self.views_tree(ui);
@@ -1247,11 +1243,11 @@ impl PostmortemApp {
         });
         let ev = self.table.ui(ui, &data.rows, &self.prefs);
         if let Some(rec) = ev.selected.and_then(|i| data.records.get(i)) {
-            let content = self.content_for(&case, rec);
+            let content = self.content_for(rec);
             self.viewer.set_content(content);
         }
         if let Some(rec) = ev.activated.and_then(|i| data.records.get(i))
-            && let Some(c) = self.content_for(&case, rec)
+            && let Some(c) = self.content_for(rec)
         {
             self.open_popout(c);
         }
@@ -1276,6 +1272,9 @@ impl PostmortemApp {
             }
             // Hashes were just computed.
             self.viewer.refresh_hashes();
+            // Derived files and data sources may have been added.
+            self.case_sources.refresh();
+            self.listings.clear();
         }
         self.was_analysing = live;
         let counts = self.result_counts.get(ui.ctx(), case.as_ref(), live);
@@ -1373,79 +1372,51 @@ impl PostmortemApp {
         }
     }
 
-    fn data_source_children(&mut self, ui: &mut egui::Ui, ds: &DataSource) {
-        if let Some(vs) = &ds.evidence.volume_system {
-            for p in &vs.partitions {
-                if p.kind == SlotKind::Meta {
-                    continue;
+    fn data_source_children(&mut self, ui: &mut egui::Ui, t: &crate::case_tree::DsTree) {
+        for v in &t.volumes {
+            let label = format!(
+                "{} {}",
+                if v.unallocated() {
+                    icons::UNALLOCATED
+                } else {
+                    icons::VOLUME
+                },
+                v.label()
+            );
+            let node = NodeId::Volume {
+                ds: t.ds.id,
+                volume: v.volume.id,
+            };
+            self.tree_node(ui, &node, &label, !v.roots.is_empty(), |app, ui| {
+                for r in &v.roots {
+                    app.fs_root_children(ui, r);
                 }
-                let label = format!(
-                    "{} vol{} ({}: {}-{})",
-                    if p.kind == SlotKind::Unallocated {
-                        icons::UNALLOCATED
-                    } else {
-                        icons::VOLUME
-                    },
-                    p.addr,
-                    p.description,
-                    p.start_sector,
-                    p.end_sector().saturating_sub(1)
-                );
-                let fs_idx = ds
-                    .evidence
-                    .filesystems
-                    .iter()
-                    .position(|f| f.partition.as_ref().is_some_and(|fp| fp.addr == p.addr));
-                let node = NodeId::Volume {
-                    ds: ds.id,
-                    addr: p.addr,
-                };
-                self.tree_node(ui, &node, &label, fs_idx.is_some(), |app, ui| {
-                    if let Some(i) = fs_idx {
-                        app.fs_root_children(ui, ds, i);
-                    }
-                });
-            }
-        } else {
-            if ds.evidence.filesystems.is_empty() {
-                ui.weak("No file system found");
-            }
-            for i in 0..ds.evidence.filesystems.len() {
-                self.fs_root_children(ui, ds, i);
-            }
+            });
+        }
+        if t.volumes.is_empty() && t.loose.is_empty() {
+            ui.weak("No file system found");
+        }
+        for r in &t.loose {
+            self.fs_root_children(ui, r);
         }
     }
 
-    fn fs_root_children(&mut self, ui: &mut egui::Ui, ds: &DataSource, fs_idx: usize) {
-        let Some(fs) = ds.fs(fs_idx) else { return };
+    fn fs_root_children(&mut self, ui: &mut egui::Ui, r: &crate::case_tree::FsRoot) {
         let root = NodeId::Dir {
-            ds: ds.id,
-            fs: fs_idx,
-            inode: fs.root(),
-            path: Arc::from("/"),
+            ds: r.fs.ds_id,
+            file: r.root.id,
         };
-        let label = format!("{} / ({})", icons::FOLDER, fs.info().kind);
+        let label = format!("{} / ({})", icons::FOLDER, r.fs.kind);
         self.tree_node(ui, &root, &label, true, |app, ui| {
             app.dir_children(ui, &root);
-            let orphans = NodeId::Orphans {
-                ds: ds.id,
-                fs: fs_idx,
-            };
-            app.tree_node(
-                ui,
-                &orphans,
-                &format!("{} $OrphanFiles", icons::FOLDER),
-                false,
-                |_, _| {},
-            );
         });
     }
 
     fn dir_children(&mut self, ui: &mut egui::Ui, node: &NodeId) {
-        let NodeId::Dir { ds, fs, .. } = node else {
+        let NodeId::Dir { ds, .. } = node else {
             return;
         };
-        let (ds, fs) = (*ds, *fs);
+        let ds = *ds;
         let ctx = ui.ctx().clone();
         match self.listing(&ctx, node).cloned() {
             None => {
@@ -1461,12 +1432,8 @@ impl PostmortemApp {
                 let mut dirs: Vec<&FileRow> = rows.iter().filter(|r| r.is_dir()).collect();
                 dirs.sort_by_key(|r| r.name.to_lowercase());
                 for r in dirs {
-                    let child = NodeId::Dir {
-                        ds,
-                        fs,
-                        inode: r.inode,
-                        path: Arc::from(r.path.as_str()),
-                    };
+                    let Some(file) = r.file_id() else { continue };
+                    let child = NodeId::Dir { ds, file };
                     let label = if r.deleted() {
                         format!("{} {} ✖", icons::FOLDER, r.name)
                     } else {
@@ -1520,18 +1487,8 @@ impl PostmortemApp {
         };
         match &node {
             NodeId::DataSource(ds) => self.data_source_summary(ui, *ds),
-            NodeId::Volume { ds, addr } => self.volume_summary(ui, *ds, *addr),
-            NodeId::Dir { path, .. } => {
-                ui.horizontal(|ui| {
-                    ui.strong("Listing");
-                    ui.monospace(path.as_ref());
-                });
-                self.file_table(ui, &node);
-            }
-            NodeId::Orphans { .. } => {
-                ui.strong("$OrphanFiles — deleted files whose parent directory is gone");
-                self.file_table(ui, &node);
-            }
+            NodeId::Volume { ds, volume } => self.volume_summary(ui, *ds, *volume),
+            NodeId::Dir { .. } => self.file_table(ui, &node),
             NodeId::Results { type_id } => self.results_view(ui, *type_id),
             NodeId::View(v) => self.view_table(ui, v),
         }
@@ -1576,37 +1533,22 @@ impl PostmortemApp {
                 .rows
                 .get(i)
                 .and_then(|r| r.file.as_ref())
-                .and_then(|f| self.content_for(&case, f));
+                .and_then(|f| self.content_for(f));
             self.viewer.set_content(content);
         }
     }
 
     /// The evidence-backed content of a case file (for the viewers).
-    fn content_for(&self, case: &pm_case::Case, f: &pm_casedb::FileRecord) -> Option<Content> {
-        let ds = case.db().data_source(f.ds_id).ok()??;
-        let fs_rec = case.db().file_system(f.fs_id?).ok()??;
-        let first = PathBuf::from(ds.paths.first()?);
-        let src = self
-            .sources
-            .iter()
-            .find(|s| s.evidence.image.info.paths.first() == Some(&first))?;
-        let found = src
-            .evidence
-            .filesystems
-            .iter()
-            .find(|x| x.offset == fs_rec.byte_offset)?;
-        let mut row = FileRow::from_fs(&*found.fs, f.inode?, &f.path(), f.name_alloc);
-        row.name.clone_from(&f.name);
-        row.stream = f.stream;
-        row.size = f.size;
-        Some(Content {
-            fs: Arc::clone(&found.fs),
-            row,
-        })
+    fn content_for(&self, f: &pm_casedb::FileRecord) -> Option<Content> {
+        let case = self.analysis.lock().case().cloned()?;
+        Some(Content::from_case(case, crate::views::row_of(f)))
     }
 
     fn file_table(&mut self, ui: &mut egui::Ui, node: &NodeId) {
         let ctx = ui.ctx().clone();
+        let NodeId::Dir { ds, .. } = *node else {
+            return;
+        };
         let rows = match self.listing(&ctx, node).cloned() {
             None => {
                 ui.horizontal(|ui| {
@@ -1621,39 +1563,32 @@ impl PostmortemApp {
             }
             Some(Ok(r)) => r,
         };
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        if let Some(dir) = rows.first().and_then(|r| r.file.as_ref()) {
+            ui.horizontal(|ui| {
+                ui.strong("Listing");
+                ui.monospace(&dir.parent_path);
+            });
+        }
         ui.weak(format!("{} items", rows.len()));
         let ev = self.table.ui(ui, &rows, &self.prefs);
-        let Some(fs) = self.fs_of(node) else { return };
-        if let Some(i) = ev.selected.and_then(|i| rows.get(i)) {
-            self.viewer.set_content(Some(Content {
-                fs: Arc::clone(&fs),
-                row: i.clone(),
-            }));
+        let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
+        if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {
+            self.viewer.set_content(Some(content(r)));
         }
         if let Some(r) = ev.activated.and_then(|i| rows.get(i)) {
             if r.is_dir() {
-                let (NodeId::Dir { ds, fs: f, .. } | NodeId::Orphans { ds, fs: f }) = node.clone()
-                else {
-                    return;
-                };
-                self.navigate(NodeId::Dir {
-                    ds,
-                    fs: f,
-                    inode: r.inode,
-                    path: Arc::from(r.path.as_str()),
-                });
+                if let Some(file) = r.file_id() {
+                    self.navigate(NodeId::Dir { ds, file });
+                }
             } else {
-                self.open_popout(Content {
-                    fs: Arc::clone(&fs),
-                    row: r.clone(),
-                });
+                self.open_popout(content(r));
             }
         }
         if let Some(r) = ev.popout.and_then(|i| rows.get(i)) {
-            self.open_popout(Content {
-                fs: Arc::clone(&fs),
-                row: r.clone(),
-            });
+            self.open_popout(content(r));
         }
         if let Some(r) = ev.timeline.and_then(|i| rows.get(i)) {
             let t = r
@@ -1666,12 +1601,29 @@ impl PostmortemApp {
             }
         }
         if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
-            self.export(&ctx, Content { fs, row: r.clone() });
+            self.export(&ctx, content(r));
         }
     }
 
-    fn data_source_summary(&mut self, ui: &mut egui::Ui, ds: usize) {
-        let Some(d) = self.sources.get(ds).cloned() else {
+    /// The opened evidence of a case data source (matched by image path),
+    /// for the tools still on the in-memory index.
+    fn evidence_index(&self, ds_id: i64) -> Option<usize> {
+        let first = self.case_sources.find(ds_id)?.ds.paths.first()?;
+        let first = std::path::Path::new(first);
+        self.sources
+            .iter()
+            .position(|s| s.evidence.image.info.paths.first().map(PathBuf::as_path) == Some(first))
+    }
+
+    fn data_source_summary(&mut self, ui: &mut egui::Ui, ds_id: i64) {
+        let Some(d) = self
+            .evidence_index(ds_id)
+            .and_then(|i| self.sources.get(i).cloned())
+        else {
+            ui.horizontal(|ui| {
+                ui.spinner();
+                ui.weak("Opening the data source…");
+            });
             return;
         };
         let index = self.shared_index(ui.ctx());
@@ -1686,17 +1638,25 @@ impl PostmortemApp {
         }
     }
 
-    fn volume_summary(&mut self, ui: &mut egui::Ui, ds: usize, addr: u32) {
-        let Some(d) = self.sources.get(ds) else {
+    fn volume_summary(&mut self, ui: &mut egui::Ui, ds_id: i64, volume_id: i64) {
+        let Some(t) = self.case_sources.find(ds_id) else {
             return;
         };
-        let Some(vs) = &d.evidence.volume_system else {
+        let Some(v) = t.volumes.iter().find(|v| v.volume.id == volume_id) else {
             return;
         };
-        let Some(p) = vs.partitions.iter().find(|p| p.addr == addr) else {
-            return;
+        let vol = &v.volume;
+        ui.heading(format!("vol{} — {}", vol.addr, vol.description));
+        let bytes = vol.sector_count.saturating_mul(u64::from(vol.sector_size));
+        let fs = if v.roots.is_empty() {
+            "none detected".to_owned()
+        } else {
+            v.roots
+                .iter()
+                .map(|r| r.fs.kind.clone())
+                .collect::<Vec<_>>()
+                .join(", ")
         };
-        ui.heading(format!("vol{} — {}", p.addr, p.description));
         egui::Grid::new("vol-summary")
             .num_columns(2)
             .striped(true)
@@ -1707,22 +1667,23 @@ impl PostmortemApp {
                     ui.label(v);
                     ui.end_row();
                 };
-                kv("Kind", format!("{:?}", p.kind));
-                kv("Start sector", p.start_sector.to_string());
+                kv(
+                    "Kind",
+                    if v.unallocated() {
+                        "Unallocated"
+                    } else {
+                        "Allocated"
+                    }
+                    .to_owned(),
+                );
+                kv("Start sector", vol.start_sector.to_string());
                 kv(
                     "Length",
-                    format!("{} sectors — {}", p.sector_count, size_long(vs.byte_len(p))),
+                    format!("{} sectors — {}", vol.sector_count, size_long(bytes)),
                 );
-                if let Some(n) = &p.name {
+                if let Some(n) = &vol.name {
                     kv("Name", n.clone());
                 }
-                if let Some(u) = &p.unique_id {
-                    kv("Partition GUID", u.to_string());
-                }
-                let fs = d.evidence.fs_for_partition(addr).map_or_else(
-                    || "none detected".to_owned(),
-                    |f| f.fs.info().kind.to_string(),
-                );
                 kv("File system", fs);
             });
     }
@@ -1885,22 +1846,29 @@ impl PostmortemApp {
             })
             .collect();
         let resolver = move |c: &Content| -> Option<crate::viewers::FileHashes> {
-            let same = |a: &Arc<dyn pm_fs::FileSystem>| {
-                std::ptr::addr_eq(Arc::as_ptr(a), Arc::as_ptr(&c.fs))
-            };
-            let (_, path, offset) = fss.iter().find(|(fs, ..)| same(fs))?;
             let db = case.db();
-            let ds = db
-                .data_sources()
-                .ok()?
-                .into_iter()
-                .find(|d| d.paths.first().map(PathBuf::from).as_ref() == Some(path))?;
-            let fs = db
-                .file_systems(ds.id)
-                .ok()?
-                .into_iter()
-                .find(|f| f.byte_offset == *offset)?;
-            let f = db.file_by_inode(fs.id, c.row.inode, c.row.stream).ok()??;
+            let f = match &c.origin {
+                // Re-read the row: hashes may have been computed since it
+                // was listed.
+                crate::model::ContentOrigin::Case(_) => db.file(c.row.file_id()?).ok()??,
+                crate::model::ContentOrigin::Fs(open) => {
+                    let same = |a: &Arc<dyn pm_fs::FileSystem>| {
+                        std::ptr::addr_eq(Arc::as_ptr(a), Arc::as_ptr(open))
+                    };
+                    let (_, path, offset) = fss.iter().find(|(fs, ..)| same(fs))?;
+                    let ds = db
+                        .data_sources()
+                        .ok()?
+                        .into_iter()
+                        .find(|d| d.paths.first().map(PathBuf::from).as_ref() == Some(path))?;
+                    let fs = db
+                        .file_systems(ds.id)
+                        .ok()?
+                        .into_iter()
+                        .find(|f| f.byte_offset == *offset)?;
+                    db.file_by_inode(fs.id, c.row.inode, c.row.stream).ok()??
+                }
+            };
             let hex = |v: Option<Vec<u8>>| v.map(|b| pm_core::decode::to_hex(&b));
             Some(crate::viewers::FileHashes {
                 md5: hex(f.md5),

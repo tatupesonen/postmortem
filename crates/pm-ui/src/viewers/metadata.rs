@@ -1,6 +1,8 @@
 //! File metadata viewer (Autopsy's "File Metadata" tab).
 
-use pm_fs::{ExtentKind, MetaFlags, Times};
+use std::sync::Arc;
+
+use pm_fs::{ExtentKind, FileSystem, MetaFlags, Times};
 
 use crate::format::{DisplayPrefs, size_long};
 use crate::model::Content;
@@ -23,9 +25,15 @@ fn times(ui: &mut egui::Ui, title: &str, t: &Times, prefs: &DisplayPrefs) {
 pub(super) fn ui(
     ui: &mut egui::Ui,
     c: &Content,
+    fs: Option<&Arc<dyn FileSystem>>,
     prefs: &DisplayPrefs,
     hashes: Option<&super::FileHashes>,
 ) {
+    // Live metadata from the file system has what the case database does
+    // not keep ($FILE_NAME times, link count); case rows fall back to the
+    // stored values.
+    let live = fs.and_then(|fs| fs.metadata(c.row.inode).ok());
+    let meta = live.as_ref().or(c.row.meta.as_ref());
     egui::ScrollArea::vertical()
         .auto_shrink(false)
         .show(ui, |ui| {
@@ -60,7 +68,7 @@ pub(super) fn ui(
                             "Unallocated (deleted entry)"
                         },
                     );
-                    if let Some(m) = &r.meta {
+                    if let Some(m) = meta {
                         row(
                             ui,
                             "Metadata",
@@ -112,17 +120,27 @@ pub(super) fn ui(
                             times(ui, "$FILE_NAME times", fnt, prefs);
                         }
                     }
-                    row(
-                        ui,
-                        "File system",
-                        format!(
-                            "{} ({} byte blocks)",
-                            c.fs.info().kind,
-                            c.fs.info().block_size
-                        ),
-                    );
+                    if let Some(fs) = fs {
+                        row(
+                            ui,
+                            "File system",
+                            format!("{} ({} byte blocks)", fs.info().kind, fs.info().block_size),
+                        );
+                    }
+                    if let Some((_, f)) = c.case_file() {
+                        row(ui, "Object ID", f.id.to_string());
+                        row(
+                            ui,
+                            "MIME Type",
+                            f.mime.as_deref().unwrap_or("Not calculated"),
+                        );
+                        row(ui, "Origin", format!("{:?}", f.origin));
+                    }
                 });
-            if let Ok(streams) = c.fs.streams(c.row.inode)
+            let Some(fs) = fs else {
+                return;
+            };
+            if let Ok(streams) = fs.streams(c.row.inode)
                 && streams.len() > 1
             {
                 ui.separator();
@@ -137,7 +155,7 @@ pub(super) fn ui(
                     ));
                 }
             }
-            if let Ok(extents) = c.fs.extents(c.row.inode, c.row.stream)
+            if let Ok(extents) = fs.extents(c.row.inode, c.row.stream)
                 && !extents.is_empty()
             {
                 ui.separator();

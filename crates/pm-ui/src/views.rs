@@ -292,6 +292,7 @@ pub(crate) fn row_of(f: &FileRecord) -> FileRow {
         meta: Some(meta),
         size: f.size,
         path: f.path(),
+        file: Some(Arc::new(f.clone())),
     }
 }
 

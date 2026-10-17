@@ -356,6 +356,7 @@ mod tests {
             )),
             size,
             path: format!("/{name}"),
+            file: None,
         }
     }
 

@@ -7,6 +7,7 @@
 mod add_source;
 mod analysis;
 mod app;
+mod case_tree;
 mod case_ui;
 mod discovery;
 mod format;
