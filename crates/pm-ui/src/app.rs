@@ -122,8 +122,8 @@ pub struct PostmortemApp {
     result_selected: Option<usize>,
     result_table: crate::results::ResultTable,
     /// Analysis was running last frame (refresh results when it stops).
-    was_analysing: bool,
-    was_analysing_views: bool,
+    /// Case change bus → view refreshes.
+    change_watch: crate::changes::ChangeWatch,
     add_wizard: Option<crate::add_source::AddSourceWizard>,
     /// Case folder and data-source count the hash resolver was built for.
     resolver_key: Option<PathBuf>,
@@ -216,8 +216,7 @@ impl PostmortemApp {
             keyword_groups_for: 0,
             result_selected: None,
             result_table: crate::results::ResultTable::default(),
-            was_analysing: false,
-            was_analysing_views: false,
+            change_watch: crate::changes::ChangeWatch::default(),
             add_wizard: None,
             resolver_key: None,
             view_counts: crate::views::Counts::default(),
@@ -406,6 +405,7 @@ impl PostmortemApp {
     /// Closes the case and everything shown from it.
     pub fn close_case(&mut self, ctx: &egui::Context) {
         self.analysis.lock().close();
+        self.change_watch.reset();
         self.listings.clear();
         self.selected = None;
         self.back.clear();
@@ -1331,11 +1331,6 @@ impl PostmortemApp {
             return;
         }
         let hide = self.persisted.hide_known_in_views;
-        if self.was_analysing_views && !live {
-            self.view_counts.invalidate();
-            self.view_rows.clear();
-        }
-        self.was_analysing_views = live;
         let c = self.view_counts.get(ui.ctx(), case.as_ref(), live, hide);
         let n = |v: Option<&u64>| crate::format::grouped(v.copied().unwrap_or(0));
         ui.add_space(8.0);
@@ -1509,23 +1504,6 @@ impl PostmortemApp {
         if case.is_none() {
             return;
         }
-        if self.was_analysing && !live {
-            // Final counts and rows once analysis has finished.
-            self.result_counts.invalidate();
-            self.result_rows.clear();
-            // New artifacts (web history, …) become timeline events.
-            if let Some(t) = &self.timeline {
-                t.lock().invalidate();
-            }
-            // Hashes were just computed.
-            self.viewer.refresh_hashes();
-            // Derived files and data sources may have been added.
-            self.case_sources.refresh();
-            self.listings.clear();
-            self.case_summary.refresh();
-            self.node_views.clear();
-        }
-        self.was_analysing = live;
         let counts = self.result_counts.get(ui.ctx(), case.as_ref(), live);
         // Cached rows go stale while results are still being added.
         for t in counts.iter() {
@@ -1836,9 +1814,6 @@ impl PostmortemApp {
         {
             self.errors.push(e.to_string());
         }
-        if remove.is_some() {
-            self.case_summary.refresh();
-        }
     }
 
     /// Tools › Communications: loads the filter choices in the background.
@@ -1926,9 +1901,9 @@ impl PostmortemApp {
             return;
         };
         match w.ui(ctx, &case) {
-            crate::report_ui::WizardAction::None => {}
+            // The Reports node follows the change bus.
+            crate::report_ui::WizardAction::None | crate::report_ui::WizardAction::Finished => {}
             crate::report_ui::WizardAction::Close => self.report_wizard = None,
-            crate::report_ui::WizardAction::Finished => self.case_summary.refresh(),
         }
     }
 
@@ -2614,15 +2589,7 @@ impl PostmortemApp {
                 self.errors.push(e.clone());
             }
             self.removing = None;
-            // Everything shown from the case may refer to removed rows.
-            self.case_sources.invalidate();
-            self.listings.clear();
-            self.view_counts.invalidate();
-            self.view_rows.clear();
-            self.result_counts.invalidate();
-            self.result_rows.clear();
-            self.case_summary.refresh();
-            self.node_views.clear();
+            // The change bus refreshes the views; the selection may be gone.
             self.selected = None;
             self.back.clear();
             self.forward.clear();
@@ -2730,7 +2697,6 @@ impl PostmortemApp {
                         number,
                         request: Arc::new(req),
                         rows: crate::task::Cached::default(),
-                        reported: false,
                         table: crate::table::TableState::default(),
                     });
                 self.result_tab = ResultTab::KeywordSearch(number);
@@ -2816,13 +2782,6 @@ impl PostmortemApp {
             }
             return;
         };
-        if !s.reported && data.saved > 0 {
-            // Saved hits appear under Analysis Results › Keyword Hits.
-            s.reported = true;
-            self.result_counts.invalidate();
-            self.result_rows.clear();
-            self.case_summary.refresh();
-        }
         if data.rows.is_empty() {
             ui.weak("No results found.");
             return;
@@ -2932,9 +2891,6 @@ impl PostmortemApp {
         let tree = self.case_sources.get(ctx, case.as_ref(), false);
         let errors = self.hosts_ui.ui(ctx, case.as_ref(), &tree);
         self.errors.extend(errors);
-        if self.hosts_ui.take_changed() {
-            self.case_sources.refresh();
-        }
         if let Some(d) = self.run_ingest.as_mut() {
             match d.ui(ctx) {
                 crate::add_source::RunAction::None => {}
@@ -3117,6 +3073,76 @@ impl PostmortemApp {
         self.persisted.ingest.hash_lookup = s.hash_lookup;
     }
 
+    /// Refreshes what changed in the case database since the last frame
+    /// (ADR-023 change bus): counts while writes go on, tables once they
+    /// settle.
+    fn apply_case_changes(&mut self, ctx: &egui::Context, case: &Arc<pm_case::Case>) {
+        use crate::changes::Watch;
+        let changes = std::sync::Arc::clone(case.db().changes());
+        let live = self.analysis.lock().any_active();
+        for watch in Watch::ALL {
+            let due = self.change_watch.poll(&changes, watch, live);
+            if !due.counts {
+                continue;
+            }
+            match watch {
+                Watch::Files => {
+                    self.view_counts.invalidate();
+                    if due.rows {
+                        self.listings.clear();
+                        self.view_rows.clear();
+                        self.node_views.clear();
+                        self.viewer.refresh_hashes();
+                        for s in &mut self.searches {
+                            s.rows.refresh();
+                        }
+                    }
+                }
+                Watch::Results => {
+                    self.result_counts.invalidate();
+                    self.keyword_groups.refresh();
+                    self.case_summary.refresh();
+                    if due.rows {
+                        self.result_rows.clear();
+                        self.node_views.clear();
+                    }
+                }
+                Watch::Annotations => {
+                    self.case_summary.refresh();
+                    if due.rows {
+                        self.listings.clear();
+                        self.view_rows.clear();
+                        self.result_rows.clear();
+                        self.node_views.clear();
+                        for s in &mut self.searches {
+                            s.rows.refresh();
+                        }
+                        for s in &mut self.keyword_searches {
+                            s.rows.refresh();
+                        }
+                    }
+                }
+                Watch::Sources => {
+                    self.case_sources.refresh();
+                    if due.rows {
+                        self.listings.clear();
+                    }
+                }
+                Watch::Reports => self.case_summary.refresh(),
+                Watch::Timeline => {
+                    if due.rows
+                        && let Some(t) = &self.timeline
+                    {
+                        t.lock().invalidate();
+                    }
+                }
+            }
+        }
+        if self.change_watch.pending() {
+            ctx.request_repaint_after(crate::changes::LIVE_REFRESH);
+        }
+    }
+
     /// Draws one frame (shared by eframe and UI tests).
     pub fn frame(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
@@ -3129,19 +3155,8 @@ impl PostmortemApp {
         for d in self.tagging.take_created() {
             crate::tags_ui::upsert_definition(&mut self.persisted.custom_tags, d);
         }
-        if self.tagging.take_changed() {
-            // Scores and tag columns changed.
-            self.listings.clear();
-            self.view_rows.clear();
-            self.result_rows.clear();
-            self.case_summary.refresh();
-            self.node_views.clear();
-            for s in &mut self.searches {
-                s.rows.refresh();
-            }
-            for s in &mut self.keyword_searches {
-                s.rows.refresh();
-            }
+        if let Some(case) = &case {
+            self.apply_case_changes(&ctx, case);
         }
         egui::Panel::top("menu").show(ui, |ui| {
             self.menu_bar(ui);

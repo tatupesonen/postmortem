@@ -480,7 +480,6 @@ pub(crate) struct Tagging {
     pub(crate) catalog: Catalog,
     dialog: Option<(TagTarget, Dialog)>,
     tasks: Vec<Task<Result<(), String>>>,
-    changed: bool,
     /// Tag names created from the New Tag dialog, for the user settings.
     created: Vec<TagDefinition>,
 }
@@ -549,17 +548,19 @@ impl Tagging {
     /// show.
     pub(crate) fn ui(&mut self, ctx: &egui::Context, case: Option<&Arc<Case>>) -> Vec<String> {
         let mut errors = Vec::new();
+        let mut finished = false;
         self.tasks.retain_mut(|t| match t.poll() {
             Some(r) => {
                 if let Err(e) = r {
                     errors.push(e.clone());
                 }
-                self.changed = true;
+                finished = true;
                 false
             }
             None => true,
         });
-        if self.changed {
+        // Tag names may have been added; other views follow the change bus.
+        if finished {
             self.catalog.invalidate();
         }
         let Some(case) = case else {
@@ -615,12 +616,6 @@ impl Tagging {
     /// definitions).
     pub(crate) fn take_created(&mut self) -> Vec<TagDefinition> {
         std::mem::take(&mut self.created)
-    }
-
-    /// Whether a tag change finished since the last call (listings, the
-    /// Tags tree and scores need reloading).
-    pub(crate) fn take_changed(&mut self) -> bool {
-        std::mem::take(&mut self.changed)
     }
 }
 

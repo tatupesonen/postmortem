@@ -106,12 +106,21 @@ fn harness(open: Vec<PathBuf>) -> Harness<'static, PostmortemApp> {
     harness_with(open, true)
 }
 
+/// How long a UI flow may wait for background work: 1 minute, or
+/// `PM_UI_SETTLE_SECS` (CI runners are slower and run flows in parallel).
+fn settle_timeout() -> Duration {
+    std::env::var("PM_UI_SETTLE_SECS")
+        .ok()
+        .and_then(|s| s.parse().ok())
+        .map_or(Duration::from_mins(1), Duration::from_secs)
+}
+
 /// Steps until `done` holds (background tasks finish off-thread).
 fn settle(
     h: &mut Harness<'_, PostmortemApp>,
     mut done: impl FnMut(&mut Harness<'_, PostmortemApp>) -> bool,
 ) {
-    let deadline = Instant::now() + Duration::from_mins(1);
+    let deadline = Instant::now() + settle_timeout();
     loop {
         h.step();
         if done(h) {
@@ -119,7 +128,17 @@ fn settle(
         }
         if Instant::now() >= deadline {
             shot(h, "timeout");
-            panic!("UI did not settle");
+            // What was on screen, so a CI failure says what was missing.
+            let labels: Vec<String> = h
+                .query_all(egui_kittest::kittest::by())
+                .filter_map(|n| n.accesskit_node().label())
+                .filter(|l| !l.trim().is_empty())
+                .take(200)
+                .collect();
+            panic!(
+                "UI did not settle after {:?}; visible labels: {labels:?}",
+                settle_timeout()
+            );
         }
         std::thread::sleep(Duration::from_millis(5));
     }

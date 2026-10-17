@@ -10,6 +10,7 @@ mod app;
 mod case_nodes;
 mod case_tree;
 mod case_ui;
+mod changes;
 pub mod cli;
 mod cvt_ui;
 mod discovery;

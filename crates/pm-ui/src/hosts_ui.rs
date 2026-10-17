@@ -128,7 +128,6 @@ pub(crate) struct HostsUi {
     new_person: Option<(i64, String, Option<String>)>,
     confirm_merge: Option<(Host, Host)>,
     tasks: Vec<Task<Result<(), String>>>,
-    changed: bool,
 }
 
 impl HostsUi {
@@ -161,11 +160,6 @@ impl HostsUi {
         self.tasks.push(Task::spawn(ctx, move || f(&case)));
     }
 
-    /// Whether a host/person change finished since the last call.
-    pub(crate) fn take_changed(&mut self) -> bool {
-        std::mem::take(&mut self.changed)
-    }
-
     /// Draws the dialogs; returns errors to show.
     pub(crate) fn ui(
         &mut self,
@@ -179,7 +173,6 @@ impl HostsUi {
                 if let Err(e) = r {
                     errors.push(e.clone());
                 }
-                self.changed = true;
                 false
             }
             None => true,

@@ -44,4 +44,8 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       # UI tests run headless (egui_kittest); they only need a GPU when
       # PM_UI_SCREENSHOT_DIR asks for screenshots, which CI does not set.
+      # Hosted runners have few cores and every UI flow runs an ingest, so
+      # flows get longer to settle; a timeout prints what was on screen.
       - run: cargo test --workspace --all-features --locked
+        env:
+          PM_UI_SETTLE_SECS: "300"

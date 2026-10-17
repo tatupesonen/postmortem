@@ -333,8 +333,6 @@ pub(crate) struct KeywordResults {
     pub(crate) number: usize,
     pub(crate) request: Arc<KeywordRequest>,
     pub(crate) rows: crate::task::Cached<KeywordRows>,
-    /// The tree was refreshed for saved hits.
-    pub(crate) reported: bool,
     /// This tab's sort and selection.
     pub(crate) table: crate::table::TableState,
 }
