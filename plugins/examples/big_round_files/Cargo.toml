@@ -1,0 +1,23 @@
+[package]
+name = "big_round_files"
+description = "Example postmortem plugin: Autopsy's 'Big and Round File Finder' sample module"
+version = "1.0.0"
+edition = "2024"
+license = "Apache-2.0"
+publish = false
+
+# Built on its own (not part of the postmortem workspace):
+#   cargo build --release --target wasm32-wasip2
+[workspace]
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+pm-plugin-sdk = { path = "../../../crates/pm-plugin-sdk" }
+serde_json = "1"
+
+[profile.release]
+opt-level = "s"
+lto = true
+strip = true

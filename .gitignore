@@ -5,3 +5,6 @@
 /fuzz/artifacts
 .DS_Store
 /.claude/
+/plugins/**/target
+/plugins/**/Cargo.lock
+*.swp

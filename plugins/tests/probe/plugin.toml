@@ -1,0 +1,6 @@
+api = "0.1"
+component = "probe.wasm"
+
+[limits]
+memory_mb = 32
+fuel_per_call = 200000000

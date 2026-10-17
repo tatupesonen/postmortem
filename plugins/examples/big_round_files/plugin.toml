@@ -1,0 +1,6 @@
+# The pm-plugin-api version this plugin was built against.
+api = "0.1"
+component = "big_round_files.wasm"
+
+[limits]
+memory_mb = 32

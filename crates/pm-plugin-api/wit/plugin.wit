@@ -35,7 +35,7 @@ interface types {
         size: u64,
     }
 
-    record find-files {
+    record file-query {
         name: option<string>,
         extension: option<string>,
         path-contains: option<string>,
@@ -106,17 +106,17 @@ interface types {
 }
 
 interface host {
-    use types.{file-info, data-source-info, find-files, new-result, derived-file, level, message};
+    use types.{file-info, data-source-info, file-query, new-result, derived-file, level, message};
 
     data-source: func() -> data-source-info;
     read: func(file-id: s64, offset: u64, len: u32) -> result<list<u8>, string>;
     file: func(file-id: s64) -> result<option<file-info>, string>;
-    find-files: func(q: find-files) -> result<list<file-info>, string>;
+    find-files: func(q: file-query) -> result<list<file-info>, string>;
     children: func(file-id: s64) -> result<list<file-info>, string>;
     post: func(r: new-result) -> result<_, string>;
     add-derived: func(parent-id: s64, files: list<derived-file>) -> result<list<s64>, string>;
     log: func(level: level, message: string);
-    message: func(m: message);
+    post-message: func(m: message);
     is-cancelled: func() -> bool;
 }
 
