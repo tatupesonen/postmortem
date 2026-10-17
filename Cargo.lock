@@ -4279,6 +4279,7 @@ dependencies = [
  "pm-testkit",
  "proptest",
  "rstest",
+ "ruzstd",
  "sha1",
  "tempfile",
  "thiserror 2.0.21",

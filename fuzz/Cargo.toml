@@ -204,3 +204,31 @@ path = "fuzz_targets/encryption_check.rs"
 test = false
 doc = false
 bench = false
+
+[[bin]]
+name = "vhd_read"
+path = "fuzz_targets/vhd_read.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "vhdx_read"
+path = "fuzz_targets/vhdx_read.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "vmdk_read"
+path = "fuzz_targets/vmdk_read.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "qcow2_read"
+path = "fuzz_targets/qcow2_read.rs"
+test = false
+doc = false
+bench = false

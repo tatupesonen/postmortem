@@ -3,10 +3,25 @@
 //! [`open`] takes the first file of an image, discovers its segments, sniffs
 //! the container format and returns an [`Image`]: a [`ReadAt`] over the
 //! *logical* (decompressed, de-sparsed) disk bytes plus container metadata.
+//!
+//! Supported containers: raw and split raw, EWF (E01), and the virtual
+//! machine formats VHD (fixed, dynamic, differencing), VHDX (fixed, dynamic,
+//! differencing), VMDK (monolithic/split sparse and flat, streamOptimized,
+//! descriptor files, delta links) and QCOW2 (v2/v3, compressed clusters,
+//! backing files). Differencing images open their parents automatically,
+//! relative to the child's directory.
 
+mod cache;
 pub mod concat;
 pub mod ewf;
+pub mod exts;
+mod mapped;
+pub mod parent;
+pub mod qcow2;
 pub mod segments;
+pub mod vhd;
+pub mod vhdx;
+pub mod vmdk;
 
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -16,6 +31,11 @@ use pm_core::{ReadAt, SharedSource};
 use thiserror::Error;
 
 pub use concat::ConcatSource;
+pub use exts::{
+    ENCASE_IMAGE_EXTS, RAW_IMAGE_EXTS, SUPPORTED_IMAGE_EXTS, VIRTUAL_MACHINE_EXTS,
+    is_supported_image_file, is_virtual_machine_file,
+};
+pub use mapped::{BlockMap, MappedSource, Run};
 
 /// Errors opening a disk image.
 #[derive(Debug, Error)]
@@ -33,6 +53,15 @@ pub enum ImageError {
     Corrupt { format: ImageFormat, reason: String },
     #[error("no image paths given")]
     NoPaths,
+    #[error(
+        "differencing image {} needs its parent image \"{parent}\", which was not found next to it or at the stored path",
+        child.display()
+    )]
+    MissingParent { child: PathBuf, parent: String },
+    #[error("{format} image is encrypted ({method}); encrypted images cannot be opened")]
+    Encrypted { format: ImageFormat, method: String },
+    #[error("parent image chain is deeper than {0} levels or circular")]
+    ParentChainTooDeep(usize),
 }
 
 /// Container format of a disk image.
@@ -154,14 +183,26 @@ fn open_file(path: &Path) -> Result<FileSource, ImageError> {
     })
 }
 
-/// Opens an image given its first segment, discovering the rest.
+/// Opens an image given its first segment (or descriptor / only file),
+/// discovering further segments, extents and parent images.
 pub fn open(first: impl AsRef<Path>) -> Result<Image, ImageError> {
-    let first = first.as_ref();
-    let head = open_file(first)?;
+    open_depth(first.as_ref(), 0)
+}
+
+/// Opens `path`, which is `depth` levels down a parent chain.
+pub(crate) fn open_depth(path: &Path, depth: usize) -> Result<Image, ImageError> {
+    if depth > parent::MAX_PARENT_DEPTH {
+        return Err(ImageError::ParentChainTooDeep(parent::MAX_PARENT_DEPTH));
+    }
+    let head = open_file(path)?;
     match sniff(&head) {
-        ImageFormat::Raw => open_paths(&segments::discover(first)),
-        ImageFormat::Ewf => open_ewf(&ewf::discover(first)),
-        format => Err(ImageError::Unsupported { format }),
+        ImageFormat::Raw => open_raw(&segments::discover(path)),
+        ImageFormat::Ewf => open_ewf(&ewf::discover(path)),
+        ImageFormat::Vhd => vhd::open_path(path, depth),
+        ImageFormat::Vhdx => vhdx::open_path(path, depth),
+        ImageFormat::Vmdk => vmdk::open_path(path, depth),
+        ImageFormat::Qcow => qcow2::open_path(path, depth),
+        format @ (ImageFormat::Ewf2 | ImageFormat::Dmg) => Err(ImageError::Unsupported { format }),
     }
 }
 
@@ -201,8 +242,22 @@ pub fn open_ewf(paths: &[PathBuf]) -> Result<Image, ImageError> {
     })
 }
 
-/// Opens an explicit, ordered list of raw segments.
+/// Opens an explicit, ordered list of segments (as stored for a data
+/// source). Raw segments are concatenated in the given order; EWF segments
+/// are used as listed; other containers (VMDK, VHD, VHDX, QCOW2) are opened
+/// from the first path, which re-discovers their extents and parents.
 pub fn open_paths(paths: &[PathBuf]) -> Result<Image, ImageError> {
+    let first = paths.first().ok_or(ImageError::NoPaths)?;
+    let head = open_file(first)?;
+    match sniff(&head) {
+        ImageFormat::Raw => open_raw(paths),
+        ImageFormat::Ewf => open_ewf(paths),
+        _ => open(first),
+    }
+}
+
+/// Opens an explicit, ordered list of raw segments (no format detection).
+pub fn open_raw(paths: &[PathBuf]) -> Result<Image, ImageError> {
     if paths.is_empty() {
         return Err(ImageError::NoPaths);
     }
