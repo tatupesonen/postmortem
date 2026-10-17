@@ -46,6 +46,7 @@ pm-carve = { path = "crates/pm-carve" }
 pm-text = { path = "crates/pm-text" }
 pm-search = { path = "crates/pm-search" }
 pm-plugin-api = { path = "crates/pm-plugin-api" }
+pm-browser = { path = "crates/pm-browser" }
 
 # Foundations
 thiserror = "2.0.21"
