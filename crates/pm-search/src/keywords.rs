@@ -622,6 +622,11 @@ impl KeywordListStore {
         self.lists.iter().find(|l| l.name == name)
     }
 
+    /// An editable list (locked lists are not handed out).
+    pub fn get_mut(&mut self, name: &str) -> Option<&mut KeywordList> {
+        self.lists.iter_mut().find(|l| l.name == name && !l.locked)
+    }
+
     /// Adds or replaces an editable list (a locked list's name is refused).
     pub fn put(&mut self, list: KeywordList) -> Result<(), ListError> {
         match self.lists.iter_mut().find(|l| l.name == list.name) {
@@ -865,6 +870,8 @@ mod tests {
         );
         store.put(l).unwrap();
         assert!(store.put(KeywordList::new(URLS, vec![])).is_err());
+        assert!(store.get_mut(URLS).is_none());
+        store.get_mut("mine").unwrap().use_for_ingest = false;
         store.save(&path).unwrap();
         let again = KeywordListStore::load(&path).unwrap();
         assert_eq!(again.get("mine").unwrap().keywords.len(), 2);

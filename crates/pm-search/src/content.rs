@@ -50,6 +50,8 @@ const WRITER_THREADS: usize = 4;
 const COMMIT_INTERVAL: Duration = Duration::from_mins(1);
 /// Distinct hit terms kept per object in search results.
 const MAX_HITS_PER_OBJECT: usize = 100;
+/// Upper bound on objects collected per search pass.
+const MAX_BATCH: usize = 65_536;
 
 #[derive(Debug, Clone, Copy)]
 struct Fields {
@@ -126,6 +128,26 @@ pub struct TextQuery {
     pub search_type: SearchType,
     /// Restrict to these data sources (empty: all).
     pub ds_ids: Vec<i64>,
+}
+
+impl TextQuery {
+    /// The query that finds a keyword hit again (Extracted Text viewer):
+    /// the regular expression if the hit has one, else the hit text as
+    /// an exact (search type 0) or substring match. Arguments are the
+    /// hit's `TSK_KEYWORD`, `TSK_KEYWORD_SEARCH_TYPE` and
+    /// `TSK_KEYWORD_REGEXP`.
+    pub fn for_keyword_hit(keyword: &str, search_type: Option<i64>, regexp: Option<&str>) -> Self {
+        let (term, search_type) = match (regexp, search_type) {
+            (Some(r), _) if !r.is_empty() => (r.to_owned(), SearchType::Regex),
+            (_, Some(1)) => (keyword.to_owned(), SearchType::Substring),
+            _ => (keyword.to_owned(), SearchType::Exact),
+        };
+        Self {
+            term,
+            search_type,
+            ds_ids: Vec::new(),
+        }
+    }
 }
 
 /// One result row: an object with at least one verified hit.
@@ -472,13 +494,14 @@ impl ContentIndex {
         let mut out = SearchPage::default();
         let mut cursor = after;
         let limit = limit.max(1);
+        // Objects collected per pass; doubled while candidates keep
+        // failing verification, so a scan is not quadratic.
+        let mut batch = (limit * 4).max(64);
         loop {
             if cancelled() {
                 out.next = cursor;
                 return Ok(out);
             }
-            let want = limit - out.hits.len();
-            let batch = (want * 4).max(64);
             let windowed = self.after_query(query.box_clone(), cursor);
             let found = searcher.search(&*windowed, &Candidates::new(cursor, batch))?;
             let objs: Vec<(i64, Vec<(u32, DocAddress)>)> = found.objs.into_iter().collect();
@@ -509,6 +532,7 @@ impl ContentIndex {
                 out.next = None;
                 return Ok(out);
             }
+            batch = (batch * 2).min(MAX_BATCH);
         }
     }
 
@@ -999,6 +1023,19 @@ mod tests {
         let text = "İİ Needle and NEEDLE";
         let got: Vec<&str> = hits[0].ranges.iter().map(|r| &text[r.clone()]).collect();
         assert_eq!(got, ["Needle", "NEEDLE"]);
+    }
+
+    #[test]
+    fn queries_for_keyword_hits() {
+        let q = TextQuery::for_keyword_hit("hello", Some(1), Some("ell"));
+        assert_eq!((q.term.as_str(), q.search_type), ("ell", SearchType::Regex));
+        let q = TextQuery::for_keyword_hit("hello", Some(1), None);
+        assert_eq!(q.search_type, SearchType::Substring);
+        let q = TextQuery::for_keyword_hit("jean", Some(0), Some(""));
+        assert_eq!(
+            (q.term.as_str(), q.search_type),
+            ("jean", SearchType::Exact)
+        );
     }
 
     #[test]

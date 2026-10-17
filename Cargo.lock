@@ -4152,6 +4152,7 @@ dependencies = [
 name = "pm-modules"
 version = "0.1.0"
 dependencies = [
+ "fatfs",
  "jiff",
  "md-5 0.11.0",
  "parking_lot",
@@ -4164,7 +4165,9 @@ dependencies = [
  "pm-lnk",
  "pm-prefetch",
  "pm-registry",
+ "pm-search",
  "pm-testkit",
+ "pm-text",
  "pm-winartifacts",
  "proptest",
  "rusqlite",
@@ -4175,6 +4178,7 @@ dependencies = [
  "tempfile",
  "thiserror 2.0.21",
  "tracing",
+ "zip",
 ]
 
 [[package]]

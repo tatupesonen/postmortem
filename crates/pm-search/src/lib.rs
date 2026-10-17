@@ -15,6 +15,7 @@
 
 pub mod ccn;
 pub mod content;
+pub mod docid;
 pub mod keywords;
 pub mod matcher;
 pub mod names;

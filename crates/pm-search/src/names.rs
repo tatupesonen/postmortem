@@ -267,6 +267,17 @@ impl NameIndex {
         Ok(())
     }
 
+    /// Indexes files known not to be in the index yet (no replacement
+    /// check; bulk loads and benchmarks). Commit with [`NameIndex::commit`].
+    pub fn add_new(&self, files: &[FileRecord]) -> Result<(), SearchError> {
+        let w = self.writer.lock();
+        let w = w.as_ref().ok_or(SearchError::ReadOnly)?;
+        for f in files.iter().filter(|f| Self::indexable(f)) {
+            w.add_document(self.doc(f))?;
+        }
+        Ok(())
+    }
+
     /// Commits added files.
     pub fn commit(&self) -> Result<(), SearchError> {
         let last = self.last_indexed_id()?;

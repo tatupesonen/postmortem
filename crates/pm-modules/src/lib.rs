@@ -4,6 +4,7 @@
 pub mod event_logs;
 mod exif;
 pub mod hash_lookup;
+pub mod keyword_search;
 pub mod picture_analyzer;
 pub mod recent_activity;
 mod util;
@@ -22,5 +23,6 @@ pub fn core_modules() -> Vec<Arc<dyn ModuleFactory>> {
         Arc::new(event_logs::EventLogFactory),
         Arc::new(hash_lookup::HashLookupFactory),
         Arc::new(picture_analyzer::PictureAnalyzerFactory),
+        Arc::new(keyword_search::KeywordSearchFactory),
     ]
 }

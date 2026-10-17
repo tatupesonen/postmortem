@@ -26,6 +26,8 @@ pm-registry.workspace = true
 pm-lnk.workspace = true
 pm-prefetch.workspace = true
 pm-winartifacts.workspace = true
+pm-text.workspace = true
+pm-search.workspace = true
 
 [dev-dependencies]
 pm-registry = { workspace = true, features = ["builder"] }
@@ -35,6 +37,8 @@ pm-case.workspace = true
 pm-testkit.workspace = true
 tempfile.workspace = true
 proptest.workspace = true
+fatfs.workspace = true
+zip = { version = "=8.6.0", default-features = false }
 
 [lints]
 workspace = true
