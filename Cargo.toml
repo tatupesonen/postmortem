@@ -39,6 +39,8 @@ pm-registry = { path = "crates/pm-registry" }
 pm-lnk = { path = "crates/pm-lnk" }
 pm-prefetch = { path = "crates/pm-prefetch" }
 pm-winartifacts = { path = "crates/pm-winartifacts" }
+pm-text = { path = "crates/pm-text" }
+pm-search = { path = "crates/pm-search" }
 
 # Foundations
 thiserror = "2.0.21"
