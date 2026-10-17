@@ -226,7 +226,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Picture Analyzer (EXIF → metadata + GPS artifacts, HEIC handling)
 - [x] Encryption Detection (entropy, BitLocker/LUKS/FileVault/VeraCrypt signatures, password-protected Office/PDF/zip)
 - [x] Interesting Files Identifier (full rule language, rule sets import/export)
-- [ ] Data Source Integrity (verify stored hashes, compute hashes)
+- [x] Data Source Integrity (verify stored hashes, compute hashes)
 - [ ] Ingest UI: module config panels, progress panel, inbox, snapshot/diagnostics
 
 ### M5 — Text extraction and keyword search

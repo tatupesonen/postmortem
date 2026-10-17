@@ -10,12 +10,12 @@ merged from `wip/filetype`, reviewed, fixed and completed).
 | 2 | Extension Mismatch Detector | done |
 | 3 | Encryption Detection (+ `pm-encryption`) | done |
 | 4 | Interesting Files Identifier + reusable FilesSet engine (`pm-rules`) | done |
-| 5 | Data Source Integrity (+ `pm-casedb/src/integrity.rs`) | not started |
+| 5 | Data Source Integrity (+ `pm-casedb/src/integrity.rs`) | done |
 
 Pipeline order in `core_modules()` follows Autopsy's effective order
 (`PipelineConfig.xml`, then `IngestModuleFactoryLoader.coreModuleOrdering`
 for unlisted core modules): Hash Lookup, File Type Identification,
-Embedded File Extractor, Picture Analyzer, Extension Mismatch, Interesting Files, PhotoRec, Encryption
+Embedded File Extractor, Picture Analyzer, Keyword Search, Extension Mismatch, Interesting Files, PhotoRec, Encryption
 Detection; Data Source Integrity is a stage-2 data-source module.
 
 ## 1. File Type Identification
@@ -272,3 +272,53 @@ reader); end-to-end: user sets with every condition kind, messages,
 re-ingest, disabled sets via XML, standard sets by default, start-up
 failure.
 
+## 5. Data Source Integrity
+
+`crates/pm-casedb/src/integrity.rs`: `ImageHash`, `data_source_hashes`,
+`set_data_source_hash` (validated hex, stored lower case, never
+overwrites, like TSK's `setMD5`), usable by the add-data-source UI for
+user-entered hashes.
+
+`crates/pm-modules/src/data_source_integrity.rs`: module
+`data_source_integrity` ("Data Source Integrity", "Calculates and
+validates hashes of data sources."), a stage-2 data-source module.
+Settings `compute_hashes` / `verify_hashes` (both true; both false fails
+start-up with "At least one of the checkboxes must be selected"). Logical
+files: "Skipping non-disk image data source X". Stored hashes → one pass
+over the image, "Integrity of X verified" (info) or "X failed integrity
+verification" (warning) with Autopsy's report as plain text, and on a
+mismatch `TSK_VERIFICATION_FAILED` on the data source (Notable,
+justification and `TSK_COMMENT` "MD5 hash verification failed:\n
+Calculated hash: …\n  Stored hash: …\n "). No stored hashes → MD5,
+SHA-1 and SHA-256 computed and stored, "X hashes calculated".
+
+Deviation: stored hashes are compared ignoring case (Autopsy's
+case-sensitive comparison reports a valid upper-case hash as a failure).
+
+Tests: end-to-end on the E01 fixture (stored MD5 + SHA-1 verified), a
+tampered stored MD5 (result, message, re-ingest), the demo raw image
+(compute, options off, then verify), user-entered hashes.
+
+## Coordinator to-dos
+
+* **UI settings panels** (pm-ui, not this track): File Type
+  Identification user types (`FileTypeSettings`, legacy XML import via
+  `pm_filetype::import_legacy_xml`); Extension Mismatch global map editor
+  (`ext_mismatch::parse_config` / `write_config`) and the per-job check
+  mode/skip options; Encryption Detection thresholds; Interesting Files
+  set editor with import/export (`pm_rules::xml`) and per-job disabled
+  sets (`pm_rules::standard::with_standard_sets` for the user's sets);
+  Data Source Integrity options; entering MD5/SHA-1/SHA-256 when adding a
+  data source (`CaseDb::set_data_source_hash`).
+* **Ingest file filters** can now be built on `pm_rules` (Autopsy's
+  `FilesSet` with `ignore_unallocated_space`; port the remaining
+  `IngestFileFiltersTest` pipeline checks once `pm-ingest` uses them).
+* **Schema**: volumes are not artifact parents; Encryption Detection
+  attaches volume results to the data source with the volume in
+  `TSK_DESCRIPTION`. Data-source-level artifacts are not de-duplicated by
+  the ingest writer (`artifact_exists` only handles files); the modules
+  check themselves (`util::ds_result_exists`).
+* **Flaky test on master**: `pm-ui/tests/ui_flows.rs::hosts_and_persons`
+  fails under the full parallel gate on this machine (its `settle` loop is
+  timing-sensitive) and passes alone or with `RUST_TEST_THREADS≤2`; the
+  last two gates of this branch ran with `RUST_TEST_THREADS=2`.
