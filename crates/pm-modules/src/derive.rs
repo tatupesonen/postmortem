@@ -11,12 +11,18 @@
 //! files are then scheduled into the running job (`addFilesToJob`), so
 //! they pass through the whole file pipeline, recursively.
 //!
+//! For a flat list of streams (e-mail attachments, embedded objects) use
+//! [`add_children`]:
+//!
 //! ```text
-//! let mut tree = DerivedTree::new(ctx.case.dir(), "Email", &file.rec);
-//! let node = tree.child(tree.root(), "attachment.pdf", None);
-//! tree.write_file(node, "0", &mut reader, Times::default())?;
-//! tree.commit(ctx, &Existing::default(), &mut |_, _| {})?;
+//! let added = add_children(ctx, &file.rec, "EmailParser", vec![
+//!     Stream { name: "invoice.pdf".into(), times: Times::default(), data: &mut reader },
+//! ])?;
+//! // `added[i]` is the file id of stream `i` (`None`: not added).
 //! ```
+//!
+//! For trees (archives) build a [`DerivedTree`] node by node and
+//! [`DerivedTree::commit`] it.
 //!
 //! Re-extraction follows Autopsy's `SevenZipExtractor`: a file that is
 //! already in the case (same parent path and name) is left alone unless
@@ -182,6 +188,24 @@ impl DerivedTree {
     /// The output folder of the source.
     pub fn output(&self) -> &OutputDir {
         &self.out
+    }
+
+    /// A new child of `parent`, even when a sibling has the same name
+    /// (two attachments called `image.png` stay two files).
+    pub fn new_child(&mut self, parent: NodeId, name: &str) -> NodeId {
+        let id = u32::try_from(self.nodes.len()).unwrap_or(u32::MAX);
+        self.nodes.push(Node {
+            parent: parent.0,
+            name: name.to_owned(),
+            raw: None,
+            kind: NodeKind::Dir,
+            times: Times::default(),
+            children: Vec::new(),
+        });
+        if let Some(p) = self.nodes.get_mut(parent.0 as usize) {
+            p.children.push(id);
+        }
+        NodeId(id)
     }
 
     /// The child of `parent` called `name`, created as a directory if it
@@ -453,6 +477,63 @@ fn flush(
     }
     ctx.add_files_to_job(recs);
     Ok(())
+}
+
+/// One byte stream to store as a derived file.
+pub struct Stream<'r> {
+    /// File name shown in the case (any characters; the local copy is
+    /// named by position).
+    pub name: String,
+    pub times: Times,
+    pub data: &'r mut dyn Read,
+}
+
+impl std::fmt::Debug for Stream<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("Stream")
+            .field("name", &self.name)
+            .field("times", &self.times)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Stores `streams` as derived files directly below `parent`
+/// (`ModuleOutput/<module_folder>/<parent id>/<n>`, XOR1), inserts them
+/// and schedules them into the job, so they are analysed like any other
+/// file. Returns the file id of each stream, in order (`None` when it was
+/// not added: empty name or the job was cancelled).
+///
+/// Idempotent across ingest runs: when `parent` already has files from
+/// this module (an earlier run), nothing is written and every entry is
+/// `None`.
+pub fn add_children<'r>(
+    ctx: &JobContext,
+    parent: &FileRecord,
+    module_folder: &str,
+    streams: impl IntoIterator<Item = Stream<'r>>,
+) -> Result<Vec<Option<i64>>, ModuleError> {
+    let existing = Existing::load(&ctx.case, module_folder, parent.id)?;
+    let mut tree = DerivedTree::new(ctx.case.dir(), module_folder, parent);
+    let mut nodes: Vec<Option<NodeId>> = Vec::new();
+    for (i, s) in streams.into_iter().enumerate() {
+        if !existing.is_empty() || s.name.is_empty() || ctx.is_cancelled() {
+            nodes.push(None);
+            continue;
+        }
+        let node = tree.new_child(tree.root(), &s.name);
+        tree.write_file(node, &i.to_string(), s.data, s.times)?;
+        nodes.push(Some(node));
+    }
+    let mut ids: HashMap<NodeId, i64> = HashMap::new();
+    if !tree.is_empty() {
+        tree.commit(ctx, &Existing::default(), &mut |n, id| {
+            ids.insert(n, id);
+        })?;
+    }
+    Ok(nodes
+        .into_iter()
+        .map(|n| n.and_then(|n| ids.get(&n).copied()))
+        .collect())
 }
 
 /// Autopsy `FileUtil.escapeFileName`: every run of control characters and

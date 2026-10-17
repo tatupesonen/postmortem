@@ -92,3 +92,20 @@ proptest! {
         check(data, keep);
     }
 }
+
+/// Inputs that crashed the `carve_scan` fuzz target (first byte: flags,
+/// as in the target).
+#[test]
+fn fuzz_regressions() {
+    let dir =
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fuzz/regressions/carve_scan");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return;
+    };
+    for e in entries {
+        let data = std::fs::read(e.unwrap().path()).unwrap();
+        if let Some((&flags, rest)) = data.split_first() {
+            check(rest.to_vec(), flags & 1 != 0);
+        }
+    }
+}

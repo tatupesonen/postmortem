@@ -201,3 +201,21 @@ fn every_seed_is_valid() {
         assert!(s.complete > 0, "{format:?}: {s:?}");
     }
 }
+
+/// Inputs that crashed the `archive_extract` fuzz target (first byte:
+/// format index into `ALL`, as in the target).
+#[test]
+fn fuzz_regressions() {
+    let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fuzz/regressions/archive_extract");
+    let Ok(entries) = std::fs::read_dir(&dir) else {
+        return;
+    };
+    for e in entries {
+        let data = std::fs::read(e.unwrap().path()).unwrap();
+        let Some((&sel, rest)) = data.split_first() else {
+            continue;
+        };
+        exercise(ALL[usize::from(sel) % ALL.len()], rest.to_vec());
+    }
+}
