@@ -49,6 +49,7 @@ impl Case {
             meta: RwLock::new(meta),
             db: Arc::new(db),
             sources: Mutex::new(HashMap::new()),
+            index: Mutex::new(None),
         })
     }
 

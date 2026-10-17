@@ -1,5 +1,5 @@
 //! A module written against `pm-plugin-api` runs in the ingest framework
-//! through `plugin_host::PluginModule` (ADR-021): host-side file filter,
+//! through `plugin_host::PluginModule` (ADR-022): host-side file filter,
 //! content reads, results, derived files, data-source work, messages and
 //! idempotent re-runs.
 #![allow(
@@ -45,8 +45,7 @@ impl FileIngest for SecretFiles {
             NewResult::new("TSK_INTERESTING_FILE_HIT", Some(file.id))
                 .with(Attribute::text("TSK_SET_NAME", "Secrets"))
                 .with(Attribute::text("TSK_COMMENT", line.trim())),
-        )
-        .map(|()| ())?;
+        )?;
         let mut hit = NewResult::new("TSK_INTERESTING_FILE_HIT", Some(file.id));
         hit.significance = Some(Significance::LikelyNotable);
         hit.attributes = vec![Attribute::text("TSK_SET_NAME", "Secrets (scored)")];

@@ -1,4 +1,4 @@
-// The postmortem plugin world (ADR-021), version 0.1.
+// The postmortem plugin world (ADR-022), version 0.1.
 //
 // Mirrors the Rust crate `pm-plugin-api` one to one: a plugin exports
 // `module` and imports `host`. Plugins have no file system, network,

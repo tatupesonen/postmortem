@@ -4224,7 +4224,7 @@ dependencies = [
 
 [[package]]
 name = "pm-browser"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "flate2",
  "plist",
@@ -4537,7 +4537,7 @@ dependencies = [
 
 [[package]]
 name = "pm-mcp"
-version = "0.1.0"
+version = "0.1.1"
 dependencies = [
  "base64 0.22.1",
  "bytes",

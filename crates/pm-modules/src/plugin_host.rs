@@ -1,4 +1,4 @@
-//! Runs modules written against `pm-plugin-api` (ADR-021) inside the
+//! Runs modules written against `pm-plugin-api` (ADR-022) inside the
 //! ingest framework: [`PluginModule`] turns any [`Plugin`] — a built-in
 //! parser or a WebAssembly plugin loaded by `pm-plugin-wasm` — into a
 //! [`ModuleFactory`], and [`JobHost`] implements the plugin's [`Host`]
