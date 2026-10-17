@@ -26,12 +26,16 @@ pm-registry.workspace = true
 pm-lnk.workspace = true
 pm-prefetch.workspace = true
 pm-winartifacts.workspace = true
+pm-case.workspace = true
+pm-archive.workspace = true
+pm-carve.workspace = true
 
 [dev-dependencies]
+encoding_rs.workspace = true
+rars.workspace = true
 pm-registry = { workspace = true, features = ["builder"] }
 pm-lnk = { workspace = true, features = ["builder"] }
 pm-prefetch = { workspace = true, features = ["builder"] }
-pm-case.workspace = true
 pm-testkit.workspace = true
 tempfile.workspace = true
 proptest.workspace = true

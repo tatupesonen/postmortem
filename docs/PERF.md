@@ -12,3 +12,7 @@ builds. Re-measure when touching the paths below. Each benchmark is an
 | Add data source, synthetic 1 M-name tree (walk + writer + index rebuild) | ≥ 150 k rows/s | 205 k rows/s (1 M rows in 4.88 s, 211 MB DB) | `cargo test -p pm-case --release --test case -- --ignored load_rate --nocapture` | 2026-10-14 |
 | Children of a 911-entry directory after load | < 20 ms | 1.7 ms | same | 2026-10-14 |
 | Extension counts over 1 M rows | < 100 ms | 46 ms | same | 2026-10-14 |
+| Carving scan, 512 MiB with 2048 planted files (in memory / file in page cache) | ≥ disk speed | 4 827 / 3 318 MiB/s (Linux, 8 cores, one thread) | `cargo test -p pm-carve --release --test bench -- --ignored --nocapture` | 2026-10-17 |
+| Zip extraction, one 256 MiB deflate member / stored member | — | 475 / 11 399 MiB/s decoded (Linux) | `cargo test -p pm-archive --release --test bench -- --ignored --nocapture` | 2026-10-17 |
+| Zip extraction, 20 000 small members | — | 406 k members/s (Linux) | same | 2026-10-17 |
+| gzip, 256 MiB decoded | — | 377 MiB/s (Linux) | same | 2026-10-17 |
