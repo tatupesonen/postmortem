@@ -6,7 +6,7 @@ exact next steps.
 
 ## Where this work lives
 The agent's isolated worktree was created in the **Autopsy** repo
-(`/Users/tatu/slop/autopsy/.claude/worktrees/agent-aecc9bf4627e4b9c9`), not
+(`/home/tatu/slop/autopsy/.claude/worktrees/agent-aecc9bf4627e4b9c9`), not
 in postmortem. The isolation guard blocked git commands in the postmortem
 checkout, so the work went into a copy of postmortem `master` (`57b8baf`,
 the user's uncommitted `assets/brand` changes left out) at

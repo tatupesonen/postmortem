@@ -1,6 +1,6 @@
 # 06 — Multi-user, automation & infrastructure: feature inventory (Autopsy → postmortem)
 
-This inventory covers everything in Autopsy that exists to make several machines work on one case, to run Autopsy unattended, or to support it operationally. It is detailed enough to reimplement the behaviour in postmortem (pure Rust) without reading the Java. The Autopsy source (read-only) is at `/Users/tatu/slop/autopsy`. Unless stated otherwise, paths are relative to `Core/src/org/sleuthkit/autopsy/`. Experimental paths are relative to `Experimental/src/org/sleuthkit/autopsy/experimental/`.
+This inventory covers everything in Autopsy that exists to make several machines work on one case, to run Autopsy unattended, or to support it operationally. It is detailed enough to reimplement the behaviour in postmortem (pure Rust) without reading the Java. The Autopsy source (read-only) is at `/home/tatu/slop/autopsy`. Unless stated otherwise, paths are relative to `Core/src/org/sleuthkit/autopsy/`. Experimental paths are relative to `Experimental/src/org/sleuthkit/autopsy/experimental/`.
 
 Scope:
 

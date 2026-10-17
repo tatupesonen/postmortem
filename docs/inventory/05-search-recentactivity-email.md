@@ -1,6 +1,6 @@
 # 05 — Keyword Search, Recent Activity, Email: feature inventory
 
-Source: Autopsy (read-only, `/Users/tatu/slop/autopsy`), modules `KeywordSearch`,
+Source: Autopsy (read-only, `/home/tatu/slop/autopsy`), modules `KeywordSearch`,
 `Core/src/org/sleuthkit/autopsy/keywordsearchservice`, `Core/.../textextractors`
 (used by KWS), `RecentActivity`, `thunderbirdparser`.
 Target: **postmortem** (pure Rust, egui, own SQLite/PostgreSQL schema, Tantivy).

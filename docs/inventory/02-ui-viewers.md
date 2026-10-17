@@ -1,6 +1,6 @@
 # 02 — UI shell & viewers: feature inventory (Autopsy → postmortem)
 
-This inventory covers Autopsy's main UI shell, result viewers, content viewers and the supporting UI subsystems. It is detailed enough to reimplement them in postmortem (Rust, egui with multi-viewport popouts) without reading the Java. The Autopsy source (read-only) is at `/Users/tatu/slop/autopsy`. Unless stated otherwise, paths are relative to `Core/src/org/sleuthkit/autopsy/`.
+This inventory covers Autopsy's main UI shell, result viewers, content viewers and the supporting UI subsystems. It is detailed enough to reimplement them in postmortem (Rust, egui with multi-viewport popouts) without reading the Java. The Autopsy source (read-only) is at `/home/tatu/slop/autopsy`. Unless stated otherwise, paths are relative to `Core/src/org/sleuthkit/autopsy/`.
 
 Scope: `corecomponents`, `corecomponentinterfaces`, `contentviewers` (all sub-packages), `resultviewers`, `rejview`, `guiutils`, `guicomponentutils`, `textextractors`, `texttranslation`, `textsummarizer`, `imagewriter`, `logicalimager`, `livetriage`, `url`. It also covers the NetBeans window layout, menus, toolbar and shortcuts (`core/layer.xml`, `*.wsmode`, `*.wstcref`, `@ActionReference`) and `/branding`. A few closely coupled pieces that live elsewhere are included: the KeywordSearch Extracted Text viewer, the Central Repository Other Occurrences viewer, and the startup window in `casemodule`.
 

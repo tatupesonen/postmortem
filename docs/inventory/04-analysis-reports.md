@@ -2,7 +2,7 @@
 
 Scope: Autopsy analysis tools and reporting, documented so they can be reimplemented in **postmortem** (pure Rust, egui with multi-viewport popouts, own SQLite/PostgreSQL schema, multi-user) without reading the Java. Covered: Timeline, Communications (CVT), Geolocation, Discovery, Common Properties Search, All Cases Search, Data Source Summary, Health Monitor, Central Repository, Reporting (all report modules and the wizard), and Image Gallery.
 
-Source root: `/Users/tatu/slop/autopsy` (read-only); most of the code is under `Core/src/org/sleuthkit/autopsy/<area>`, and Image Gallery is under `ImageGallery/`. Class names appear only as brief pointers. The descriptions focus on behaviour, defaults, algorithms, queries and the data produced.
+Source root: `/home/tatu/slop/autopsy` (read-only); most of the code is under `Core/src/org/sleuthkit/autopsy/<area>`, and Image Gallery is under `ImageGallery/`. Class names appear only as brief pointers. The descriptions focus on behaviour, defaults, algorithms, queries and the data produced.
 
 Conventions:
 - **(TSK)** marks facts that come from the sleuthkit Java bindings, which are not in this tree. Check these against the TSK sources before relying on exact IDs.
@@ -26,7 +26,7 @@ Conventions:
 
 ## Timeline
 
-Source: `Core/src/org/sleuthkit/autopsy/timeline/**` (about 19.6k lines, JavaFX embedded in a NetBeans TopComponent). The event store and query engine (`TimelineManager`, `TimelineEventType`, `TimelineFilter`, `TimelineLevelOfDetail`) live in the sleuthkit Java bindings. No sleuthkit checkout exists under `/Users/tatu/slop`, so the TSK-side facts below come from usage in this repo plus TSK knowledge. Items marked (TSK) should be verified against sleuthkit `TimelineManager.java` before copying numbers.
+Source: `Core/src/org/sleuthkit/autopsy/timeline/**` (about 19.6k lines, JavaFX embedded in a NetBeans TopComponent). The event store and query engine (`TimelineManager`, `TimelineEventType`, `TimelineFilter`, `TimelineLevelOfDetail`) live in the sleuthkit Java bindings. No sleuthkit checkout exists under `/home/tatu/slop`, so the TSK-side facts below come from usage in this repo plus TSK knowledge. Items marked (TSK) should be verified against sleuthkit `TimelineManager.java` before copying numbers.
 
 ### Entry points & lifecycle
 - **Open**: Tools menu > "Timeline", and a case toolbar button (26 px icon). These are enabled only when a case is open. If `countFilesWhere("1=1") > 6,000,000`, the app shows the info dialog "There are too many files in the DB to ensure reasonable performance. Timeline will be disabled." and disables the action. A module setting `timeline/enable_timeline=false` (set on Linux look-and-feel failure) disables it with "Timeline functionality is not available yet." A case with no data source shows "Could not create timeline, there are no data sources."

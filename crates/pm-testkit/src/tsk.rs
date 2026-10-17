@@ -1,6 +1,6 @@
 //! Differential testing against The Sleuth Kit command-line tools.
 //!
-//! When `mmls`/`fls` are installed (e.g. `brew install sleuthkit`), tests can
+//! When `mmls`/`fls` are installed (e.g. `apt install sleuthkit` / `brew install sleuthkit`), tests can
 //! compare postmortem's view of an image with TSK's — the engine Autopsy uses.
 //! Every function returns `None` when the tool is unavailable so tests can
 //! skip gracefully on machines without TSK.

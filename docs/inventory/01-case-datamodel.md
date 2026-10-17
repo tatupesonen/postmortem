@@ -1,6 +1,6 @@
 # 01 — Case Management & Core Data Model: Feature Inventory
 
-Source tree: `/Users/tatu/slop/autopsy/Core/src/org/sleuthkit/autopsy/` (abbreviated `A/` below).
+Source tree: `/home/tatu/slop/autopsy/Core/src/org/sleuthkit/autopsy/` (abbreviated `A/` below).
 Scope: `casemodule`, `datasourceprocessors`, `datamodel`, `directorytree`, `events`, `tags`, `actions`, `menuactions`, `filesearch`, `core`, `coreutils` (+ `machinesettings`, `featureaccess`, `guiutils/RefreshThrottler` where they define behaviour of the above).
 
 Conventions used in this document:

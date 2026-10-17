@@ -14,14 +14,14 @@ in this repository. This document is the contract each iteration follows.
 | `docs/DECISIONS.md` | Architecture decision records (ADR-NNN). Append; never silently rewrite. |
 | `docs/inventory/*.md` | Feature inventory of Autopsy, by area. The parity reference. |
 
-The Autopsy source at `/Users/tatu/slop/autopsy` is **read-only reference**.
+The Autopsy source at `/home/tatu/slop/autopsy` is **read-only reference**.
 Never modify it.
 
 ## One iteration
 
 1. **Orient** (keep it cheap): read `PROGRESS.md` `## Now` and `## Blockers`,
    then only the `PLAN.md` milestone that holds the current task. Run
-   `git -C /Users/tatu/slop/postmortem log --oneline -5` to confirm where we are.
+   `git -C /home/tatu/slop/postmortem log --oneline -5` to confirm where we are.
 2. **Baseline**: run the quality gate (below). If it is red, fixing it *is* the
    task for this iteration.
 3. **Pick work**: the current task in `## Now`, or else the first unchecked
@@ -37,14 +37,16 @@ Never modify it.
    step, prepend a dated entry to `## Log` (what was done, what was learned,
    test counts), add an ADR for any non-obvious decision.
 8. **Commit**: `scripts/gate.sh && git add -A && git commit` in `postmortem/` with a conventional
-   message (`feat(fs-ntfs): …`) ending with the Co-Authored-By trailer. Local
-   commits only — never push, never add remotes.
+   message (`feat(fs-ntfs): …`) ending with the Co-Authored-By trailer. Then
+   push to the work branch: `git push origin HEAD:parity-wip` (user decision
+   2026-10-17, after unpushed worktree branches were lost). Never push to
+   `master`, never add remotes.
 9. **Continue**: if there is remaining work and context budget, go back to 3.
    Otherwise end the turn; the loop wakeup re-enters at step 1.
 
 ## Quality gate
 
-Run `scripts/gate.sh` from `/Users/tatu/slop/postmortem` (fmt check, clippy
+Run `scripts/gate.sh` from `/home/tatu/slop/postmortem` (fmt check, clippy
 with `-D warnings`, all tests). **Commit only as `scripts/gate.sh && git commit …`**
 so that a red gate can never be committed. **Never pipe the gate** (`gate.sh | tail` returns tail's exit
 status and lets a red gate through).
@@ -84,7 +86,7 @@ ends.
   `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::print_stderr, reason = "test code")]`
   because helper functions there are not covered by clippy.toml's test allowances.
 - **Differential tests against TSK** (`pm_testkit::tsk`, needs
-  `brew install sleuthkit`): volume and filesystem output must match
+  `apt install sleuthkit` or `brew install sleuthkit`): volume and filesystem output must match
   `mmls`/`fls` on generated images, except for documented improvements.
 - Every public behaviour gets a test. Unit tests sit next to code; cross-crate
   behaviour goes in `tests/`.
