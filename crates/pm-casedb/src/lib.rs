@@ -20,6 +20,7 @@ pub mod file_search;
 mod hosts;
 pub mod integrity;
 pub mod keyword_hits;
+pub mod mcp;
 mod model;
 pub mod os_accounts;
 mod scores;

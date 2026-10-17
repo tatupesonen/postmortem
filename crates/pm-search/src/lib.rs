@@ -151,6 +151,26 @@ impl CaseIndex {
         Ok(ix)
     }
 
+    /// Opens the indexes of a case for searching only (another process,
+    /// such as the MCP server). Returns `None` when the case has no
+    /// indexes of this [`INDEX_VERSION`]; nothing is created or deleted
+    /// and no writer lock is taken. Not shared through [`CaseIndex::open`].
+    pub fn open_read_only(case_dir: &Path) -> Result<Option<Arc<Self>>, SearchError> {
+        let dir = case_dir.join(INDEX_DIR);
+        let current = std::fs::read_to_string(dir.join("VERSION")).ok();
+        if current.as_deref().map(str::trim) != Some(INDEX_VERSION.to_string().as_str())
+            || !dir.join("content").join("meta.json").is_file()
+            || !dir.join("names").join("meta.json").is_file()
+        {
+            return Ok(None);
+        }
+        Ok(Some(Arc::new(Self {
+            content: ContentIndex::open_read_only(&dir.join("content"))?,
+            names: NameIndex::open_read_only(&dir.join("names"))?,
+            dir,
+        })))
+    }
+
     pub fn content(&self) -> &ContentIndex {
         &self.content
     }
@@ -202,5 +222,31 @@ mod tests {
         let d = CaseIndex::open(dir.path()).unwrap();
         assert_eq!(d.content().stats().unwrap().objects, 0);
         assert!(d.dir().ends_with(INDEX_DIR));
+    }
+
+    #[test]
+    fn read_only_open_needs_existing_indexes_and_never_locks() {
+        let dir = tempfile::tempdir().unwrap();
+        assert!(CaseIndex::open_read_only(dir.path()).unwrap().is_none());
+        assert!(!dir.path().join(INDEX_DIR).exists(), "nothing created");
+        let w = CaseIndex::open(dir.path()).unwrap();
+        w.content()
+            .add_summary(ObjRef::File(7), 1, "seen.txt", 0)
+            .unwrap();
+        w.content().commit().unwrap();
+        w.names().commit().unwrap();
+        let r = CaseIndex::open_read_only(dir.path()).unwrap().unwrap();
+        assert_eq!(r.content().stats().unwrap().objects, 1);
+        assert!(matches!(
+            r.content().add_summary(ObjRef::File(8), 1, "x", 0),
+            Err(SearchError::ReadOnly)
+        ));
+        // The writer keeps working while the read-only copy is open.
+        w.content()
+            .add_summary(ObjRef::File(9), 1, "later.txt", 0)
+            .unwrap();
+        w.content().commit().unwrap();
+        r.content().reload().unwrap();
+        assert_eq!(r.content().stats().unwrap().objects, 2);
     }
 }

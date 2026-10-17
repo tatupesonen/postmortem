@@ -217,19 +217,40 @@ impl std::fmt::Debug for ContentIndex {
 impl ContentIndex {
     /// Opens or creates the index in `dir`.
     pub fn open(dir: &Path) -> Result<Self, SearchError> {
-        std::fs::create_dir_all(dir)?;
+        Self::open_with(dir, true)
+    }
+
+    /// Opens an existing index for searching only: nothing is created and
+    /// the writer lock is never taken, so a writer in another process
+    /// (the GUI's ingest) is not blocked.
+    pub fn open_read_only(dir: &Path) -> Result<Self, SearchError> {
+        Self::open_with(dir, false)
+    }
+
+    fn open_with(dir: &Path, writable: bool) -> Result<Self, SearchError> {
+        if writable {
+            std::fs::create_dir_all(dir)?;
+        }
         let (schema, f) = schema();
         let mmap = tantivy::directory::MmapDirectory::open(dir)
             .map_err(|e| SearchError::Index(e.to_string()))?;
-        let index = Index::open_or_create(mmap, schema)?;
+        let index = if writable {
+            Index::open_or_create(mmap, schema)?
+        } else {
+            Index::open(mmap)?
+        };
         register_tokenizers(&index);
-        let writer = match index.writer_with_num_threads(WRITER_THREADS, WRITER_HEAP) {
-            Ok(w) => Some(w),
-            Err(tantivy::TantivyError::LockFailure(..)) => {
-                tracing::warn!("content index {} is locked: read-only", dir.display());
-                None
+        let writer = if writable {
+            match index.writer_with_num_threads(WRITER_THREADS, WRITER_HEAP) {
+                Ok(w) => Some(w),
+                Err(tantivy::TantivyError::LockFailure(..)) => {
+                    tracing::warn!("content index {} is locked: read-only", dir.display());
+                    None
+                }
+                Err(e) => return Err(e.into()),
             }
-            Err(e) => return Err(e.into()),
+        } else {
+            None
         };
         let reader = index
             .reader_builder()

@@ -1,0 +1,53 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "id": 2,
+      "ref": "host:2",
+      "evidence": {
+        "name": "bait.dd Host"
+      },
+      "dataSources": [
+        {
+          "ref": "ds:2",
+          "objectId": 2,
+          "name": "bait.dd",
+          "type": "Image",
+          "size": 8388608,
+          "timezone": "<redacted>",
+          "addedDate": "<redacted>",
+          "imageType": "raw",
+          "sectorSize": 512,
+          "paths": "<redacted>",
+          "md5": null,
+          "sha1": null,
+          "sha256": null
+        }
+      ]
+    },
+    {
+      "id": 1,
+      "ref": "host:1",
+      "evidence": {
+        "name": "demo.dd Host"
+      },
+      "dataSources": [
+        {
+          "ref": "ds:1",
+          "objectId": 1,
+          "name": "demo.dd",
+          "type": "Image",
+          "size": 69206016,
+          "timezone": "<redacted>",
+          "addedDate": "<redacted>",
+          "imageType": "raw",
+          "sectorSize": 512,
+          "paths": "<redacted>",
+          "md5": null,
+          "sha1": null,
+          "sha256": null
+        }
+      ]
+    }
+  ]
+}

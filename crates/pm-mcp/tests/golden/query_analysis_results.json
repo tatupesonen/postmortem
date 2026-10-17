@@ -1,0 +1,33 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "result:6",
+      "objectId": 6,
+      "sourceFileId": 30,
+      "sourceRef": "file:30",
+      "artifactType": "TSK_INTERESTING_ITEM",
+      "artifactTypeDisplayName": "Interesting Items",
+      "analysisResult": true,
+      "dataSourceId": 1,
+      "score": {
+        "significance": "Notable",
+        "priority": "Normal"
+      },
+      "evidence": {
+        "attributes": [
+          {
+            "type": "TSK_SET_NAME",
+            "value": "Credentials"
+          },
+          {
+            "type": "TSK_COMMENT",
+            "value": "password file"
+          }
+        ]
+      }
+    }
+  ],
+  "next_cursor": null,
+  "truncated": false
+}

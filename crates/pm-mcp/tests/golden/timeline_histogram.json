@@ -1,0 +1,56 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "bucketSeconds": 43200,
+    "buckets": [
+      {
+        "start": "2021-05-31T00:00:00Z",
+        "startEpoch": 1622419200,
+        "end": "2021-05-31T12:00:00Z",
+        "endEpoch": 1622462400,
+        "total": 1,
+        "byCategory": {
+          "File System": 1,
+          "Web Activity": 0,
+          "Other": 0
+        }
+      },
+      {
+        "start": "2021-05-31T12:00:00Z",
+        "startEpoch": 1622462400,
+        "end": "2021-06-01T00:00:00Z",
+        "endEpoch": 1622505600,
+        "total": 16,
+        "byCategory": {
+          "File System": 15,
+          "Web Activity": 1,
+          "Other": 0
+        }
+      },
+      {
+        "start": "2021-06-01T00:00:00Z",
+        "startEpoch": 1622505600,
+        "end": "2021-06-01T12:00:00Z",
+        "endEpoch": 1622548800,
+        "total": 8,
+        "byCategory": {
+          "File System": 8,
+          "Web Activity": 0,
+          "Other": 0
+        }
+      },
+      {
+        "start": "2021-06-01T12:00:00Z",
+        "startEpoch": 1622548800,
+        "end": "2021-06-02T00:00:00Z",
+        "endEpoch": 1622592000,
+        "total": 0,
+        "byCategory": {
+          "File System": 0,
+          "Web Activity": 0,
+          "Other": 0
+        }
+      }
+    ]
+  }
+}

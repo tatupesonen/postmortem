@@ -1,0 +1,31 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "jobs": [
+      {
+        "jobId": 1,
+        "dataSourceId": 1,
+        "dataSourceRef": "ds:1",
+        "started": "<redacted>",
+        "ended": "<redacted>",
+        "status": "completed",
+        "modules": [
+          {
+            "module": "hash_lookup",
+            "version": "<redacted>"
+          },
+          {
+            "module": "file_type",
+            "version": "<redacted>"
+          },
+          {
+            "module": "keyword_search",
+            "version": "<redacted>"
+          }
+        ],
+        "settings": "<redacted>"
+      }
+    ],
+    "note": "Per-file errors and skipped files are reported in the ingest messages of the GUI, not stored in the case."
+  }
+}

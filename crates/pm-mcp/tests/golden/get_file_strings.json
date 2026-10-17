@@ -1,0 +1,14 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "ref": "file:26",
+    "offset": 0,
+    "scannedBytes": 8107,
+    "fileSize": 8107,
+    "outputTruncated": false,
+    "nextOffset": null,
+    "evidence": {
+      "strings": "This program cannot be run in DOS mode.\n"
+    }
+  }
+}

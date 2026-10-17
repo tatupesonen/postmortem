@@ -47,6 +47,12 @@ pm-text = { path = "crates/pm-text" }
 pm-search = { path = "crates/pm-search" }
 pm-plugin-api = { path = "crates/pm-plugin-api" }
 pm-browser = { path = "crates/pm-browser" }
+pm-mcp = { path = "crates/pm-mcp" }
+
+# MCP server (pm-mcp, ADR-021)
+rmcp = { version = "=3.5.0", default-features = false, features = ["server", "transport-io", "transport-streamable-http-server"] }
+tokio = { version = "1.53.3", features = ["rt-multi-thread", "io-std", "net", "time", "sync"] }
+base64 = "0.22.1"
 
 # Foundations
 thiserror = "2.0.21"

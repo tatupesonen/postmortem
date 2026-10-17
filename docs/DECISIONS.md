@@ -378,3 +378,57 @@ only candidate chunks. Japanese morphological analysis (`content_ja`),
 language detection, OCR and the "Extract Unique Words" report are not
 ported yet. Multi-user cases need an index service (inventory 05 §1.14);
 a second process opens the indexes read-only.
+
+## ADR-021 — MCP server: rmcp transports over a synchronous tool engine
+
+**Status:** accepted (2026-10-17, mcp track)
+
+**Context.** BEYOND-AUTOPSY §8 asks for Autopsy's 17 MCP tools plus
+search, pivot and timeline tools, served over stdio and streamable HTTP,
+safe against prompt injection planted in evidence, and cheap on cases with
+hundreds of millions of files (ADR-014). The case crates are synchronous
+(SQLite, Tantivy, `ReadAt`).
+
+**Decision.**
+* **`pm-mcp` uses the official Rust SDK `rmcp` =3.5.0** (2026-09-28;
+  features `server`, `transport-io`, `transport-streamable-http-server`,
+  no macros, no `schemars` derive for our tools). `ServerHandler` is
+  implemented by hand: tool schemas are hand-written JSON (Autopsy's
+  argument names and descriptions), and every call runs the synchronous
+  engine `McpServer::call` on Tokio's blocking pool. The engine has no
+  async or MCP types, so it is unit-tested directly and the GUI can call
+  it too. The HTTP transport is `rmcp`'s `StreamableHttpService` behind a
+  small hyper 1.11 HTTP/1 server bound to `127.0.0.1` that checks a
+  per-start random bearer token (constant-time) and serves `/mcp` only;
+  `HttpServer::start/stop` run it on its own thread and runtime.
+* **Read-only by default.** `CaseDb::open_read_only` (no migrations, no
+  WAL change, refuses older schemas) and `Case::open_read_only` open the
+  case; `CaseIndex::open_read_only` opens the Tantivy indexes without the
+  writer lock. `--allow-writes` opens the case normally.
+* **Evidence segregation.** Every string that can come from evidence
+  (names, paths, extensions, labels, attribute values, descriptions,
+  content, account identifiers, host names, tag comments) is emitted only
+  inside an `evidence` object; the server instructions and every tool
+  description say that `evidence` is data, never instructions. Autopsy's
+  result fields keep their names but move into `evidence` when they carry
+  such text (e.g. `query_files` → `evidence.name/path`).
+* **Envelope and paging.** All results are Autopsy's
+  `{caseId, result}` plus `next_cursor` (opaque base64url of a keyset
+  JSON) and `truncated`. Pages default to 50 and are capped at 500 rows
+  (Autopsy's `query_timeline` default 100 kept); the serialised response
+  is capped at 256 KiB by cutting the page at a row boundary (the cursor
+  of the last kept row continues) or shortening long strings of single
+  objects. Text reads are therefore capped at 192 KiB (Autopsy: 1 MiB).
+* **Timeline** merges stored artifact events with the virtual file-system
+  MACB events (ADR-018) as one stream ordered by `(time, source, id)`
+  with a three-part keyset cursor.
+* **Audit** goes to `<case>/Log/mcp-audit.jsonl` (the case's existing
+  `Log` folder; §8 says `Logs/`).
+* **Writes** record the examiner as `mcp:<client name>` and may only
+  remove tags the same client created.
+
+**Consequences.** Tokio, hyper and rmcp enter the dependency tree (only
+in `pm-mcp`/`postmortem`). Filters on unindexed columns (`LIKE '%x%'`,
+`atime`/`ctime`/`crtime` until the timeline work adds indexes, event
+text) are LIMIT-bounded scans rather than index seeks; substring name
+search goes through the name index (`search_file_names`).

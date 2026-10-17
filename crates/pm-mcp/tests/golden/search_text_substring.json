@@ -1,0 +1,40 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "file:9",
+      "objectId": 9,
+      "objectType": "file",
+      "page": 1,
+      "dataSourceId": 1,
+      "mimeType": "application/octet-stream",
+      "size": 131072,
+      "evidence": {
+        "path": "/$MFT",
+        "preview": "sswords.txt\nrouter: «hunter2«\nwifi: correct-horse",
+        "hits": [
+          "hunter2"
+        ]
+      }
+    },
+    {
+      "ref": "file:30",
+      "objectId": 30,
+      "objectType": "file",
+      "page": 1,
+      "dataSourceId": 1,
+      "mimeType": "text/plain",
+      "size": 51,
+      "evidence": {
+        "path": "/Users/alice/Documents/passwords.txt",
+        "preview": "router: «hunter2«\nwifi: correct-horse",
+        "hits": [
+          "hunter2"
+        ]
+      }
+    }
+  ],
+  "next_cursor": null,
+  "truncated": false,
+  "searchType": "substring"
+}

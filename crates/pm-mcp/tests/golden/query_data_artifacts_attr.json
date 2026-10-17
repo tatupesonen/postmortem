@@ -1,0 +1,38 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "artifact:9",
+      "objectId": 9,
+      "sourceFileId": 26,
+      "sourceRef": "file:26",
+      "artifactType": "TSK_GPS_BOOKMARK",
+      "artifactTypeDisplayName": "GPS Bookmarks",
+      "analysisResult": false,
+      "dataSourceId": 1,
+      "evidence": {
+        "attributes": [
+          {
+            "type": "TSK_GEO_LATITUDE",
+            "value": 60.1699
+          },
+          {
+            "type": "TSK_GEO_LONGITUDE",
+            "value": 24.9384
+          },
+          {
+            "type": "TSK_DATETIME",
+            "value": "2021-05-30T18:40:00Z",
+            "epoch": 1622400000
+          },
+          {
+            "type": "TSK_NAME",
+            "value": "Helsinki"
+          }
+        ]
+      }
+    }
+  ],
+  "next_cursor": null,
+  "truncated": false
+}

@@ -1,0 +1,28 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "file:30",
+      "objectId": 30,
+      "dataSourceId": 1,
+      "size": 51,
+      "isDirectory": false,
+      "deleted": false,
+      "mimeType": "text/plain",
+      "modifiedTime": "2021-05-30T23:41:00Z",
+      "md5Hash": "09318c057437d8bbad4ab0edb2b85709",
+      "evidence": {
+        "name": "passwords.txt",
+        "path": "/Users/alice/Documents/passwords.txt"
+      },
+      "knownState": "UNKNOWN",
+      "hashSetHits": [],
+      "sha1Hash": "b98d45d12da981b5728374162f46975d6e18765f",
+      "sha256Hash": "9ab0fd41ea53602e03b51de4809b5e50b26e3d08256f422af40a14526a175ceb"
+    }
+  ],
+  "next_cursor": null,
+  "truncated": false,
+  "hashType": "md5",
+  "note": "Only the case database is searched; known/notable status and hash-set hits come from the Hash Lookup module (see list_ingest_jobs)."
+}

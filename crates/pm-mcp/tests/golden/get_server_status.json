@@ -1,0 +1,14 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "server": "postmortem-mcp",
+    "version": "<redacted>",
+    "status": "running",
+    "caseOpen": true,
+    "caseName": "MCP demo",
+    "readOnly": true,
+    "writesEnabled": false,
+    "imagePreviews": false,
+    "keywordIndex": true
+  }
+}

@@ -1,0 +1,93 @@
+{
+  "caseId": "MCP demo",
+  "result": {
+    "ref": "file:26",
+    "objectId": 26,
+    "dataSourceId": 1,
+    "size": 8107,
+    "modifiedTime": "2021-05-31T23:58:00Z",
+    "modifiedTimeEpoch": 1622505480,
+    "accessedTime": "2021-05-31T23:59:00Z",
+    "accessedTimeEpoch": 1622505540,
+    "changeTime": "2021-05-31T23:58:00Z",
+    "changeTimeEpoch": 1622505480,
+    "createdTime": "<redacted>",
+    "createdTimeEpoch": 1622505480,
+    "fileType": "FS",
+    "dirType": "r",
+    "metaType": "r",
+    "dirFlag": "Allocated",
+    "metaFlags": "Allocated",
+    "deleted": false,
+    "modes": null,
+    "knownState": "UNKNOWN",
+    "mimeType": "application/x-dosexec",
+    "md5Hash": "7856410df03095179a0b591ffd88826c",
+    "sha256Hash": "1e32f2b2dff1d0ca6571c2cf539972f9f649fc08da392df0c1b3c56e7faf836b",
+    "sha1Hash": "53a0e6fb6dcf51829d7c4700ab4e5856aa16d70e",
+    "uid": null,
+    "gid": null,
+    "metaAddr": 74,
+    "metaSeq": 1,
+    "evidence": {
+      "name": "setup.exe",
+      "path": "/Users/alice/Downloads/setup.exe",
+      "parentPath": "/Users/alice/Downloads/",
+      "extension": "exe",
+      "ownerUid": null,
+      "fileAttributes": []
+    },
+    "times": {
+      "modified": {
+        "iso": "2021-05-31T23:58:00Z",
+        "epoch": 1622505480,
+        "nanos": 0
+      },
+      "accessed": {
+        "iso": "2021-05-31T23:59:00Z",
+        "epoch": 1622505540,
+        "nanos": 0
+      },
+      "changed": {
+        "iso": "2021-05-31T23:58:00Z",
+        "epoch": 1622505480,
+        "nanos": 0
+      },
+      "created": "<redacted>"
+    },
+    "fileSystemId": 1,
+    "dataSourceRef": "ds:1",
+    "parentRef": "file:21",
+    "stream": null,
+    "attributesFlags": 32,
+    "metaFlagsRaw": 3,
+    "alternateStreams": [
+      {
+        "ref": "file:27",
+        "objectId": 27,
+        "dataSourceId": 1,
+        "size": 99,
+        "isDirectory": false,
+        "deleted": false,
+        "mimeType": "text/plain",
+        "modifiedTime": "2021-05-31T23:58:00Z",
+        "md5Hash": "c7c8499b87a828c4d9726190c80d2901",
+        "evidence": {
+          "name": "setup.exe:Zone.Identifier",
+          "path": "/Users/alice/Downloads/setup.exe:Zone.Identifier"
+        }
+      }
+    ],
+    "score": {
+      "significance": "Unknown",
+      "priority": "Normal"
+    },
+    "scoreReasons": [],
+    "extensionMismatch": false,
+    "tags": [],
+    "owner": null,
+    "derivedFrom": [],
+    "childCount": 0,
+    "hasDataArtifacts": true
+  }
+}

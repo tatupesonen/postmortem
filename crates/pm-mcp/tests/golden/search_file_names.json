@@ -1,0 +1,53 @@
+{
+  "caseId": "MCP demo",
+  "result": [
+    {
+      "ref": "file:34",
+      "objectId": 34,
+      "dataSourceId": 1,
+      "size": 43,
+      "isDirectory": false,
+      "deleted": false,
+      "mimeType": "text/plain",
+      "modifiedTime": "2021-07-20T12:06:00Z",
+      "md5Hash": "3e32268d2ae9066813b68f6424f88854",
+      "evidence": {
+        "name": "report_2021_07_18.txt",
+        "path": "/Users/alice/Documents/Projects/report_2021_07_18.txt"
+      }
+    },
+    {
+      "ref": "file:59",
+      "objectId": 59,
+      "dataSourceId": 1,
+      "size": 43,
+      "isDirectory": false,
+      "deleted": false,
+      "mimeType": "text/plain",
+      "modifiedTime": "2021-01-05T14:24:00Z",
+      "md5Hash": "1b64600944100a16fef89f4023d22da2",
+      "evidence": {
+        "name": "report_2021_01_12.txt",
+        "path": "/Users/alice/Documents/Projects/report_2021_01_12.txt"
+      }
+    },
+    {
+      "ref": "file:60",
+      "objectId": 60,
+      "dataSourceId": 1,
+      "size": 43,
+      "isDirectory": false,
+      "deleted": false,
+      "mimeType": "text/plain",
+      "modifiedTime": "2021-02-12T15:41:00Z",
+      "md5Hash": "1d499ad8d0d7da9af174bb81b1036215",
+      "evidence": {
+        "name": "report_2021_02_13.txt",
+        "path": "/Users/alice/Documents/Projects/report_2021_02_13.txt"
+      }
+    }
+  ],
+  "next_cursor": "NjA",
+  "truncated": false,
+  "totalMatches": 12
+}
