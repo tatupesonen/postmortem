@@ -151,3 +151,15 @@ bookmark and event-log entries.
   copy token / `client_config_snippet`, the `McpConfig` switches) and a
   "Go to reference" box — coordinator.
 * Conformance run with the MCP inspector not automated (needs Node).
+
+## Status at pause (2026-10-17)
+Committed as `5bab2b7` (full gate green: 796 tests workspace-wide).
+pm-mcp: 18 unit tests, 10 integration tests (`tests/tools.rs`, 46 golden
+files), 2 transport tests (stdio pipes, HTTP + token); plus 5 `pm-casedb`
+mcp tests, 1 `pm-case` read-only test, 1 `pm-search` read-only index test.
+
+Remaining (not started): `user_activity`, `program_execution`,
+`usb_devices` (need the §2–§6 analyses), `set_comment` (needs a comment
+store), hash-set/NSRL lookups in `lookup_hash`, MCP-inspector conformance
+run, the GUI options panel and "Go to reference" box (coordinator),
+timeline indexes on `atime`/`ctime`/`crtime` (timeline track).
