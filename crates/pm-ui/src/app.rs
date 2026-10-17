@@ -26,6 +26,16 @@ use crate::views::View;
 
 type Listing = Result<Arc<Vec<FileRow>>, String>;
 
+/// A tab of the result pane (Autopsy opens each search in its own result
+/// window next to the main "Listing").
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ResultTab {
+    /// What is selected in the tree.
+    Listing,
+    FileSearch(usize),
+    KeywordSearch(usize),
+}
+
 /// Settings persisted between runs.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(default)]
@@ -136,6 +146,9 @@ pub struct PostmortemApp {
     /// "Files Indexed" for the panel.
     keyword_indexed: crate::task::Cached<u64>,
     keyword_searches: Vec<crate::keyword_search_ui::KeywordResults>,
+    result_tab: ResultTab,
+    /// Searches run in this case, for numbering (Autopsy never reuses one).
+    searches_run: (usize, usize),
     run_ingest: Option<crate::add_source::RunIngestDialog>,
     hosts_ui: crate::hosts_ui::HostsUi,
     options: Option<crate::options_ui::OptionsWindow>,
@@ -209,6 +222,8 @@ impl PostmortemApp {
             keyword_panel: None,
             keyword_indexed: crate::task::Cached::default(),
             keyword_searches: Vec::new(),
+            result_tab: ResultTab::Listing,
+            searches_run: (0, 0),
             run_ingest: None,
             hosts_ui: crate::hosts_ui::HostsUi::default(),
             options: None,
@@ -414,6 +429,8 @@ impl PostmortemApp {
         self.keyword_panel = None;
         self.keyword_indexed.clear();
         self.keyword_searches.clear();
+        self.result_tab = ResultTab::Listing;
+        self.searches_run = (0, 0);
         ctx.send_viewport_cmd(egui::ViewportCommand::Title("postmortem".into()));
     }
 
@@ -496,6 +513,7 @@ impl PostmortemApp {
     }
 
     pub fn navigate(&mut self, node: NodeId) {
+        self.result_tab = ResultTab::Listing;
         if self.selected.as_ref() == Some(&node) {
             return;
         }
@@ -1965,6 +1983,14 @@ impl PostmortemApp {
     }
 
     fn results(&mut self, ui: &mut egui::Ui) {
+        if self.has_case() {
+            self.result_tabs(ui);
+        }
+        match self.result_tab {
+            ResultTab::Listing => {}
+            ResultTab::FileSearch(n) => return self.search_view(ui, n),
+            ResultTab::KeywordSearch(n) => return self.keyword_view(ui, n),
+        }
         let Some(node) = self.selected.clone() else {
             let wordmark = self.wordmark(ui.ctx());
             if !self.has_case() {
@@ -2017,8 +2043,6 @@ impl PostmortemApp {
             | NodeId::TagResults(_)
             | NodeId::Score { .. }
             | NodeId::OsAccounts => self.node_view(ui, &node),
-            NodeId::FileSearch(n) => self.search_view(ui, *n),
-            NodeId::KeywordSearch(n) => self.keyword_view(ui, *n),
             NodeId::View(v) => self.view_table(ui, v),
         }
     }
@@ -2371,13 +2395,15 @@ impl PostmortemApp {
             crate::file_search_ui::SearchAction::None => {}
             crate::file_search_ui::SearchAction::Close => self.file_search = None,
             crate::file_search_ui::SearchAction::Search(search) => {
-                let number = self.searches.len() + 1;
+                self.searches_run.0 += 1;
+                let number = self.searches_run.0;
                 self.searches.push(crate::file_search_ui::SearchResults {
                     number,
                     rows: crate::task::Cached::default(),
                     search: Arc::from(search),
+                    table: crate::table::TableState::default(),
                 });
-                self.navigate(NodeId::FileSearch(number));
+                self.result_tab = ResultTab::FileSearch(number);
             }
         }
     }
@@ -2466,15 +2492,68 @@ impl PostmortemApp {
             PanelAction::Search(req) => {
                 // Autopsy's dropdown closes once the search starts.
                 self.keyword_panel = None;
-                let number = self.keyword_searches.len() + 1;
+                self.searches_run.1 += 1;
+                let number = self.searches_run.1;
                 self.keyword_searches
                     .push(crate::keyword_search_ui::KeywordResults {
                         number,
                         request: Arc::new(req),
                         rows: crate::task::Cached::default(),
                         reported: false,
+                        table: crate::table::TableState::default(),
                     });
-                self.navigate(NodeId::KeywordSearch(number));
+                self.result_tab = ResultTab::KeywordSearch(number);
+            }
+        }
+    }
+
+    /// The result pane's tabs: Listing, then one per search (closable).
+    fn result_tabs(&mut self, ui: &mut egui::Ui) {
+        let mut tabs = vec![(ResultTab::Listing, "Listing".to_owned())];
+        tabs.extend(self.searches.iter().map(|s| {
+            (
+                ResultTab::FileSearch(s.number),
+                format!("File Search Results {}", s.number),
+            )
+        }));
+        tabs.extend(
+            self.keyword_searches
+                .iter()
+                .map(|s| (ResultTab::KeywordSearch(s.number), s.title())),
+        );
+        if tabs.len() == 1 {
+            return;
+        }
+        let mut close = None;
+        ui.horizontal_wrapped(|ui| {
+            for (tab, title) in tabs {
+                let on = self.result_tab == tab;
+                ui.scope(|ui| {
+                    ui.spacing_mut().item_spacing.x = 2.0;
+                    if ui.selectable_label(on, &title).clicked() {
+                        self.result_tab = tab;
+                    }
+                    if tab != ResultTab::Listing
+                        && ui
+                            .small_button("×")
+                            .on_hover_text(format!("Close {title}"))
+                            .clicked()
+                    {
+                        close = Some(tab);
+                    }
+                });
+                ui.separator();
+            }
+        });
+        ui.separator();
+        if let Some(tab) = close {
+            match tab {
+                ResultTab::FileSearch(n) => self.searches.retain(|s| s.number != n),
+                ResultTab::KeywordSearch(n) => self.keyword_searches.retain(|s| s.number != n),
+                ResultTab::Listing => {}
+            }
+            if self.result_tab == tab {
+                self.result_tab = ResultTab::Listing;
             }
         }
     }
@@ -2492,7 +2571,6 @@ impl PostmortemApp {
         else {
             return;
         };
-        ui.heading(s.title());
         let (loader, req) = (Arc::clone(&case), Arc::clone(&s.request));
         let Some(data) = s.rows.get(&ctx, move || {
             crate::keyword_search_ui::run(&loader, &req, &|| false)
@@ -2537,7 +2615,7 @@ impl PostmortemApp {
         let query = s.request.query.clone();
         let rows = &data.rows;
         let tags = self.tagging.catalog.get(&ctx, Some(&case));
-        let ev = self.table.ui_with(
+        let ev = s.table.ui_with(
             ui,
             rows,
             &self.prefs,
@@ -2571,7 +2649,6 @@ impl PostmortemApp {
         let Some(s) = self.searches.iter_mut().find(|s| s.number == number) else {
             return;
         };
-        ui.heading(format!("File Search Results {number}"));
         let (loader, search) = (Arc::clone(&case), Arc::clone(&s.search));
         let Some(data) = s
             .rows
@@ -2601,7 +2678,7 @@ impl PostmortemApp {
             format!("{} matches", crate::format::grouped(rows.len() as u64))
         });
         let tags = self.tagging.catalog.get(&ctx, Some(&case));
-        let ev = self.table.ui(ui, rows, &self.prefs, Some(&tags));
+        let ev = s.table.ui(ui, rows, &self.prefs, Some(&tags));
         if let Some((i, req)) = ev.tag
             && let Some(id) = rows.get(i).and_then(FileRow::file_id)
         {

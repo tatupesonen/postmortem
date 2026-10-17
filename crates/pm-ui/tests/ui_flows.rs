@@ -1142,6 +1142,20 @@ fn keyword_search_from_the_toolbar() {
     });
     shot(&mut h, "keyword_search_saved");
 
+    // Each search keeps its own tab; the first is still there.
+    h.query_all_by_label("Keyword search 1 - migration")
+        .next()
+        .unwrap()
+        .click();
+    h.run_steps(2);
+    settle(&mut h, |h| h.query_by_label_contains("2 files").is_some());
+    shot(&mut h, "result_tabs");
+    // Closing the first tab leaves the second.
+    h.query_all_by_label("×").next().unwrap().click();
+    h.run_steps(2);
+    assert!(h.query_by_label_contains("Keyword search 1").is_none());
+    h.get_by_label_contains("Keyword search 2 - hunter");
+
     // The tree groups hits like Autopsy: list › keyword › match.
     click(&mut h, "Keyword Hits (");
     click(&mut h, "Single Literal Keyword Search (2)");

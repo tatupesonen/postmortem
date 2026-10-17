@@ -63,10 +63,6 @@ pub enum NodeId {
         bad: bool,
     },
     OsAccounts,
-    /// The results of file search number `n` (File Search by Attributes).
-    FileSearch(usize),
-    /// The results of ad-hoc keyword search number `n`.
-    KeywordSearch(usize),
     /// A list, keyword or match under Analysis Results › Keyword Hits.
     KeywordHits(pm_casedb::keyword_hits::KeywordHitFilter),
 }
@@ -83,8 +79,6 @@ impl NodeId {
             | Self::TagResults(_)
             | Self::Score { .. }
             | Self::OsAccounts
-            | Self::FileSearch(_)
-            | Self::KeywordSearch(_)
             | Self::KeywordHits(_) => None,
         }
     }

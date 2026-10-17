@@ -57,7 +57,7 @@ struct Doc {
 
 /// Opens the text of `file` and finds `query`'s hits in it.
 fn open(case: &Case, file: &FileRecord, query: Option<&TextQuery>) -> Result<Option<Doc>, String> {
-    let ix = CaseIndex::open(case.dir()).map_err(|e| e.to_string())?;
+    let ix = case.index().map_err(|e| e.to_string())?;
     let content = ix.content();
     content.reload().map_err(|e| e.to_string())?;
     let obj = ObjRef::File(file.id);

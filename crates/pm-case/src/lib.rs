@@ -51,6 +51,8 @@ pub enum CaseError {
     NotFound(String),
     #[error("cancelled")]
     Cancelled,
+    #[error(transparent)]
+    Search(#[from] pm_search::SearchError),
 }
 
 pub type Result<T, E = CaseError> = std::result::Result<T, E>;

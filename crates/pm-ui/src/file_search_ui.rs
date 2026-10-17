@@ -411,6 +411,8 @@ pub(crate) struct SearchResults {
     pub(crate) number: usize,
     pub(crate) rows: crate::task::Cached<(Vec<FileRow>, bool)>,
     pub(crate) search: Arc<FileSearch>,
+    /// This tab's sort and selection.
+    pub(crate) table: crate::table::TableState,
 }
 
 #[cfg(test)]

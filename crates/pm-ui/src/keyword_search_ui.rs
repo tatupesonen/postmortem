@@ -10,7 +10,7 @@ use std::collections::BTreeSet;
 use std::sync::Arc;
 
 use pm_case::Case;
-use pm_search::{CaseIndex, ObjRef, SearchType, TextQuery};
+use pm_search::{ObjRef, SearchType, TextQuery};
 
 use crate::model::FileRow;
 
@@ -212,7 +212,7 @@ fn radio_label(st: SearchType) -> &'static str {
 
 /// Files in the content index ("Files Indexed: N").
 pub(crate) fn indexed_count(case: &Case) -> Result<u64, String> {
-    let ix = CaseIndex::open(case.dir()).map_err(|e| e.to_string())?;
+    let ix = case.index().map_err(|e| e.to_string())?;
     ix.content().reload().map_err(|e| e.to_string())?;
     Ok(ix.content().stats().map_err(|e| e.to_string())?.objects)
 }
@@ -236,7 +236,7 @@ pub(crate) fn run(
     req: &KeywordRequest,
     cancelled: &(dyn Fn() -> bool + Sync),
 ) -> Result<KeywordRows, String> {
-    let ix = CaseIndex::open(case.dir()).map_err(|e| e.to_string())?;
+    let ix = case.index().map_err(|e| e.to_string())?;
     let content = ix.content();
     content.reload().map_err(|e| e.to_string())?;
     if content.stats().map_err(|e| e.to_string())?.objects == 0 {
@@ -335,6 +335,8 @@ pub(crate) struct KeywordResults {
     pub(crate) rows: crate::task::Cached<KeywordRows>,
     /// The tree was refreshed for saved hits.
     pub(crate) reported: bool,
+    /// This tab's sort and selection.
+    pub(crate) table: crate::table::TableState,
 }
 
 impl KeywordResults {

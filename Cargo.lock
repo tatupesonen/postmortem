@@ -4062,6 +4062,7 @@ dependencies = [
  "pm-evidence",
  "pm-fs",
  "pm-image",
+ "pm-search",
  "pm-testkit",
  "pm-volume",
  "proptest",

@@ -81,6 +81,9 @@ pub struct Case {
     meta: RwLock<CaseFile>,
     db: Arc<CaseDb>,
     sources: Mutex<HashMap<i64, Arc<OpenSource>>>,
+    /// The keyword and file-name indexes, opened on first use and kept
+    /// open (with their writer) while the case is.
+    index: Mutex<Option<Arc<pm_search::CaseIndex>>>,
 }
 
 impl Case {
@@ -117,6 +120,7 @@ impl Case {
             meta: RwLock::new(meta),
             db: Arc::new(db),
             sources: Mutex::new(HashMap::new()),
+            index: Mutex::new(None),
         })
     }
 
@@ -160,6 +164,7 @@ impl Case {
             meta: RwLock::new(meta),
             db: Arc::new(db),
             sources: Mutex::new(HashMap::new()),
+            index: Mutex::new(None),
         })
     }
 
@@ -234,7 +239,22 @@ impl Case {
     pub fn delete_data_source(&self, ds_id: i64) -> Result<()> {
         self.sources.lock().remove(&ds_id);
         self.db.delete_data_source(ds_id)?;
+        // Autopsy's keyword search service deletes it from the index too.
+        if self.dir.join(pm_search::INDEX_DIR).exists() {
+            self.index()?.delete_data_source(ds_id)?;
+        }
         Ok(())
+    }
+
+    /// The case's keyword and file-name indexes (created on first use).
+    pub fn index(&self) -> Result<Arc<pm_search::CaseIndex>> {
+        let mut ix = self.index.lock();
+        if let Some(ix) = ix.as_ref() {
+            return Ok(Arc::clone(ix));
+        }
+        let opened = pm_search::CaseIndex::open(&self.dir)?;
+        *ix = Some(Arc::clone(&opened));
+        Ok(opened)
     }
 
     /// The parsed file system with case id `fs_id`.
