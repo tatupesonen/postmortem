@@ -1,6 +1,6 @@
 <p align="center">
   <picture>
-    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/postmortem-wordmark-on-dark.svg">
+    <source media="(prefers-color-scheme: dark)" srcset="assets/brand/postmortem-wordmark-on-dark.png">
     <img alt="postmortem" src="assets/brand/postmortem-wordmark-on-light.svg" width="360">
   </picture>
 </p>
