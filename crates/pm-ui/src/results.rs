@@ -237,6 +237,31 @@ pub(crate) fn load_rows(case: &Case, key: &ResultKey) -> Result<ResultRows, Stri
     Ok(out)
 }
 
+/// The query that finds a keyword hit result again (for the Extracted
+/// Text viewer); `None` for other results and hits in an artifact's text.
+pub(crate) fn keyword_query(r: &ResultRow) -> Option<pm_search::TextQuery> {
+    if Some(r.artifact.type_id) != pm_casedb::catalog::artifact_type_id("TSK_KEYWORD_HIT") {
+        return None;
+    }
+    let attr = |name: &str| r.attrs.iter().find(|(n, _)| n == name).map(|(_, v)| v);
+    if attr("Associated Artifact").is_some() {
+        return None;
+    }
+    let text = |name: &str| match attr(name) {
+        Some(AttrValue::Text(t)) => Some(t.as_str()),
+        _ => None,
+    };
+    let search_type = match attr("Keyword Search Type") {
+        Some(AttrValue::Int(i)) => Some(*i),
+        _ => None,
+    };
+    Some(pm_search::TextQuery::for_keyword_hit(
+        text("Keyword")?,
+        search_type,
+        text("Keyword Regular Expression"),
+    ))
+}
+
 fn score_text(s: Option<Significance>) -> &'static str {
     s.map_or("", Significance::name)
 }

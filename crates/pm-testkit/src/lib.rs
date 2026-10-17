@@ -24,7 +24,8 @@ pub mod tsk;
 pub use disk::{DiskBuilder, GptPart, MbrPart};
 
 /// Writes generated test data to a file shared by every test process and
-/// returns its path: `<temp>/pm-testkit/<stem>-<content hash>.<ext>`.
+/// returns its path: `<temp>/pm-testkit/<stem>-<content hash>/<stem>.<ext>`
+/// (the file keeps its plain name, which tests see as the data source name).
 ///
 /// The file is written once (atomically, via a rename) and reused, so test
 /// binaries neither regenerate nor leak a copy per run (a `TempDir` in a
@@ -38,17 +39,18 @@ pub fn shared_file(stem: &str, ext: &str, bytes: &[u8]) -> std::path::PathBuf {
     use std::hash::{Hash, Hasher};
     let mut h = std::collections::hash_map::DefaultHasher::new();
     bytes.hash(&mut h);
-    let dir = std::env::temp_dir().join("pm-testkit");
+    let root = std::env::temp_dir().join("pm-testkit");
+    let folder = format!("{stem}-{:016x}", h.finish());
+    let dir = root.join(&folder);
     std::fs::create_dir_all(&dir).expect("create the shared test-data folder");
-    let name = format!("{stem}-{:016x}.{ext}", h.finish());
-    let path = dir.join(&name);
+    let path = dir.join(format!("{stem}.{ext}"));
     if !path.exists() {
-        let tmp = dir.join(format!("{name}.{}.tmp", std::process::id()));
+        let tmp = dir.join(format!("{stem}.{ext}.{}.tmp", std::process::id()));
         std::fs::write(&tmp, bytes).expect("write shared test data");
         std::fs::rename(&tmp, &path).expect("publish shared test data");
     }
     let day = std::time::Duration::from_hours(24);
-    for e in std::fs::read_dir(&dir).into_iter().flatten().flatten() {
+    for e in std::fs::read_dir(&root).into_iter().flatten().flatten() {
         let n = e.file_name().to_string_lossy().into_owned();
         let stale = e
             .metadata()
@@ -56,8 +58,8 @@ pub fn shared_file(stem: &str, ext: &str, bytes: &[u8]) -> std::path::PathBuf {
             .ok()
             .and_then(|t| t.elapsed().ok())
             .is_some_and(|age| age > day);
-        if stale && n != name && n.starts_with(&format!("{stem}-")) {
-            let _ = std::fs::remove_file(e.path());
+        if stale && n != folder && n.starts_with(&format!("{stem}-")) {
+            let _ = std::fs::remove_dir_all(e.path());
         }
     }
     path

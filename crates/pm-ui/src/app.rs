@@ -2092,12 +2092,12 @@ impl PostmortemApp {
         }
         if let Some(i) = ev.clicked {
             self.result_selected = Some(i);
-            let content = rows
-                .rows
-                .get(i)
+            let row = rows.rows.get(i);
+            let content = row
                 .and_then(|r| r.file.as_ref())
                 .and_then(|f| self.content_for(f));
-            self.viewer.set_content(content);
+            self.viewer
+                .show(content, row.and_then(crate::results::keyword_query));
         }
     }
 
@@ -2534,6 +2534,7 @@ impl PostmortemApp {
             );
         }
         ui.weak(summary);
+        let query = s.request.query.clone();
         let rows = &data.rows;
         let tags = self.tagging.catalog.get(&ctx, Some(&case));
         let ev = self.table.ui_with(
@@ -2551,7 +2552,7 @@ impl PostmortemApp {
         }
         let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
         if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {
-            self.viewer.set_content(Some(content(r)));
+            self.viewer.show(Some(content(r)), Some(query));
         }
         if let Some(r) = ev.activated.or(ev.popout).and_then(|i| rows.get(i)) {
             self.open_popout(content(r));

@@ -1097,6 +1097,15 @@ fn keyword_search_from_the_toolbar() {
     );
     shot(&mut h, "keyword_search");
 
+    // Selecting the file opens Extracted Text on its hit.
+    click(&mut h, "meeting notes.txt");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Matches on page: 1 of 1")
+            .is_some()
+    });
+    h.get_by_label_contains("Page: 1 of 1");
+    shot(&mut h, "extracted_text");
+
     // A saved substring search feeds Analysis Results › Keyword Hits.
     click(&mut h, "🔍 Keyword Search");
     let field = h

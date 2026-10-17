@@ -4,6 +4,7 @@
 //! one for the selected file is chosen automatically. The user's explicit
 //! choice is kept while they browse files of the same kind.
 
+mod extracted;
 mod hex;
 mod image_view;
 mod metadata;
@@ -17,6 +18,7 @@ use pm_core::SharedSource;
 use crate::format::DisplayPrefs;
 use crate::model::Content;
 
+pub(crate) use extracted::ExtractedView;
 pub(crate) use hex::HexView;
 pub(crate) use image_view::ImageView;
 pub(crate) use strings::StringsView;
@@ -27,15 +29,17 @@ pub(crate) use text::TextView;
 pub(crate) enum Tab {
     Hex,
     Strings,
+    Extracted,
     Text,
     Application,
     Metadata,
 }
 
 impl Tab {
-    pub(crate) const ALL: [Self; 5] = [
+    pub(crate) const ALL: [Self; 6] = [
         Self::Hex,
         Self::Strings,
+        Self::Extracted,
         Self::Text,
         Self::Application,
         Self::Metadata,
@@ -45,6 +49,7 @@ impl Tab {
         match self {
             Self::Hex => "Hex",
             Self::Strings => "Strings",
+            Self::Extracted => "Extracted Text",
             Self::Text => "Text",
             Self::Application => "Application",
             Self::Metadata => "File Metadata",
@@ -122,6 +127,9 @@ pub(crate) struct ViewerPanel {
     hex: HexView,
     strings: StringsView,
     text: TextView,
+    extracted: ExtractedView,
+    /// The keyword search whose hits the Extracted Text viewer marks.
+    query: Option<pm_search::TextQuery>,
     image: ImageView,
     hash_resolver: Option<HashResolver>,
     hashes: Option<FileHashes>,
@@ -139,6 +147,8 @@ impl Default for ViewerPanel {
             hex: HexView::default(),
             strings: StringsView::default(),
             text: TextView::default(),
+            extracted: ExtractedView::default(),
+            query: None,
             image: ImageView::default(),
             hash_resolver: None,
             hashes: None,
@@ -167,9 +177,25 @@ impl ViewerPanel {
     }
 
     pub(crate) fn set_content(&mut self, content: Option<Content>) {
+        self.show(content, None);
+    }
+
+    /// Shows `content` with the hits of `query` marked in the Extracted
+    /// Text viewer, which is then preferred (as in Autopsy, for keyword
+    /// search results and keyword hits).
+    pub(crate) fn show(&mut self, content: Option<Content>, query: Option<pm_search::TextQuery>) {
+        if self.query != query {
+            self.query = query;
+            self.extracted = ExtractedView::default();
+            if self.content == content {
+                self.tab = self.preferred();
+                return;
+            }
+        }
         if self.content == content {
             return;
         }
+        self.extracted = ExtractedView::default();
         self.hex = HexView::default();
         self.strings = StringsView::default();
         self.text = TextView::default();
@@ -199,6 +225,10 @@ impl ViewerPanel {
     fn supports(&self, tab: Tab) -> bool {
         match tab {
             Tab::Metadata => self.content.is_some(),
+            Tab::Extracted => self
+                .content
+                .as_ref()
+                .is_some_and(|c| c.case_file().is_some() && !c.row.is_dir()),
             Tab::Application => self.kind == Sniffed::Picture,
             Tab::Hex | Tab::Strings | Tab::Text => {
                 matches!(self.source, Some(Ok(_))) && self.kind != Sniffed::Empty
@@ -209,6 +239,9 @@ impl ViewerPanel {
     /// Autopsy-style preferred viewer: application viewer for pictures,
     /// text for text, otherwise hex; metadata for directories.
     fn preferred(&self) -> Tab {
+        if self.query.is_some() && self.supports(Tab::Extracted) {
+            return Tab::Extracted;
+        }
         match self.kind {
             Sniffed::Picture => Tab::Application,
             Sniffed::Text => Tab::Text,
@@ -254,6 +287,12 @@ impl ViewerPanel {
             }
             (Tab::Hex, Some(src)) => self.hex.ui(ui, &src),
             (Tab::Strings, Some(src)) => self.strings.ui(ui, &src),
+            (Tab::Extracted, _) => match content.case_file() {
+                Some((case, file)) => self.extracted.ui(ui, case, file, self.query.as_ref()),
+                None => {
+                    ui.weak("No text available for this file.");
+                }
+            },
             (Tab::Text, Some(src)) => self.text.ui(ui, &src),
             (Tab::Application, Some(src)) => self.image.ui(ui, &src, &content.row.path),
             _ => {
