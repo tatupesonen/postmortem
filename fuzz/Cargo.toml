@@ -20,6 +20,7 @@ pm-evtlog = { path = "../crates/pm-evtlog" }
 pm-registry = { path = "../crates/pm-registry" }
 pm-lnk = { path = "../crates/pm-lnk" }
 pm-prefetch = { path = "../crates/pm-prefetch" }
+pm-filetype = { path = "../crates/pm-filetype" }
 pm-archive = { path = "../crates/pm-archive" }
 pm-carve = { path = "../crates/pm-carve" }
 
@@ -113,6 +114,27 @@ bench = false
 [[bin]]
 name = "carve_scan"
 path = "fuzz_targets/carve_scan.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "filetype_detect"
+path = "fuzz_targets/filetype_detect.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "filetype_containers"
+path = "fuzz_targets/filetype_containers.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "cfb_open"
+path = "fuzz_targets/cfb_open.rs"
 test = false
 doc = false
 bench = false

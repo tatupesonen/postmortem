@@ -1,0 +1,22 @@
+The file tika-mimetypes.xml in this directory is copied verbatim from
+Apache Tika 3.0.0 (tika-core/src/main/resources/org/apache/tika/mime/),
+licensed under the Apache License, Version 2.0
+(http://www.apache.org/licenses/LICENSE-2.0).
+
+Apache Tika
+Copyright 2021 The Apache Software Foundation
+
+This product includes software developed at
+The Apache Software Foundation (http://www.apache.org/).
+
+Tika-mimetypes.xml includes mimetype definitions that were adapted from the
+PRONOM Technical Registry by The National Archives
+(http://www.nationalarchives.gov.uk/PRONOM/Default.aspx). PRONOM is published
+under the Open Government License 3.0
+(http://www.nationalarchives.gov.uk/doc/open-government-licence/version/3/).
+
+The detection logic in pm-filetype is a Rust port of Apache Tika 3.0.0's
+MimeTypes, MagicDetector, TextDetector, XmlRootExtractor and container
+detectors (Apache-2.0), of vorbis-java-tika 0.8's OggDetector (Apache-2.0),
+of the format sniffing in Apache Commons Compress 1.27.1 (Apache-2.0) and of
+the binary property list validation in dd-plist 1.28 (MIT).

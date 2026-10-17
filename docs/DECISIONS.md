@@ -295,3 +295,24 @@ The event type ids are TSK's, so both sources merge into one timeline.
 **Consequences.** No load-time cost for FS events; the timeline counts
 query unions two sources; "tagged"/"hash hit" filters for FS events join
 `file_tags`/hash-hit artifacts instead of reading description flags.
+
+## ADR-019 — Directories get no MIME type
+
+**Status:** accepted (2026-10-17, core-file-modules track)
+
+**Context.** Autopsy's `FileTypeDetector.getMIMEType` gives every object
+that is not a regular file (`!isFile()`) `application/octet-stream`, and
+the ingest scheduler always processes directories, so Autopsy stores
+octet-stream on every directory. Its own `IngestFileFiltersTest` asserts
+the opposite (directories outside the filter have no MIME type), see
+inventory 08 §3.
+
+**Decision.** File Type Identification leaves directories and virtual
+directories (`$OrphanFiles`, `$Unalloc`, derived folders) without a MIME
+type. Every other object is typed as in Autopsy: regular files by
+detection; empty files, unallocated blocks, slack under 4 096 bytes and
+non-regular objects (FAT/exFAT virtual files, symlinks, devices) as
+`application/octet-stream`. Directory traversal is never filtered.
+
+**Consequences.** No useless writes for millions of directories; MIME
+views, filters and rules (which only match files) are unaffected.

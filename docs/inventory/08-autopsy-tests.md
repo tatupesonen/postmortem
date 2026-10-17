@@ -1378,7 +1378,7 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [ ] port: IngestFileFiltersTest.testEmbeddedJpg — extracted children obey the filter; derived/local directories typed
 - [ ] port: FilesSet condition semantics — ParentPath substring (case-insensitive, `parent + "/"`), Extension exact (leading dot stripped), FullName exact, meta-type FILES, ignoreUnallocated rejects UNALLOC/SLACK/UNUSED
 - [ ] port: ingest scheduler — `.`/`..` never processed; directories bypass the filter
-- [ ] decide: directory MIME-type semantics (section 3 inconsistency), with an ADR
+- [x] decide: directory MIME-type semantics (section 3 inconsistency), with an ADR (ADR-019: directories get none)
 
 ### Embedded file extraction
 - [x] port: EmbeddedFileTest.runTestEncryptionAndZipBomb — protected zips → TSK_ENCRYPTION_DETECTED; depth bomb (> MAX_DEPTH 4) and ratio bomb (≥ 600) → TSK_INTERESTING_ITEM set "Possible Zip Bomb"; other files no artefacts
@@ -1508,7 +1508,7 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [ ] build: integration-test style YAML outputs for summary queries (UserActivitySummaryTests equivalent) diffed against gold
 
 ### Derived (section 19)
-- [ ] derive: file-type detection signature table tests
+- [x] derive: file-type detection signature table tests (pm-filetype unit tests + 10,861-file differential run against Tika 3.0.0)
 - [ ] derive: hash DB formats (TSK idx, NSRL, EnCase, md5sum text) parse and lookup
 - [ ] derive: interesting-files rules — every condition type, exclusive rules, XML round-trip
 - [ ] derive: file extension mismatch table
