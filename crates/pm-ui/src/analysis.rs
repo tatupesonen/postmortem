@@ -122,6 +122,54 @@ impl Analysis {
     }
 }
 
+impl Analysis {
+    /// Runs the ingest modules again on a data source already in the case
+    /// (Autopsy "Run Ingest Modules").
+    pub(crate) fn run_ingest(
+        &mut self,
+        ctx: &egui::Context,
+        ds_id: i64,
+        name: String,
+        settings: JobSettings,
+    ) -> Result<(), String> {
+        let case = self.case.clone().ok_or("No case is open.")?;
+        let job = Arc::new(AnalysisJob {
+            name,
+            load: Arc::new(LoadProgress::default()),
+            ingest: Arc::new(IngestProgress::default()),
+            stage: Mutex::new(Stage::Analysing),
+        });
+        self.jobs.push(Arc::clone(&job));
+        let inbox = Arc::clone(&self.inbox);
+        let ctx = ctx.clone();
+        std::thread::Builder::new()
+            .name("pm-ingest".into())
+            .spawn(move || {
+                let modules = pm_modules::core_modules();
+                let stage = match pm_ingest::run_job(
+                    &case,
+                    ds_id,
+                    &settings,
+                    &modules,
+                    &job.ingest,
+                    &inbox,
+                ) {
+                    Ok(s) => Stage::Done {
+                        files: s.files,
+                        artifacts: s.artifacts,
+                        errors: s.errors.len(),
+                        cancelled: s.cancelled,
+                    },
+                    Err(e) => Stage::Failed(e.to_string()),
+                };
+                *job.stage.lock() = stage;
+                ctx.request_repaint();
+            })
+            .map(|_| ())
+            .map_err(|e| format!("cannot start ingest: {e}"))
+    }
+}
+
 fn run(
     case: &Arc<Case>,
     image: &Path,

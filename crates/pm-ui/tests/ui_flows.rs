@@ -819,3 +819,44 @@ fn file_search_by_name() {
     h.get_by_label_contains("sunset.bmp");
     shot(&mut h, "file_search");
 }
+
+/// The data source menu runs ingest again and removes the data source.
+#[test]
+fn data_source_menu_runs_ingest_and_removes() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
+    settle(&mut h, |h| {
+        h.query_all_by_label("🖴 demo.dd").next().is_some()
+    });
+    h.query_all_by_label("🖴 demo.dd")
+        .next()
+        .unwrap()
+        .click_secondary();
+    h.run_steps(2);
+    click(&mut h, "Run Ingest Modules");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Configure ingest for demo.dd")
+            .is_some()
+    });
+    click_exact(&mut h, "Finish");
+    // A second job runs and finishes.
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("Analysed demo.dd").count() >= 1
+            && h.query_by_label_contains("Configure ingest").is_none()
+    });
+
+    h.query_all_by_label("🖴 demo.dd")
+        .next()
+        .unwrap()
+        .click_secondary();
+    h.run_steps(2);
+    settle(&mut h, |h| {
+        h.query_by_label("Remove Data Source")
+            .is_some_and(|n| !n.accesskit_node().is_disabled())
+    });
+    click_exact(&mut h, "Remove Data Source");
+    click_exact(&mut h, "Remove");
+    settle(&mut h, |h| {
+        h.query_all_by_label("🖴 demo.dd").next().is_none()
+    });
+}

@@ -121,6 +121,13 @@ fn day_start(date: &str, zone: &str) -> Result<i64, String> {
 }
 
 impl FileSearchWindow {
+    /// Autopsy's "Open File Search by Attributes" on a data source: the
+    /// data source filter starts enabled with that source selected.
+    pub(crate) fn preselect_data_source(&mut self, id: i64) {
+        self.ds_on = true;
+        self.ds = vec![id];
+    }
+
     /// The search the form describes, or Autopsy's validation message.
     pub(crate) fn search(&self) -> Result<FileSearch, String> {
         let mut s = FileSearch::default();

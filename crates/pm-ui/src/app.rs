@@ -123,6 +123,10 @@ pub struct PostmortemApp {
     /// Details of the selected OS account.
     account_details: Option<(i64, crate::task::Cached<crate::case_nodes::Details>)>,
     file_search: Option<crate::file_search_ui::FileSearchWindow>,
+    run_ingest: Option<crate::add_source::RunIngestDialog>,
+    /// A data source awaiting removal confirmation `(id, name)`.
+    confirm_remove: Option<(i64, String)>,
+    removing: Option<Task<Result<(), String>>>,
     mime_types: crate::task::Cached<Vec<String>>,
     searches: Vec<crate::file_search_ui::SearchResults>,
 }
@@ -185,6 +189,9 @@ impl PostmortemApp {
             node_grid: crate::grid::Grid::default(),
             account_details: None,
             file_search: None,
+            run_ingest: None,
+            confirm_remove: None,
+            removing: None,
             mime_types: crate::task::Cached::default(),
             searches: Vec::new(),
         };
@@ -1114,13 +1121,14 @@ impl PostmortemApp {
             }
             for t in trees.iter() {
                 let node = NodeId::DataSource(t.ds.id);
-                self.tree_node(
+                let resp = self.tree_node(
                     ui,
                     &node,
                     &format!("{} {}", icons::DATA_SOURCE, t.ds.name),
                     true,
                     |app, ui| app.data_source_children(ui, t),
                 );
+                resp.context_menu(|ui| self.data_source_menu(ui, &t.ds));
             }
             self.views_tree(ui);
             self.results_tree(ui);
@@ -1384,6 +1392,40 @@ impl PostmortemApp {
         }
     }
 
+    /// Autopsy's data source node actions.
+    fn data_source_menu(&mut self, ui: &mut egui::Ui, ds: &pm_casedb::DataSourceRecord) {
+        let busy = self.analysis.lock().any_active();
+        if ui
+            .add_enabled(!busy, egui::Button::new("Run Ingest Modules"))
+            .on_disabled_hover_text("Ingest is running")
+            .clicked()
+        {
+            self.run_ingest = Some(crate::add_source::RunIngestDialog {
+                ds_id: ds.id,
+                ds_name: ds.name.clone(),
+                prefs: self.persisted.ingest.clone(),
+            });
+            ui.close();
+        }
+        if ui.button("Open File Search by Attributes").clicked() {
+            let w = self
+                .file_search
+                .get_or_insert_with(crate::file_search_ui::FileSearchWindow::default);
+            w.preselect_data_source(ds.id);
+            self.mime_types.refresh();
+            ui.close();
+        }
+        ui.separator();
+        if ui
+            .add_enabled(!busy, egui::Button::new("Remove Data Source"))
+            .on_disabled_hover_text("Cannot remove a data source while ingest is running")
+            .clicked()
+        {
+            self.confirm_remove = Some((ds.id, ds.name.clone()));
+            ui.close();
+        }
+    }
+
     /// OS Accounts, Tags and Score (Autopsy's tree order after the results).
     fn case_nodes_tree(&mut self, ui: &mut egui::Ui) {
         let Some(case) = self.analysis.lock().case().cloned() else {
@@ -1590,7 +1632,7 @@ impl PostmortemApp {
         label: &str,
         has_children: bool,
         children: impl FnOnce(&mut Self, &mut egui::Ui),
-    ) {
+    ) -> egui::Response {
         let id = ui.make_persistent_id(node);
         let selected = self.selected.as_ref() == Some(node);
         if has_children {
@@ -1616,13 +1658,17 @@ impl PostmortemApp {
             if clicked {
                 self.navigate(node.clone());
             }
+            header.inner
         } else {
             ui.horizontal(|ui| {
                 ui.add_space(18.0);
-                if ui.selectable_label(selected, label).clicked() {
+                let r = ui.selectable_label(selected, label);
+                if r.clicked() {
                     self.navigate(node.clone());
                 }
-            });
+                r
+            })
+            .inner
         }
     }
 
@@ -2102,6 +2148,57 @@ impl PostmortemApp {
         }
     }
 
+    /// Autopsy's "Remove Data Source" confirmation and the removal task.
+    fn remove_data_source_dialog(&mut self, ctx: &egui::Context) {
+        if let Some(t) = &mut self.removing
+            && let Some(r) = t.poll()
+        {
+            if let Err(e) = r {
+                self.errors.push(e.clone());
+            }
+            self.removing = None;
+            // Everything shown from the case may refer to removed rows.
+            self.case_sources.invalidate();
+            self.listings.clear();
+            self.view_counts.invalidate();
+            self.view_rows.clear();
+            self.result_counts.invalidate();
+            self.result_rows.clear();
+            self.case_summary.refresh();
+            self.node_views.clear();
+            self.selected = None;
+            self.back.clear();
+            self.forward.clear();
+            self.viewer.set_content(None);
+        }
+        let Some((id, name)) = self.confirm_remove.clone() else {
+            return;
+        };
+        let mut close = false;
+        egui::Modal::new(egui::Id::new("remove-ds")).show(ctx, |ui| {
+            ui.heading("Remove Data Source");
+            ui.label(format!(
+                "Are you sure you want to remove {name} from the case?\nThe data source and its analysis results will be removed from the case database; the image file is not deleted."
+            ));
+            ui.horizontal(|ui| {
+                if ui.button("Remove").clicked() {
+                    if let Some(case) = self.analysis.lock().case().cloned() {
+                        self.removing = Some(Task::spawn(ctx, move || {
+                            case.delete_data_source(id).map_err(|e| e.to_string())
+                        }));
+                    }
+                    close = true;
+                }
+                if ui.button("Cancel").clicked() {
+                    close = true;
+                }
+            });
+        });
+        if close {
+            self.confirm_remove = None;
+        }
+    }
+
     /// "File Search Results {n}".
     fn search_view(&mut self, ui: &mut egui::Ui, number: usize) {
         let ctx = ui.ctx().clone();
@@ -2162,6 +2259,22 @@ impl PostmortemApp {
 
     fn dialogs(&mut self, ctx: &egui::Context) {
         self.file_search_window(ctx);
+        if let Some(d) = self.run_ingest.as_mut() {
+            match d.ui(ctx) {
+                crate::add_source::RunAction::None => {}
+                crate::add_source::RunAction::Cancel => self.run_ingest = None,
+                crate::add_source::RunAction::Run(req) => {
+                    let (ds_id, settings, prefs) = *req;
+                    let name = d.ds_name.clone();
+                    self.run_ingest = None;
+                    self.persisted.ingest = prefs;
+                    if let Err(e) = self.analysis.lock().run_ingest(ctx, ds_id, name, settings) {
+                        self.errors.push(e);
+                    }
+                }
+            }
+        }
+        self.remove_data_source_dialog(ctx);
         if let Some(w) = self.add_wizard.as_mut() {
             match w.ui(ctx) {
                 crate::add_source::AddAction::None => {}
