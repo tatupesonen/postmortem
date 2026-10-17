@@ -4,6 +4,7 @@ description = "Hash sets: TSK .kdb, NSRL RDS v2/v3, md5sum, HashKeeper, EnCase a
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

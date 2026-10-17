@@ -4,6 +4,7 @@ description = "WebAssembly plugin host: loads component plugins (WIT world postm
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

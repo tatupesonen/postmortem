@@ -4,6 +4,7 @@ description = "E-mail parsing for the Email Parser module: MBOX, EML, JWZ thread
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

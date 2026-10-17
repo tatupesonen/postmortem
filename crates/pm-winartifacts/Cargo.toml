@@ -4,6 +4,7 @@ description = "Windows OS artefact analyses for postmortem: registry (OS info, S
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

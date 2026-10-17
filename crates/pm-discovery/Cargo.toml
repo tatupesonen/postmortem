@@ -4,6 +4,7 @@ description = "File Discovery for postmortem: Autopsy's discovery filters, group
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

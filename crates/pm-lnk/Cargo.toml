@@ -4,6 +4,7 @@ description = "Windows shell artefacts for postmortem: shell links (.lnk), shell
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [features]

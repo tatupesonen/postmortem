@@ -4,6 +4,7 @@ description = "Forensic NTFS parser for postmortem: MFT, attribute lists, ADS, L
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

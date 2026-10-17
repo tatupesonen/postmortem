@@ -729,3 +729,34 @@ fn artifacts_post_their_timeline_events() {
     assert_eq!(db.events_of_artifact(run_id).unwrap().len(), 1);
     assert_eq!(db.backfill_artifact_events().unwrap(), 0, "runs once");
 }
+
+/// The change bus moves only the generations of the domains a committed
+/// write touched.
+#[test]
+fn committed_writes_bump_their_domains() {
+    use pm_casedb::changes::Domain;
+    let (_dir, db) = new_db();
+    let ch = std::sync::Arc::clone(db.changes());
+    let before = |d| ch.generation(d);
+    let (files0, arts0, tags0) = (
+        before(Domain::Files),
+        before(Domain::Artifacts),
+        before(Domain::Tags),
+    );
+    let (ds, a, _) = populate(&db);
+    assert!(ch.generation(Domain::Files) > files0);
+    assert!(ch.generation(Domain::DataSources) > 0);
+    assert_eq!(ch.generation(Domain::Artifacts), arts0, "no artifact yet");
+    db.add_artifact(&data_artifact(ds, a, "TSK_WEB_HISTORY"))
+        .unwrap();
+    assert!(ch.generation(Domain::Artifacts) > arts0);
+    assert_eq!(ch.generation(Domain::Tags), tags0);
+    // A failed transaction publishes nothing.
+    let files = ch.generation(Domain::Files);
+    let r: pm_casedb::Result<()> = db.write(|tx| {
+        tx.execute("UPDATE files SET size = 1 WHERE id = ?1", [a])?;
+        Err(pm_casedb::DbError::Invalid("abort".into()))
+    });
+    assert!(r.is_err());
+    assert_eq!(ch.generation(Domain::Files), files, "rolled back");
+}

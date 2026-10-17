@@ -4,6 +4,7 @@ description = "Disk image containers for postmortem: raw, split raw, EWF (E01), 
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

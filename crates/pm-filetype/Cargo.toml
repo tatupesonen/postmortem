@@ -4,6 +4,7 @@ description = "File type identification: Apache Tika 3.0.0 detection ported to R
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [features]

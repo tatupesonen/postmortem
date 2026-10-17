@@ -13,6 +13,7 @@
 
 mod artifact_events;
 mod browsers;
+pub mod changes;
 pub mod catalog;
 pub mod communications;
 mod derived;
@@ -35,6 +36,7 @@ mod windows_artifacts;
 pub use browsers::{ArtifactRow, NameFilter};
 
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 
 use parking_lot::Mutex;
 use rusqlite::{Connection, OpenFlags, OptionalExtension, Row, params};
@@ -94,6 +96,7 @@ pub struct CaseDb {
     writer: Mutex<Connection>,
     readers: Mutex<Vec<Connection>>,
     file_ids: FileIds,
+    changes: Arc<changes::Changes>,
 }
 
 impl CaseDb {
@@ -116,16 +119,25 @@ impl CaseDb {
         configure(&conn, true)?;
         migrate(&mut conn)?;
         let file_ids = FileIds::load(&conn)?;
+        let changes = Arc::new(changes::Changes::default());
+        changes.install(&conn)?;
         Ok(Self {
             path,
             writer: Mutex::new(conn),
             readers: Mutex::new(Vec::new()),
             file_ids,
+            changes,
         })
     }
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    /// Generation counters of committed writes, per domain (the case
+    /// change bus).
+    pub fn changes(&self) -> &Arc<changes::Changes> {
+        &self.changes
     }
 
     /// Runs `f` on a pooled read-only connection.

@@ -4,6 +4,7 @@ description = "Windows event logs: EVTX (Vista+) and legacy EVT (NT/2000/XP/2003
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

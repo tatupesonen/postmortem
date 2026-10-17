@@ -4,6 +4,7 @@ description = "Forensic ext2/3/4 parser for postmortem: extents, indirect blocks
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

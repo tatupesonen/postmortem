@@ -4,6 +4,7 @@ description = "Autopsy's files-set rule language (interesting files, ingest filt
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

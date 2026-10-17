@@ -63,12 +63,15 @@ jobs:
             exit 1
           fi
 
+      # The `dist` profile (Cargo.toml): opt-level 3, fat LTO, one codegen
+      # unit, no debug information, symbols stripped.
       - name: Build
         shell: bash
         run: |
           for t in ${{ matrix.target }} ${{ matrix.extra_target }}; do
-            cargo build --release --locked -p postmortem --target "$t"
+            cargo build --profile dist --locked -p postmortem --target "$t"
           done
+          ls -l target/*/dist/postmortem* || true
 
       - name: Package (Linux)
         if: runner.os == 'Linux'
@@ -76,7 +79,7 @@ jobs:
         run: |
           dir="postmortem-${{ steps.version.outputs.version }}-${{ matrix.name }}"
           mkdir -p "dist/$dir"
-          cp target/${{ matrix.target }}/release/postmortem "dist/$dir/"
+          cp target/${{ matrix.target }}/dist/postmortem "dist/$dir/"
           cp assets/brand/postmortem-icon-256.png "dist/$dir/postmortem.png"
           tar -C dist -czf "dist/$dir.tar.gz" "$dir"
           rm -r "dist/$dir"
@@ -87,7 +90,7 @@ jobs:
         run: |
           $dir = "postmortem-${{ steps.version.outputs.version }}-${{ matrix.name }}"
           New-Item -ItemType Directory -Force "dist/$dir" | Out-Null
-          Copy-Item "target/${{ matrix.target }}/release/postmortem.exe" "dist/$dir/"
+          Copy-Item "target/${{ matrix.target }}/dist/postmortem.exe" "dist/$dir/"
           Compress-Archive -Path "dist/$dir" -DestinationPath "dist/$dir.zip"
           Remove-Item -Recurse "dist/$dir"
 
@@ -99,8 +102,8 @@ jobs:
           app=dist/postmortem.app
           mkdir -p "$app/Contents/MacOS" "$app/Contents/Resources"
           lipo -create -output "$app/Contents/MacOS/postmortem" \
-            target/${{ matrix.target }}/release/postmortem \
-            target/${{ matrix.extra_target }}/release/postmortem
+            target/${{ matrix.target }}/dist/postmortem \
+            target/${{ matrix.extra_target }}/dist/postmortem
           # Icon: an iconset rendered from the 1024 px brand icon.
           iconset=$(mktemp -d)/postmortem.iconset
           mkdir -p "$iconset"

@@ -97,6 +97,7 @@ impl CaseDb {
             writer: parking_lot::Mutex::new(conn),
             readers: parking_lot::Mutex::new(Vec::new()),
             file_ids,
+            changes: std::sync::Arc::default(),
         })
     }
 

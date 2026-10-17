@@ -4,6 +4,7 @@ description = "Reports: Autopsy's HTML and Excel table reports and the Files - T
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

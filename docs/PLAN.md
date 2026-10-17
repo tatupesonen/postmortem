@@ -45,8 +45,8 @@ planned any more: `pm-app` (application services live in `pm-case` and
 subcommands), `pm-comms`/`pm-summary` (in `pm-casedb` queries and
 `pm-ui`), `pm-artifacts` (split into `pm-registry`, `pm-evtlog`,
 `pm-lnk`, `pm-prefetch`, `pm-winartifacts`, `pm-browser`), `pm-mod-*`
-(one `pm-modules` crate). `pm-index` (in-memory file walk) is being
-removed (ADR-023).
+(one `pm-modules` crate), `pm-index` (in-memory file walk, removed
+2026-10-18 by ADR-023).
 
 Dependency rules: arrows point down only. Parsers know nothing about
 cases or the database. Ingest modules depend on `pm-ingest` (or
@@ -145,8 +145,7 @@ embedded Python.
 | `pm-archive`, `pm-carve`, `pm-encryption`, `pm-rules` | archives, carving, encryption detection, interesting-file rules | done |
 | `pm-geo` | waypoints/tracks/routes/areas, GPX, KML | done |
 | `pm-timeline` | event model, calendar bins, DB timeline (`db.rs`) | done |
-| `pm-discovery` | file discovery filters/grouping (on `pm-index`; moving to the DB) | first cut |
-| `pm-index` | in-memory file walk (being removed, ADR-023) | legacy |
+| `pm-discovery` | file discovery filters/grouping over files of a type from the case DB | first cut |
 | `pm-report` | HTML, XLSX, files text, body file, KML, tagged hashes | done (portable case, CASE/UCO pending) |
 | `pm-plugin-api`, `pm-plugin-wasm`, `pm-plugin-sdk` | plugin API, wasmtime host, guest SDK (ADR-022) | done (ingest kind) |
 | `pm-mcp` | MCP server (ADR-021) | done |
@@ -192,7 +191,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Synthetic scale generators (pm-testkit): NTFS volumes and file tables with 1 M / 10 M entries; `benches/` with divan; recorded budgets in docs/PERF.md
 - [ ] NTFS bulk MFT enumeration (sequential chunked scan, parallel record parsing) feeding the loader
 - [ ] Loader: deferred secondary-index creation, ≥ 200 k files/s, bounded memory (streaming parent-id resolution)
-- [ ] DB-backed views replace `pm-index`: tree, File Types, Deleted, Discovery, Gallery, Data Source Summary via indexed SQL + precomputed aggregate tables — tree, views, Timeline and Gallery done; Discovery and Data Source Summary in progress (ADR-023)
+- [x] DB-backed views replace `pm-index`: tree, File Types, Deleted, Discovery, Gallery, Data Source Summary, Timeline via indexed SQL — done 2026-10-18; `pm-index` deleted
 - [x] File-name/path search index in Tantivy (n-gram tokenizer) with sub-second substring search over 100 M names (shared `pm-search` crate with the M5 content index) — `pm_search::names` (positional trigrams, exact substring/prefix/name/path queries, keyset paging, `catch_up`); 10 M names: 4–25 ms per selective query (docs/PERF.md); UI hook pending (coordinator)
 - [x] Timeline: events table + pre-aggregated per-unit counts; counts view never scans events — events table + time-column indexes; counts are indexed range histograms (no pre-aggregation needed so far)
 - [ ] Huge directory UX: keyset-paged listings, cached child counts

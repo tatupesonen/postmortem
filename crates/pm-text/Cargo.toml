@@ -4,6 +4,7 @@ description = "Streaming text extraction for keyword search: encodings, plain te
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

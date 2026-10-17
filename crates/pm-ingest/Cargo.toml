@@ -4,6 +4,7 @@ description = "postmortem ingest framework: module contract, scheduling, pipelin
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

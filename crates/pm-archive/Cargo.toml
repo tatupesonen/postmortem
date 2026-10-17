@@ -4,6 +4,7 @@ description = "Streaming readers for archives and embedded content (zip, 7z, tar
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

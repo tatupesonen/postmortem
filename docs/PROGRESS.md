@@ -4,13 +4,13 @@
 
 Read `docs/DIRECTION.md` first (owner decisions and working rules).
 
-Current work: the architecture cleanup of ADR-023, step 1 — move the
-Data Source Summary (`pm-ui/src/summary.rs`) and Discovery
-(`pm-ui/src/discovery.rs`, `pm-discovery`) to DB queries, then delete the
-GUI's second evidence open (`PostmortemApp::sources`) and the in-memory
-file index (`SharedIndex`, `pm-index` walk). Then ADR-023 steps 2–6,
-the Postgres dialect layer (ADR-024), and the analyst-workflow features
-(`BEYOND-AUTOPSY.md` §8, starting with multi-select in tables).
+ADR-023 step 1 is done (de1801a: every view reads the case DB;
+`pm-index` deleted). Next: release v0.1.2 (dist profile: fat LTO,
+stripped), then ADR-023 steps 2–6 (case change bus, split `app.rs`, UI
+task pool, rename the `pm-casedb` query layer, module API migration,
+ingest memory), the Postgres dialect layer (ADR-024), and the
+analyst-workflow features (`BEYOND-AUTOPSY.md` §8, starting with
+multi-select in tables).
 
 Also queued:
 * `postmortem ingest --only <ids>` to re-run modules on existing data

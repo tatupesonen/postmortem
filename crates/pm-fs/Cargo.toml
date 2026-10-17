@@ -4,6 +4,7 @@ description = "Filesystem abstraction for postmortem: the FileSystem trait, comm
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

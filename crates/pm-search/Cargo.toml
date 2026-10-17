@@ -4,6 +4,7 @@ description = "Keyword and file-name search: Tantivy content and name indexes, A
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

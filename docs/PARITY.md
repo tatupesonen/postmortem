@@ -426,7 +426,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| File discovery: Images / Videos / Documents, size buckets, data source, parent folder filters, group by, orderings, paging, thumbnails | `discovery/search/*`, `discovery/ui/*` | Partial | `pm-discovery` (5 tests) plus a window. Types come from extensions, not MIME. Runs on `pm-index`, not the DB. Missing: "Possibly User Created", Hash Set, Interesting Item and Object Detected filters; Past Occurrences/frequency (CR); MD5 de-duplication. |
+| File discovery: Images / Videos / Documents, size buckets, data source, parent folder filters, group by, orderings, paging, thumbnails | `discovery/search/*`, `discovery/ui/*` | Partial | `pm-discovery` (14 tests) plus a window, on the case DB: types by detected MIME (images, videos) or extension (documents, and files not yet typed); known files left out. Missing: "Possibly User Created", Hash Set, Interesting Item and Object Detected filters; Past Occurrences/frequency (CR); MD5 de-duplication. |
 | Domain discovery (web artifacts → domains, page views, downloads, activity dates, account types, categories) | `DomainSearch*`, `DomainSearchCacheLoader` | Missing | 20 Autopsy tests to port (08 §11). |
 | Details pane (file instances, artifacts tabs for domains, document text summary) | `discovery/ui/*DetailsPanel`, `A/textsummarizer` | Missing | — |
 | Discovery CR frequency + "previously notable" | `discovery/search/DiscoveryAttributes` | Missing | Depends on CR. |
@@ -449,7 +449,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Types tab (pie, counts by MIME/category, OS, usage) | `ui/TypesPanel` | Partial | Pie by extension category, from the in-memory index (moving to the DB, ADR-023). No OS/usage rows. |
+| Types tab (pie, counts by MIME/category, OS, usage) | `ui/TypesPanel` | Partial | Pie by extension category from case-DB aggregates. No OS/usage rows. |
 | User Activity tab (top programs, recent domains, web searches, devices, accounts) | `ui/UserActivityPanel` | Missing | About 30 Autopsy unit tests to port (08 §10). |
 | Analysis tab (hash set, keyword, interesting hits) | `ui/AnalysisPanel` | Missing | — |
 | Recent Files tab (recently opened docs, downloads, attachments) | `ui/RecentFilesPanel` | Partial | Postmortem shows recently modified/accessed/created files instead. Autopsy's artifact-based lists are missing. |
@@ -769,7 +769,7 @@ Each package fits one agent. Every UI package touches `pm-ui`, which `RULES.md` 
   - DSS: User Activity, Analysis, Recent Files (artifact-based), Geolocation (cities DB), Ingest History tabs; Case › DSS dialog; ingest-running banner; port about 30 DSS unit tests.
   - Discovery: domain discovery (+20 tests), MIME-based types, hash/interesting/object/user-created filters, MD5 de-duplication, details pane, text summarizer.
   - Gallery: groupings (hash set, category, tags, camera, MIME), seen/next-unseen, Project VIC categories + shortcuts + undo, tag actions, hash badges, slideshow + video, details pane, persisted thumbnail cache, options.
-  - Move all three off `pm-index` onto indexed DB queries (ADR-014).
+  - Move all three off `pm-index` onto indexed DB queries (ADR-014). Done 2026-10-18.
 - Key sources: `A/datasourcesummary/**`, `A/discovery/**`, `A/textsummarizer`, `IG/**`.
 - Dependencies: WP-0, WP-1, most modules.
 

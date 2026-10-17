@@ -4,6 +4,7 @@ description = "Forensic exFAT parser for postmortem: entry sets with checksums, 
 version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
+publish.workspace = true
 license.workspace = true
 
 [dependencies]

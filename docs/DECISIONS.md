@@ -487,7 +487,7 @@ per range and filter, schema v3 adds the time-column indexes); the Image
 Gallery lists pictures from the DB.
 
 **Review findings and plan (in order).**
-1. The GUI opens each image a second time (`PostmortemApp::sources`,
+1. **[done 2026-10-18, de1801a]** The GUI opens each image a second time (`PostmortemApp::sources`,
    `pm_evidence::open`) beside `Case`'s cached evidence, and builds a
    full in-memory file index (`SharedIndex`/`pm-index`) eagerly. Move the
    Data Source Summary and Discovery to DB queries, then delete

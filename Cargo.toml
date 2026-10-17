@@ -1,15 +1,16 @@
 [workspace]
 resolver = "3"
 members = ["crates/*"]
-default-members = ["crates/*"]
 exclude = ["fuzz"]
 
 [workspace.package]
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 rust-version = "1.97"
 license = "AGPL-3.0-or-later"
-repository = "https://example.invalid/postmortem"
+repository = "https://github.com/tatupesonen/postmortem"
+# Internal crates are not published; pm-plugin-api and pm-plugin-sdk opt out.
+publish = false
 authors = ["postmortem contributors"]
 
 [workspace.dependencies]
@@ -95,7 +96,7 @@ image = { version = "0.25.10", default-features = false, features = ["rayon", "j
 serde = { version = "1.0.229", features = ["derive"] }
 tracing-subscriber = { version = "0.3.23", features = ["env-filter"] }
 resvg = "0.48.1"
-rusqlite = { version = "0.40.2", features = ["bundled", "blob", "backup", "functions", "limits", "window"] }
+rusqlite = { version = "0.40.2", features = ["bundled", "blob", "backup", "functions", "hooks", "limits", "window"] }
 serde_json = "1.0.154"
 toml = "1.1.8"
 
@@ -161,6 +162,17 @@ opt-level = 1
 lto = "thin"
 codegen-units = 1
 debug = "line-tables-only"
+
+# Published binaries (GitHub releases): full optimisation and no debug
+# information. `release` keeps line tables for profiling and readable
+# backtraces on the developer machine.
+[profile.dist]
+inherits = "release"
+opt-level = 3
+lto = "fat"
+codegen-units = 1
+debug = false
+strip = "symbols"
 
 [profile.bench]
 inherits = "release"
