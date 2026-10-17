@@ -325,6 +325,10 @@ pub trait Host {
 
     /// The job was cancelled: return as soon as possible.
     fn is_cancelled(&self) -> bool;
+
+    /// A handle to this host that can be kept for the rest of the job
+    /// (runtimes such as the WebAssembly host must own what they call).
+    fn shared(&self) -> std::sync::Arc<dyn Host + Send + Sync>;
 }
 
 /// Per-file analysis. One instance runs on one worker thread; the host

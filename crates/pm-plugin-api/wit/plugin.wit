@@ -1,0 +1,140 @@
+// The postmortem plugin world (ADR-021), version 0.1.
+//
+// Mirrors the Rust crate `pm-plugin-api` one to one: a plugin exports
+// `module` and imports `host`. Plugins have no file system, network,
+// clock or environment access beyond what `host` offers; the host limits
+// each call's fuel and the instance's memory.
+package postmortem:plugin@0.1.0;
+
+interface types {
+    enum file-kind { file, directory, unallocated, carved, derived, other }
+
+    record file-info {
+        id: s64,
+        ds-id: s64,
+        name: string,
+        // Parent folder with a trailing "/".
+        parent-path: string,
+        // Lower case, without the dot.
+        extension: string,
+        size: u64,
+        kind: file-kind,
+        deleted: bool,
+        mime: option<string>,
+        md5: option<string>,
+        modified: option<s64>,
+        accessed: option<s64>,
+        created: option<s64>,
+        changed: option<s64>,
+    }
+
+    record data-source-info {
+        id: s64,
+        name: string,
+        timezone: string,
+        size: u64,
+    }
+
+    record find-files {
+        name: option<string>,
+        extension: option<string>,
+        path-contains: option<string>,
+        mime: option<string>,
+        limit: option<u32>,
+    }
+
+    variant value {
+        text(string),
+        int(s64),
+        double(f64),
+        bytes(list<u8>),
+        time(s64),
+    }
+
+    record attribute {
+        kind: string,
+        value: value,
+    }
+
+    enum significance { unknown, likely-none, likely-notable, none, notable }
+
+    record new-result {
+        artifact-type: string,
+        file-id: option<s64>,
+        significance: option<significance>,
+        conclusion: option<string>,
+        configuration: option<string>,
+        justification: option<string>,
+        attributes: list<attribute>,
+    }
+
+    record derived-file {
+        name: string,
+        data: list<u8>,
+        modified: option<s64>,
+        accessed: option<s64>,
+        created: option<s64>,
+    }
+
+    enum level { debug, info, warn, error }
+
+    record message {
+        level: level,
+        subject: string,
+        details: string,
+        file-id: option<s64>,
+    }
+
+    record file-filter {
+        mime-types: list<string>,
+        extensions: list<string>,
+        names: list<string>,
+        include-unallocated: bool,
+        include-directories: bool,
+        max-size: option<u64>,
+    }
+
+    record plugin-info {
+        id: string,
+        name: string,
+        description: string,
+        version: string,
+        enabled-by-default: bool,
+        file-filter: option<file-filter>,
+        data-source-stage: option<u32>,
+    }
+}
+
+interface host {
+    use types.{file-info, data-source-info, find-files, new-result, derived-file, level, message};
+
+    data-source: func() -> data-source-info;
+    read: func(file-id: s64, offset: u64, len: u32) -> result<list<u8>, string>;
+    file: func(file-id: s64) -> result<option<file-info>, string>;
+    find-files: func(q: find-files) -> result<list<file-info>, string>;
+    children: func(file-id: s64) -> result<list<file-info>, string>;
+    post: func(r: new-result) -> result<_, string>;
+    add-derived: func(parent-id: s64, files: list<derived-file>) -> result<list<s64>, string>;
+    log: func(level: level, message: string);
+    message: func(m: message);
+    is-cancelled: func() -> bool;
+}
+
+interface module {
+    use types.{plugin-info, file-info};
+
+    info: func() -> plugin-info;
+    // Settings are JSON; "null" when the job gives none.
+    default-settings: func() -> string;
+    validate: func(settings: string) -> result<_, string>;
+    // Prepares this instance for a job (one instance per worker).
+    start: func(settings: string) -> result<_, string>;
+    process-file: func(file: file-info) -> result<_, string>;
+    finish-files: func();
+    process-data-source: func() -> result<_, string>;
+}
+
+world plugin {
+    import host;
+    export module;
+}

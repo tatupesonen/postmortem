@@ -9,7 +9,6 @@
 //! keeps the last opened content source, so the many small reads a parser
 //! makes do not reopen the file.
 
-use std::cell::RefCell;
 use std::collections::HashSet;
 use std::sync::{Arc, LazyLock};
 
@@ -89,7 +88,7 @@ impl ModuleFactory for PluginModule {
             .map_err(|e| ModuleError(e.0))?;
         Ok(Arc::new(PluginJob {
             plugin: Arc::clone(&self.plugin),
-            info: self.info.clone(),
+            info: Arc::new(self.info.clone()),
             settings: settings.clone(),
         }))
     }
@@ -97,7 +96,7 @@ impl ModuleFactory for PluginModule {
 
 struct PluginJob {
     plugin: Arc<dyn Plugin>,
-    info: api::PluginInfo,
+    info: Arc<api::PluginInfo>,
     settings: serde_json::Value,
 }
 
@@ -108,7 +107,7 @@ impl ModuleJob for PluginJob {
             Ok(Some(inner)) => Some(Box::new(FileAdapter {
                 inner,
                 filter,
-                info: self.info.clone(),
+                info: Arc::clone(&self.info),
             })),
             Ok(None) => None,
             Err(e) => {
@@ -125,7 +124,7 @@ impl ModuleJob for PluginJob {
                 stage,
                 Box::new(DsAdapter {
                     inner,
-                    info: self.info.clone(),
+                    info: Arc::clone(&self.info),
                 }),
             )),
             Ok(None) => None,
@@ -140,7 +139,7 @@ impl ModuleJob for PluginJob {
 struct FileAdapter {
     inner: Box<dyn api::FileIngest>,
     filter: FileFilter,
-    info: api::PluginInfo,
+    info: Arc<api::PluginInfo>,
 }
 
 impl FileModule for FileAdapter {
@@ -168,7 +167,7 @@ impl FileModule for FileAdapter {
 
 struct DsAdapter {
     inner: Box<dyn api::DataSourceIngest>,
-    info: api::PluginInfo,
+    info: Arc<api::PluginInfo>,
 }
 
 impl DataSourceModule for DsAdapter {
@@ -212,30 +211,32 @@ pub fn file_info(f: &FileRecord) -> api::FileInfo {
     }
 }
 
-/// The plugin's view of a job.
+/// The plugin's view of a job. Cheap to clone: clones share the job and
+/// the content cache.
+#[derive(Clone)]
 #[allow(missing_debug_implementations, reason = "holds the job context")]
-pub struct JobHost<'c> {
-    ctx: &'c JobContext,
-    info: &'c api::PluginInfo,
+pub struct JobHost {
+    ctx: JobContext,
+    info: Arc<api::PluginInfo>,
     /// The last opened content (parsers read one file many times).
-    open: RefCell<Option<(i64, SharedSource)>>,
+    open: Arc<Mutex<Option<(i64, SharedSource)>>>,
 }
 
-impl<'c> JobHost<'c> {
-    pub fn new(ctx: &'c JobContext, info: &'c api::PluginInfo) -> Self {
+impl JobHost {
+    pub fn new(ctx: &JobContext, info: &Arc<api::PluginInfo>) -> Self {
         Self {
-            ctx,
-            info,
-            open: RefCell::new(None),
+            ctx: ctx.clone(),
+            info: Arc::clone(info),
+            open: Arc::new(Mutex::new(None)),
         }
     }
 
     fn remember(&self, id: i64, src: SharedSource) {
-        *self.open.borrow_mut() = Some((id, src));
+        *self.open.lock() = Some((id, src));
     }
 
     fn source(&self, id: i64) -> api::Result<SharedSource> {
-        if let Some((open, src)) = &*self.open.borrow()
+        if let Some((open, src)) = &*self.open.lock()
             && *open == id
         {
             return Ok(src.clone());
@@ -280,7 +281,7 @@ fn significance(s: api::Significance) -> pm_casedb::Significance {
     }
 }
 
-impl Host for JobHost<'_> {
+impl Host for JobHost {
     fn data_source(&self) -> api::DataSourceInfo {
         let ds = self
             .ctx
@@ -435,7 +436,7 @@ impl Host for JobHost<'_> {
             .zip(readers.iter_mut())
             .map(|((name, times), data)| crate::derive::Stream { name, times, data });
         let ids =
-            crate::derive::add_children(self.ctx, &parent, &output_folder(&self.info.id), streams)
+            crate::derive::add_children(&self.ctx, &parent, &output_folder(&self.info.id), streams)
                 .map_err(|e| api::PluginError(e.0))?;
         // `None`: not added (empty name, cancelled, or added by an earlier
         // run of the module).
@@ -467,5 +468,9 @@ impl Host for JobHost<'_> {
 
     fn is_cancelled(&self) -> bool {
         self.ctx.is_cancelled()
+    }
+
+    fn shared(&self) -> Arc<dyn Host + Send + Sync> {
+        Arc::new(self.clone())
     }
 }
