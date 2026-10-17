@@ -124,6 +124,7 @@ pub struct PostmortemApp {
     account_details: Option<(i64, crate::task::Cached<crate::case_nodes::Details>)>,
     file_search: Option<crate::file_search_ui::FileSearchWindow>,
     run_ingest: Option<crate::add_source::RunIngestDialog>,
+    hosts_ui: crate::hosts_ui::HostsUi,
     /// A data source awaiting removal confirmation `(id, name)`.
     confirm_remove: Option<(i64, String)>,
     removing: Option<Task<Result<(), String>>>,
@@ -190,6 +191,7 @@ impl PostmortemApp {
             account_details: None,
             file_search: None,
             run_ingest: None,
+            hosts_ui: crate::hosts_ui::HostsUi::default(),
             confirm_remove: None,
             removing: None,
             mime_types: crate::task::Cached::default(),
@@ -763,6 +765,13 @@ impl PostmortemApp {
                     ui.close();
                     self.pick_image(ui.ctx());
                 }
+                if ui
+                    .add_enabled(has_case, egui::Button::new("Manage Hosts"))
+                    .clicked()
+                {
+                    self.hosts_ui.open_manage();
+                    ui.close();
+                }
                 ui.add_enabled_ui(has_case, |ui| {
                     ui.menu_button("Add Recent Image", |ui| {
                         if self.persisted.recent.is_empty() {
@@ -1119,16 +1128,38 @@ impl PostmortemApp {
             {
                 self.navigate(NodeId::DataSource(first.ds.id));
             }
-            for t in trees.iter() {
-                let node = NodeId::DataSource(t.ds.id);
-                let resp = self.tree_node(
-                    ui,
-                    &node,
-                    &format!("{} {}", icons::DATA_SOURCE, t.ds.name),
-                    true,
-                    |app, ui| app.data_source_children(ui, t),
+            // Autopsy's default layout: Data Sources › host › data source.
+            let mut host_action = None;
+            for (host, sources) in trees.by_host() {
+                let node = NodeId::Host(host.map(|h| h.id));
+                let label = format!(
+                    "{} {}",
+                    icons::HOST,
+                    host.map_or("Unknown Host", |h| h.name.as_str())
                 );
-                resp.context_menu(|ui| self.data_source_menu(ui, &t.ds));
+                let resp = self.tree_node_with(ui, &node, &label, true, true, |app, ui| {
+                    for t in sources {
+                        let node = NodeId::DataSource(t.ds.id);
+                        let resp = app.tree_node(
+                            ui,
+                            &node,
+                            &format!("{} {}", icons::DATA_SOURCE, t.ds.name),
+                            true,
+                            |app, ui| app.data_source_children(ui, t),
+                        );
+                        resp.context_menu(|ui| app.data_source_menu(ui, &t.ds));
+                    }
+                });
+                if let Some(h) = host {
+                    resp.context_menu(|ui| {
+                        if let Some(a) = crate::hosts_ui::host_menu(ui, h, &trees) {
+                            host_action = Some(a);
+                        }
+                    });
+                }
+            }
+            if let (Some(a), Some(case)) = (host_action, case.as_ref()) {
+                self.hosts_ui.act(ui.ctx(), case, a);
             }
             self.views_tree(ui);
             self.results_tree(ui);
@@ -1392,6 +1423,31 @@ impl PostmortemApp {
         }
     }
 
+    /// A host node: its data sources (Autopsy lists the node's children).
+    fn host_view(&mut self, ui: &mut egui::Ui, host: Option<i64>) {
+        let case = self.analysis.lock().case().cloned();
+        let tree = self.case_sources.get(ui.ctx(), case.as_ref(), false);
+        let name = host
+            .and_then(|id| tree.hosts.iter().find(|h| h.id == id))
+            .map_or("Unknown Host", |h| h.name.as_str());
+        ui.heading(format!("{} {name}", icons::HOST));
+        let mut open = None;
+        for t in tree
+            .iter()
+            .filter(|t| t.host.as_ref().map(|h| h.id) == host)
+        {
+            if ui
+                .selectable_label(false, format!("{} {}", icons::DATA_SOURCE, t.ds.name))
+                .double_clicked()
+            {
+                open = Some(t.ds.id);
+            }
+        }
+        if let Some(ds) = open {
+            self.navigate(NodeId::DataSource(ds));
+        }
+    }
+
     /// Autopsy's data source node actions.
     fn data_source_menu(&mut self, ui: &mut egui::Ui, ds: &pm_casedb::DataSourceRecord) {
         let busy = self.analysis.lock().any_active();
@@ -1633,13 +1689,26 @@ impl PostmortemApp {
         has_children: bool,
         children: impl FnOnce(&mut Self, &mut egui::Ui),
     ) -> egui::Response {
+        self.tree_node_with(ui, node, label, has_children, false, children)
+    }
+
+    /// [`Self::tree_node`] with a choice of initial expansion.
+    fn tree_node_with(
+        &mut self,
+        ui: &mut egui::Ui,
+        node: &NodeId,
+        label: &str,
+        has_children: bool,
+        default_open: bool,
+        children: impl FnOnce(&mut Self, &mut egui::Ui),
+    ) -> egui::Response {
         let id = ui.make_persistent_id(node);
         let selected = self.selected.as_ref() == Some(node);
         if has_children {
             let state = egui::collapsing_header::CollapsingState::load_with_default_open(
                 ui.ctx(),
                 id,
-                false,
+                default_open,
             );
             let (_, header, _) = state
                 .show_header(ui, |ui| ui.selectable_label(selected, label))
@@ -1729,15 +1798,20 @@ impl PostmortemApp {
                 ui.colored_label(ui.visuals().error_fg_color, e);
             }
             Some(Ok(rows)) => {
-                let mut dirs: Vec<&FileRow> = rows.iter().filter(|r| r.is_dir()).collect();
+                let mut dirs: Vec<&FileRow> = rows.iter().filter(|r| r.can_open()).collect();
                 dirs.sort_by_key(|r| r.name.to_lowercase());
                 for r in dirs {
                     let Some(file) = r.file_id() else { continue };
                     let child = NodeId::Dir { ds, file };
-                    let label = if r.deleted() {
-                        format!("{} {} ✖", icons::FOLDER, r.name)
+                    let icon = if r.is_dir() {
+                        icons::FOLDER
                     } else {
-                        format!("{} {}", icons::FOLDER, r.name)
+                        icons::ARCHIVE
+                    };
+                    let label = if r.deleted() {
+                        format!("{icon} {} ✖", r.name)
+                    } else {
+                        format!("{icon} {}", r.name)
                     };
                     self.tree_node(ui, &child, &label, true, |app, ui| {
                         app.dir_children(ui, &child);
@@ -1787,6 +1861,7 @@ impl PostmortemApp {
         };
         match &node {
             NodeId::DataSource(ds) => self.data_source_summary(ui, *ds),
+            NodeId::Host(h) => self.host_view(ui, *h),
             NodeId::Volume { ds, volume } => self.volume_summary(ui, *ds, *volume),
             NodeId::Dir { .. } => self.file_table(ui, &node),
             NodeId::Results { type_id } => self.results_view(ui, *type_id),
@@ -1915,7 +1990,7 @@ impl PostmortemApp {
             self.viewer.set_content(Some(content(r)));
         }
         if let Some(r) = ev.activated.and_then(|i| rows.get(i)) {
-            if r.is_dir() {
+            if r.can_open() {
                 if let Some(file) = r.file_id() {
                     self.navigate(NodeId::Dir { ds, file });
                 }
@@ -2259,6 +2334,13 @@ impl PostmortemApp {
 
     fn dialogs(&mut self, ctx: &egui::Context) {
         self.file_search_window(ctx);
+        let case = self.analysis.lock().case().cloned();
+        let tree = self.case_sources.get(ctx, case.as_ref(), false);
+        let errors = self.hosts_ui.ui(ctx, case.as_ref(), &tree);
+        self.errors.extend(errors);
+        if self.hosts_ui.take_changed() {
+            self.case_sources.refresh();
+        }
         if let Some(d) = self.run_ingest.as_mut() {
             match d.ui(ctx) {
                 crate::add_source::RunAction::None => {}

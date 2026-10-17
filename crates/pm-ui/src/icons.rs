@@ -10,6 +10,8 @@ pub(crate) const DATA_SOURCE: &str = "🖴";
 pub(crate) const VOLUME: &str = "🗄";
 pub(crate) const UNALLOCATED: &str = "⛶";
 pub(crate) const FOLDER: &str = "🗀";
+/// A file with derived children (archive members, extracted files).
+pub(crate) const ARCHIVE: &str = "📦";
 pub(crate) const VIEWS: &str = "👁";
 pub(crate) const FILE_TYPES: &str = "🗐";
 pub(crate) const BY_EXTENSION: &str = "🔤";
@@ -29,6 +31,7 @@ pub(crate) const COMMENT: &str = "💬";
 /// C column: tagged, no comment.
 pub(crate) const TAGGED: &str = "🏷";
 pub(crate) const OS_ACCOUNTS: &str = "👥";
+pub(crate) const HOST: &str = "🖥";
 
 /// By Extension groups (`views::EXT_GROUPS` / `DOC_GROUPS` names).
 pub(crate) fn file_group(name: &str) -> &'static str {
@@ -138,6 +141,7 @@ mod tests {
             VOLUME,
             UNALLOCATED,
             FOLDER,
+            ARCHIVE,
             VIEWS,
             FILE_TYPES,
             BY_EXTENSION,
@@ -153,6 +157,7 @@ mod tests {
             COMMENT,
             TAGGED,
             OS_ACCOUNTS,
+            HOST,
         ];
         for (name, _) in crate::views::EXT_GROUPS
             .iter()

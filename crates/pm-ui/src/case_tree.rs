@@ -9,7 +9,7 @@ use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use pm_case::Case;
-use pm_casedb::{DataSourceRecord, FileRecord, FileSystemRecord, VolumeRecord};
+use pm_casedb::{DataSourceRecord, FileRecord, FileSystemRecord, Host, Person, VolumeRecord};
 
 use crate::task::Task;
 
@@ -51,18 +51,68 @@ impl VolumeNode {
 #[derive(Debug, Clone)]
 pub(crate) struct DsTree {
     pub(crate) ds: DataSourceRecord,
+    /// The host the data source belongs to (`None`: "Unknown Host").
+    pub(crate) host: Option<Host>,
     /// Volume-system slots except meta slots, in address order.
     pub(crate) volumes: Vec<VolumeNode>,
     /// File systems not inside a volume (no volume system).
     pub(crate) loose: Vec<FsRoot>,
 }
 
+/// The case's data sources, hosts and persons.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CaseTree {
+    /// Data sources sorted case-insensitively by name (Autopsy order).
+    pub(crate) sources: Vec<DsTree>,
+    /// Every active host, by name.
+    pub(crate) hosts: Vec<Host>,
+    pub(crate) persons: Vec<Person>,
+}
+
+impl CaseTree {
+    pub(crate) fn iter(&self) -> std::slice::Iter<'_, DsTree> {
+        self.sources.iter()
+    }
+
+    pub(crate) fn first(&self) -> Option<&DsTree> {
+        self.sources.first()
+    }
+
+    pub(crate) fn is_empty(&self) -> bool {
+        self.sources.is_empty()
+    }
+
+    /// Hosts with their data sources, in Autopsy's Data Sources order;
+    /// data sources without a host come last under `None` ("Unknown
+    /// Host").
+    pub(crate) fn by_host(&self) -> Vec<(Option<&Host>, Vec<&DsTree>)> {
+        let mut out: Vec<(Option<&Host>, Vec<&DsTree>)> = self
+            .hosts
+            .iter()
+            .map(|h| {
+                let ds = self
+                    .sources
+                    .iter()
+                    .filter(|t| t.host.as_ref().map(|x| x.id) == Some(h.id))
+                    .collect();
+                (Some(h), ds)
+            })
+            .collect();
+        let orphans: Vec<&DsTree> = self.sources.iter().filter(|t| t.host.is_none()).collect();
+        if !orphans.is_empty() {
+            out.push((None, orphans));
+        }
+        out
+    }
+}
+
 /// Loads the tree structure of every data source.
-pub(crate) fn load(case: &Case) -> Result<Vec<DsTree>, String> {
+pub(crate) fn load(case: &Case) -> Result<CaseTree, String> {
     let db = case.db();
     let err = |e: pm_casedb::DbError| e.to_string();
     let mut out = Vec::new();
     for ds in db.data_sources().map_err(err)? {
+        let host = db.host_of_data_source(ds.id).map_err(err)?;
         let fss = db.file_systems(ds.id).map_err(err)?;
         let mut roots: Vec<FsRoot> = Vec::with_capacity(fss.len());
         for fs in fss {
@@ -91,16 +141,26 @@ pub(crate) fn load(case: &Case) -> Result<Vec<DsTree>, String> {
                 None => loose.push(r),
             }
         }
-        out.push(DsTree { ds, volumes, loose });
+        out.push(DsTree {
+            ds,
+            host,
+            volumes,
+            loose,
+        });
     }
-    Ok(out)
+    out.sort_by_key(|t| t.ds.name.to_lowercase());
+    Ok(CaseTree {
+        sources: out,
+        hosts: db.hosts().map_err(err)?,
+        persons: db.persons().map_err(err)?,
+    })
 }
 
 /// The tree structure, reloaded in the background when stale.
 #[derive(Debug, Default)]
 pub(crate) struct Sources {
-    task: Option<Task<Result<Vec<DsTree>, String>>>,
-    current: Arc<Vec<DsTree>>,
+    task: Option<Task<Result<CaseTree, String>>>,
+    current: Arc<CaseTree>,
     refreshed: Option<Instant>,
     error: Option<String>,
 }
@@ -113,7 +173,7 @@ impl Sources {
         ctx: &egui::Context,
         case: Option<&Arc<Case>>,
         live: bool,
-    ) -> Arc<Vec<DsTree>> {
+    ) -> Arc<CaseTree> {
         if let Some(t) = &mut self.task
             && let Some(r) = t.poll()
         {
@@ -159,11 +219,11 @@ impl Sources {
     pub(crate) fn invalidate(&mut self) {
         self.refreshed = None;
         self.task = None;
-        self.current = Arc::new(Vec::new());
+        self.current = Arc::new(CaseTree::default());
     }
 
     /// The data source with `id` in the last loaded structure.
     pub(crate) fn find(&self, id: i64) -> Option<&DsTree> {
-        self.current.iter().find(|d| d.ds.id == id)
+        self.current.sources.iter().find(|d| d.ds.id == id)
     }
 }
