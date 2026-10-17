@@ -3828,9 +3828,11 @@ dependencies = [
 name = "pm-modules"
 version = "0.1.0"
 dependencies = [
+ "encoding_rs",
  "jiff",
  "md-5",
  "parking_lot",
+ "pm-archive",
  "pm-case",
  "pm-casedb",
  "pm-core",
@@ -3843,6 +3845,7 @@ dependencies = [
  "pm-testkit",
  "pm-winartifacts",
  "proptest",
+ "rars",
  "rusqlite",
  "serde",
  "serde_json",
