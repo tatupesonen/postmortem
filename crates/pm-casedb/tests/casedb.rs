@@ -529,17 +529,29 @@ fn tags_and_notable() {
         .remove(0);
     let t1 = db.tag_file(f.id, bookmark, "look", "alice", 5).unwrap();
     assert_eq!(db.file(f.id).unwrap().unwrap().known, Known::Unknown);
-    db.tag_file(f.id, notable, "", "alice", 6).unwrap();
+    assert_eq!(db.file_score(f.id).unwrap(), Significance::Unknown);
+    let t2 = db.tag_file(f.id, notable, "", "alice", 6).unwrap();
+    assert_eq!(
+        db.file_score(f.id).unwrap(),
+        Significance::Notable,
+        "a notable tag scores the file notable (TSK TaggingManager)"
+    );
     assert_eq!(
         db.file(f.id).unwrap().unwrap().known,
-        Known::Notable,
-        "notable tag marks file notable"
+        Known::Unknown,
+        "tags never change the known status"
     );
     assert_eq!(db.file_tags(f.id).unwrap().len(), 2);
     assert_eq!(db.files_with_tag(bookmark).unwrap()[0].1.id, f.id);
     db.untag_file(t1).unwrap();
     assert_eq!(db.file_tags(f.id).unwrap().len(), 1);
     assert_eq!(db.tag_counts().unwrap(), [(notable, 1)]);
+    db.untag_file(t2).unwrap();
+    assert_eq!(
+        db.file_score(f.id).unwrap(),
+        Significance::Unknown,
+        "removing the notable tag recomputes the score"
+    );
     let custom = db.add_tag_name("Evidence", "", false).unwrap();
     assert!(db.tag_names().unwrap().iter().any(|t| t.id == custom));
 }

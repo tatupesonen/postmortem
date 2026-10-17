@@ -462,13 +462,15 @@ impl FileAnalysis {
     }
 }
 
-/// Analysis-result significance (ordered; higher is more significant).
+/// Analysis-result significance, ordered like TSK's `Score.Significance`:
+/// definitive conclusions outrank likely ones, so
+/// `Notable > None > LikelyNotable > LikelyNone > Unknown`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Significance {
     Unknown = 0,
     LikelyNone = 1,
-    None = 2,
-    LikelyNotable = 3,
+    LikelyNotable = 2,
+    None = 3,
     Notable = 4,
 }
 
@@ -477,8 +479,8 @@ impl Significance {
         Some(match c {
             0 => Self::Unknown,
             1 => Self::LikelyNone,
-            2 => Self::None,
-            3 => Self::LikelyNotable,
+            2 => Self::LikelyNotable,
+            3 => Self::None,
             4 => Self::Notable,
             _ => return None,
         })
@@ -495,10 +497,22 @@ impl Significance {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+/// Result priority: an override result (e.g. set by an examiner)
+/// outranks every normal one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum Priority {
     Normal = 0,
     Override = 1,
+}
+
+impl Priority {
+    pub fn from_code(c: i64) -> Option<Self> {
+        match c {
+            0 => Some(Self::Normal),
+            1 => Some(Self::Override),
+            _ => None,
+        }
+    }
 }
 
 /// An attribute value.
@@ -521,6 +535,26 @@ impl Value {
             Self::Int(i) | Self::DateTime(i) => (None, Some(*i), None, None),
             Self::Double(d) => (None, None, Some(*d), None),
             Self::Bytes(b) => (None, None, None, Some(b)),
+        }
+    }
+
+    /// Decodes the value columns of an attribute row, given its type's
+    /// value-type code.
+    pub(crate) fn from_columns(
+        value_type: i64,
+        text: Option<String>,
+        int: Option<i64>,
+        dbl: Option<f64>,
+        blob: Option<Vec<u8>>,
+    ) -> Self {
+        use crate::catalog::ValueType as V;
+        match V::from_code(value_type) {
+            Some(V::DateTime) => Self::DateTime(int.unwrap_or(0)),
+            Some(V::Integer | V::Long) => Self::Int(int.unwrap_or(0)),
+            Some(V::Double) => Self::Double(dbl.unwrap_or(0.0)),
+            Some(V::Bytes) => Self::Bytes(blob.unwrap_or_default()),
+            Some(V::Json) => Self::Json(text.unwrap_or_default()),
+            Some(V::String) | None => Self::Text(text.unwrap_or_default()),
         }
     }
 
@@ -604,20 +638,7 @@ pub struct AttributeRecord {
 
 impl AttributeRecord {
     pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
-        use crate::catalog::ValueType as V;
-        let vt = V::from_code(r.get(3)?);
-        let text: Option<String> = r.get(5)?;
-        let int: Option<i64> = r.get(6)?;
-        let dbl: Option<f64> = r.get(7)?;
-        let blob: Option<Vec<u8>> = r.get(8)?;
-        let value = match vt {
-            Some(V::DateTime) => Value::DateTime(int.unwrap_or(0)),
-            Some(V::Integer | V::Long) => Value::Int(int.unwrap_or(0)),
-            Some(V::Double) => Value::Double(dbl.unwrap_or(0.0)),
-            Some(V::Bytes) => Value::Bytes(blob.unwrap_or_default()),
-            Some(V::Json) => Value::Json(text.unwrap_or_default()),
-            Some(V::String) | None => Value::Text(text.unwrap_or_default()),
-        };
+        let value = Value::from_columns(r.get(3)?, r.get(5)?, r.get(6)?, r.get(7)?, r.get(8)?);
         Ok(Self {
             type_id: r.get(0)?,
             name: r.get(1)?,
@@ -635,9 +656,14 @@ pub struct TagName {
     pub description: String,
     pub color: String,
     pub notable: bool,
+    /// The tag set this name belongs to (names in a set are exclusive).
+    pub tag_set_id: Option<i64>,
+    /// Position within the tag set.
+    pub rank: Option<i64>,
 }
 
 impl TagName {
+    /// Reads [`crate::tags::TAG_NAME_COLS`].
     pub(crate) fn from_row(r: &Row<'_>) -> rusqlite::Result<Self> {
         Ok(Self {
             id: r.get(0)?,
@@ -645,6 +671,8 @@ impl TagName {
             description: r.get(2)?,
             color: r.get(3)?,
             notable: r.get(4)?,
+            tag_set_id: r.get(5)?,
+            rank: r.get(6)?,
         })
     }
 }

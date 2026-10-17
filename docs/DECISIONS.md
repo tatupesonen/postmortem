@@ -237,3 +237,61 @@ files that are analysed like any other (inventory 03 §1.9, §2.4, PhotoRec
 **Consequences.** Re-ingest sees derived files as ordinary (`Last` class)
 files. Modules that re-extract (Embedded File Extractor) must not re-add
 files that already exist, or they would be analysed twice.
+
+## ADR-017 — Schema v2: TSK's data model on separate id spaces
+
+**Status:** accepted (2026-10-17, WP-0)
+
+**Context.** Hosts/persons, OS accounts, communication accounts, timeline
+events and aggregate scores were missing (PARITY §0.4), which blocked
+OS Accounts, Communications, the Score tree, tag scoring and artifact
+timeline events. TSK keys all of these on one `tsk_objects` id space;
+postmortem has separate `files`, `artifacts` and `os_accounts` tables
+(ADR-002).
+
+**Decision.** Migration `0002_schema_v2.sql` ports TSK 4.12's tables and
+semantics (`CaseDatabaseFactory`, `OsAccountManager`,
+`OsAccountRealmManager`, `HostManager`, `CommunicationsManager`,
+`ScoringManager`, `TaggingManager`, `TimelineManager`):
+* Polymorphic references name the table instead of an object id:
+  `scores(obj_kind, obj_id)` with kind file/artifact/OS account; an
+  analysis result scores its `source_artifact_id` if set, else its file;
+  `event_descriptions(file_id, artifact_id)`; account relationships point
+  at the source artifact.
+* Significance codes now sort like TSK's ordinals
+  (`Notable > None > LikelyNotable > LikelyNone > Unknown`); v1 rows are
+  remapped and scores backfilled by the migration.
+* Aggregate scores are maintained in the same transaction as the result
+  or tag that changes them (raise on add, recompute on remove), so the
+  Score tree, S column and Discovery never aggregate results on the fly.
+* Notable tags change the score, never `files.known` (TSK behaviour; v1
+  set `known = 2`).
+* OS account instances keep only the most significant kind per data
+  source (TSK's read semantics, stored once).
+* Ported from TSK's own `OsAccountTest` (13 cases) plus scoring, tag-set,
+  event, communications and v1 → v2 migration tests.
+* Fixed TSK bug: after a realm update TSK looks up "another realm with
+  the same address" by the realm *name*, so that merge never happens; we
+  look up the address.
+
+**Not yet ported:** host addresses API (tables exist), data-artifact and
+analysis-result ingest pipelines (WP-0 follow-up in `pm-ingest`).
+
+## ADR-018 — File-system timeline events are virtual
+
+**Status:** accepted (2026-10-17)
+
+**Context.** TSK writes four `tsk_events` rows per file (MACB), each with
+an `event_descriptions` row repeating the path. With hundreds of millions
+of files (ADR-014) that is billions of rows and several copies of every
+path.
+
+**Decision.** Only artifact events are stored (`events` +
+`event_descriptions`). File-system events are read from the time columns
+of `files` through indexes (the timeline WP adds the missing
+`atime`/`ctime`/`crtime` indexes and pre-aggregated per-unit counts).
+The event type ids are TSK's, so both sources merge into one timeline.
+
+**Consequences.** No load-time cost for FS events; the timeline counts
+query unions two sources; "tagged"/"hash hit" filters for FS events join
+`file_tags`/hash-hit artifacts instead of reading description flags.

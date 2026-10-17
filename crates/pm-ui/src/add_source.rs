@@ -56,12 +56,16 @@ impl IngestPrefs {
 pub(crate) enum AddAction {
     None,
     Cancel,
-    Start {
-        image: PathBuf,
-        load: LoadOptions,
-        settings: JobSettings,
-        prefs: IngestPrefs,
-    },
+    Start(Box<StartRequest>),
+}
+
+/// What the wizard collected for adding a data source.
+#[derive(Debug, Clone)]
+pub(crate) struct StartRequest {
+    pub(crate) image: PathBuf,
+    pub(crate) load: LoadOptions,
+    pub(crate) settings: JobSettings,
+    pub(crate) prefs: IngestPrefs,
 }
 
 /// The two-step Add Data Source wizard.
@@ -141,7 +145,7 @@ impl AddSourceWizard {
                         if ui.button("Finish").clicked() {
                             match self.check_image() {
                                 Ok(image) => {
-                                    action = AddAction::Start {
+                                    action = AddAction::Start(Box::new(StartRequest {
                                         image,
                                         load: LoadOptions {
                                             timezone: self.timezone.clone(),
@@ -151,7 +155,7 @@ impl AddSourceWizard {
                                         },
                                         settings: self.prefs.job_settings(),
                                         prefs: self.prefs.clone(),
-                                    };
+                                    }));
                                 }
                                 Err(e) => {
                                     self.error = Some(e);

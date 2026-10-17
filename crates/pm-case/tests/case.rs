@@ -761,3 +761,33 @@ fn real_disk_matches_tsk() {
         eprintln!("fs at {}: {} names match TSK", fs.byte_offset, want.len());
     }
 }
+
+#[test]
+fn data_sources_get_tsks_default_host_or_the_chosen_one() {
+    let (_tmp, case, s) = loaded_case();
+    let file_name = demo_image()
+        .file_name()
+        .unwrap()
+        .to_string_lossy()
+        .into_owned();
+    let host = case.db().host_of_data_source(s.ds_id).unwrap().unwrap();
+    assert_eq!(host.name, format!("{file_name} Host"));
+
+    let second = add_image(
+        &case,
+        demo_image(),
+        &LoadOptions {
+            host: Some("Suspect laptop".into()),
+            ..LoadOptions::default()
+        },
+        &LoadProgress::default(),
+    )
+    .unwrap();
+    let host2 = case
+        .db()
+        .host_of_data_source(second.ds_id)
+        .unwrap()
+        .unwrap();
+    assert_eq!(host2.name, "Suspect laptop");
+    assert_eq!(case.db().data_sources_of_host(host.id).unwrap(), [s.ds_id]);
+}

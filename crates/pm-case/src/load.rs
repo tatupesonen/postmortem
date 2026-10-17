@@ -59,6 +59,9 @@ pub struct LoadOptions {
     pub fat_orphans: bool,
     /// Walker threads (0 = available parallelism).
     pub threads: usize,
+    /// Host (device) the data source belongs to; `None` creates (or
+    /// reuses) TSK's default host, `"<first image file> Host"`.
+    pub host: Option<String>,
 }
 
 impl Default for LoadOptions {
@@ -70,6 +73,7 @@ impl Default for LoadOptions {
             unalloc_chunk: DEFAULT_UNALLOC_CHUNK,
             fat_orphans: true,
             threads: 0,
+            host: None,
         }
     }
 }
@@ -230,6 +234,10 @@ fn add_structure(db: &CaseDb, ev: &Evidence, opts: &LoadOptions) -> Result<(i64,
     };
     Ok(db.bulk(|b| {
         let ds_id = b.add_data_source(&ds)?;
+        let host = opts.host.clone().unwrap_or_else(|| {
+            pm_casedb::default_host_name(ds.paths.first().map(String::as_str), ds_id)
+        });
+        b.assign_host(ds_id, &host)?;
         let mut volume_ids = Vec::new();
         if let Some(vs) = &ev.volume_system {
             let kind = match vs.kind {

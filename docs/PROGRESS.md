@@ -1,61 +1,43 @@
 # Progress
 
-## Now — RESUME HERE (end of 2026-10-15, user paused; gates stopped on request)
+## Now — RESUME HERE (2026-10-17, Linux machine, autonomous)
 
-1. **Run the gate once on master** — not verified since these merges:
-   `081170b` merge windows-artifacts (its branch was green at 408 tests),
-   `fb8ab99` timeline Details fix (only its UI test run). Last green
-   master gate: `9b482d5` (381 tests).
-2. **Merge the paused agent branches** (worktrees under
-   `.claude/worktrees/`, status in `docs/agents/<track>.md` — copies of
-   each branch's status file are on master), one at a time with at least
-   `cargo check` + clippy + tests after each. **Order: search first (user
-   priority — then build its Keyword Search module + UI and let the user
-   test), then core-file-modules, email-mobile, browsers.**
-   - `worktree-agent-a7b6ec3a36039f4b0` (browsers, WIP `59d0936`, gate
-     NOT run; only its own crates checked). Expect conflicts in
-     `crates/pm-modules/src/recent_activity/mod.rs` with the merged
-     windows step list (keep both: browser rewrite + `windows::steps()`).
-   - `worktree-agent-a7f517951264ab1af` (email-mobile, WIP `517bcc5`,
-     gate NOT run): pm-email (MBOX/MIME/PST/vCard/threading), accounts &
-     relationships helpers (`pm-casedb/src/communications.rs`), Email
-     Parser, Android Analyzer (22 apps). Its Android browser code calls
-     `crate::recent_activity::extract_domain` — keep that name/path when
-     merging the browsers rewrite. GPX/DJI/YARA/VM extractor not started.
-   - `worktree-agent-a88eb7301e06e903b` (core-file-modules, WIP
-     `804510b`): pm-filetype (Tika 3.0.0 parity, 99.96 % on a 20 517-file
-     corpus) + File Type Identification. Items 2–5 (Extension Mismatch,
-     Encryption Detection, Interesting Files/pm-rules, DS Integrity) not
-     started. It reports clippy errors in `pm-ui/src/timeline_chart.rs`
-     on master — fix during step 1. It also touched
-     `recent_activity/{ie,mod}.rs` (clippy + fmt) → merge conflicts likely.
-   - `worktree-agent-aa0dd6f7121b0f9da` (search, WIP `2a327b8`, not yet
-     merged with master): pm-text (all extractors, strings, chunker) and
-     pm-search (Tantivy content + name indexes, keyword lists, inline
-     matcher, credit cards) — unit-tested. NOT done: Keyword Search
-     ingest module, all UI (name search box, keyword panel, extracted-text
-     viewer). **User priority: finish search first, then test it.**
-   - carving (`bd8b5fa`): plan only, in `docs/agents/derived-and-carving.md`.
-   - Bug to fix: the Add Data Source wizard enables every module not in
-     `IngestPrefs::disabled`, ignoring `ModuleInfo::enabled_by_default`
-     (Keyword Search must default to off).
-   - Reported fmt/clippy failures on master in `pm-ui/src/timeline*.rs`,
-     `pm-ingest/src/context.rs`, `pm-modules/src/recent_activity/*` —
-     fix in step 1.
-   - hashing: merged `af99033` (fixes a duplicate `CaseDb::child_named`
-     that broke the build after the windows-artifacts merge; master now
-     compiles — `cargo check --workspace --all-targets` OK at `ea6b33b`,
-     tests not run). Audit + next steps in `docs/agents/hashing.md`:
-     hash all non-dir/non-unalloc files (not only regular), SHA-1 in the
-     same pass, Autopsy's message texts, hash indexes migration (take
-     `0002_hash_indexes`; WP-0 becomes `0003`), UI columns/viewer/search.
-   - derived-and-carving: infrastructure merged; `pm-archive` +
-     extractor + carving are parked in that worktree's `.wip-derived/`.
-3. Then resume each track for its remaining items (see the track docs),
-   and wave 2 from `docs/PARITY.md` (WP-0 schema v2 first).
-4. Known: Recent Activity writes artifacts directly to the DB (needs
-   artifact ids) so ingest progress does not count them — add a
-   `JobContext` API that returns ids / flushes the writer.
+Context: the project moved to a Linux VM (`/home/tatu/slop`). The paused
+agent worktrees from the Mac (search, core-file-modules, email-mobile,
+browsers, carving `.wip-derived/`) were **lost** (never pushed). The user
+chose to **reimplement** them here; `docs/agents/<track>.md` are the specs.
+Work is pushed to `origin/parity-wip` after each green commit (never to
+`master`). User-confirmed scope: everything incl. multi-user and WASM
+plugins; external-tool runners (aLEAPP/Plaso/Volatility) last; Cyber
+Triage lowest priority.
+
+Running now (3 agents in worktrees, coordinator merges):
+1. **search** — pm-text, pm-search, Keyword Search module (spec
+   `docs/agents/search.md`). Then coordinator builds the UI.
+2. **core-file-modules** — pm-filetype + File Type ID, Extension Mismatch,
+   Encryption Detection, Interesting Files (pm-rules), DS Integrity.
+3. **derived-and-carving** — pm-archive, Embedded File Extractor, pm-carve
+   + PhotoRec Carver.
+
+Coordinator (master):
+* ✅ WP-0 schema v2 (ADR-017/018): hosts/persons, OS accounts + realms
+  (TSK OsAccountTest ported), communications accounts/relationships,
+  events, aggregate scores, tag sets + artifact tags, hash indexes;
+  default host per data source.
+* Next: WP-0 follow-ups — data-artifact/analysis-result ingest pipelines
+  in `pm-ingest` (coordinate with the derived track's pm-ingest edits),
+  Recent Activity writing OS accounts (SAM/ProfileList) and events;
+  then UI for tags (WP-1) and results browsing (WP-2) while agents run.
+* When agents finish: merge one at a time (search first), full gate,
+  push; start the next tracks (browsers, email-mobile, windows extras,
+  image formats/file systems, CR, reports, timeline, CVT/geo).
+
+Machine notes: `apt` installed sleuthkit 4.12.1 + ewf-tools (TSK
+differentials now run; TSK 4.12 vs the 4.15 the project used on the Mac
+may differ). The GUI in this VMware VM needs `LIBGL_ALWAYS_SOFTWARE=1`
+or `WGPU_BACKEND=vulkan` (SVGA3D GL renders blank). References in
+`/home/tatu/slop/reference/` (sleuthkit 4.12.1 source, Tika
+mimetypes, Eric Zimmerman tools).
 
 ## 2026-10-15: parallel parity push (goal: all Autopsy features, tested)
 
@@ -155,6 +137,20 @@
 _None._
 
 ## Log
+
+### 2026-10-17 — WP-0 schema v2
+- Migration `0002_schema_v2.sql` + `pm-casedb` modules `scores`, `tags`,
+  `hosts`, `os_accounts` (+ `windows` SID rules), `communications`,
+  `events`. TSK semantics throughout (ADR-017); FS events virtual
+  (ADR-018). Significance codes reordered to TSK ordinals; v1 cases
+  migrate and get scores backfilled. Notable tags score instead of
+  setting `known`.
+- Tests: TSK `OsAccountTest` ported (13 cases + delete-host guard), score
+  ordering/override/artifact targets, tag-set exclusivity and rescoring,
+  events, communications normalisation/relationships/filters, v1→v2
+  migration, default host per data source. Workspace: 481 tests.
+- Environment: toolchain clippy component reinstalled; sleuthkit and
+  ewf-tools installed; three agent tracks relaunched.
 
 - 2026-10-14: pm-case loader (205 k rows/s synthetic), ingest framework, Hash Lookup, case-first UI with status-bar progress, results tree; NTFS TSK-exact on the NIST Hacking Case image.
 ### 2026-10-14 — Picture Analyzer (EXIF)

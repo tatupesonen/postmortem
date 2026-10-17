@@ -1790,12 +1790,13 @@ impl PostmortemApp {
             match w.ui(ctx) {
                 crate::add_source::AddAction::None => {}
                 crate::add_source::AddAction::Cancel => self.add_wizard = None,
-                crate::add_source::AddAction::Start {
-                    image,
-                    load,
-                    settings,
-                    prefs,
-                } => {
+                crate::add_source::AddAction::Start(req) => {
+                    let crate::add_source::StartRequest {
+                        image,
+                        load,
+                        settings,
+                        prefs,
+                    } = *req;
                     self.add_wizard = None;
                     self.persisted.ingest = prefs;
                     self.add_data_source_with(ctx, image, load, settings);

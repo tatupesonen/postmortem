@@ -12,8 +12,14 @@
 //! end (multi-user cases, M11) can share it.
 
 pub mod catalog;
+pub mod communications;
 mod derived;
+pub mod events;
+mod hosts;
 mod model;
+pub mod os_accounts;
+mod scores;
+mod tags;
 mod windows_artifacts;
 
 use std::path::{Path, PathBuf};
@@ -23,11 +29,17 @@ use rusqlite::{Connection, OpenFlags, OptionalExtension, Row, params};
 use thiserror::Error;
 
 pub use derived::{DerivedUpdate, FileIds};
+pub use hosts::{Host, Person, default_host_name};
 pub use model::*;
+pub use scores::{ObjKind, Score};
+pub use tags::{ArtifactTag, NewTagName, TagSet};
 
 /// Current schema version written by this build.
-pub const SCHEMA_VERSION: i64 = 1;
-const MIGRATIONS: &[&str] = &[include_str!("../migrations/0001_initial.sql")];
+pub const SCHEMA_VERSION: i64 = 2;
+const MIGRATIONS: &[&str] = &[
+    include_str!("../migrations/0001_initial.sql"),
+    include_str!("../migrations/0002_schema_v2.sql"),
+];
 /// Rows per transaction in bulk mode.
 const BULK_COMMIT_EVERY: usize = 50_000;
 const MAX_IDLE_READERS: usize = 8;
@@ -494,12 +506,9 @@ impl CaseDb {
         })
     }
 
-    /// Highest analysis-result significance per file (the "S" column).
+    /// A file's aggregate significance (the "S" column).
     pub fn file_score(&self, file_id: i64) -> Result<Significance> {
-        self.read(|c| {
-            let s: Option<i64> = c.query_row("SELECT MAX(significance) FROM artifacts WHERE file_id = ?1 AND significance IS NOT NULL AND review_status <> 2", [file_id], |r| r.get(0))?;
-            Ok(s.and_then(Significance::from_code).unwrap_or(Significance::Unknown))
-        })
+        Ok(self.score(ObjKind::File, file_id)?.significance)
     }
 
     /// Registers (or finds) a custom artifact type.
@@ -541,93 +550,6 @@ impl CaseDb {
             )?;
             let rows = st
                 .query_map([], |r| Ok((r.get(0)?, r.get(1)?, r.get(2)?, r.get(3)?)))?
-                .collect::<rusqlite::Result<Vec<_>>>()?;
-            Ok(rows)
-        })
-    }
-
-    // -------------------------------------------------------------- tags
-
-    pub fn tag_names(&self) -> Result<Vec<TagName>> {
-        self.read(|c| {
-            let mut st = c.prepare("SELECT id, name, description, color, notable FROM tag_names ORDER BY name COLLATE NOCASE")?;
-            let rows = st.query_map([], TagName::from_row)?.collect::<rusqlite::Result<Vec<_>>>()?;
-            Ok(rows)
-        })
-    }
-
-    pub fn add_tag_name(&self, name: &str, description: &str, notable: bool) -> Result<i64> {
-        self.write(|tx| {
-            tx.execute(
-                "INSERT INTO tag_names (name, description, notable) VALUES (?1, ?2, ?3)",
-                params![name, description, notable],
-            )?;
-            Ok(tx.last_insert_rowid())
-        })
-    }
-
-    pub fn tag_file(
-        &self,
-        file_id: i64,
-        tag_name_id: i64,
-        comment: &str,
-        examiner: &str,
-        now: i64,
-    ) -> Result<i64> {
-        self.write(|tx| {
-            tx.execute(
-                "INSERT INTO file_tags (file_id, tag_name_id, comment, examiner, created_at) VALUES (?1, ?2, ?3, ?4, ?5)",
-                params![file_id, tag_name_id, comment, examiner, now],
-            )?;
-            // A notable tag marks the file notable (Autopsy behaviour).
-            tx.execute("UPDATE files SET known = 2 WHERE id = ?1 AND (SELECT notable FROM tag_names WHERE id = ?2) = 1", params![file_id, tag_name_id])?;
-            Ok(tx.last_insert_rowid())
-        })
-    }
-
-    pub fn untag_file(&self, file_tag_id: i64) -> Result<()> {
-        self.write(|tx| {
-            tx.execute("DELETE FROM file_tags WHERE id = ?1", [file_tag_id])?;
-            Ok(())
-        })
-    }
-
-    pub fn file_tags(&self, file_id: i64) -> Result<Vec<FileTag>> {
-        self.read(|c| {
-            let mut st = c.prepare_cached(
-                "SELECT ft.id, ft.file_id, ft.tag_name_id, tn.name, ft.comment, ft.examiner, ft.created_at FROM file_tags ft JOIN tag_names tn ON tn.id = ft.tag_name_id WHERE ft.file_id = ?1 ORDER BY ft.id",
-            )?;
-            let rows = st.query_map([file_id], FileTag::from_row)?.collect::<rusqlite::Result<Vec<_>>>()?;
-            Ok(rows)
-        })
-    }
-
-    pub fn files_with_tag(&self, tag_name_id: i64) -> Result<Vec<(FileTag, FileRecord)>> {
-        let tags: Vec<FileTag> = self.read(|c| {
-            let mut st = c.prepare(
-                "SELECT ft.id, ft.file_id, ft.tag_name_id, tn.name, ft.comment, ft.examiner, ft.created_at FROM file_tags ft JOIN tag_names tn ON tn.id = ft.tag_name_id WHERE ft.tag_name_id = ?1 ORDER BY ft.id",
-            )?;
-            let rows = st.query_map([tag_name_id], FileTag::from_row)?.collect::<rusqlite::Result<Vec<_>>>()?;
-            Ok(rows)
-        })?;
-        let mut out = Vec::with_capacity(tags.len());
-        for t in tags {
-            if let Some(f) = self.file(t.file_id)? {
-                out.push((t, f));
-            }
-        }
-        Ok(out)
-    }
-
-    /// `(tag name id, count)` of tagged files.
-    pub fn tag_counts(&self) -> Result<Vec<(i64, u64)>> {
-        self.read(|c| {
-            let mut st =
-                c.prepare("SELECT tag_name_id, COUNT(*) FROM file_tags GROUP BY tag_name_id")?;
-            let rows = st
-                .query_map([], |r| {
-                    Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?.max(0) as u64))
-                })?
                 .collect::<rusqlite::Result<Vec<_>>>()?;
             Ok(rows)
         })
@@ -736,6 +658,21 @@ fn insert_artifact(tx: &Connection, a: &NewArtifact) -> Result<i64> {
     )?
     .execute(params![a.type_id, a.ds_id, a.file_id, a.source_artifact_id, sig, prio, a.conclusion, a.configuration, a.justification, a.created_at])?;
     let id = tx.last_insert_rowid();
+    if let (Some((significance, priority)), Some((kind, obj))) = (
+        a.score,
+        scores::scored_object(a.file_id, a.source_artifact_id),
+    ) {
+        scores::raise(
+            tx,
+            kind,
+            obj,
+            Some(a.ds_id),
+            Score {
+                significance,
+                priority,
+            },
+        )?;
+    }
     let mut st = tx.prepare_cached(
         "INSERT INTO attributes (artifact_id, type_id, source, value_text, value_int, value_double, value_blob) VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7)",
     )?;
@@ -810,6 +747,16 @@ impl Bulk<'_> {
             params![d.name, d.kind as i64, paths, d.size as i64, d.sector_size, d.timezone, d.image_format, d.md5, d.sha1, d.sha256, acq, d.added_at],
         )?;
         Ok(self.conn.last_insert_rowid())
+    }
+
+    /// Puts a data source on the host `name`, creating the host if needed.
+    pub fn assign_host(&mut self, ds_id: i64, name: &str) -> Result<Host> {
+        let host = hosts::host_named(self.conn, name)?;
+        self.conn.execute(
+            "UPDATE data_sources SET host_id = ?2 WHERE id = ?1",
+            params![ds_id, host.id],
+        )?;
+        Ok(host)
     }
 
     pub fn add_volume_system(
@@ -939,6 +886,8 @@ const FILE_INDEXES: &[(&str, &str)] = &[
     ("files_ext", "ON files(extension, ds_id) WHERE kind = 1"),
     ("files_mime", "ON files(mime, ds_id) WHERE mime IS NOT NULL"),
     ("files_md5", "ON files(md5) WHERE md5 IS NOT NULL"),
+    ("files_sha1", "ON files(sha1) WHERE sha1 IS NOT NULL"),
+    ("files_sha256", "ON files(sha256) WHERE sha256 IS NOT NULL"),
     ("files_mtime", "ON files(mtime)"),
     ("files_size", "ON files(size) WHERE kind = 1"),
     (
