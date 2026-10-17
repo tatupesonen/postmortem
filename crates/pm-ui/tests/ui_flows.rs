@@ -1325,3 +1325,26 @@ fn new_hash_set_receives_files_from_the_table() {
     });
     let _ = std::fs::remove_file(&kdb);
 }
+
+/// The Image Gallery lists the case's pictures from the database and shows
+/// identical ones (same MD5) once.
+#[test]
+fn gallery_shows_identical_pictures_once() {
+    let mut h = harness(vec![demo()]);
+    wait_analysed(&mut h);
+    // Draw the gallery's own viewport inside the harness.
+    h.ctx.set_embed_viewports(true);
+    click(&mut h, "Gallery");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Show duplicates (2)").is_some()
+    });
+    h.get_by_label_contains("5 pictures in");
+    // NTFS and FAT folders stay apart; the first allocated copy is shown.
+    h.get_by_label_contains("demo.dd/vol2/Users/alice/Pictures/ (2)");
+    h.get_by_label_contains("demo.dd/vol3/DCIM/ (1, 1 duplicates)");
+    shot(&mut h, "gallery_dedup");
+    click(&mut h, "Show duplicates (2)");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("7 pictures in").is_some()
+    });
+}

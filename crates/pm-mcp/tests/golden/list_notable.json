@@ -530,11 +530,11 @@
       "tags": []
     },
     {
-      "ref": "file:97",
+      "ref": "file:98",
       "significance": "Likely Notable",
       "object": {
-        "ref": "file:97",
-        "objectId": 97,
+        "ref": "file:98",
+        "objectId": 98,
         "dataSourceId": 2,
         "size": 81920,
         "isDirectory": false,
@@ -551,8 +551,8 @@
         {
           "ref": "result:13",
           "objectId": 13,
-          "sourceFileId": 97,
-          "sourceRef": "file:97",
+          "sourceFileId": 98,
+          "sourceRef": "file:98",
           "artifactType": "TSK_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
@@ -591,11 +591,11 @@
       "tags": []
     },
     {
-      "ref": "file:106",
+      "ref": "file:107",
       "significance": "Likely Notable",
       "object": {
-        "ref": "file:106",
-        "objectId": 106,
+        "ref": "file:107",
+        "objectId": 107,
         "dataSourceId": 2,
         "size": 195,
         "isDirectory": false,
@@ -612,8 +612,8 @@
         {
           "ref": "result:12",
           "objectId": 12,
-          "sourceFileId": 106,
-          "sourceRef": "file:106",
+          "sourceFileId": 107,
+          "sourceRef": "file:107",
           "artifactType": "TSK_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,

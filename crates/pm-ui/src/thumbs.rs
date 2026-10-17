@@ -1,5 +1,6 @@
 //! Thumbnail cache shared by the Image Gallery and Discovery: decodes in the
-//! background on first request and keeps GPU textures for reuse.
+//! background on first request and keeps GPU textures for reuse, up to a
+//! bound: the least recently drawn thumbnails are dropped beyond it.
 
 use std::collections::HashMap;
 use std::hash::Hash;
@@ -44,9 +45,14 @@ pub(crate) fn decode_thumb(src: &pm_core::SharedSource) -> Option<egui::ColorIma
     ))
 }
 
+/// Thumbnails kept: about 145 KiB each at `THUMB_PX`, so ~290 MiB of
+/// textures at most, several screens of the largest grid.
+const MAX_THUMBS: usize = 2_000;
+
 /// Cache of thumbnails keyed by `K`.
 pub(crate) struct ThumbCache<K> {
-    map: HashMap<K, Thumb>,
+    /// Thumbnail and the frame it was last drawn in.
+    map: HashMap<K, (Thumb, u64)>,
 }
 
 impl<K> Default for ThumbCache<K> {
@@ -64,7 +70,7 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug> ThumbCache<K> {
 
     #[cfg(test)]
     pub(crate) fn any_ready(&self) -> bool {
-        self.map.values().any(|t| matches!(t, Thumb::Ready(_)))
+        self.map.values().any(|(t, _)| matches!(t, Thumb::Ready(_)))
     }
 
     /// Paints the thumbnail for `key` into `rect`, starting a decode on first
@@ -76,20 +82,39 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug> ThumbCache<K> {
         key: &K,
         content: impl FnOnce() -> Option<Content>,
     ) {
-        if !self.map.contains_key(key) {
+        if self.map.contains_key(key) {
+            self.paint_with(ui, rect, key, || None);
+        } else {
             let c = content();
+            self.paint_with(ui, rect, key, move || c);
+        }
+    }
+
+    /// [`Self::paint`] with `load` run on the decode thread (for content
+    /// that needs a database lookup).
+    pub(crate) fn paint_with(
+        &mut self,
+        ui: &egui::Ui,
+        rect: Rect,
+        key: &K,
+        load: impl FnOnce() -> Option<Content> + Send + 'static,
+    ) {
+        let frame = ui.ctx().cumulative_frame_nr();
+        if !self.map.contains_key(key) {
             let task = Task::spawn(ui.ctx(), move || {
-                c.and_then(|c| c.source().ok())
+                load()
+                    .and_then(|c| c.source().ok())
                     .and_then(|s| decode_thumb(&s))
             });
-            self.map.insert(key.clone(), Thumb::Loading(task));
+            self.map.insert(key.clone(), (Thumb::Loading(task), frame));
         }
         let painter = ui.painter_at(rect);
         let weak = ui.visuals().weak_text_color();
         let warn = ui.visuals().warn_fg_color;
-        let Some(t) = self.map.get_mut(key) else {
+        let Some((t, used)) = self.map.get_mut(key) else {
             return;
         };
+        *used = frame;
         if let Thumb::Loading(task) = t
             && let Some(result) = task.poll()
         {
@@ -133,6 +158,19 @@ impl<K: Hash + Eq + Clone + std::fmt::Debug> ThumbCache<K> {
                 );
             }
         }
+    }
+
+    /// Drops the least recently drawn thumbnails beyond the bound (call
+    /// once per frame, after painting).
+    pub(crate) fn trim(&mut self) {
+        if self.map.len() <= MAX_THUMBS {
+            return;
+        }
+        let mut used: Vec<u64> = self.map.values().map(|(_, f)| *f).collect();
+        let cut = self.map.len() - MAX_THUMBS;
+        let (_, nth, _) = used.select_nth_unstable(cut);
+        let nth = *nth;
+        self.map.retain(|_, (_, f)| *f >= nth);
     }
 }
 

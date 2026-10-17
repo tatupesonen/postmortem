@@ -713,17 +713,11 @@ impl PostmortemApp {
     }
 
     fn open_gallery(&mut self, ctx: &egui::Context) {
-        if self.sources.is_empty() {
-            self.errors
-                .push("Add a data source before opening the Image Gallery.".into());
+        let Some(case) = self.analysis.lock().case().cloned() else {
             return;
-        }
+        };
         if self.gallery.is_none() || self.gallery_closed.swap(false, Ordering::Relaxed) {
-            let w = GalleryWindow::new(
-                self.shared_index(ctx),
-                self.sources.clone(),
-                self.prefs.clone(),
-            );
+            let w = GalleryWindow::new(case, self.prefs.clone());
             self.gallery = Some(Arc::new(Mutex::new(w)));
         }
         ctx.send_viewport_cmd_to(

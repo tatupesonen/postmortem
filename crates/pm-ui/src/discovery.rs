@@ -9,9 +9,8 @@ use pm_discovery::{
 use pm_index::FileIndex;
 
 use crate::format::{DisplayPrefs, grouped};
-use crate::gallery::self_content;
 use crate::index::SharedIndex;
-use crate::model::{Content, DataSource};
+use crate::model::{Content, DataSource, FileRow};
 use crate::sortable::{Order, Sort, cmp_text};
 use crate::thumbs::ThumbCache;
 use crate::viewers::ViewerPanel;
@@ -49,6 +48,17 @@ impl std::fmt::Debug for DiscoveryWindow {
             .field("criteria", &self.criteria)
             .finish_non_exhaustive()
     }
+}
+
+/// Content for index entry `i`.
+fn self_content(sources: &[DataSource], idx: &FileIndex, i: usize) -> Option<Content> {
+    let f = idx.files.get(i)?;
+    let ds = sources.iter().find(|d| d.id as u32 == f.ds)?;
+    let fs = ds.fs(f.fs as usize)?;
+    Some(Content::from_fs(
+        Arc::clone(fs),
+        FileRow::from_fs(&**fs, f.inode, &f.path, f.name_allocated),
+    ))
 }
 
 impl DiscoveryWindow {

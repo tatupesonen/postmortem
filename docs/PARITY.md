@@ -426,7 +426,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Gallery window, folder (path) groups, thumbnail grid, deleted marking, viewer pop-out | `IG/gui/*` | Partial | `gallery.rs` with a test. Built on `pm-index`. Pictures only; no videos. |
+| Gallery window, folder (path) groups, thumbnail grid, deleted marking, viewer pop-out | `IG/gui/*` | Partial | `gallery.rs` on the case database (no evidence walk): folders by Autopsy unique path (image/volN/folder), known and NTFS system files left out. Identical pictures (MD5) shown once with a ×N badge and a "Show duplicates" toggle (beyond Autopsy). Thumbnail cache bounded (LRU). Pictures only; no videos. |
 | Group by Hashset / Category / Tags / Camera Make / Model / MIME; group sort (priority, hit density) | `datamodel/grouping/*` | Missing | — |
 | Seen / next unseen group, seen by other examiners | `GroupManager`, `NextUnseenGroup` | Missing | — |
 | Categories (Project VIC tag set), keyboard 0–5, category summary table, undo/redo | `CategorizeAction`, `UndoRedoManager` | Missing | — |
@@ -434,7 +434,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Hash-hit badges and "Only Hash Hits" list | `HashHitGroupList` | Missing | — |
 | Slideshow with video player | `gui/drawableviews/SlideShowView`, `VideoPlayer` | Missing | — |
 | Metadata "Details" pane | `MetaDataPane` | Missing | — |
-| Persistent drawable DB / thumbnail cache, listening during ingest, Options › Image Gallery | `drawable.db`, `ImageGalleryOptionsPanel` | Missing | The thumbnail cache is in memory only (`thumbs.rs`). |
+| Persistent drawable DB / thumbnail cache, listening during ingest, Options › Image Gallery | `drawable.db`, `ImageGalleryOptionsPanel` | Missing | The thumbnail cache is in memory only (`thumbs.rs`), capped at 2,000 thumbnails. The list itself comes from the case DB, so no drawable DB is needed. |
 
 ## 23. Data Source Summary (`A/datasourcesummary`)
 

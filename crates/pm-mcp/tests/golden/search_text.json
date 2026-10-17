@@ -2,8 +2,8 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "ref": "file:97",
-      "objectId": 97,
+      "ref": "file:98",
+      "objectId": 98,
       "objectType": "file",
       "page": 1,
       "dataSourceId": 2,
@@ -18,8 +18,8 @@
       }
     },
     {
-      "ref": "file:106",
-      "objectId": 106,
+      "ref": "file:107",
+      "objectId": 107,
       "objectType": "file",
       "page": 1,
       "dataSourceId": 2,

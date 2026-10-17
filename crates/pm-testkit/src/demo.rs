@@ -288,6 +288,12 @@ fn fat_volume() -> Vec<u8> {
             .unwrap()
             .write_all(&gradient_bmp(200, 150))
             .unwrap();
+        // The same picture as the NTFS Pictures/sunset.bmp (a duplicate
+        // for the Image Gallery).
+        root.create_file("DCIM/IMG_0002.bmp")
+            .unwrap()
+            .write_all(&gradient_bmp(320, 200))
+            .unwrap();
         root.create_file("readme.txt")
             .unwrap()
             .write_all(b"USB stick belonging to alice\n")

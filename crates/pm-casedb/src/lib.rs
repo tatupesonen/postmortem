@@ -17,6 +17,7 @@ pub mod communications;
 mod derived;
 pub mod events;
 pub mod file_search;
+pub mod gallery;
 mod hosts;
 pub mod integrity;
 pub mod keyword_hits;

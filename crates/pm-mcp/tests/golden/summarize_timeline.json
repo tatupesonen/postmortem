@@ -5,9 +5,9 @@
     "startEpoch": 1577959200,
     "endTime": "2022-05-10T18:30:00Z",
     "endEpoch": 1652207400,
-    "totalEvents": 371,
+    "totalEvents": 374,
     "byCategory": {
-      "File System": 370,
+      "File System": 373,
       "Web Activity": 1,
       "Other": 0
     }
