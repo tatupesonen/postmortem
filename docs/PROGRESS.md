@@ -1,44 +1,27 @@
 # Progress
 
-## Now — RESUME HERE (2026-10-17, Linux machine, autonomous)
+## Now — RESUME HERE (2026-10-18, Linux machine, solo)
 
-Context: the project moved to a Linux VM. The paused
-agent worktrees from the Mac (search, core-file-modules, email-mobile,
-browsers, carving `.wip-derived/`) were **lost** (never pushed). The user
-chose to **reimplement** them here; `docs/agents/<track>.md` are the specs.
-Finished work merges straight to `master` and is pushed (`parity-wip`
-kept in sync). User-confirmed scope (2026-10-17): everything incl.
-multi-user (PostgreSQL via Docker/Podman for tests) and WASM plugins;
-external-tool runners (aLEAPP/iLEAPP/Plaso/Volatility) are OUT — port the
-valuable LEAPP parsers natively instead; Cyber Triage is OUT.
+Read `docs/DIRECTION.md` first (owner decisions and working rules).
 
-Running now (3 agents in worktrees, coordinator merges):
-1. **search** — pm-text, pm-search, Keyword Search module (spec
-   `docs/agents/search.md`). Then coordinator builds the UI.
-2. **core-file-modules** — pm-filetype + File Type ID, Extension Mismatch,
-   Encryption Detection, Interesting Files (pm-rules), DS Integrity.
-3. **derived-and-carving** — pm-archive, Embedded File Extractor, pm-carve
-   + PhotoRec Carver.
+Current work: the architecture cleanup of ADR-023, step 1 — move the
+Data Source Summary (`pm-ui/src/summary.rs`) and Discovery
+(`pm-ui/src/discovery.rs`, `pm-discovery`) to DB queries, then delete the
+GUI's second evidence open (`PostmortemApp::sources`) and the in-memory
+file index (`SharedIndex`, `pm-index` walk). Then ADR-023 steps 2–6,
+the Postgres dialect layer (ADR-024), and the analyst-workflow features
+(`BEYOND-AUTOPSY.md` §8, starting with multi-select in tables).
 
-Coordinator (master):
-* ✅ WP-0 schema v2 (ADR-017/018): hosts/persons, OS accounts + realms
-  (TSK OsAccountTest ported), communications accounts/relationships,
-  events, aggregate scores, tag sets + artifact tags, hash indexes;
-  default host per data source.
-* Next: WP-0 follow-ups — data-artifact/analysis-result ingest pipelines
-  in `pm-ingest` (coordinate with the derived track's pm-ingest edits),
-  Recent Activity writing OS accounts (SAM/ProfileList) and events;
-  then UI for tags (WP-1) and results browsing (WP-2) while agents run.
-* When agents finish: merge one at a time (search first), full gate,
-  push; start the next tracks (browsers, email-mobile, windows extras,
-  image formats/file systems, CR, reports, timeline, CVT/geo).
+Also queued:
+* `postmortem ingest --only <ids>` to re-run modules on existing data
+  sources; then re-run Recent Activity on the owner's cases in
+  `~/postmortem/Cases` (bad Windows 10 jump-list dates, fixed in 3f83fcc).
+* Time-zone warning after Recent Activity (DIRECTION.md).
 
-Machine notes: `apt` installed sleuthkit 4.12.1 + ewf-tools (TSK
-differentials now run; TSK 4.12 vs the 4.15 the project used on the Mac
-may differ). The GUI in this VMware VM needs `LIBGL_ALWAYS_SOFTWARE=1`
-or `WGPU_BACKEND=vulkan` (SVGA3D GL renders blank). References in
-`../reference/` (sleuthkit 4.12.1 source, Tika
-mimetypes, Eric Zimmerman tools).
+Done recently (2026-10-18): DB timeline (5c40373), artifact timeline
+events (fd63f70), jump-list fix (3f83fcc), gallery on DB with MD5 dedup
+(0d1479b), hash sets/CSV/external viewer/delete case (6f7eaf4), CVT
+(e156ca3), `postmortem ingest` CLI.
 
 ## 2026-10-15: parallel parity push (goal: all Autopsy features, tested)
 

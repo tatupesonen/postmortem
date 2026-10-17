@@ -469,3 +469,62 @@ API 0.2 added `post_communication` (accounts and relationships written
 with the result) and `define_attribute_type` / `define_artifact_type`;
 plugins built against 0.1 load unchanged (the host only gained
 functions). The Email Parser is the first built-in module on this API.
+
+## ADR-023 — Everything reads the case database; architecture review 2026-10-18
+(Owner directive 2026-10-18: "The timeline should use database and not
+memory… basically everything should use database.")
+
+**Decision.** Every view and tool (Timeline, Image Gallery, Discovery,
+Data Source Summary, searches, MCP, reports) reads the case database. No
+feature walks the evidence into memory. Evidence is opened only through
+`pm_case::Case` (`filesystem()`, `image_source()`, cached per data
+source) for content reads.
+
+Done so far: artifact timeline events are written with each artifact
+(`pm-casedb/src/artifact_events.rs`, TSK `TimelineEventTypes`); the
+Timeline window runs on `pm_timeline::db::DbTimeline` (indexed queries
+per range and filter, schema v3 adds the time-column indexes); the Image
+Gallery lists pictures from the DB.
+
+**Review findings and plan (in order).**
+1. The GUI opens each image a second time (`PostmortemApp::sources`,
+   `pm_evidence::open`) beside `Case`'s cached evidence, and builds a
+   full in-memory file index (`SharedIndex`/`pm-index`) eagerly. Move the
+   Data Source Summary and Discovery to DB queries, then delete
+   `sources`, `SharedIndex` and the `pm-index` file walk (keep
+   `FileCategory` in a shared crate).
+2. `pm-ui/src/app.rs` (~3,400 lines) holds every tool's state and ~60
+   manual `invalidate()`/`refresh()` calls. Add a **case change bus**
+   (Autopsy `Case.Events`): `CaseDb` bumps per-domain generation counters
+   (files, artifacts, tags, events, data sources, reports, accounts) on
+   commit; views refresh when their counter moves. Then split `app.rs`
+   into feature modules that own their state.
+3. UI `Task`s share rayon's global pool with heavy work (a WASM compile
+   once starved the UI). Give UI queries their own small pool.
+4. `pm-casedb/src/mcp.rs` has become the general read/query layer
+   (timeline, file filters, keyset paging) used beyond MCP. Rename it
+   (`query`), drop the `mcp_` prefixes; MCP-specific shaping stays in
+   `pm-mcp`.
+5. Two module APIs coexist (`ModuleFactory` and `pm-plugin-api`);
+   continue moving built-in modules onto `pm-plugin-api` (ADR-022).
+6. Explain the ~3 GB peak resident during ingest of a 15 GB image
+   (`postmortem ingest` now reports heap vs mapped pages).
+
+**Consequences.** Memory no longer grows with the number of files for
+browsing features; MCP, reports and the GUI see the same data; old
+in-memory code paths and their flaky test waits disappear.
+
+## ADR-024 — Multi-user on PostgreSQL through a dialect layer
+(Owner decision 2026-10-18.)
+
+**Decision.** Single-user cases stay on SQLite. Multi-user cases use
+PostgreSQL, as Autopsy does. `pm-casedb` keeps one public API (`CaseDb`
+and its query types); SQL is produced through a thin dialect layer
+(placeholders, upserts, `RETURNING`, type names, `LIKE`/collation and
+index DDL differences) over two backends. Refactor `pm-casedb` toward
+this before more SQL is added; new queries go through the layer.
+Postgres tests run against the official image via Docker/Podman.
+
+**Alternatives rejected.** A postmortem case server in front of SQLite
+(new server component, no shared-database deployment like Autopsy's);
+postponing multi-user (the owner keeps it in scope).

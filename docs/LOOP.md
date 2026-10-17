@@ -8,6 +8,7 @@ in this repository. This document is the contract each iteration follows.
 
 | File | Purpose |
 |------|---------|
+| `docs/DIRECTION.md` | The owner's standing decisions, priorities and working rules. Read first. |
 | `docs/LOOP.md` | This protocol. Change only when the process itself needs to change. |
 | `docs/PLAN.md` | Architecture, crate map, milestones and the task checklist (`- [ ]` / `- [x]`). |
 | `docs/PROGRESS.md` | `## Now` (current task + next steps), `## Blockers`, and an append-only `## Log` (newest first). |
