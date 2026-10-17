@@ -459,5 +459,7 @@ search goes through the name index (`search_file_names`).
 
 **Consequences.** Any parser can later ship as a plugin with little
 change; results from plugins are attributed to the plugin's display name;
-custom artifact types are not yet definable by plugins (a planned additive
-host call).
+API 0.2 added `post_communication` (accounts and relationships written
+with the result) and `define_attribute_type` / `define_artifact_type`;
+plugins built against 0.1 load unchanged (the host only gained
+functions). The Email Parser is the first built-in module on this API.

@@ -28,8 +28,34 @@ pub(crate) enum WriteOp {
     /// New derived/carved files; the writer commits, then replies with
     /// their records.
     Files(Vec<NewFile>, FilesReply),
+    /// A message, call or contact with its accounts and relationship.
+    Communication(Box<NewCommunication>),
     /// End of the job: the writer commits and exits.
     Stop,
+}
+
+/// A communication artifact (e-mail, message, call, contact) posted with
+/// the accounts it involves (TSK `createAccountFileInstance` +
+/// `addRelationships`). The writer inserts the artifact, registers each
+/// account on the artifact's file, and relates the participants through
+/// the artifact, all in one transaction; nothing is added when the file
+/// already has the same artifact (re-runs are idempotent).
+#[derive(Debug, Clone)]
+pub struct NewCommunication {
+    pub artifact: NewArtifact,
+    /// Attribute types identifying a duplicate artifact.
+    pub key: Vec<i64>,
+    /// Module name (attribute source of the account instances).
+    pub module: String,
+    /// `(account type name, identifier)`, e.g. `("EMAIL", "bob@x.com")`.
+    pub accounts: Vec<(String, String)>,
+    /// Indexes into `accounts` of the relationship's participants, its
+    /// kind and time (`None`: the accounts are only registered).
+    pub relationship: Option<(
+        Vec<usize>,
+        pm_casedb::communications::RelationshipKind,
+        Option<i64>,
+    )>,
 }
 
 /// Job-wide context handed to every module call.
@@ -69,6 +95,12 @@ impl JobContext {
         let _ = self
             .sink
             .send(WriteOp::Artifact(artifact, Some(key.to_vec())));
+    }
+
+    /// Posts a communication artifact with its accounts (see
+    /// [`NewCommunication`]).
+    pub fn post_communication(&self, c: NewCommunication) {
+        let _ = self.sink.send(WriteOp::Communication(Box::new(c)));
     }
 
     /// Posts an artifact without the duplicate check (for bulk extractors

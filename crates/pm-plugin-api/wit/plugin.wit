@@ -76,6 +76,30 @@ interface types {
         created: option<s64>,
     }
 
+    // API 0.2: communications (accounts and relationships).
+    record account-id {
+        account-type: string,
+        id: string,
+    }
+
+    enum relationship-kind { message, call-log, contact }
+
+    record relationship {
+        // Indexes into the communication's accounts.
+        members: list<u32>,
+        kind: relationship-kind,
+        time: option<s64>,
+    }
+
+    record communication {
+        accounts: list<account-id>,
+        relationship: option<relationship>,
+    }
+
+    enum value-kind { %string, integer, long, double, bytes, date-time, json }
+
+    enum artifact-category { data-artifact, analysis-result }
+
     enum level { debug, info, warn, error }
 
     record message {
@@ -106,7 +130,7 @@ interface types {
 }
 
 interface host {
-    use types.{file-info, data-source-info, file-query, new-result, derived-file, level, message};
+    use types.{file-info, data-source-info, file-query, new-result, derived-file, level, message, communication, value-kind, artifact-category};
 
     data-source: func() -> data-source-info;
     read: func(file-id: s64, offset: u64, len: u32) -> result<list<u8>, string>;
@@ -114,6 +138,10 @@ interface host {
     find-files: func(q: file-query) -> result<list<file-info>, string>;
     children: func(file-id: s64) -> result<list<file-info>, string>;
     post: func(r: new-result) -> result<_, string>;
+    // API 0.2.
+    post-communication: func(r: new-result, c: communication) -> result<_, string>;
+    define-attribute-type: func(name: string, display: string, kind: value-kind) -> result<_, string>;
+    define-artifact-type: func(name: string, display: string, category: artifact-category) -> result<_, string>;
     add-derived: func(parent-id: s64, files: list<derived-file>) -> result<list<s64>, string>;
     log: func(level: level, message: string);
     post-message: func(m: message);

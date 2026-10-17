@@ -49,6 +49,7 @@ pm-plugin-api = { path = "crates/pm-plugin-api" }
 pm-plugin-wasm = { path = "crates/pm-plugin-wasm" }
 pm-plugin-sdk = { path = "crates/pm-plugin-sdk" }
 pm-report = { path = "crates/pm-report" }
+pm-email = { path = "crates/pm-email" }
 pm-browser = { path = "crates/pm-browser" }
 pm-mcp = { path = "crates/pm-mcp" }
 

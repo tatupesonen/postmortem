@@ -20,7 +20,7 @@ mod module;
 mod progress;
 mod sched;
 
-pub use context::{HEAD_LEN, IngestFile, JobContext};
+pub use context::{HEAD_LEN, IngestFile, JobContext, NewCommunication};
 pub use inbox::{Inbox, IngestMessage, MAX_ERROR_MESSAGES, MessageKind};
 pub use job::{FileFilter, IngestError, JobSettings, JobSummary, ModuleSetting, run_job};
 pub use module::{DataSourceModule, FileModule, ModuleError, ModuleFactory, ModuleInfo, ModuleJob};

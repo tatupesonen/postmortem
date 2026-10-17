@@ -575,6 +575,34 @@ impl CaseDb {
         })
     }
 
+    /// The id of an artifact type by name, standard or custom.
+    pub fn artifact_type_id_named(&self, name: &str) -> Result<Option<i64>> {
+        if let Some(id) = catalog::artifact_type_id(name) {
+            return Ok(Some(id));
+        }
+        self.read(|c| {
+            Ok(
+                c.prepare_cached("SELECT id FROM artifact_types WHERE name = ?1")?
+                    .query_row([name], |r| r.get(0))
+                    .optional()?,
+            )
+        })
+    }
+
+    /// The id of an attribute type by name, standard or custom.
+    pub fn attribute_type_id_named(&self, name: &str) -> Result<Option<i64>> {
+        if let Some(id) = catalog::attribute_type_id(name) {
+            return Ok(Some(id));
+        }
+        self.read(|c| {
+            Ok(
+                c.prepare_cached("SELECT id FROM attribute_types WHERE name = ?1")?
+                    .query_row([name], |r| r.get(0))
+                    .optional()?,
+            )
+        })
+    }
+
     // ------------------------------------------------------- ingest jobs
 
     pub fn start_ingest_job(
@@ -748,6 +776,33 @@ pub struct Bulk<'c> {
 }
 
 impl Bulk<'_> {
+    /// [`CaseDb::account_instance`] in this bulk transaction.
+    pub fn account_instance(
+        &mut self,
+        inst: communications::AccountInstanceSpec<'_>,
+    ) -> Result<(communications::Account, i64)> {
+        communications::account_instance_tx(self.conn, inst)
+    }
+
+    /// [`CaseDb::add_relationships`] in this bulk transaction.
+    pub fn add_relationships(
+        &mut self,
+        participants: &[i64],
+        source_artifact_id: i64,
+        kind: communications::RelationshipKind,
+        date_time: Option<i64>,
+        ds_id: i64,
+    ) -> Result<()> {
+        communications::relationships_tx(
+            self.conn,
+            participants,
+            source_artifact_id,
+            kind,
+            date_time,
+            ds_id,
+        )
+    }
+
     fn tick(&mut self) -> Result<()> {
         self.pending += 1;
         if self.pending >= BULK_COMMIT_EVERY {

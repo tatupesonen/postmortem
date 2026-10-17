@@ -456,6 +456,11 @@ fn run_writer(
                         b.add_artifact(&a)?;
                         artifacts += 1;
                     }
+                    WriteOp::Communication(c) => {
+                        if write_communication(b, &c)? {
+                            artifacts += 1;
+                        }
+                    }
                     WriteOp::Files(files, reply) => {
                         let mut recs = Vec::with_capacity(files.len());
                         for f in &files {
@@ -490,4 +495,42 @@ fn run_writer(
             return Ok(());
         }
     }
+}
+
+/// Applies a [`crate::NewCommunication`]; `true` when the artifact was new.
+fn write_communication(
+    b: &mut pm_casedb::Bulk<'_>,
+    c: &crate::NewCommunication,
+) -> pm_casedb::Result<bool> {
+    let Some(art_id) = b.add_artifact_unless_exists(&c.artifact, &c.key)? else {
+        return Ok(false);
+    };
+    let Some(file_id) = c.artifact.file_id else {
+        return Ok(true);
+    };
+    let mut ids = Vec::with_capacity(c.accounts.len());
+    for (type_name, id) in &c.accounts {
+        let (account, _) = b.account_instance(pm_casedb::communications::AccountInstanceSpec {
+            type_name,
+            id,
+            module: &c.module,
+            file_id,
+            ds_id: c.artifact.ds_id,
+            extra: Vec::new(),
+            now: c.artifact.created_at,
+        })?;
+        ids.push(account.id);
+    }
+    if let Some((members, kind, time)) = &c.relationship {
+        let mut participants: Vec<i64> = members
+            .iter()
+            .filter_map(|&i| ids.get(i).copied())
+            .collect();
+        participants.sort_unstable();
+        participants.dedup();
+        if participants.len() > 1 {
+            b.add_relationships(&participants, art_id, *kind, *time, c.artifact.ds_id)?;
+        }
+    }
+    Ok(true)
 }

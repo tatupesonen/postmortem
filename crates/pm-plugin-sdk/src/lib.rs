@@ -100,6 +100,65 @@ impl api::Host for GuestHost {
         wit_host::post(&result_to_wit(r)).map_err(err)
     }
 
+    fn define_attribute_type(
+        &self,
+        name: &str,
+        display: &str,
+        kind: api::ValueKind,
+    ) -> api::Result<()> {
+        let kind = match kind {
+            api::ValueKind::String => wit::ValueKind::String,
+            api::ValueKind::Integer => wit::ValueKind::Integer,
+            api::ValueKind::Long => wit::ValueKind::Long,
+            api::ValueKind::Double => wit::ValueKind::Double,
+            api::ValueKind::Bytes => wit::ValueKind::Bytes,
+            api::ValueKind::DateTime => wit::ValueKind::DateTime,
+            api::ValueKind::Json => wit::ValueKind::Json,
+        };
+        wit_host::define_attribute_type(name, display, kind).map_err(err)
+    }
+
+    fn define_artifact_type(
+        &self,
+        name: &str,
+        display: &str,
+        category: api::ArtifactCategory,
+    ) -> api::Result<()> {
+        let category = match category {
+            api::ArtifactCategory::DataArtifact => wit::ArtifactCategory::DataArtifact,
+            api::ArtifactCategory::AnalysisResult => wit::ArtifactCategory::AnalysisResult,
+        };
+        wit_host::define_artifact_type(name, display, category).map_err(err)
+    }
+
+    fn post_communication(&self, r: api::NewResult, c: api::Communication) -> api::Result<()> {
+        let c = wit::Communication {
+            accounts: c
+                .accounts
+                .into_iter()
+                .map(|a| wit::AccountId {
+                    account_type: a.account_type,
+                    id: a.id,
+                })
+                .collect(),
+            relationship: c
+                .relationship
+                .map(|(members, kind, time)| wit::Relationship {
+                    members: members
+                        .into_iter()
+                        .map(|m| u32::try_from(m).unwrap_or(u32::MAX))
+                        .collect(),
+                    kind: match kind {
+                        api::RelationshipKind::Message => wit::RelationshipKind::Message,
+                        api::RelationshipKind::CallLog => wit::RelationshipKind::CallLog,
+                        api::RelationshipKind::Contact => wit::RelationshipKind::Contact,
+                    },
+                    time,
+                }),
+        };
+        wit_host::post_communication(&result_to_wit(r), &c).map_err(err)
+    }
+
     fn add_derived(&self, parent_id: i64, files: Vec<api::DerivedFile>) -> api::Result<Vec<i64>> {
         let files: Vec<wit::DerivedFile> = files
             .into_iter()

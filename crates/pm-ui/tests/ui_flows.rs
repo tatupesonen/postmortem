@@ -69,6 +69,8 @@ fn harness_full(
             theme: egui::ThemePreference::Light,
             // Never create cases in the user's home folder from tests.
             case_root: Some(CASES.path().to_path_buf()),
+            // Never the user's own plugins.
+            plugins_dir: Some(CASES.path().join("no-plugins")),
             ingest,
             ..Default::default()
         },

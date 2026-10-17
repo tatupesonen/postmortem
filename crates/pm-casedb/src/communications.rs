@@ -323,63 +323,7 @@ impl CaseDb {
     /// `TSK_ACCOUNT_TYPE` and the normalised `TSK_ID` unless the file
     /// already has one. Returns the account and the instance artifact id.
     pub fn account_instance(&self, inst: AccountInstanceSpec<'_>) -> Result<(Account, i64)> {
-        let AccountInstanceSpec {
-            type_name,
-            id,
-            module,
-            file_id,
-            ds_id,
-            extra,
-            now,
-        } = inst;
-        let art_type = artifact_type_id("TSK_ACCOUNT").unwrap_or(39);
-        let (Some(type_attr), Some(id_attr)) = (
-            attribute_type_id("TSK_ACCOUNT_TYPE"),
-            attribute_type_id("TSK_ID"),
-        ) else {
-            return Err(DbError::Invalid(
-                "account attributes missing from the catalogue".into(),
-            ));
-        };
-        self.write(|tx| {
-            let account = account_or_new(tx, type_name, id)?;
-            let existing: Option<i64> = tx
-                .prepare_cached(
-                    "SELECT a.id FROM artifacts a \
-                     JOIN attributes t ON t.artifact_id = a.id AND t.type_id = ?3 AND t.value_text = ?4 \
-                     JOIN attributes i ON i.artifact_id = a.id AND i.type_id = ?5 AND i.value_text = ?6 \
-                     WHERE a.file_id = ?1 AND a.type_id = ?2 LIMIT 1",
-                )?
-                .query_row(
-                    params![file_id, art_type, type_attr, type_name, id_attr, account.identifier],
-                    |r| r.get(0),
-                )
-                .optional()?;
-            if let Some(a) = existing {
-                return Ok((account, a));
-            }
-            let mut attributes = vec![
-                (type_attr, Value::Text(type_name.to_owned()), module.to_owned()),
-                (id_attr, Value::Text(account.identifier.clone()), module.to_owned()),
-            ];
-            attributes.extend(extra);
-            let art = crate::insert_artifact(
-                tx,
-                &NewArtifact {
-                    type_id: art_type,
-                    ds_id,
-                    file_id: Some(file_id),
-                    source_artifact_id: None,
-                    score: None,
-                    conclusion: None,
-                    configuration: None,
-                    justification: None,
-                    created_at: now,
-                    attributes,
-                },
-            )?;
-            Ok((account, art))
-        })
+        self.write(|tx| account_instance_tx(tx, inst))
     }
 
     /// Relates every pair of `participants` through `source_artifact_id`
@@ -393,18 +337,8 @@ impl CaseDb {
         date_time: Option<i64>,
         ds_id: i64,
     ) -> Result<()> {
-        let date_time = date_time.filter(|t| *t > 0);
         self.write(|tx| {
-            let mut st = tx.prepare_cached(
-                "INSERT OR IGNORE INTO account_relationships (account1_id, account2_id, source_artifact_id, date_time, kind, ds_id) \
-                 VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
-            )?;
-            for (i, a) in participants.iter().enumerate() {
-                for b in participants.iter().skip(i + 1) {
-                    st.execute(params![a, b, source_artifact_id, date_time, kind as i64, ds_id])?;
-                }
-            }
-            Ok(())
+            relationships_tx(tx, participants, source_artifact_id, kind, date_time, ds_id)
         })
     }
 
@@ -531,6 +465,112 @@ impl CaseDb {
             Ok(rows)
         })
     }
+}
+
+/// [`CaseDb::account_instance`] inside a transaction.
+pub(crate) fn account_instance_tx(
+    tx: &Connection,
+    inst: AccountInstanceSpec<'_>,
+) -> Result<(Account, i64)> {
+    let AccountInstanceSpec {
+        type_name,
+        id,
+        module,
+        file_id,
+        ds_id,
+        extra,
+        now,
+    } = inst;
+    let art_type = artifact_type_id("TSK_ACCOUNT").unwrap_or(39);
+    let (Some(type_attr), Some(id_attr)) = (
+        attribute_type_id("TSK_ACCOUNT_TYPE"),
+        attribute_type_id("TSK_ID"),
+    ) else {
+        return Err(DbError::Invalid(
+            "account attributes missing from the catalogue".into(),
+        ));
+    };
+    let account = account_or_new(tx, type_name, id)?;
+    let existing: Option<i64> = tx
+        .prepare_cached(
+            "SELECT a.id FROM artifacts a \
+             JOIN attributes t ON t.artifact_id = a.id AND t.type_id = ?3 AND t.value_text = ?4 \
+             JOIN attributes i ON i.artifact_id = a.id AND i.type_id = ?5 AND i.value_text = ?6 \
+             WHERE a.file_id = ?1 AND a.type_id = ?2 LIMIT 1",
+        )?
+        .query_row(
+            params![
+                file_id,
+                art_type,
+                type_attr,
+                type_name,
+                id_attr,
+                account.identifier
+            ],
+            |r| r.get(0),
+        )
+        .optional()?;
+    if let Some(a) = existing {
+        return Ok((account, a));
+    }
+    let mut attributes = vec![
+        (
+            type_attr,
+            Value::Text(type_name.to_owned()),
+            module.to_owned(),
+        ),
+        (
+            id_attr,
+            Value::Text(account.identifier.clone()),
+            module.to_owned(),
+        ),
+    ];
+    attributes.extend(extra);
+    let art = crate::insert_artifact(
+        tx,
+        &NewArtifact {
+            type_id: art_type,
+            ds_id,
+            file_id: Some(file_id),
+            source_artifact_id: None,
+            score: None,
+            conclusion: None,
+            configuration: None,
+            justification: None,
+            created_at: now,
+            attributes,
+        },
+    )?;
+    Ok((account, art))
+}
+
+/// [`CaseDb::add_relationships`] inside a transaction.
+pub(crate) fn relationships_tx(
+    tx: &Connection,
+    participants: &[i64],
+    source_artifact_id: i64,
+    kind: RelationshipKind,
+    date_time: Option<i64>,
+    ds_id: i64,
+) -> Result<()> {
+    let date_time = date_time.filter(|t| *t > 0);
+    let mut st = tx.prepare_cached(
+        "INSERT OR IGNORE INTO account_relationships (account1_id, account2_id, source_artifact_id, date_time, kind, ds_id) \
+         VALUES (?1, ?2, ?3, ?4, ?5, ?6)",
+    )?;
+    for (i, a) in participants.iter().enumerate() {
+        for b in participants.iter().skip(i + 1) {
+            st.execute(params![
+                a,
+                b,
+                source_artifact_id,
+                date_time,
+                kind as i64,
+                ds_id
+            ])?;
+        }
+    }
+    Ok(())
 }
 
 #[cfg(test)]

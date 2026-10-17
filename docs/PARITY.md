@@ -302,7 +302,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Scalpel Carver (disabled in Autopsy) | `ScalpelCarver/` | N/A? | Not registered in Autopsy. |
 | Central Repository ingest module | `centralrepository/ingestmodule` | Missing | §25. |
 | Keyword Search ingest module | `KWS/KeywordSearchIngestModule` | Done | §15. |
-| Email Parser | `TB/*` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| Email Parser | `TB/*` | Partial | MBOX, EML, vCard on pm-plugin-api (pm-email); PST/OST missing. |
 | Recent Activity | `RA/*` | Partial / In progress | §14. |
 
 ## 14. Recent Activity (`RA/`)
@@ -354,9 +354,9 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| MBOX / EML / PST/OST / vCard parsing, attachments as derived files | `TB/MboxParser`, `EMLParser`, `PstParser`, `VcardParser`, `MimeJ4MessageParser` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
-| Email threading (JWZ) | `TB/EmailMessageThreader` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
-| Email accounts & relationships (CommunicationsManager) | `TB/ThunderbirdMboxFileIngestModule` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| MBOX / EML / PST/OST / vCard parsing, attachments as derived files | `TB/MboxParser`, `EMLParser`, `PstParser`, `VcardParser`, `MimeJ4MessageParser` | Partial | MBOX (streamed, size-capped), EML and vCard done with attachments/photos as derived files; PST/OST missing. |
+| Email threading (JWZ) | `TB/EmailMessageThreader` | Done | Union of Message-ID / In-Reply-To / References; deterministic thread ids (Autopsy: random UUIDs). |
+| Email accounts & relationships (CommunicationsManager) | `TB/ThunderbirdMboxFileIngestModule` | Done | EMAIL/PHONE/DEVICE accounts and MESSAGE/CONTACT relationships via post_communication. |
 | Android Analyzer, 22 app parsers (contacts, call log, SMS, Tango, WWF, Google Maps, browser/cache location, IMO, Xender, Zapya, SHAREit, LINE, WhatsApp, TextNow, Skype, Viber, FB Messenger, Samsung Internet/Opera, OruxMaps, installed apps) | `IPM/android/*.py` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
 | GPX Parser | `IPM/GPX_Module` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
 | DJI Drone Analyzer | `A/modules/drones` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |

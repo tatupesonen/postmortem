@@ -44,6 +44,8 @@ impl Default for Limits {
 pub(crate) fn engine() -> &'static Engine {
     static ENGINE: LazyLock<Engine> = LazyLock::new(|| {
         let mut c = Config::new();
+        // Plugins are compiled on the loading thread: parallel compilation
+        // would use rayon's global pool, which the UI's tasks share.
         c.wasm_component_model(true).consume_fuel(true);
         // The default configuration is valid; a failure here is a build
         // problem, so fall back to the defaults rather than abort.
@@ -146,6 +148,54 @@ impl wit_host::Host for State {
     fn post(&mut self, r: wit::NewResult) -> Result<(), String> {
         self.host()?
             .post(convert::result_from_wit(r))
+            .map_err(|e| e.0)
+    }
+
+    fn define_attribute_type(
+        &mut self,
+        name: String,
+        display: String,
+        kind: wit::ValueKind,
+    ) -> Result<(), String> {
+        let kind = match kind {
+            wit::ValueKind::String => api::ValueKind::String,
+            wit::ValueKind::Integer => api::ValueKind::Integer,
+            wit::ValueKind::Long => api::ValueKind::Long,
+            wit::ValueKind::Double => api::ValueKind::Double,
+            wit::ValueKind::Bytes => api::ValueKind::Bytes,
+            wit::ValueKind::DateTime => api::ValueKind::DateTime,
+            wit::ValueKind::Json => api::ValueKind::Json,
+        };
+        self.host()?
+            .define_attribute_type(&name, &display, kind)
+            .map_err(|e| e.0)
+    }
+
+    fn define_artifact_type(
+        &mut self,
+        name: String,
+        display: String,
+        category: wit::ArtifactCategory,
+    ) -> Result<(), String> {
+        let category = match category {
+            wit::ArtifactCategory::DataArtifact => api::ArtifactCategory::DataArtifact,
+            wit::ArtifactCategory::AnalysisResult => api::ArtifactCategory::AnalysisResult,
+        };
+        self.host()?
+            .define_artifact_type(&name, &display, category)
+            .map_err(|e| e.0)
+    }
+
+    fn post_communication(
+        &mut self,
+        r: wit::NewResult,
+        c: wit::Communication,
+    ) -> Result<(), String> {
+        self.host()?
+            .post_communication(
+                convert::result_from_wit(r),
+                convert::communication_from_wit(c),
+            )
             .map_err(|e| e.0)
     }
 

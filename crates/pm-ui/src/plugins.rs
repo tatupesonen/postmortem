@@ -15,9 +15,20 @@ use pm_modules::plugin_host::PluginSet;
 static PLUGINS: LazyLock<RwLock<Arc<PluginSet>>> =
     LazyLock::new(|| RwLock::new(Arc::new(PluginSet::default())));
 
+/// A plugins folder chosen in the settings (overrides the default).
+static DIR: LazyLock<RwLock<Option<PathBuf>>> = LazyLock::new(|| RwLock::new(None));
+
+/// Uses `dir` as the plugins folder (`None`: the default).
+pub(crate) fn set_dir(dir: Option<PathBuf>) {
+    *DIR.write() = dir;
+}
+
 /// `$POSTMORTEM_PLUGINS`, or `~/postmortem/Plugins` (next to the default
 /// case folder).
 pub(crate) fn plugins_dir() -> PathBuf {
+    if let Some(d) = DIR.read().clone() {
+        return d;
+    }
     std::env::var_os("POSTMORTEM_PLUGINS").map_or_else(
         || {
             std::env::home_dir()

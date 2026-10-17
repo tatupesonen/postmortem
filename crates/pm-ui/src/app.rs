@@ -54,6 +54,9 @@ pub struct Persisted {
     pub hide_known_in_views: bool,
     /// The user's tag names (Options › Tags), added to every opened case.
     pub custom_tags: Vec<crate::tags_ui::TagDefinition>,
+    /// Plugins folder (`None`: `$POSTMORTEM_PLUGINS` or
+    /// `~/postmortem/Plugins`).
+    pub plugins_dir: Option<PathBuf>,
 }
 
 impl Default for Persisted {
@@ -68,6 +71,7 @@ impl Default for Persisted {
             ingest: crate::add_source::IngestPrefs::default(),
             hide_known_in_views: true,
             custom_tags: Vec::new(),
+            plugins_dir: None,
         }
     }
 }
@@ -176,6 +180,7 @@ impl PostmortemApp {
     /// Constructs the app without eframe (used by UI tests).
     pub fn with_state(ctx: &egui::Context, persisted: Persisted, open: Vec<PathBuf>) -> Self {
         ctx.set_theme(persisted.theme);
+        crate::plugins::set_dir(persisted.plugins_dir.clone());
         crate::plugins::reload(ctx);
         let mut app = Self {
             prefs: DisplayPrefs::default(),

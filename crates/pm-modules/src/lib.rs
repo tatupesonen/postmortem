@@ -3,6 +3,7 @@
 
 pub mod data_source_integrity;
 pub mod derive;
+pub mod email_parser;
 pub mod embedded;
 pub mod encryption;
 pub mod event_logs;
@@ -35,6 +36,10 @@ pub fn core_modules() -> Vec<Arc<dyn ModuleFactory>> {
         Arc::new(embedded::EmbeddedFileExtractorFactory),
         Arc::new(picture_analyzer::PictureAnalyzerFactory),
         Arc::new(keyword_search::KeywordSearchFactory),
+        // Built on pm-plugin-api (ADR-022).
+        Arc::new(plugin_host::PluginModule::new(Arc::new(
+            email_parser::EmailParser,
+        ))),
         Arc::new(ext_mismatch::ExtMismatchFactory),
         Arc::new(interesting_files::InterestingFilesFactory),
         Arc::new(photorec::PhotoRecCarverFactory),

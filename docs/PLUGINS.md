@@ -47,6 +47,12 @@ pm_plugin_sdk::export_plugin!(MyPlugin);
   such as `TSK_INTERESTING_ITEM` and TSK attribute types such as
   `TSK_SET_NAME`), `add_derived` (extracted files, scheduled for analysis),
   `log`, `message` (ingest inbox), `is_cancelled`.
+* **Communications** (API 0.2): `post_communication` posts a result such
+  as `TSK_EMAIL_MSG` or `TSK_CONTACT` together with its accounts (e.g.
+  `EMAIL` / `PHONE` identifiers) and a MESSAGE / CALL_LOG / CONTACT
+  relationship between them, atomically.
+* **Custom types** (API 0.2): `define_attribute_type` and
+  `define_artifact_type` register types that results may then use by name.
 * **Settings** are JSON. `default_settings` provides the defaults shown in
   the ingest module list, where the examiner can edit them; `validate`
   rejects bad settings before the job starts.
@@ -58,7 +64,7 @@ pm_plugin_sdk::export_plugin!(MyPlugin);
 `plugin.toml`:
 
 ```toml
-api = "0.1"                  # the pm-plugin-api version you built against
+api = "0.2"                  # the pm-plugin-api version you built against
 component = "my_plugin.wasm"
 
 [limits]

@@ -25,7 +25,7 @@ mod filter;
 pub use filter::FileFilter;
 
 /// The API version this crate implements.
-pub const API_VERSION: Version = Version { major: 0, minor: 1 };
+pub const API_VERSION: Version = Version { major: 0, minor: 2 };
 
 /// A `major.minor` API version.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -271,6 +271,61 @@ pub struct DerivedFile {
 /// The most bytes one [`DerivedFile`] may carry.
 pub const MAX_DERIVED_FILE: usize = 256 * 1024 * 1024;
 
+/// An account as a communication names it (TSK `Account.Type` name and
+/// identifier, e.g. `EMAIL` / `bob@example.com`; the host normalises it).
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub struct AccountId {
+    pub account_type: String,
+    pub id: String,
+}
+
+impl AccountId {
+    pub fn new(account_type: impl Into<String>, id: impl Into<String>) -> Self {
+        Self {
+            account_type: account_type.into(),
+            id: id.into(),
+        }
+    }
+}
+
+/// TSK `Relationship.Type`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum RelationshipKind {
+    Message,
+    CallLog,
+    Contact,
+}
+
+/// The accounts a communication result involves (API 0.2): each is
+/// registered on the result's file, and `relationship` relates the
+/// participants through the result.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Communication {
+    pub accounts: Vec<AccountId>,
+    /// `(indexes into accounts, kind, time)`.
+    pub relationship: Option<(Vec<usize>, RelationshipKind, Option<i64>)>,
+}
+
+/// How a custom attribute's value is stored (TSK value types).
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ValueKind {
+    String,
+    Integer,
+    Long,
+    Double,
+    Bytes,
+    DateTime,
+    Json,
+}
+
+/// Whether a custom artifact type is a data artifact or an analysis
+/// result.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ArtifactCategory {
+    DataArtifact,
+    AnalysisResult,
+}
+
 /// Log levels.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum Level {
@@ -325,6 +380,39 @@ pub trait Host {
 
     /// The job was cancelled: return as soon as possible.
     fn is_cancelled(&self) -> bool;
+
+    /// Posts a communication result (an e-mail, message, call or contact)
+    /// together with its accounts and relationship, atomically (API 0.2).
+    /// Re-runs add nothing.
+    fn post_communication(&self, result: NewResult, communication: Communication) -> Result<()> {
+        let _ = (result, communication);
+        Err(PluginError::new(
+            "this host does not support communications",
+        ))
+    }
+
+    /// Registers (or finds) a custom attribute type that results may then
+    /// use by name (TSK `getOrAddAttributeType`; API 0.2).
+    fn define_attribute_type(&self, name: &str, display: &str, kind: ValueKind) -> Result<()> {
+        let _ = (name, display, kind);
+        Err(PluginError::new(
+            "this host does not support custom attribute types",
+        ))
+    }
+
+    /// Registers (or finds) a custom artifact type (TSK
+    /// `getOrAddArtifactType`; API 0.2).
+    fn define_artifact_type(
+        &self,
+        name: &str,
+        display: &str,
+        category: ArtifactCategory,
+    ) -> Result<()> {
+        let _ = (name, display, category);
+        Err(PluginError::new(
+            "this host does not support custom artifact types",
+        ))
+    }
 
     /// A handle to this host that can be kept for the rest of the job
     /// (runtimes such as the WebAssembly host must own what they call).
@@ -441,6 +529,6 @@ mod tests {
         assert!(v(0, 1).runs_on(v(0, 3)));
         assert!(!v(0, 2).runs_on(v(0, 1)), "needs newer host calls");
         assert!(!v(1, 0).runs_on(v(0, 9)));
-        assert_eq!(API_VERSION.to_string(), "0.1");
+        assert_eq!(API_VERSION.to_string(), "0.2");
     }
 }

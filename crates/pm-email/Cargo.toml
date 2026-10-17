@@ -1,0 +1,17 @@
+[package]
+name = "pm-email"
+description = "E-mail parsing for the Email Parser module: MBOX, EML, JWZ threading, vCard"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+mail-parser = { version = "=0.11.9", default-features = false, features = ["full_encoding"] }
+base64 = "0.22.1"
+
+[dev-dependencies]
+proptest.workspace = true
+
+[lints]
+workspace = true

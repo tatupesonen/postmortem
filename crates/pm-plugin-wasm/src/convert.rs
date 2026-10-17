@@ -85,6 +85,30 @@ pub(crate) fn result_from_wit(r: wit::NewResult) -> api::NewResult {
     }
 }
 
+pub(crate) fn communication_from_wit(c: wit::Communication) -> api::Communication {
+    api::Communication {
+        accounts: c
+            .accounts
+            .into_iter()
+            .map(|a| api::AccountId {
+                account_type: a.account_type,
+                id: a.id,
+            })
+            .collect(),
+        relationship: c.relationship.map(|r| {
+            (
+                r.members.into_iter().map(|m| m as usize).collect(),
+                match r.kind {
+                    wit::RelationshipKind::Message => api::RelationshipKind::Message,
+                    wit::RelationshipKind::CallLog => api::RelationshipKind::CallLog,
+                    wit::RelationshipKind::Contact => api::RelationshipKind::Contact,
+                },
+                r.time,
+            )
+        }),
+    }
+}
+
 pub(crate) fn derived_from_wit(d: wit::DerivedFile) -> api::DerivedFile {
     api::DerivedFile {
         name: d.name,
