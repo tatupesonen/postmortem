@@ -2,10 +2,10 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "ref": "result:6",
-      "objectId": 6,
-      "sourceFileId": 30,
-      "sourceRef": "file:30",
+      "ref": "result:15",
+      "objectId": 15,
+      "sourceFileId": 32,
+      "sourceRef": "file:32",
       "artifactType": "TSK_INTERESTING_ITEM",
       "artifactTypeDisplayName": "Interesting Items",
       "analysisResult": true,

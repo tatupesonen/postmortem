@@ -2,8 +2,8 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "ref": "artifact:10",
-      "objectId": 10,
+      "ref": "artifact:19",
+      "objectId": 19,
       "sourceFileId": null,
       "sourceRef": null,
       "artifactType": "PM_EVENT_LOG",

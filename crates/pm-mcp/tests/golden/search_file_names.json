@@ -2,8 +2,8 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "ref": "file:35",
-      "objectId": 35,
+      "ref": "file:37",
+      "objectId": 37,
       "dataSourceId": 1,
       "size": 43,
       "isDirectory": false,
@@ -17,8 +17,8 @@
       }
     },
     {
-      "ref": "file:60",
-      "objectId": 60,
+      "ref": "file:62",
+      "objectId": 62,
       "dataSourceId": 1,
       "size": 43,
       "isDirectory": false,
@@ -32,8 +32,8 @@
       }
     },
     {
-      "ref": "file:61",
-      "objectId": 61,
+      "ref": "file:63",
+      "objectId": 63,
       "dataSourceId": 1,
       "size": 43,
       "isDirectory": false,
@@ -47,7 +47,7 @@
       }
     }
   ],
-  "next_cursor": "NjE",
+  "next_cursor": "NjM",
   "truncated": false,
   "totalMatches": 12
 }

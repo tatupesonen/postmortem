@@ -1,8 +1,8 @@
 {
   "caseId": "MCP demo",
   "result": {
-    "objectId": 30,
-    "ref": "file:30",
+    "objectId": 32,
+    "ref": "file:32",
     "fileSize": 51,
     "offset": 0,
     "bytesRead": 51,

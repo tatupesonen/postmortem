@@ -2,10 +2,10 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "ref": "artifact:8",
-      "objectId": 8,
-      "sourceFileId": 104,
-      "sourceRef": "file:104",
+      "ref": "artifact:17",
+      "objectId": 17,
+      "sourceFileId": 106,
+      "sourceRef": "file:106",
       "artifactType": "TSK_CONTACT",
       "artifactTypeDisplayName": "Contacts",
       "analysisResult": false,

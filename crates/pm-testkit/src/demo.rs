@@ -127,6 +127,17 @@ fn ntfs_volume() -> Vec<u8> {
             ..Default::default()
         },
     );
+    // E-mail and a contact (Email Parser → Communications).
+    b.file_with(
+        "Users/alice/Documents/invite.eml",
+        b"From: Alice <alice@example.com>\r\nTo: Bob <bob@example.com>\r\nCc: carol@example.org\r\nSubject: Friday\r\nDate: Fri, 28 May 2021 08:30:00 +0000\r\nMessage-ID: <invite@example.com>\r\n\r\nServer migration on Friday, see you there.\r\n",
+        opts(times(ft(2021, 5, 28, 8, 31), ft(2021, 5, 28, 8, 31), ft(2021, 5, 28, 8, 31))),
+    );
+    b.file_with(
+        "Users/alice/Documents/bob.vcf",
+        b"BEGIN:VCARD\r\nVERSION:3.0\r\nFN:Bob Example\r\nTEL;TYPE=CELL:+358401234567\r\nEMAIL:bob@example.com\r\nEND:VCARD\r\n",
+        opts(times(ft(2021, 5, 28, 9, 0), ft(2021, 5, 28, 9, 0), ft(2021, 5, 28, 9, 0))),
+    );
     // A GPS track (GPX Parser → Geolocation): a walk in Helsinki.
     b.file_with(
         "Users/alice/Documents/walk.gpx",

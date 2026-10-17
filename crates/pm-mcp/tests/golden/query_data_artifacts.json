@@ -2,8 +2,8 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "ref": "artifact:5",
-      "objectId": 5,
+      "ref": "artifact:14",
+      "objectId": 14,
       "sourceFileId": 26,
       "sourceRef": "file:26",
       "artifactType": "TSK_WEB_HISTORY",

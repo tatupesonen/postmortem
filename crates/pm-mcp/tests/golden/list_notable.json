@@ -2,11 +2,11 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "ref": "file:30",
+      "ref": "file:32",
       "significance": "Notable",
       "object": {
-        "ref": "file:30",
-        "objectId": 30,
+        "ref": "file:32",
+        "objectId": 32,
         "dataSourceId": 1,
         "size": 51,
         "isDirectory": false,
@@ -21,10 +21,10 @@
       },
       "reasons": [
         {
-          "ref": "result:6",
-          "objectId": 6,
-          "sourceFileId": 30,
-          "sourceRef": "file:30",
+          "ref": "result:15",
+          "objectId": 15,
+          "sourceFileId": 32,
+          "sourceRef": "file:32",
           "artifactType": "TSK_INTERESTING_ITEM",
           "artifactTypeDisplayName": "Interesting Items",
           "analysisResult": true,
@@ -63,7 +63,7 @@
         "deleted": false,
         "mimeType": "application/octet-stream",
         "modifiedTime": "2021-03-04T10:20:30Z",
-        "md5Hash": "34b69583d5086bad053e33187ffc6524",
+        "md5Hash": "39ac802c44c8bd40e36fce689dd84afa",
         "evidence": {
           "name": "$MFT",
           "path": "/$MFT"
@@ -71,8 +71,8 @@
       },
       "reasons": [
         {
-          "ref": "result:2",
-          "objectId": 2,
+          "ref": "result:8",
+          "objectId": 8,
           "sourceFileId": 9,
           "sourceRef": "file:9",
           "artifactType": "TSK_KEYWORD_HIT",
@@ -108,6 +108,123 @@
             ],
             "configuration": "Email Addresses"
           }
+        },
+        {
+          "ref": "result:9",
+          "objectId": 9,
+          "sourceFileId": 9,
+          "sourceRef": "file:9",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "alice@example.com"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": "te.eml\nfrom: alice <«alice@example.com«>\nto: bob <bob@examp"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        },
+        {
+          "ref": "result:10",
+          "objectId": 10,
+          "sourceFileId": 9,
+          "sourceRef": "file:9",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "carol@example.org"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": "ob@example.com>\ncc: «carol@example.org«\nsubject: friday\ndat"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        },
+        {
+          "ref": "result:11",
+          "objectId": 11,
+          "sourceFileId": 9,
+          "sourceRef": "file:9",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "invite@example.com"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": " +0000\nmessage-id: <«invite@example.com«>\nserver migration o"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
         }
       ],
       "tags": []
@@ -118,6 +235,245 @@
       "object": {
         "ref": "file:29",
         "objectId": 29,
+        "dataSourceId": 1,
+        "size": 105,
+        "isDirectory": false,
+        "deleted": false,
+        "mimeType": "text/x-vcard",
+        "modifiedTime": "2021-05-28T09:00:00Z",
+        "md5Hash": "9dfc6894124733b921de77a0b074e600",
+        "evidence": {
+          "name": "bob.vcf",
+          "path": "/Users/alice/Documents/bob.vcf"
+        }
+      },
+      "reasons": [
+        {
+          "ref": "result:1",
+          "objectId": 1,
+          "sourceFileId": 29,
+          "sourceRef": "file:29",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "bob@example.com"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": "358401234567\r\nemail:«bob@example.com«\r\nend:vcard\r\n\n\n-----"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        }
+      ],
+      "tags": []
+    },
+    {
+      "ref": "file:30",
+      "significance": "Likely Notable",
+      "object": {
+        "ref": "file:30",
+        "objectId": 30,
+        "dataSourceId": 1,
+        "size": 219,
+        "isDirectory": false,
+        "deleted": false,
+        "mimeType": "message/rfc822",
+        "modifiedTime": "2021-05-28T08:31:00Z",
+        "md5Hash": "c3563573177d986d293352704dd2bcb2",
+        "evidence": {
+          "name": "invite.eml",
+          "path": "/Users/alice/Documents/invite.eml"
+        }
+      },
+      "reasons": [
+        {
+          "ref": "result:2",
+          "objectId": 2,
+          "sourceFileId": 30,
+          "sourceRef": "file:30",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "carol@example.org"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": ":30:00z\nmessage-cc: «carol@example.org«\nmessage-from: alice"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        },
+        {
+          "ref": "result:3",
+          "objectId": 3,
+          "sourceFileId": 30,
+          "sourceRef": "file:30",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "alice@example.com"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": "essage-from: alice <«alice@example.com«>\nmessage-id: invite"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        },
+        {
+          "ref": "result:4",
+          "objectId": 4,
+          "sourceFileId": 30,
+          "sourceRef": "file:30",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "invite@example.com"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": "le.com>\nmessage-id: «invite@example.com«\nmessage-to: bob <bo"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        },
+        {
+          "ref": "result:5",
+          "objectId": 5,
+          "sourceFileId": 30,
+          "sourceRef": "file:30",
+          "artifactType": "TSK_KEYWORD_HIT",
+          "artifactTypeDisplayName": "Keyword Hits",
+          "analysisResult": true,
+          "dataSourceId": 1,
+          "score": {
+            "significance": "Likely Notable",
+            "priority": "Normal"
+          },
+          "evidence": {
+            "attributes": [
+              {
+                "type": "TSK_KEYWORD",
+                "value": "bob@example.com"
+              },
+              {
+                "type": "TSK_KEYWORD_REGEXP",
+                "value": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"
+              },
+              {
+                "type": "TSK_SET_NAME",
+                "value": "Email Addresses"
+              },
+              {
+                "type": "TSK_KEYWORD_PREVIEW",
+                "value": "om\nmessage-to: bob <«bob@example.com«>\ntitle: friday"
+              },
+              {
+                "type": "TSK_KEYWORD_SEARCH_TYPE",
+                "value": 2
+              }
+            ],
+            "configuration": "Email Addresses"
+          }
+        }
+      ],
+      "tags": []
+    },
+    {
+      "ref": "file:31",
+      "significance": "Likely Notable",
+      "object": {
+        "ref": "file:31",
+        "objectId": 31,
         "dataSourceId": 1,
         "size": 118,
         "isDirectory": false,
@@ -132,10 +488,10 @@
       },
       "reasons": [
         {
-          "ref": "result:1",
-          "objectId": 1,
-          "sourceFileId": 29,
-          "sourceRef": "file:29",
+          "ref": "result:7",
+          "objectId": 7,
+          "sourceFileId": 31,
+          "sourceRef": "file:31",
           "artifactType": "TSK_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
@@ -174,11 +530,11 @@
       "tags": []
     },
     {
-      "ref": "file:95",
+      "ref": "file:97",
       "significance": "Likely Notable",
       "object": {
-        "ref": "file:95",
-        "objectId": 95,
+        "ref": "file:97",
+        "objectId": 97,
         "dataSourceId": 2,
         "size": 81920,
         "isDirectory": false,
@@ -193,10 +549,10 @@
       },
       "reasons": [
         {
-          "ref": "result:4",
-          "objectId": 4,
-          "sourceFileId": 95,
-          "sourceRef": "file:95",
+          "ref": "result:13",
+          "objectId": 13,
+          "sourceFileId": 97,
+          "sourceRef": "file:97",
           "artifactType": "TSK_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,
@@ -235,11 +591,11 @@
       "tags": []
     },
     {
-      "ref": "file:104",
+      "ref": "file:106",
       "significance": "Likely Notable",
       "object": {
-        "ref": "file:104",
-        "objectId": 104,
+        "ref": "file:106",
+        "objectId": 106,
         "dataSourceId": 2,
         "size": 195,
         "isDirectory": false,
@@ -254,10 +610,10 @@
       },
       "reasons": [
         {
-          "ref": "result:3",
-          "objectId": 3,
-          "sourceFileId": 104,
-          "sourceRef": "file:104",
+          "ref": "result:12",
+          "objectId": 12,
+          "sourceFileId": 106,
+          "sourceRef": "file:106",
           "artifactType": "TSK_KEYWORD_HIT",
           "artifactTypeDisplayName": "Keyword Hits",
           "analysisResult": true,

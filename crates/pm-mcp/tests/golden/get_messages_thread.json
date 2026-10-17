@@ -2,10 +2,10 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "ref": "artifact:7",
-      "objectId": 7,
-      "sourceFileId": 104,
-      "sourceRef": "file:104",
+      "ref": "artifact:16",
+      "objectId": 16,
+      "sourceFileId": 106,
+      "sourceRef": "file:106",
       "artifactType": "TSK_MESSAGE",
       "artifactTypeDisplayName": "Messages",
       "analysisResult": false,

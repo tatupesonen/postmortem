@@ -1062,6 +1062,13 @@ fn user_tags_are_added_to_new_cases() {
     });
 }
 
+/// The count on the Keyword Hits tree node.
+fn keyword_hits(h: &Harness<'_, PostmortemApp>) -> Option<u64> {
+    let n = h.query_by_label_contains("Keyword Hits (")?;
+    let label = n.accesskit_node().label()?;
+    label.rsplit_once('(')?.1.trim_end_matches(')').parse().ok()
+}
+
 /// Toolbar Keyword Search: an exact term lists the file with its
 /// preview; "Save search results" adds keyword hits to the tree.
 #[test]
@@ -1091,8 +1098,8 @@ fn keyword_search_from_the_toolbar() {
         h.query_by_label_contains("Keyword search 1 - migration")
             .is_some()
     });
-    // The note itself, and $MFT, which holds its resident data.
-    settle(&mut h, |h| h.query_by_label_contains("2 files").is_some());
+    // The note, the e-mail, and $MFT, which holds the note's resident data.
+    settle(&mut h, |h| h.query_by_label_contains("3 files").is_some());
     h.get_by_label_contains("meeting notes.txt");
     assert!(
         h.query_all_by_label_contains("«migration«")
@@ -1111,6 +1118,7 @@ fn keyword_search_from_the_toolbar() {
     shot(&mut h, "extracted_text");
 
     // A saved substring search feeds Analysis Results › Keyword Hits.
+    let hits_before = keyword_hits(&h).expect("Keyword Hits node");
     click(&mut h, "🔍 Keyword Search");
     let field = h
         .query_all(egui_kittest::kittest::by().role(egui::accesskit::Role::TextInput))
@@ -1139,11 +1147,8 @@ fn keyword_search_from_the_toolbar() {
             .is_some()
             && h.query_by_label_contains("keyword hits saved").is_some()
     });
-    // The default Email Addresses list found 2 hits during ingest.
-    settle(&mut h, |h| {
-        h.query_by_label_contains("Keyword Hits (")
-            .is_some_and(|n| !format!("{:?}", n.accesskit_node().label()).contains("(2)"))
-    });
+    // Two saved hits (passwords.txt and $MFT) are added to what ingest found.
+    settle(&mut h, |h| keyword_hits(h) == Some(hits_before + 2));
     shot(&mut h, "keyword_search_saved");
 
     // Each search keeps its own tab; the first is still there.
@@ -1152,7 +1157,7 @@ fn keyword_search_from_the_toolbar() {
         .unwrap()
         .click();
     h.run_steps(2);
-    settle(&mut h, |h| h.query_by_label_contains("2 files").is_some());
+    settle(&mut h, |h| h.query_by_label_contains("3 files").is_some());
     shot(&mut h, "result_tabs");
     // Closing the first tab leaves the second.
     h.query_all_by_label("×").next().unwrap().click();
@@ -1226,4 +1231,25 @@ fn geolocation_window_lists_located_results() {
     });
     h.get_by_label("GPS Bookmark");
     shot(&mut h, "geolocation");
+}
+
+/// Tools › Communications lists the demo's e-mail accounts and the
+/// selected account's messages.
+#[test]
+fn communications_window_browses_accounts_and_messages() {
+    let mut h = harness(vec![demo()]);
+    wait_analysed(&mut h);
+    click(&mut h, "📞 Communications");
+    settle(&mut h, |h| h.query_by_label("alice@example.com").is_some());
+    click_exact(&mut h, "alice@example.com");
+    settle(&mut h, |h| h.query_by_label("Messages (1)").is_some());
+    click_exact(&mut h, "Friday");
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("Server migration on Friday")
+            .next()
+            .is_some()
+    });
+    shot(&mut h, "communications");
+    click_exact(&mut h, "Visualize");
+    shot(&mut h, "communications_graph");
 }

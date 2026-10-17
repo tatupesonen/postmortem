@@ -2,8 +2,8 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "ref": "file:30",
-      "objectId": 30,
+      "ref": "file:32",
+      "objectId": 32,
       "dataSourceId": 1,
       "size": 51,
       "isDirectory": false,

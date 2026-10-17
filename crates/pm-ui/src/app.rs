@@ -163,6 +163,9 @@ pub struct PostmortemApp {
     report_wizard: Option<crate::report_ui::ReportWizard>,
     /// Tools › Geolocation.
     geo: Option<crate::geo_ui::GeoWindow>,
+    /// Tools › Communications: choices loading, then the window.
+    cvt_choices: Option<Task<Result<crate::cvt_ui::Choices, String>>>,
+    cvt: Option<crate::cvt_ui::CvtWindow>,
     /// A data source awaiting removal confirmation `(id, name)`.
     confirm_remove: Option<(i64, String)>,
     removing: Option<Task<Result<(), String>>>,
@@ -244,6 +247,8 @@ impl PostmortemApp {
             report_choices: None,
             report_wizard: None,
             geo: None,
+            cvt_choices: None,
+            cvt: None,
             confirm_remove: None,
             removing: None,
             mime_types: crate::task::Cached::default(),
@@ -950,6 +955,13 @@ impl PostmortemApp {
                     ui.close();
                 }
                 if ui
+                    .add_enabled(self.has_case(), egui::Button::new("📞 Communications"))
+                    .clicked()
+                {
+                    self.open_communications(ui.ctx());
+                    ui.close();
+                }
+                if ui
                     .add_enabled(self.has_case(), egui::Button::new("🌍 Geolocation"))
                     .clicked()
                 {
@@ -1069,6 +1081,13 @@ impl PostmortemApp {
                 && let Some(c) = self.viewer.content().cloned()
             {
                 self.open_popout(c);
+            }
+            if ui
+                .add_enabled(self.has_case(), egui::Button::new("📞 Communications"))
+                .on_hover_text("Browse accounts and their messages, calls and contacts (Tools › Communications)")
+                .clicked()
+            {
+                self.open_communications(ui.ctx());
             }
             if ui
                 .add_enabled(self.has_case(), egui::Button::new("🌍 Geolocation"))
@@ -1800,6 +1819,37 @@ impl PostmortemApp {
         }
         if remove.is_some() {
             self.case_summary.refresh();
+        }
+    }
+
+    /// Tools › Communications: loads the filter choices in the background.
+    fn open_communications(&mut self, ctx: &egui::Context) {
+        if let Some(case) = self.analysis.lock().case().cloned() {
+            self.cvt_choices = Some(Task::spawn(ctx, move || {
+                crate::cvt_ui::Choices::load(&case)
+            }));
+        }
+    }
+
+    fn communications(&mut self, ctx: &egui::Context) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            self.cvt = None;
+            self.cvt_choices = None;
+            return;
+        };
+        if let Some(t) = &mut self.cvt_choices
+            && let Some(r) = t.poll()
+        {
+            match r {
+                Ok(c) => self.cvt = Some(crate::cvt_ui::CvtWindow::new(c.clone())),
+                Err(e) => self.errors.push(e.clone()),
+            }
+            self.cvt_choices = None;
+        }
+        if let Some(w) = &mut self.cvt
+            && !w.ui(ctx, &case, &self.prefs)
+        {
+            self.cvt = None;
         }
     }
 
@@ -3125,6 +3175,7 @@ impl PostmortemApp {
         }
         self.report_wizard(&ctx);
         self.geolocation(&ctx);
+        self.communications(&ctx);
         self.persisted.table = self.table.clone();
     }
 }

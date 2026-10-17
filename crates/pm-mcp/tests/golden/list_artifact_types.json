@@ -12,7 +12,7 @@
       "artifactType": "TSK_KEYWORD_HIT",
       "displayName": "Keyword Hits",
       "category": "analysis_result",
-      "count": 4,
+      "count": 12,
       "queryWith": "query_analysis_results"
     },
     {
@@ -32,6 +32,13 @@
     {
       "artifactType": "TSK_GPS_BOOKMARK",
       "displayName": "GPS Bookmarks",
+      "category": "data_artifact",
+      "count": 1,
+      "queryWith": "query_data_artifacts"
+    },
+    {
+      "artifactType": "TSK_METADATA",
+      "displayName": "Metadata",
       "category": "data_artifact",
       "count": 1,
       "queryWith": "query_data_artifacts"

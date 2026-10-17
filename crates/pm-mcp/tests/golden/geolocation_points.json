@@ -2,8 +2,8 @@
   "caseId": "MCP demo",
   "result": [
     {
-      "ref": "artifact:9",
-      "objectId": 9,
+      "ref": "artifact:18",
+      "objectId": 18,
       "sourceFileId": 26,
       "sourceRef": "file:26",
       "artifactType": "TSK_GPS_BOOKMARK",

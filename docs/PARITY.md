@@ -148,7 +148,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Hosts | TSK `HostManager` | Done | Schema v2 + Manage Hosts UI. |
 | Persons | TSK `PersonManager` | Done | Schema v2 + person UI on host nodes. |
 | OS accounts, realms, instances, attributes | TSK `OsAccountManager` | Done | Schema v2 with TSK merge rules; SAM/ProfileList feed it. |
-| Communication accounts + account_relationships | TSK `CommunicationsManager` | Missing | Schema absent. Blocks Communications (§19). email-mobile can only emit TSK_ACCOUNT artifacts. |
+| Communication accounts + account_relationships | TSK `CommunicationsManager` | Done | Schema v2; written by the Email Parser via post_communication. |
 | Timeline events table (event types, 3 description levels, tagged/hash_hit flags) | TSK `TimelineManager`, `tsk_events` | Partial | Schema v2 `events` + API; the Timeline UI still builds events in memory (WP-15). |
 | Ingest job records | TSK `ingest_jobs` | Done | `start/finish_ingest_job`. |
 | Reports table | TSK `reports` | Partial | Table only. |
@@ -395,13 +395,13 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| CVT window (Browse/Visualize tabs) | `CVTTopComponent` | Missing | — |
-| Filters (account types, devices, date range, most recent N, limit) | `FiltersPanel` | Missing | — |
-| Accounts browser table | `AccountsBrowser` | Missing | — |
-| Relationship graph (pin/unpin/reset, lock, layouts, zoom, snapshot report) | `VisualizationPanel`, `CommunicationsGraph`, `PinAccountsAction`, `communications/snapshot` | Missing | — |
-| Relationship browser: Summary, Messages (threads), Call Logs, Contacts, Media | `relationships/*` | Missing | — |
+| CVT window (Browse/Visualize tabs) | `CVTTopComponent` | Done | Tools › Communications. |
+| Filters (account types, devices, date range, most recent N, limit) | `FiltersPanel` | Partial | Devices, account types, relationship kinds, date range; "most recent N" and result limit missing. |
+| Accounts browser table | `AccountsBrowser` | Done | Account, device, type, item count; sortable. |
+| Relationship graph (pin/unpin/reset, lock, layouts, zoom, snapshot report) | `VisualizationPanel`, `CommunicationsGraph`, `PinAccountsAction`, `communications/snapshot` | Partial | Radial graph of the selected account and its correspondents (click to follow); pin/lock/layouts/snapshot missing. |
+| Relationship browser: Summary, Messages (threads), Call Logs, Contacts, Media | `relationships/*` | Partial | Messages, Call Logs, Contacts with details; Summary and Media tabs and message threads missing. |
 | Persona integration in CVT | `CVTPersonaCache`, `PersonaPanel` | Missing | — |
-| Data dependency: accounts/relationships tables | TSK `CommunicationsManager` | Missing | Schema blocker. |
+| Data dependency: accounts/relationships tables | TSK `CommunicationsManager` | Done | — |
 
 ## 20. Geolocation (`A/geolocation`)
 

@@ -93,7 +93,7 @@
                   "blockSize": 512,
                   "blockCount": 81920,
                   "rootInum": 2,
-                  "rootRef": "file:75",
+                  "rootRef": "file:77",
                   "evidence": {
                     "label": "USB STICK",
                     "serial": "1234-5678"

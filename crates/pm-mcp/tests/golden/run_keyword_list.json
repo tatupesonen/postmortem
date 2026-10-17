@@ -5,13 +5,14 @@
     "keywords": [
       {
         "searchType": "regex",
-        "objectsWithHits": 4,
+        "objectsWithHits": 6,
         "countCapped": false,
         "firstRefs": [
           "file:9",
           "file:29",
-          "file:95",
-          "file:104"
+          "file:30",
+          "file:31",
+          "file:97"
         ],
         "error": null,
         "keyword": "(\\{?)[a-zA-Z0-9%+_\\-]+(\\.[a-zA-Z0-9%+_\\-]+)*(\\}?)\\@([a-zA-Z0-9]([a-zA-Z0-9\\-]*[a-zA-Z0-9])?\\.)+[a-zA-Z]{2,4}"

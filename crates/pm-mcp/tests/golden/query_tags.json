@@ -5,8 +5,8 @@
       "tagId": 1,
       "tagName": "Notable Item",
       "itemType": "file",
-      "objectId": 30,
-      "ref": "file:30",
+      "objectId": 32,
+      "ref": "file:32",
       "examiner": "examiner1",
       "createdTime": "<redacted>",
       "evidence": {
@@ -18,8 +18,8 @@
       "tagId": 2,
       "tagName": "Follow Up",
       "itemType": "file",
-      "objectId": 104,
-      "ref": "file:104",
+      "objectId": 106,
+      "ref": "file:106",
       "examiner": "examiner1",
       "createdTime": "<redacted>",
       "evidence": {

@@ -8,8 +8,8 @@
     "created": "<redacted>",
     "readOnly": true,
     "dataSources": 2,
-    "totalFiles": 105,
-    "totalArtifacts": 11,
+    "totalFiles": 107,
+    "totalArtifacts": 20,
     "timeZones": "<redacted>",
     "timeSpan": {
       "start": "2020-01-02T10:00:00Z",
@@ -33,8 +33,8 @@
     ],
     "keywordIndex": {
       "available": true,
-      "objects": 92,
-      "chunks": 75
+      "objects": 95,
+      "chunks": 78
     },
     "notes": "Times are UTC. Data-source time zones only matter for FAT and other local-time file systems."
   }
