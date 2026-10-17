@@ -208,13 +208,15 @@ pub(crate) fn open_depth(path: &Path, depth: usize) -> Result<Image, ImageError>
 
 /// Opens an image from an explicit, ordered list of segments (as a case
 /// records them), detecting the format from the first one: EWF segments
-/// are decoded, anything else is concatenated as a raw split image.
+/// are decoded, raw segments concatenated, and virtual disks (VHD, VHDX,
+/// VMDK, QCOW2) opened from their first file.
 pub fn open_segments(paths: &[PathBuf]) -> Result<Image, ImageError> {
     let first = paths.first().ok_or(ImageError::NoPaths)?;
     match sniff(&open_file(first)?) {
         ImageFormat::Raw => open_paths(paths),
         ImageFormat::Ewf => open_ewf(paths),
-        format => Err(ImageError::Unsupported { format }),
+        // Virtual disks find their own extents and parents.
+        _ => open(first),
     }
 }
 
