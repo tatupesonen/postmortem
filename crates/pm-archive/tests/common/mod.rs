@@ -1,5 +1,5 @@
 //! Shared helpers: a sink that collects every member.
-#![allow(dead_code, reason = "shared by several test crates")]
+#![allow(dead_code, unreachable_pub, reason = "shared by several test crates")]
 
 use pm_archive::{ArchiveError, Entry, Format, MemberEnd, Options, Sink, Summary};
 use pm_core::io::MemSource;

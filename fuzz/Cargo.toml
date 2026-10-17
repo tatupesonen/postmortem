@@ -20,6 +20,7 @@ pm-evtlog = { path = "../crates/pm-evtlog" }
 pm-registry = { path = "../crates/pm-registry" }
 pm-lnk = { path = "../crates/pm-lnk" }
 pm-prefetch = { path = "../crates/pm-prefetch" }
+pm-archive = { path = "../crates/pm-archive" }
 
 [workspace]
 members = ["."]
@@ -62,6 +63,11 @@ bench = false
 [[bin]]
 name = "evtlog_parse"
 path = "fuzz_targets/evtlog_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
 name = "registry_hive"
 path = "fuzz_targets/registry_hive.rs"
 test = false
@@ -85,6 +91,20 @@ bench = false
 [[bin]]
 name = "prefetch_parse"
 path = "fuzz_targets/prefetch_parse.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "archive_extract"
+path = "fuzz_targets/archive_extract.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "archive_detect"
+path = "fuzz_targets/archive_detect.rs"
 test = false
 doc = false
 bench = false

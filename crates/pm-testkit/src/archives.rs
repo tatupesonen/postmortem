@@ -540,7 +540,65 @@ pub fn iso(files: &[(&str, &[u8])], joliet: bool, rock_ridge: bool) -> Vec<u8> {
     while img.len() > 64 * 1024 && img.ends_with(&[0u8; 2048]) {
         img.truncate(img.len() - 2048);
     }
+    // `fstool` leaves the recording dates of directory records zero; give
+    // every record (primary and Joliet trees) the fixture time.
+    let date = iso_record_date(MTIME);
+    for vd in 16..32usize {
+        let at = vd * 2048;
+        match img.get(at) {
+            Some(1 | 2) => {
+                let root = img[at + 156..at + 156 + 34].to_vec();
+                iso_date_tree(&mut img, &root, &date, 0);
+            }
+            _ => break,
+        }
+    }
     img
+}
+
+/// ISO 9660 7-byte recording date (UTC) of Unix seconds.
+fn iso_record_date(t: i64) -> [u8; 7] {
+    let ts = jiff::Timestamp::from_second(t).unwrap();
+    let dt = ts.to_zoned(jiff::tz::TimeZone::UTC).datetime();
+    [
+        (dt.year() - 1900) as u8,
+        dt.month() as u8,
+        dt.day() as u8,
+        dt.hour() as u8,
+        dt.minute() as u8,
+        dt.second() as u8,
+        0,
+    ]
+}
+
+/// Sets the date of every record below the directory record `dir`.
+fn iso_date_tree(img: &mut [u8], dir: &[u8], date: &[u8; 7], depth: u32) {
+    if depth > 16 {
+        return;
+    }
+    let lba = u32::from_le_bytes(dir[2..6].try_into().unwrap()) as usize;
+    let len = u32::from_le_bytes(dir[10..14].try_into().unwrap()) as usize;
+    let (start, end) = (lba * 2048, (lba * 2048 + len).min(img.len()));
+    let mut pos = start;
+    let mut subdirs = Vec::new();
+    while pos < end {
+        let rlen = usize::from(img[pos]);
+        if rlen == 0 {
+            // Records do not cross sectors: continue in the next one.
+            pos = (pos / 2048 + 1) * 2048;
+            continue;
+        }
+        img[pos + 18..pos + 25].copy_from_slice(date);
+        let name_len = usize::from(img[pos + 32]);
+        let dot = name_len == 1 && img[pos + 33] <= 1;
+        if img[pos + 25] & 2 != 0 && !dot {
+            subdirs.push(img[pos..pos + rlen].to_vec());
+        }
+        pos += rlen;
+    }
+    for s in subdirs {
+        iso_date_tree(img, &s, date, depth + 1);
+    }
 }
 
 // ------------------------------------------------------------- images ---

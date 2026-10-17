@@ -44,7 +44,10 @@ fn zip_methods_names_and_times() {
         assert_eq!(m.end, MemberEnd::Complete, "{p}");
         assert_eq!(m.entry.size, Some(big_text().len() as u64));
     }
-    assert_eq!(member(&ms, "docs/b.txt").entry.modified, Some(1_600_000_000));
+    assert_eq!(
+        member(&ms, "docs/b.txt").entry.modified,
+        Some(1_600_000_000)
+    );
     assert_eq!(member(&ms, "docs/a.txt").entry.modified, Some(ak::MTIME));
     let utf = member(&ms, "päivä.txt");
     assert_eq!(utf.entry.raw_path, None);
@@ -53,7 +56,10 @@ fn zip_methods_names_and_times() {
 #[test]
 fn zip_cp437_names_keep_raw_bytes() {
     let mut b = ZipBuilder::new();
-    b.add(ZipEntry::new(&[b'M', 0x84, b'r', b'z', b'.', b't', b'x', b't'][..], TEXT));
+    b.add(ZipEntry::new(
+        &[b'M', 0x84, b'r', b'z', b'.', b't', b'x', b't'][..],
+        TEXT,
+    ));
     let (_, ms) = run(Format::Zip, &b.build());
     assert_eq!(ms[0].entry.path, "März.txt");
     assert_eq!(ms[0].entry.raw_path.as_deref(), Some(&b"M\x84rz.txt"[..]));
@@ -64,7 +70,11 @@ fn zip_encryption_is_reported_and_zipcrypto_decrypted_with_password() {
     let mut b = ZipBuilder::new();
     b.add(ZipEntry::new("plain.txt", TEXT))
         .add(ZipEntry::new("secret.txt", big_text()).password("pw"))
-        .add(ZipEntry::new("stored-secret.txt", TEXT).method(Method::Stored).password("pw"))
+        .add(
+            ZipEntry::new("stored-secret.txt", TEXT)
+                .method(Method::Stored)
+                .password("pw"),
+        )
         .add(ZipEntry::new("aes.txt", TEXT).fake_aes());
     let z = b.build();
     let (s, ms) = run(Format::Zip, &z);
@@ -81,7 +91,11 @@ fn zip_encryption_is_reported_and_zipcrypto_decrypted_with_password() {
         ..Options::default()
     };
     let (r, ms) = run_with(Format::Zip, &z, &opts);
-    assert_eq!(r.unwrap().encrypted, 1, "only the AES entry stays encrypted");
+    assert_eq!(
+        r.unwrap().encrypted,
+        1,
+        "only the AES entry stays encrypted"
+    );
     assert_eq!(member(&ms, "secret.txt").data, big_text());
     assert_eq!(member(&ms, "secret.txt").end, MemberEnd::Complete);
     assert_eq!(member(&ms, "stored-secret.txt").data, TEXT);
@@ -98,7 +112,11 @@ fn zip_encryption_is_reported_and_zipcrypto_decrypted_with_password() {
 fn zip_without_central_directory_and_with_descriptors() {
     let mut b = ZipBuilder::new();
     b.add(ZipEntry::new("a.txt", big_text()).descriptor())
-        .add(ZipEntry::new("b.txt", TEXT).method(Method::Stored).descriptor())
+        .add(
+            ZipEntry::new("b.txt", TEXT)
+                .method(Method::Stored)
+                .descriptor(),
+        )
         .add(ZipEntry::new("c.txt", TEXT));
     let full = b.build();
     let (_, ms) = run(Format::Zip, &full);
@@ -204,7 +222,10 @@ fn overlapping_entries_are_caught_by_the_container_meter() {
     };
     let (r, ms) = run_with(Format::Zip, &z, &opts);
     assert!(
-        matches!(r, Err(ArchiveError::Bomb(BombReason::ContainerRatio { .. }))),
+        matches!(
+            r,
+            Err(ArchiveError::Bomb(BombReason::ContainerRatio { .. }))
+        ),
         "{r:?}"
     );
     assert!(ms.len() < 20);
@@ -221,7 +242,10 @@ fn member_cap() {
         ..Options::default()
     };
     let (r, _) = run_with(Format::Zip, &b.build(), &opts);
-    assert!(matches!(r, Err(ArchiveError::Bomb(BombReason::TooManyMembers { limit: 10 }))));
+    assert!(matches!(
+        r,
+        Err(ArchiveError::Bomb(BombReason::TooManyMembers { limit: 10 }))
+    ));
 }
 
 #[test]
@@ -500,12 +524,22 @@ fn legacy_office_pictures() {
     let (_, ms) = run(Format::Doc, &doc);
     assert_eq!(
         paths(&ms),
-        ["image_0.png", "image_1.jpg", "image_2.emf", "image_3.wmf", "image_4.dib"]
+        [
+            "image_0.png",
+            "image_1.jpg",
+            "image_2.emf",
+            "image_3.wmf",
+            "image_4.dib"
+        ]
     );
     assert_eq!(ms[0].data, png);
     assert_eq!(ms[1].data, jpg);
     assert_eq!(ms[2].data, emf, "EMF is inflated");
-    assert_eq!(&ms[3].data[..4], &[0xD7, 0xCD, 0xC6, 0x9A], "placeable header");
+    assert_eq!(
+        &ms[3].data[..4],
+        &[0xD7, 0xCD, 0xC6, 0x9A],
+        "placeable header"
+    );
     assert_eq!(&ms[3].data[22..], &wmf[..]);
     assert_eq!(&ms[4].data[..2], b"BM");
 
@@ -526,7 +560,10 @@ fn legacy_office_pictures() {
     assert_eq!(detect(&ppt), Some(Format::Ppt));
     let (_, ms) = run(Format::Ppt, &ppt);
     // Autopsy keeps JPEG, PNG, WMF, EMF and PICT from presentations.
-    assert_eq!(paths(&ms), ["image_0.png", "image_1.jpg", "image_2.emf", "image_3.wmf"]);
+    assert_eq!(
+        paths(&ms),
+        ["image_0.png", "image_1.jpg", "image_2.emf", "image_3.wmf"]
+    );
 }
 
 // ------------------------------------------------------------------ PDF
@@ -582,5 +619,8 @@ fn mime_detection_is_content_based() {
     // A zip named .txt is still a zip (Autopsy's runTestExtension).
     assert_eq!(detect(&ak::zip(&[("file.txt", b"x")])), Some(Format::Zip));
     assert_eq!(detect(b"just text"), None);
-    assert_eq!(detect(&pm_lnk::builder::compound_file(&[("Other", vec![1; 10])])), None);
+    assert_eq!(
+        detect(&pm_lnk::builder::compound_file(&[("Other", vec![1; 10])])),
+        None
+    );
 }
