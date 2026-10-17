@@ -16,6 +16,14 @@ uuid.workspace = true
 tempfile.workspace = true
 fatfs.workspace = true
 fstool.workspace = true
+flate2.workspace = true
+bzip2.workspace = true
+lzma-rust2 = { workspace = true, features = ["encoder"] }
+ruzstd.workspace = true
+sevenz-rust2 = { workspace = true, features = ["compress"] }
+rars.workspace = true
+image.workspace = true
+pm-lnk = { workspace = true, features = ["builder"] }
 
 [lints]
 workspace = true
