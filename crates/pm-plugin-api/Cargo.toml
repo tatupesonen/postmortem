@@ -1,0 +1,15 @@
+[package]
+name = "pm-plugin-api"
+description = "The postmortem module API shared by built-in parsers and WebAssembly plugins: file and data-source ingest traits, the host interface and the value types"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+
+[lints]
+workspace = true

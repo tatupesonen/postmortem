@@ -2790,7 +2790,8 @@ impl PostmortemApp {
         }
         self.resolver_key = key;
         let Some(case) = case else {
-            self.viewer.set_hash_resolver(None);
+            self.prefs.case = None;
+            self.viewer.refresh_hashes();
             return;
         };
         let fss: Vec<(Arc<dyn pm_fs::FileSystem>, PathBuf, u64)> = self
@@ -2811,7 +2812,7 @@ impl PostmortemApp {
                     .map(move |f| (Arc::clone(&f.fs), path.clone(), f.offset))
             })
             .collect();
-        let resolver = move |c: &Content| -> Option<crate::viewers::FileHashes> {
+        let resolver = move |c: &Content| -> Option<crate::viewers::CaseFileInfo> {
             let db = case.db();
             let f = match &c.origin {
                 // Re-read the row: hashes may have been computed since it
@@ -2836,20 +2837,22 @@ impl PostmortemApp {
                 }
             };
             let hex = |v: Option<Vec<u8>>| v.map(|b| pm_core::decode::to_hex(&b));
-            Some(crate::viewers::FileHashes {
-                md5: hex(f.md5),
-                sha1: hex(f.sha1),
-                sha256: hex(f.sha256),
+            Some(crate::viewers::CaseFileInfo {
+                case: Arc::clone(&case),
+                md5: hex(f.md5.clone()),
+                sha1: hex(f.sha1.clone()),
+                sha256: hex(f.sha256.clone()),
                 known: match f.known {
                     pm_casedb::Known::Known => "Known".into(),
                     pm_casedb::Known::Notable => "Notable".into(),
                     pm_casedb::Known::Unknown => "Unknown".into(),
                 },
-                mime: f.mime,
+                mime: f.mime.clone(),
+                record: Arc::new(f),
             })
         };
-        self.viewer
-            .set_hash_resolver(Some(crate::viewers::HashResolver(Arc::new(resolver))));
+        self.prefs.case = Some(crate::viewers::CaseLookup(Arc::new(resolver)));
+        self.viewer.refresh_hashes();
     }
 
     /// Tools › Options.

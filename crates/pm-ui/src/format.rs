@@ -7,12 +7,16 @@ use jiff::tz::TimeZone;
 #[derive(Debug, Clone)]
 pub(crate) struct DisplayPrefs {
     pub timezone: TimeZone,
+    /// Finds shown files in the open case (hashes, MIME type, extracted
+    /// text) for every viewer.
+    pub case: Option<crate::viewers::CaseLookup>,
 }
 
 impl Default for DisplayPrefs {
     fn default() -> Self {
         Self {
             timezone: TimeZone::UTC,
+            case: None,
         }
     }
 }

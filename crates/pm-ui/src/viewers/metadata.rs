@@ -27,7 +27,7 @@ pub(super) fn ui(
     c: &Content,
     fs: Option<&Arc<dyn FileSystem>>,
     prefs: &DisplayPrefs,
-    hashes: Option<&super::FileHashes>,
+    hashes: Option<&super::CaseFileInfo>,
 ) {
     // Live metadata from the file system has what the case database does
     // not keep ($FILE_NAME times, link count); case rows fall back to the

@@ -92,10 +92,12 @@ pub(crate) fn sniff(head: &[u8]) -> Sniffed {
     }
 }
 
-/// State of one viewer panel (main window or a pop-out).
-/// Hashes and known status of the shown file, from the case database.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
-pub(crate) struct FileHashes {
+/// The shown file as the case database has it now (hashes, known status
+/// and MIME type are filled in by analysis after the file was listed).
+#[derive(Debug, Clone)]
+pub(crate) struct CaseFileInfo {
+    pub(crate) case: Arc<pm_case::Case>,
+    pub(crate) record: Arc<pm_casedb::FileRecord>,
     pub(crate) md5: Option<String>,
     pub(crate) sha1: Option<String>,
     pub(crate) sha256: Option<String>,
@@ -104,15 +106,17 @@ pub(crate) struct FileHashes {
     pub(crate) mime: Option<String>,
 }
 
-type ResolveFn = dyn Fn(&Content) -> Option<FileHashes> + Send + Sync;
+type LookupFn = dyn Fn(&Content) -> Option<CaseFileInfo> + Send + Sync;
 
-/// Looks up a shown file's hashes in the case (`None`: not in the case).
+/// Finds a shown file in the open case (`None`: not in the case), for
+/// every viewer panel (main window, pop-outs, gallery, Discovery,
+/// Timeline). It runs off the UI thread.
 #[derive(Clone)]
-pub(crate) struct HashResolver(pub(crate) Arc<ResolveFn>);
+pub(crate) struct CaseLookup(pub(crate) Arc<LookupFn>);
 
-impl std::fmt::Debug for HashResolver {
+impl std::fmt::Debug for CaseLookup {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("HashResolver")
+        f.write_str("CaseLookup")
     }
 }
 
@@ -133,10 +137,9 @@ pub(crate) struct ViewerPanel {
     /// The keyword search whose hits the Extracted Text viewer marks.
     query: Option<pm_search::TextQuery>,
     image: ImageView,
-    hash_resolver: Option<HashResolver>,
     /// Loaded in the background (the case database is never read on the
     /// UI thread); `None` until requested.
-    hashes: Option<crate::task::Task<Option<FileHashes>>>,
+    info: Option<crate::task::Task<Option<CaseFileInfo>>>,
     /// The shown file's hashes must be (re)loaded.
     hashes_stale: bool,
 }
@@ -156,8 +159,7 @@ impl Default for ViewerPanel {
             extracted: ExtractedView::default(),
             query: None,
             image: ImageView::default(),
-            hash_resolver: None,
-            hashes: None,
+            info: None,
             hashes_stale: false,
         }
     }
@@ -169,23 +171,20 @@ impl ViewerPanel {
     }
 
     /// Shows `content` (no-op if already shown).
-    /// Sets how hashes of shown files are found (the open case).
-    pub(crate) fn set_hash_resolver(&mut self, resolver: Option<HashResolver>) {
-        self.hash_resolver = resolver;
-        self.refresh_hashes();
-    }
-
     /// Re-reads the shown file's hashes (e.g. after analysis finished).
     pub(crate) fn refresh_hashes(&mut self) {
         self.hashes_stale = true;
     }
 
-    /// Starts loading the hashes when they are stale.
-    fn load_hashes(&mut self, ctx: &egui::Context) {
+    /// Starts looking the shown file up in the case when stale.
+    fn load_info(&mut self, ctx: &egui::Context, prefs: &DisplayPrefs) {
+        if let Some(t) = &mut self.info {
+            t.poll();
+        }
         if !std::mem::take(&mut self.hashes_stale) {
             return;
         }
-        self.hashes = match (&self.hash_resolver, &self.content) {
+        self.info = match (&prefs.case, &self.content) {
             (Some(r), Some(c)) => {
                 let (r, c) = (r.clone(), c.clone());
                 Some(crate::task::Task::spawn(ctx, move || (r.0)(&c)))
@@ -240,13 +239,20 @@ impl ViewerPanel {
             .unwrap_or_else(|| self.preferred());
     }
 
+    /// Whether the case lookup found the shown file.
+    fn info_ready(&self) -> bool {
+        self.info
+            .as_ref()
+            .is_some_and(|t| t.peek().is_some_and(Option::is_some))
+    }
+
     fn supports(&self, tab: Tab) -> bool {
         match tab {
             Tab::Metadata => self.content.is_some(),
             Tab::Extracted => self
                 .content
                 .as_ref()
-                .is_some_and(|c| c.case_file().is_some() && !c.row.is_dir()),
+                .is_some_and(|c| !c.row.is_dir() && (c.case_file().is_some() || self.info_ready())),
             Tab::Application => self.kind == Sniffed::Picture,
             Tab::Hex | Tab::Strings | Tab::Text => {
                 matches!(self.source, Some(Ok(_))) && self.kind != Sniffed::Empty
@@ -269,7 +275,7 @@ impl ViewerPanel {
     }
 
     pub(crate) fn ui(&mut self, ui: &mut egui::Ui, prefs: &DisplayPrefs) {
-        self.load_hashes(ui.ctx());
+        self.load_info(ui.ctx(), prefs);
         ui.horizontal(|ui| {
             for tab in Tab::ALL {
                 let enabled = self.supports(tab);
@@ -302,21 +308,33 @@ impl ViewerPanel {
         let src = self.source.as_ref().and_then(|s| s.as_ref().ok()).cloned();
         match (self.tab, src) {
             (Tab::Metadata, _) => {
-                let hashes = self
-                    .hashes
-                    .as_mut()
-                    .and_then(crate::task::Task::poll)
+                let info = self
+                    .info
+                    .as_ref()
+                    .and_then(|t| t.peek())
                     .and_then(Option::as_ref);
-                metadata::ui(ui, &content, self.fs.as_ref(), prefs, hashes);
+                metadata::ui(ui, &content, self.fs.as_ref(), prefs, info);
             }
             (Tab::Hex, Some(src)) => self.hex.ui(ui, &src),
             (Tab::Strings, Some(src)) => self.strings.ui(ui, &src),
-            (Tab::Extracted, _) => match content.case_file() {
-                Some((case, file)) => self.extracted.ui(ui, case, file, self.query.as_ref()),
-                None => {
-                    ui.weak("No text available for this file.");
+            (Tab::Extracted, _) => {
+                let found = self
+                    .info
+                    .as_ref()
+                    .and_then(|t| t.peek())
+                    .and_then(Option::as_ref)
+                    .map(|i| (Arc::clone(&i.case), Arc::clone(&i.record)));
+                let file = content
+                    .case_file()
+                    .map(|(c, f)| (Arc::clone(c), Arc::new(f.clone())))
+                    .or(found);
+                match file {
+                    Some((case, file)) => self.extracted.ui(ui, &case, &file, self.query.as_ref()),
+                    None => {
+                        ui.weak("No text available for this file.");
+                    }
                 }
-            },
+            }
             (Tab::Text, Some(src)) => self.text.ui(ui, &src),
             (Tab::Application, Some(src)) => self.image.ui(ui, &src, &content.row.path),
             _ => {

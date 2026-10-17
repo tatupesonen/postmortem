@@ -57,6 +57,14 @@ impl<T: Send + 'static> Task<T> {
         }
     }
 
+    /// The value if [`Self::poll`] has already received it.
+    pub(crate) fn peek(&self) -> Option<&T> {
+        match self {
+            Self::Ready(v) => Some(v),
+            Self::Pending(_) => None,
+        }
+    }
+
     #[cfg(test)]
     pub(crate) fn is_ready(&mut self) -> bool {
         self.poll().is_some()
