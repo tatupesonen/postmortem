@@ -575,8 +575,8 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Third-party ingest/report/DSP/content-viewer plugins (Jython, NBM) | `A/python/*`, `pythonExamples/*` | Missing | ADR-013 replaces them with WebAssembly. `pm-plugin-api`/`pm-plugin-wasm` do not exist yet (M12). |
-| Tools › Python Plugins folder, Plugins manager | `OpenPythonModulesFolderAction` | Missing | WASM equivalent. |
+| Third-party ingest/report/DSP/content-viewer plugins (Jython, NBM) | `A/python/*`, `pythonExamples/*` | Partial | ADR-022: `pm-plugin-api` + `pm-plugin-wasm` + `pm-plugin-sdk`; file and data-source ingest plugins work end to end (example: Autopsy's Big and Round File Finder). Report, DSP and content-viewer plugin kinds are not yet in the WIT world. |
+| Tools › Python Plugins folder, Plugins manager | `OpenPythonModulesFolderAction` | Done | Tools › Plugins: folder, open, reload, loaded plugins and load errors. |
 
 ## 33. Test & quality infrastructure parity
 

@@ -152,6 +152,8 @@ pub struct PostmortemApp {
     run_ingest: Option<crate::add_source::RunIngestDialog>,
     hosts_ui: crate::hosts_ui::HostsUi,
     options: Option<crate::options_ui::OptionsWindow>,
+    /// Tools › Plugins is open.
+    plugins_open: bool,
     /// A data source awaiting removal confirmation `(id, name)`.
     confirm_remove: Option<(i64, String)>,
     removing: Option<Task<Result<(), String>>>,
@@ -171,6 +173,7 @@ impl PostmortemApp {
     /// Constructs the app without eframe (used by UI tests).
     pub fn with_state(ctx: &egui::Context, persisted: Persisted, open: Vec<PathBuf>) -> Self {
         ctx.set_theme(persisted.theme);
+        crate::plugins::reload(ctx);
         let mut app = Self {
             prefs: DisplayPrefs::default(),
             table: persisted.table.clone(),
@@ -227,6 +230,7 @@ impl PostmortemApp {
             run_ingest: None,
             hosts_ui: crate::hosts_ui::HostsUi::default(),
             options: None,
+            plugins_open: false,
             confirm_remove: None,
             removing: None,
             mime_types: crate::task::Cached::default(),
@@ -925,6 +929,10 @@ impl PostmortemApp {
                     ui.close();
                 }
                 ui.separator();
+                if ui.button("🧩 Plugins").clicked() {
+                    self.plugins_open = true;
+                    ui.close();
+                }
                 if ui.button("⚙ Options").clicked() {
                     self.open_options();
                     ui.close();
@@ -2965,6 +2973,9 @@ impl PostmortemApp {
         self.show_progress(&ctx);
         self.dialogs(&ctx);
         self.show_options(&ctx);
+        if self.plugins_open {
+            self.plugins_open = crate::plugins::window(&ctx);
+        }
         self.persisted.table = self.table.clone();
     }
 }

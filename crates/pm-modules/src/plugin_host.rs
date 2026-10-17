@@ -474,3 +474,72 @@ impl Host for JobHost {
         Arc::new(self.clone())
     }
 }
+
+/// A WebAssembly plugin loaded from the plugins folder.
+#[derive(Clone)]
+pub struct LoadedPlugin {
+    pub info: api::PluginInfo,
+    pub dir: std::path::PathBuf,
+    pub limits: pm_plugin_wasm::Limits,
+    pub module: Arc<dyn ModuleFactory>,
+}
+
+impl std::fmt::Debug for LoadedPlugin {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("LoadedPlugin")
+            .field("id", &self.info.id)
+            .field("dir", &self.dir)
+            .finish_non_exhaustive()
+    }
+}
+
+/// The plugins of a plugins folder: those that loaded, and why the others
+/// did not.
+#[derive(Debug, Clone, Default)]
+pub struct PluginSet {
+    pub plugins: Vec<LoadedPlugin>,
+    pub errors: Vec<pm_plugin_wasm::LoadError>,
+}
+
+impl PluginSet {
+    /// Loads every plugin folder below `dir` (compiling each component;
+    /// run it off the UI thread). Plugins whose id collides with a
+    /// built-in module or an earlier plugin are refused.
+    pub fn load(dir: &std::path::Path) -> Self {
+        let mut taken: HashSet<String> = crate::core_modules()
+            .iter()
+            .map(|m| m.info().id.to_owned())
+            .collect();
+        let mut set = Self::default();
+        for r in pm_plugin_wasm::load_dir(dir) {
+            match r {
+                Ok(p) => {
+                    let info = p.info();
+                    if !taken.insert(info.id.clone()) {
+                        set.errors.push(pm_plugin_wasm::LoadError {
+                            path: p.dir().to_path_buf(),
+                            reason: format!("another module already has the id {:?}", info.id),
+                        });
+                        continue;
+                    }
+                    set.plugins.push(LoadedPlugin {
+                        dir: p.dir().to_path_buf(),
+                        limits: p.limits(),
+                        module: Arc::new(PluginModule::new(p)),
+                        info,
+                    });
+                }
+                Err(e) => set.errors.push(e),
+            }
+        }
+        set
+    }
+
+    /// Ingest modules: the built-ins, then the plugins (Autopsy runs
+    /// third-party modules after its own).
+    pub fn modules(&self) -> Vec<Arc<dyn ModuleFactory>> {
+        let mut m = crate::core_modules();
+        m.extend(self.plugins.iter().map(|p| Arc::clone(&p.module)));
+        m
+    }
+}

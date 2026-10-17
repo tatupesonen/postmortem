@@ -21,6 +21,7 @@ mod index;
 mod keyword_search_ui;
 mod model;
 mod options_ui;
+mod plugins;
 mod results;
 mod sortable;
 mod summary;

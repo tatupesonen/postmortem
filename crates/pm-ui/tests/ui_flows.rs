@@ -1169,3 +1169,17 @@ fn keyword_search_from_the_toolbar() {
     click(&mut h, "Email Addresses (");
     shot(&mut h, "keyword_hits_tree");
 }
+
+/// Tools › Plugins shows the plugins folder and what is installed.
+#[test]
+fn plugins_window_lists_the_plugins_folder() {
+    let mut h = harness(Vec::new());
+    click(&mut h, "Tools");
+    click(&mut h, "Plugins");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Plugins folder:").is_some()
+    });
+    h.get_by_label("Open Plugins Folder");
+    h.get_by_label("Reload");
+    shot(&mut h, "plugins_window");
+}

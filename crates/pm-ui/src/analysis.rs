@@ -145,7 +145,7 @@ impl Analysis {
         std::thread::Builder::new()
             .name("pm-ingest".into())
             .spawn(move || {
-                let modules = pm_modules::core_modules();
+                let modules = crate::plugins::modules();
                 let stage = match pm_ingest::run_job(
                     &case,
                     ds_id,
@@ -191,7 +191,7 @@ fn run(
         Err(e) => return Stage::Failed(e.to_string()),
     };
     *job.stage.lock() = Stage::Analysing;
-    let modules = pm_modules::core_modules();
+    let modules = crate::plugins::modules();
     match pm_ingest::run_job(case, loaded.ds_id, settings, &modules, &job.ingest, inbox) {
         Ok(s) => Stage::Done {
             files: s.files,

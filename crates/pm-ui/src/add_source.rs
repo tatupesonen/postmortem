@@ -23,6 +23,9 @@ pub struct IngestPrefs {
     pub ignore_unallocated: bool,
     /// "Ignore orphan files in FAT file systems".
     pub ignore_fat_orphans: bool,
+    /// Plugin settings as JSON text, by module id (the module's defaults
+    /// when absent).
+    pub module_settings: std::collections::BTreeMap<String, String>,
 }
 
 impl IngestPrefs {
@@ -48,19 +51,23 @@ impl IngestPrefs {
 
     /// Job settings for the built-in modules.
     pub(crate) fn job_settings(&self) -> JobSettings {
-        let modules = pm_modules::core_modules()
+        let modules = crate::plugins::modules()
             .iter()
             .map(|f| {
                 let info = f.info();
                 let id = info.id;
+                let settings = if id == "hash_lookup" {
+                    serde_json::to_value(&self.hash_lookup).unwrap_or_default()
+                } else {
+                    self.module_settings
+                        .get(id)
+                        .and_then(|t| serde_json::from_str(t).ok())
+                        .unwrap_or_else(|| f.default_settings())
+                };
                 ModuleSetting {
                     id: id.into(),
                     enabled: self.is_enabled(&info),
-                    settings: if id == "hash_lookup" {
-                        serde_json::to_value(&self.hash_lookup).unwrap_or_default()
-                    } else {
-                        serde_json::Value::Null
-                    },
+                    settings,
                 }
             })
             .collect();
@@ -266,8 +273,10 @@ pub(crate) fn modules_page(ui: &mut egui::Ui, prefs: &mut IngestPrefs) {
         .max_height(420.0)
         .min_scrolled_height(260.0)
         .show(ui, |ui| {
-            for f in pm_modules::core_modules() {
+            let plugins = crate::plugins::current();
+            for f in plugins.modules() {
                 let info = f.info();
+                let is_plugin = plugins.plugins.iter().any(|p| p.info.id == info.id);
                 let mut on = prefs.is_enabled(&info);
                 if ui
                     .checkbox(&mut on, egui::RichText::new(info.name).strong())
@@ -279,6 +288,9 @@ pub(crate) fn modules_page(ui: &mut egui::Ui, prefs: &mut IngestPrefs) {
                     ui.weak(info.description);
                     if info.id == "hash_lookup" && on {
                         hash_sets_ui(ui, &mut prefs.hash_lookup);
+                    }
+                    if is_plugin && on {
+                        plugin_settings_ui(ui, prefs, info.id, &f.default_settings());
                     }
                 });
                 ui.add_space(4.0);
@@ -296,6 +308,33 @@ pub(crate) fn modules_page(ui: &mut egui::Ui, prefs: &mut IngestPrefs) {
         true,
         "All Files and Directories (Not Unallocated Space)",
     );
+}
+
+/// A plugin's settings as JSON text (plugins have no settings panels of
+/// their own yet).
+fn plugin_settings_ui(
+    ui: &mut egui::Ui,
+    prefs: &mut IngestPrefs,
+    id: &str,
+    defaults: &serde_json::Value,
+) {
+    let text = prefs
+        .module_settings
+        .entry(id.to_owned())
+        .or_insert_with(|| serde_json::to_string_pretty(defaults).unwrap_or_default());
+    ui.label("Settings (JSON):");
+    ui.add(
+        egui::TextEdit::multiline(text)
+            .code_editor()
+            .desired_rows(3)
+            .desired_width(f32::INFINITY),
+    );
+    if let Err(e) = serde_json::from_str::<serde_json::Value>(text) {
+        ui.colored_label(
+            ui.visuals().error_fg_color,
+            format!("Not valid JSON ({e}); the plugin's defaults will be used."),
+        );
+    }
 }
 
 /// What the Run Ingest Modules dialog asks for.

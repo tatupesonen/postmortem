@@ -432,3 +432,32 @@ in `pm-mcp`/`postmortem`). Filters on unindexed columns (`LIKE '%x%'`,
 `atime`/`ctime`/`crtime` until the timeline work adds indexes, event
 text) are LIMIT-bounded scans rather than index seeks; substring name
 search goes through the name index (`search_file_names`).
+
+## ADR-022 — One module API for built-in parsers and WebAssembly plugins
+(Decided with the user 2026-10-17: "Native, same API".)
+
+* **`pm-plugin-api`** is the module contract for everything outside the
+  core framework: `Plugin` (info, settings, validation), `FileIngest`,
+  `DataSourceIngest`, and a `Host` through which a module reads content,
+  finds files, posts results by TSK type names, adds derived files and
+  writes to the log and inbox. It has no dependency on the case database,
+  so it can be semver-versioned (`API_VERSION`, minor = additive).
+* **Built-in parsers stay native Rust** (speed) but are written against
+  this API; `pm_modules::plugin_host::PluginModule` runs any `Plugin` in
+  the ingest framework, applying the module's `FileFilter` on the host side.
+* **Plugins are WebAssembly components** for the `postmortem:plugin` WIT
+  world (`crates/pm-plugin-api/wit/plugin.wit`), which mirrors the crate.
+  `pm-plugin-wasm` (wasmtime 45, per ADR-011) links WASI with no files,
+  environment, arguments or network, charges fuel per call, caps memory
+  per instance, runs one instance per worker and recreates it after a
+  trap. Guests use `pm-plugin-sdk` (wit-bindgen) and implement the same
+  Rust traits, exported with `export_plugin!`.
+* **Distribution**: a plugin is a folder with `plugin.toml` (API version,
+  component path, limits) and the `.wasm`, under `~/postmortem/Plugins`
+  (or `$POSTMORTEM_PLUGINS`). Identity and capabilities come from the
+  component's own `info()`; ids may not collide with built-ins.
+
+**Consequences.** Any parser can later ship as a plugin with little
+change; results from plugins are attributed to the plugin's display name;
+custom artifact types are not yet definable by plugins (a planned additive
+host call).
