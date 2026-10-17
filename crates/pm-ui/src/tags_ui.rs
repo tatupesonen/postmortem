@@ -19,6 +19,45 @@ pub(crate) const BOOKMARK: &str = "Bookmark";
 /// Suffix of notable tag names in menus and the tree.
 pub(crate) const NOTABLE_LABEL: &str = " (Notable)";
 
+/// A user-defined tag name (Autopsy `TagNameDefinition`): kept in the user
+/// settings and added to, or updated in, every case that is opened.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct TagDefinition {
+    pub name: String,
+    pub description: String,
+    pub notable: bool,
+}
+
+impl TagDefinition {
+    fn to_case(&self) -> pm_casedb::NewTagName {
+        pm_casedb::NewTagName {
+            name: self.name.clone(),
+            description: self.description.clone(),
+            color: "NONE".into(),
+            notable: self.notable,
+        }
+    }
+}
+
+/// Adds or updates the user's tag definitions in a case (Autopsy's
+/// `TagsManager` does this when a case opens and when Options › Tags is
+/// saved).
+pub(crate) fn apply_definitions(case: &Case, defs: &[TagDefinition]) -> Result<(), String> {
+    for d in defs {
+        case.db()
+            .add_or_update_tag_name(&d.to_case())
+            .map_err(|e| format!("Unable to save the {} tag name to the case. ({e})", d.name))?;
+    }
+    Ok(())
+}
+
+/// Adds or replaces `def` in a list kept sorted by name.
+pub(crate) fn upsert_definition(defs: &mut Vec<TagDefinition>, def: TagDefinition) {
+    defs.retain(|d| d.name != def.name);
+    let at = defs.partition_point(|d| d.name < def.name);
+    defs.insert(at, def);
+}
+
 /// The case's tag names and tag sets.
 #[derive(Debug, Clone, Default)]
 pub(crate) struct TagCatalog {
@@ -442,6 +481,8 @@ pub(crate) struct Tagging {
     dialog: Option<(TagTarget, Dialog)>,
     tasks: Vec<Task<Result<(), String>>>,
     changed: bool,
+    /// Tag names created from the New Tag dialog, for the user settings.
+    created: Vec<TagDefinition>,
 }
 
 impl Tagging {
@@ -473,6 +514,21 @@ impl Tagging {
             }
             TagRequest::Remove(tag_id) => self.spawn(ctx, case, target, Write::Remove(tag_id)),
         }
+    }
+
+    /// Saves the user's tag definitions to `case` in the background.
+    pub(crate) fn apply_definitions(
+        &mut self,
+        ctx: &egui::Context,
+        case: &Arc<Case>,
+        defs: Vec<TagDefinition>,
+    ) {
+        if defs.is_empty() {
+            return;
+        }
+        let case = Arc::clone(case);
+        self.tasks
+            .push(Task::spawn(ctx, move || apply_definitions(&case, &defs)));
     }
 
     /// Bookmarks `target` (Ctrl+B).
@@ -535,16 +591,30 @@ impl Tagging {
                     description,
                     notable,
                     comment,
-                } => Write::Create {
-                    name,
-                    description,
-                    notable,
-                    comment,
-                },
+                } => {
+                    // Autopsy's `addTagName` also saves it as a user tag.
+                    self.created.push(TagDefinition {
+                        name: name.clone(),
+                        description: description.clone(),
+                        notable,
+                    });
+                    Write::Create {
+                        name,
+                        description,
+                        notable,
+                        comment,
+                    }
+                }
             };
             self.spawn(ctx, case, target, w);
         }
         errors
+    }
+
+    /// Tag names created since the last call (to add to the user's tag
+    /// definitions).
+    pub(crate) fn take_created(&mut self) -> Vec<TagDefinition> {
+        std::mem::take(&mut self.created)
     }
 
     /// Whether a tag change finished since the last call (listings, the

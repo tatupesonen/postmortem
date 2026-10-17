@@ -581,7 +581,7 @@ fn walk_local(
                 z.crc = crc;
             } else {
                 let end = next_signature(src, data_start, LOCAL_SIG)?.unwrap_or(size);
-                z.csize = end - data_start;
+                z.csize = end.saturating_sub(data_start);
             }
         }
         member(src, d, z.clone(), pos, index, filter.as_deref_mut())?;
