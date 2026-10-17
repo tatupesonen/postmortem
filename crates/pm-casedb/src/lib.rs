@@ -19,6 +19,7 @@ mod hosts;
 mod model;
 pub mod os_accounts;
 mod scores;
+mod search;
 mod tags;
 mod windows_artifacts;
 
@@ -32,6 +33,7 @@ pub use derived::{DerivedUpdate, FileIds};
 pub use hosts::{Host, Person, default_host_name};
 pub use model::*;
 pub use scores::{ObjKind, Score};
+pub use search::KeywordHitKey;
 pub use tags::{ArtifactTag, NewTagName, TagSet};
 
 /// Current schema version written by this build.
