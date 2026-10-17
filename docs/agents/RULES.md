@@ -1,5 +1,7 @@
 # Rules for parallel implementation agents
 
+> **Historical spec** from the parallel-agent period (2026-10-17). The work it describes is merged or folded into other crates; current status is in `docs/PARITY.md`, current direction in `docs/DIRECTION.md`.
+
 Several agents work at once, each in its own git worktree, and the
 coordinator merges their branches into `master`. Follow these rules so
 merges are clean and the result is shippable.

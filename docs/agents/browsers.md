@@ -1,5 +1,7 @@
 # Track `browsers` — status
 
+> **Historical spec** from the parallel-agent period (2026-10-17). The work it describes is merged or folded into other crates; current status is in `docs/PARITY.md`, current direction in `docs/DIRECTION.md`.
+
 Web browser artefacts for Recent Activity (PLAN.md M6). Reimplemented on
 the Linux box after the earlier branch was lost (2026-10-17). Paused at
 the coordinator's request; remaining work is listed at the end.

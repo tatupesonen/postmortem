@@ -1,5 +1,7 @@
 # Track: mcp (MCP server for AI assistants)
 
+> **Historical spec** from the parallel-agent period (2026-10-17). The work it describes is merged or folded into other crates; current status is in `docs/PARITY.md`, current direction in `docs/DIRECTION.md`.
+
 Status: implemented on the mcp track branch (2026-10-17); design in
 [BEYOND-AUTOPSY §8](../BEYOND-AUTOPSY.md#8-mcp-server-for-ai-assistants--next),
 decisions in ADR-021. Every slice passed the full quality gate before it was

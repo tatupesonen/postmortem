@@ -1,5 +1,7 @@
 # Track: email-mobile (email, communication accounts, mobile & specialised analysers)
 
+> **Historical spec** from the parallel-agent period (2026-10-17). The work it describes is merged or folded into other crates; current status is in `docs/PARITY.md`, current direction in `docs/DIRECTION.md`.
+
 Status: **paused at the coordinator's request** after items 1 (email +
 accounts) and 2 (Android Analyzer). Items 3 (GPX, DJI, YARA, VM extractor)
 are not started.

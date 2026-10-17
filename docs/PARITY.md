@@ -1,14 +1,14 @@
 # postmortem ↔ Autopsy parity matrix
 
-Audit date: 2026-10-15. Master is at `bbc96d8`. The 6 running track worktrees have no commits or changes yet, so every "In progress" row below is scope only, not code.
+Audit date: 2026-10-15; statuses kept up to date with each feature since, last verified against the code on 2026-10-18 (master `f5815f7`, 999 tests). Counts: about 106 Done, 99 Partial, 172 Missing.
 
 Method: I enumerated every NetBeans module and package in `../autopsy`, including `@OptionsPanelController`, `IngestModuleFactory`, `DataSourceProcessor`, `DataContentViewer`/`DataResultViewer` and report-module registrations. I cross-checked against `docs/inventory/01–08`, then read the postmortem crates (`crates/*`), `PLAN.md`, `PROGRESS.md` and `agents/RULES.md`.
 
 **Status legend**
 - **Done**: implemented and tested on master.
 - **Partial**: some of it exists; the Notes say what is missing. "Tests owed" means the code exists but has no test.
-- **In progress (track)**: inside the scope of a running track. Not on master.
-- **Missing**: nothing on master and no track owns it.
+- **Missing**: nothing on master yet.
+- **Out of scope**: excluded by an owner decision (`DIRECTION.md`).
 - **N/A?**: an Autopsy platform artefact that probably should not be ported. The coordinator should confirm each one.
 
 **Path abbreviations**
@@ -22,24 +22,33 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 - `IPM/` = `InternalPythonModules/`
 - `pm-x/…` = `crates/pm-x/…`
 
-## 0. Headline findings
+## 0. Headline findings (2026-10-18)
 
-1. **What is solid (Done):** evidence for raw/split/E01 + MBR/GPT + NTFS/FAT/exFAT/ext, all with TSK differential tests. Also the case create/open/load, the ingest core, Hash Lookup + all hash-set formats, the timeline first cut, and the shell/browse slice. There are about 346 tests in the workspace.
-2. **Implemented but untested:** Recent Activity Chromium/IE (only a few unit tests), Picture Analyzer (no end-to-end test), Timeline Details view, the timeline chart, and artifact events. `PROGRESS.md` already records these as owed.
-3. **Zero of the 126 items in the test-parity checklist (`docs/inventory/08-autopsy-tests.md §20`) are ticked.** Some are de facto covered: the hash formats and the ingest filters. No golden-dump harness exists.
-4. **Schema blocker.** The case DB has no tables for:
-   - OS accounts / realms / persons
-   - communication accounts + relationships
-   - timeline events
-   - aggregate scores
-   - data-artifact ingest pipeline support
-   
-   `RULES.md` only lets `derived-and-carving` add migrations. As a result:
-   - `windows-artifacts` (SAM/ProfileList → OS accounts) and `email-mobile` (accounts/relationships) can only emit artifacts.
-   - Communications, OS Accounts, CR and the Persons/Hosts UI have nothing to build on.
-   - This must be resolved first (WP-0).
-5. **Several views read an in-memory index or the evidence, not the case DB.** The Data Sources tree reads the evidence directly. Gallery, Discovery, Data Source Summary and the file timeline read the in-memory `pm-index` catalogue. This is ADR-014 scale debt.
-6. **UI is excluded from every track** (`pm-ui` is coordinator-owned). So every In-progress engine row also has an untracked UI-integration part, gathered in WP-2/WP-3.
+1. **Solid (Done):** evidence (raw/split/E01, VMDK/VHD/VHDX/QCOW2,
+   MBR/GPT, NTFS/FAT/exFAT/ext with TSK differential tests); case
+   create/open/load/delete; schema v3 (OS accounts, communications,
+   timeline events, scores, tag sets); the ingest framework with Autopsy's
+   core modules (Hash Lookup, File Type, Extension Mismatch, Embedded
+   Files, Picture Analyzer, Keyword Search, Interesting Files, Encryption,
+   Data Source Integrity, PhotoRec Carver), Recent Activity (browsers,
+   registry, LNK/jump lists, prefetch, event logs), Email (MBOX/EML/vCard),
+   GPX; Timeline, Gallery, Discovery (first cut), Communications,
+   Geolocation, reports, tags, result tabs, the MCP server and WebAssembly
+   plugins. 999 tests in the workspace.
+2. **Biggest missing areas:** Central Repository (§25), multi-user and
+   auto-ingest (§30, ADR-024), PST/OST e-mail, Android/iOS parsers, Edge
+   legacy/SRUM (ESE reader), content viewers for SQLite/plist/registry/
+   PDF/HTML/media and the Data Artifacts/Analysis Results/Annotations/
+   Context viewers, portable case and CASE/UCO reports, ingest profiles,
+   more file systems (HFS+, APFS, ISO9660/UDF).
+3. **Test parity:** most of the 126-item checklist in
+   `docs/inventory/08-autopsy-tests.md §20` is still to be ticked
+   explicitly, although many areas have ported tests; no whole-case golden
+   dump harness yet.
+4. **Architecture (ADR-023):** Discovery and the Data Source Summary still
+   read an in-memory file index built from a second opening of the
+   evidence; both move to the case database next. No case change bus yet
+   (Autopsy `Case.Events`).
 
 ---
 
@@ -114,7 +123,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Sun VTOC | TSK | Missing | — |
 | Pools: APFS container | TSK pools, `PoolNode` | Missing | Needs `pm-fs-apfs`. |
 | Pools: LVM | TSK pools | Missing | — |
-| BitLocker decryption (password / recovery key) | TSK, `ImageFilePanel` password, CLI `--key` | Missing | Encryption *detection* is in progress (core-file-modules). Unlock is untracked. |
+| BitLocker decryption (password / recovery key) | TSK, `ImageFilePanel` password, CLI `--key` | Missing | Encryption detection is done (Encryption Detection module); unlocking is not. |
 | LUKS / FileVault / Core Storage detection | TSK (detect) | Done | Detection only (pm-encryption); unlock is not planned. |
 
 ## 5. File systems (`pm-fs-*`)
@@ -151,20 +160,20 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Communication accounts + account_relationships | TSK `CommunicationsManager` | Done | Schema v2; written by the Email Parser via post_communication. |
 | Timeline events table (event types, 3 description levels, tagged/hash_hit flags) | TSK `TimelineManager`, `tsk_events` | Done | Artifact events are written with every data artifact (TSK `TimelineEventTypes` mappings, catch-all for the rest; back-filled once for older cases); file-system events are the indexed `files` time columns (schema v3 indexes all four). The Timeline window, MCP and reports all read the database (`pm_timeline::db`). |
 | Ingest job records | TSK `ingest_jobs` | Done | `start/finish_ingest_job`. |
-| Reports table | TSK `reports` | Partial | Table only. |
+| Reports table | TSK `reports` | Done | Written by Generate Report; listed under the Reports tree node (open, open folder, delete). |
 | Derived files / file re-injection | TSK `DerivedFile` | Done | ADR-016; `pm_modules::derive`. |
-| PostgreSQL back end | TSK | Missing | M11. |
+| PostgreSQL back end | TSK | Missing | Planned through a dialect layer in `pm-casedb` (ADR-024). |
 | Autopsy case importer (TSK DB → pm) | — | Missing | Stretch goal in `PLAN.md`. |
 
 ## 7. Directory tree (`A/directorytree`, `A/datamodel`)
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Data Sources → content hierarchy (image → volumes → dirs; VS/FS/root inlined) | `datamodel/ContentChildren`, node classes | Partial | `pm-ui/src/model.rs` reads the evidence directly, not the DB. No host level. No derived/local/carved/artifact-child nodes. |
+| Data Sources → content hierarchy (image → volumes → dirs; VS/FS/root inlined) | `datamodel/ContentChildren`, node classes | Done | `pm-ui/src/case_tree.rs` from the case DB: host › data source › volumes › file systems › directories, `$OrphanFiles`, `$Unalloc`, `$CarvedFiles`, derived files (archives open like folders). |
 | Hosts level under Data Sources; "Unknown Host" | `DataSourcesNode`, `HostNode` | Done | — |
 | Group by Person/Host layout (per-DS filtered subtrees) | `AutopsyTreeChildFactory`, `PersonNode`, `DataSourceGroupingNode` | Missing | — |
 | File Views › By Extension (Images, Videos, Audio, Archives, Databases, Documents…, Executable) with counts | `FileTypesByExtension` | Done | `pm-ui/src/views.rs`, from the case DB. Test `views_list_files_by_type_from_the_case_database`. |
-| File Views › By MIME Type | `FileTypesByMimeType` | Partial | Implemented; empty until File Type ID lands (in progress). |
+| File Views › By MIME Type | `FileTypesByMimeType` | Done | From File Type Identification results in the case DB. |
 | File Views › Deleted Files (FS / All) | `DeletedContent` | Done | Tested. |
 | File Views › File Size (50–200 MB, 200 MB–1 GB, 1 GB+) | `FileSize` | Done | — |
 | Hide known files in Views / in Data Sources; hide slack | `KnownAndSlackFilterBase`, View prefs | Partial | Only "hide known in Views", in the View menu. |
@@ -173,7 +182,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Hashset Hits by set name | `HashsetHits` | Missing | Currently a flat list. |
 | Interesting Items / Interesting File/Artifact hits by set | `InterestingHits` | Missing | — |
 | E-Mail Messages by account › folder | `EmailExtracted` | Missing | — |
-| Communication Accounts by type; credit cards By File / By BIN (BIN DB) | `datamodel/accounts/Accounts`, `ranges.csv` | Missing | The search track does card validation; the tree is untracked. |
+| Communication Accounts by type; credit cards By File / By BIN (BIN DB) | `datamodel/accounts/Accounts`, `ranges.csv` | Missing | Card validation (Luhn, BIN) is done in `pm-search`; the tree grouping is not. |
 | TSK_MALWARE filtered to notable | `AnalysisResults` | Missing | — |
 | OS Accounts node | `OsAccounts.java` | Done | Under Analysis Results (user choice). |
 | Tags node (tag › File Tags / Result Tags; hide other users' tags) | `Tags.java` | Partial | "Hide other users' tags" missing. |
@@ -239,8 +248,8 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Application › PDF viewer | `PDFViewer` | Missing | — |
 | Application › SQLite viewer (tables, paging, epoch columns, CSV export) | `SQLiteViewer` | Missing | — |
 | Application › Binary plist viewer | `PListViewer` | Missing | — |
-| Application › Windows Registry viewer (rejview tree + values) | `WindowsRegistryViewer`, `A/rejview/*` | Missing | The hive parser is coming from windows-artifacts; the viewer is untracked. |
-| File Metadata viewer (name, path, type, MIME, size, times, MD5/SHA-256, known, internal id, istat output) | `contentviewers/Metadata` | Partial | Missing: hashes, MIME, known status, data source, object id, and the istat-style block. |
+| Application › Windows Registry viewer (rejview tree + values) | `WindowsRegistryViewer`, `A/rejview/*` | Missing | The hive parser exists (`pm-registry`, MCP `read_registry_key`); the viewer does not. |
+| File Metadata viewer (name, path, type, MIME, size, times, MD5/SHA-256, known, internal id, istat output) | `contentviewers/Metadata` | Partial | Name, path, type, MIME, size, known, flags, inode, sequence, attributes, mode, link count, object id, origin, times and hashes (MD5/SHA-1/SHA-256) from the case. Missing: data source row and the istat-style block. |
 | Data Artifacts viewer (artifacts of a file; per-type sub-viewers) | `DataArtifactContentViewer`, `artifactviewers/*` | Missing | Includes the default table, General Purpose (web), Message (email/SMS with attachments), Contact and Call Log viewers. |
 | Analysis Results viewer (score, conclusion, justification per result) | `analysisresults/*` | Missing | — |
 | Annotations viewer (tags, CR comments, hash/interesting hits) | `annotations/*` | Missing | — |
@@ -267,10 +276,10 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 |---|---|---|---|
 | Module factory API, file + data-source modules, staged DS modules | `IngestModuleFactory`, `IngestJobExecutor` | Done | `pm-ingest`, 10 integration tests. |
 | Priority scheduling (user folders first, unalloc last), N workers, cancellation | `IngestTasksScheduler` | Done | Tested. |
-| Data-artifact ingest pipeline & analysis-result pipeline | `DataArtifactIngestModule`, `AnalysisResultIngestModule` (KWS indexing of artifacts, CR artifact module) | Missing | Not in any track; `pm-ingest` is owned by derived-and-carving. Needed by the search and CR work. |
+| Data-artifact ingest pipeline & analysis-result pipeline | `DataArtifactIngestModule`, `AnalysisResultIngestModule` (KWS indexing of artifacts, CR artifact module) | Missing | Not built; artifacts are not yet indexed for keyword search by a pipeline stage. |
 | Derived-file re-injection into running jobs | `IngestJobExecutor.addFiles` | Done | — |
 | Standard file filters (all / not unallocated) | `FilesSetsManager` standard filters | Done | `FileFilter`, tested. |
-| Custom file ingest filters (FilesSet rules) | `FilesSetsManager`, `IngestOptionsPanel` › File Filters | Partial | The FilesSet engine is in progress (core-file-modules). Wiring into `pm-ingest`, the UI and 7 `IngestFileFiltersTest` ports are untracked. |
+| Custom file ingest filters (FilesSet rules) | `FilesSetsManager`, `IngestOptionsPanel` › File Filters | Partial | The FilesSet engine is done (`pm-rules`, Interesting Files); it is not yet usable as an ingest file filter, and there is no UI. |
 | Ingest profiles | `ingest/profile/IngestProfiles`, `ProfileSettingsPanel` | Missing | — |
 | Ingest options (threads, process timeout) | `IngestOptionsPanel` › Settings | Partial | `JobSettings.threads` exists; no UI. |
 | Run Ingest Modules wizard on existing data source | `runIngestModuleWizard/*` | Done | See "Run Ingest Modules (on a data source)". |
@@ -303,33 +312,33 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Central Repository ingest module | `centralrepository/ingestmodule` | Missing | §25. |
 | Keyword Search ingest module | `KWS/KeywordSearchIngestModule` | Done | §15. |
 | Email Parser | `TB/*` | Partial | MBOX, EML, vCard on pm-plugin-api (pm-email); PST/OST missing. |
-| Recent Activity | `RA/*` | Partial / In progress | §14. |
+| Recent Activity | `RA/*` | Partial | §14. |
 
 ## 14. Recent Activity (`RA/`)
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| RA framework (ordered extractors, temp copies, inbox lines, re-run idempotence) | `RAImageIngestModule`, `Extract` | Partial | `recent_activity/mod.rs`: 2 steps (Chromium, IE), idempotent. Not done: TSK_ASSOCIATED_OBJECT links and download TSK_PATH_ID. Tests owed. |
-| Chromium family: history, downloads, cookies, bookmarks, logins, autofill | `Chromium.java` | Partial | Implemented; zero tests (chromium.rs). The browsers track owns the tests. |
+| RA framework (ordered extractors, temp copies, inbox lines, re-run idempotence) | `RAImageIngestModule`, `Extract` | Done | `recent_activity/mod.rs`: 21 ordered steps (browsers, web analytics, Windows registry, recycle bin, jump lists, LNK, OS info, data source usage, Zone.Identifier, prefetch, execution caches), associated objects, idempotent re-runs. |
+| Chromium family: history, downloads, cookies, bookmarks, logins, autofill | `Chromium.java` | Done | `pm-browser/src/chromium.rs`; end-to-end tests in `pm-modules/tests/browsers.rs`. |
 | Chromium: favicons, web-form addresses, extensions (+ malicious list), cache | `Chromium.java`, `ChromeCacheExtractor`, `malicious_chrome_extensions.csv` | Done | — |
-| Internet Explorer: index.dat history, Favorites, cookies | `ExtractIE.java` (pasco) | Partial | Native parser plus 3 unit tests. Not done: pasco2 test ports (08 §14) and a diff against pasco. Browsers track. |
+| Internet Explorer: index.dat history, Favorites, cookies | `ExtractIE.java` (pasco) | Partial | Native parser with unit and end-to-end tests. Not done: pasco2 test ports (08 §14) and a diff against pasco. |
 | Firefox (places, cookies, downloads, form history, logins, bookmarks) | `Firefox.java` | Done | — |
 | Safari (history, bookmarks, downloads plist, binary cookies) | `ExtractSafari.java`, `BinaryCookieReader` | Done | — |
 | Edge legacy / IE10+ WebCache (ESE) | `ExtractEdge.java` | Missing | Needs an ESE reader (drafted, not merged). |
 | Web search queries (SEUQA mappings) | `SearchEngineURLQueryAnalyzer`, `SEUQAMappings.xml` | Partial | Implemented with 1 unit test. |
 | Public suffix list domain extraction | `Util.extractDomain` / CR normalizer | Done | — |
-| Web account types (admin/mod/user roles) | `ExtractWebAccountType.java` | Missing | Not in the browsers scope as listed. |
-| Domain categorisation (default CSV, priority categoriser, custom categories) | `DomainCategoryRunner`, `DefaultDomainCategorizer`, `default_domain_categories.csv` | Missing | Untracked. |
-| Custom Web Categories options panel (import/export) | `A/url/analytics/domaincategorization/*` | Missing | Untracked. |
-| Windows Registry analyses (OS info, USB + USB ID DB, installed programs, MRUs, shellbags, BAM, Bluetooth, WiFi, network drives, WSL, SAM accounts) | `ExtractRegistry.java`, `ShellBagParser`, `UsbDeviceIdMapper` | Partial | Merged and tested on generated data; real-image verification pending. |
+| Web account types (admin/mod/user roles) | `ExtractWebAccountType.java` | Done | `pm-browser/src/account_type.rs`, Recent Activity's account-type step. |
+| Domain categorisation (default CSV, priority categoriser, custom categories) | `DomainCategoryRunner`, `DefaultDomainCategorizer`, `default_domain_categories.csv` | Done | `pm-browser/src/categories.rs` (custom, priority, default CSV), Recent Activity's Domain Category Analyzer step; tested. |
+| Custom Web Categories options panel (import/export) | `A/url/analytics/domaincategorization/*` | Partial | Custom categories are read by the module's settings (`custom_categories`); no Options panel or import/export UI. |
+| Windows Registry analyses (OS info, USB + USB ID DB, installed programs, MRUs, shellbags, BAM, Bluetooth, WiFi, network drives, WSL, SAM accounts) | `ExtractRegistry.java`, `ShellBagParser`, `UsbDeviceIdMapper` | Partial | Tested on generated data; on a real Windows 10 image (2026-10-18) OS info, time zone, network interfaces, SAM accounts and USB devices match the published case answers. Other analyses still need a real-image check. |
 | Recycle Bin ($I/$R, re-created deleted file) | `ExtractRecycleBin.java` | Partial | Merged and tested on generated data; real-image verification pending. |
-| Jump Lists (AutomaticDestinations → derived LNKs) | `ExtractJumpLists.java` | Partial | Merged and tested on generated data; real-image verification pending. |
-| LNK recent documents | `RecentDocumentsByLnk.java` | Partial | Merged and tested on generated data; real-image verification pending. |
-| Prefetch | `ExtractPrefetch.java` | Partial | Merged and tested on generated data; real-image verification pending. |
+| Jump Lists (AutomaticDestinations → derived LNKs) | `ExtractJumpLists.java` | Done | Verified on a real Windows 10 image (Szechuan Sauce, 2026-10-18), which found and fixed the Windows 10 DestList time offset; regression test with that image's bytes. |
+| LNK recent documents | `RecentDocumentsByLnk.java` | Done | Verified on a real Windows 10 image (2026-10-18): target paths and times match the published case answers. |
+| Prefetch | `ExtractPrefetch.java` | Done | Verified on a real Windows 10 image (2026-10-18): run times and counts (e.g. COREUPDATER.EXE). |
 | SRUM | `ExtractSru.java` | Missing | — |
 | Zone.Identifier → downloads | `ExtractZoneIdentifier.java` | Partial | Merged and tested on generated data; real-image verification pending. |
 | Data source usage | `DataSourceUsageAnalyzer.java` | Partial | Merged and tested on generated data; real-image verification pending. |
-| OS detection by marker files (macOS, Android, Linux distros) | `ExtractOs.java` | Missing | Not explicitly in any track; Data source usage depends on it. Confirm with windows-artifacts. |
+| OS detection by marker files (macOS, Android, Linux distros) | `ExtractOs.java` | Missing | Data source usage currently relies on Windows registry results. |
 | Thumbcache extraction (derived thumbnails) | `ExtractThumbcache.java` | Missing | Not in the windows-artifacts list. |
 
 ## 15. Keyword search & text (`KWS/`, `A/textextractors`)
@@ -342,7 +351,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Keyword list import/export (XML, EnCase) | `EnCaseKeywordSearchList` | Partial | Engine done; Options › Keyword Search lists UI missing. |
 | Credit cards (Luhn, IIN/BIN DB, TSK_ACCOUNT) | `CreditCardValidator`, `datamodel/ranges.csv` | Done | BIN tree view (§7) missing. |
 | Language detection / Japanese (CJK) analysers | `LanguageDetector`, `LanguageSpecificContent*` | Missing | Not implemented. |
-| File-name search index (Tantivy n-gram) | `PLAN.md` scale track | Done | Used by File Search by Attributes is pending. |
+| File-name search index (Tantivy n-gram) | `PLAN.md` scale track | Done | Built by Keyword Search's name index; used by MCP `search_file_names`. Not yet used by File Search by Attributes or a quick-search box. |
 | Ad-hoc search UI: toolbar Keyword Search + Keyword Lists dropdowns, results node | `DropdownToolbar`, `DropdownSingleTermSearchPanel`, `DropdownListSearchPanel`, `AdHocSearch*` | Partial | Single-term panel, result tabs, save results done; Keyword Lists dropdown missing. |
 | Keyword Search options (lists editor, string extraction scripts, general: NSRL skip, snippets, OCR) | `GlobalListSettingsPanel`, `KeywordSearchGlobalLanguageSettingsPanel`, `KeywordSearchGlobalSearchSettingsPanel` | Missing (UI) | — |
 | Keyword search job settings panel | `KeywordSearchJobSettingsPanel` | Missing (UI) | — |
@@ -359,18 +368,18 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Email accounts & relationships (CommunicationsManager) | `TB/ThunderbirdMboxFileIngestModule` | Done | EMAIL/PHONE/DEVICE accounts and MESSAGE/CONTACT relationships via post_communication. |
 | Android Analyzer, 22 app parsers (contacts, call log, SMS, Tango, WWF, Google Maps, browser/cache location, IMO, Xender, Zapya, SHAREit, LINE, WhatsApp, TextNow, Skype, Viber, FB Messenger, Samsung Internet/Opera, OruxMaps, installed apps) | `IPM/android/*.py` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
 | GPX Parser | `IPM/GPX_Module` | Done | On pm-plugin-api (pm-geo GPX parser): bookmarks, track segments, routes. |
-| DJI Drone Analyzer | `A/modules/drones` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
-| YARA Analyzer + YARA options panel (rule sets) | `A/modules/yara`, `yara/ui/*` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
-| Virtual Machine Extractor (VMDK/VHD in DS → new data sources + ingest) | `A/modules/vmextractor` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| DJI Drone Analyzer | `A/modules/drones` | Missing | To be built on `pm-plugin-api` (the earlier attempt was lost with the Mac worktrees). |
+| YARA Analyzer + YARA options panel (rule sets) | `A/modules/yara`, `yara/ui/*` | Missing | To be built on `pm-plugin-api` (the earlier attempt was lost with the Mac worktrees). |
+| Virtual Machine Extractor (VMDK/VHD in DS → new data sources + ingest) | `A/modules/vmextractor` | Missing | To be built on `pm-plugin-api` (the earlier attempt was lost with the Mac worktrees). |
 
 ## 17. External-tool / experimental modules
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| aLEAPP / iLEAPP analyzers (TSV → artifacts + HTML report) | `A/modules/leappanalyzers` | Missing | Untracked. External runner or native ports. |
-| Plaso (log2timeline/psort → TSK_TL_EVENT) | `A/modules/plaso` | Missing | Untracked. Optional external. |
-| Object Detection (OpenCV Haar) | `EXP/objectdetection` | Missing | Untracked. |
-| Volatility memory DSP | `EXP/volatilityDSP` | Missing | Untracked. |
+| aLEAPP / iLEAPP analyzers (TSV → artifacts + HTML report) | `A/modules/leappanalyzers` | Out of scope | Out of scope as an external-tool runner (owner decision 2026-10-17, DIRECTION.md); valuable parsers are ported natively instead. |
+| Plaso (log2timeline/psort → TSK_TL_EVENT) | `A/modules/plaso` | Out of scope | Out of scope as an external-tool runner (owner decision 2026-10-17, DIRECTION.md); valuable parsers are ported natively instead. |
+| Object Detection (OpenCV Haar) | `EXP/objectdetection` | Missing | Not planned yet. |
+| Volatility memory DSP | `EXP/volatilityDSP` | Out of scope | Out of scope as an external-tool runner (owner decision 2026-10-17, DIRECTION.md); valuable parsers are ported natively instead. |
 | Malware Scan (Cyber Triage cloud), CT options/licence | `CT/malwarescan/*`, `CT/ctoptions/*`, `CT/ctapi/*` | N/A (decided) | Proprietary cloud service; out of scope (user decision 2026-10-17). |
 | Sample/example modules | `A/examples/*`, `pythonExamples/*` | N/A? | Become WASM plugin templates (§32). |
 
@@ -378,13 +387,13 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Timeline window, event-type hierarchy, time binning | `TimeLineTopComponent`, `zooming/*` | Done | `pm-timeline` with 15 tests (RangeDivision). |
+| Timeline window, event-type hierarchy, time binning | `TimeLineTopComponent`, `zooming/*` | Done | `pm-timeline` (RangeDivision tests) over the case database (`pm_timeline::db`, tests in `pm-timeline/tests/db.rs`). |
 | Counts view (stacked bars, log scale, zoom) | `ui/countsview/*` | Partial | Custom chart in `timeline_chart.rs`; tests owed (no chart widget tests). |
 | Details view (clustered stripes, description LOD, expand/collapse, pin, hide descriptions) | `ui/detailview/*` | Partial | Stripes and LOD exist. Missing: expand/collapse sub-clusters, pinned lane, "Hidden Descriptions" pane, bundling. Tests owed. |
-| List view | `ui/listvew/*` | Done | Test `timeline_builds_and_lists_events`. |
+| List view | `ui/listvew/*` | Done | Test `timeline_reads_the_case_database` (`pm-ui/src/timeline.rs`). |
 | Filters: event types, data sources, file types, text | `ui/filtering/*` | Partial | Done. The filter tree lacks Apply/Reset semantics and the "select only/others" menu. |
 | Filters: Tags, Hash Hits | `ui/filtering` | Missing | — |
-| Events from all artifact types (registry, LNK, prefetch, email, messages, GPS, …) | TSK `TimelineManager` event types | Partial | Every data artifact type: TSK mappings (web, messages, email, calls, recent docs, programs, devices, EXIF, metadata, GPS, Wi-Fi, Bluetooth, calendar, …), event-log entries as Log Entry, catch-all for other standard/custom types. Analysis results get none, as in TSK. |
+| Events from all artifact types (registry, LNK, prefetch, email, messages, GPS, …) | TSK `TimelineManager` event types | Done | Every data artifact type posts events (TSK mappings for web, messages, email, calls, recent docs, programs, devices, EXIF, metadata, GPS, Wi-Fi, Bluetooth, calendar; event-log entries as Log Entry; catch-all for the rest). Analysis results get none, as in TSK. |
 | Overview range slider | `ui/TimeLineResultView` | Partial | Present; tests owed. |
 | History back/forward, zoom presets | `ViewFrame` | Done | — |
 | Add Event (manual, TSK_TL_EVENT) | `actions/AddManualEvent` | Missing | — |
@@ -440,7 +449,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Types tab (pie, counts by MIME/category, OS, usage) | `ui/TypesPanel` | Partial | Pie by extension category, from `pm-index`. No OS/usage rows. |
+| Types tab (pie, counts by MIME/category, OS, usage) | `ui/TypesPanel` | Partial | Pie by extension category, from the in-memory index (moving to the DB, ADR-023). No OS/usage rows. |
 | User Activity tab (top programs, recent domains, web searches, devices, accounts) | `ui/UserActivityPanel` | Missing | About 30 Autopsy unit tests to port (08 §10). |
 | Analysis tab (hash set, keyword, interesting hits) | `ui/AnalysisPanel` | Missing | — |
 | Recent Files tab (recently opened docs, downloads, attachments) | `ui/RecentFilesPanel` | Partial | Postmortem shows recently modified/accessed/created files instead. Autopsy's artifact-based lists are missing. |
@@ -592,6 +601,8 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 ---
 
 ## Untracked work packages, ordered by value to an examiner
+
+> Written 2026-10-15 for the parallel-track period. Many packages are done (see the tables above); current priorities are in `DIRECTION.md` and `PROGRESS.md`.
 
 Each package fits one agent. Every UI package touches `pm-ui`, which `RULES.md` reserves for the coordinator. Either the coordinator does these, or it hands `pm-ui` ownership to one UI agent at a time.
 

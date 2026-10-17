@@ -1,5 +1,7 @@
 # Hashing track: status (paused)
 
+> **Historical spec** from the parallel-agent period (2026-10-17). The work it describes is merged or folded into other crates; current status is in `docs/PARITY.md`, current direction in `docs/DIRECTION.md`.
+
 Paused on 2026-10-15 at the coordinator's request (usage limit). Almost no
 feature work is done yet. This file records the audit findings and the
 exact next steps.

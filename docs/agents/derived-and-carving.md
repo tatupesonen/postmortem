@@ -1,5 +1,7 @@
 # Track: derived-and-carving
 
+> **Historical spec** from the parallel-agent period (2026-10-17). The work it describes is merged or folded into other crates; current status is in `docs/PARITY.md`, current direction in `docs/DIRECTION.md`.
+
 Derived files + ingest re-injection (PLAN M4), Embedded File Extractor
 (M4), PhotoRec-like carving (M10). Status as of 2026-10-17 (Linux agent,
 branch `worktree-agent-ac9d7b3293b4d4267`).

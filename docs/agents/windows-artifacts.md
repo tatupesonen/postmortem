@@ -1,5 +1,7 @@
 # Track: windows-artifacts (PLAN M6 — Windows OS artefacts in Recent Activity)
 
+> **Historical spec** from the parallel-agent period (2026-10-17). The work it describes is merged or folded into other crates; current status is in `docs/PARITY.md`, current direction in `docs/DIRECTION.md`.
+
 Status: **paused at a coordinator checkpoint** (2026-10-15). Parsers, analyses
 and the Recent Activity glue are in and tested on generated data; the
 real-image verification and the remaining items below are next.

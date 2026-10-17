@@ -1,5 +1,7 @@
 # Track: search (text extraction, keyword search, file-name search)
 
+> **Historical spec** from the parallel-agent period (2026-10-17). The work it describes is merged or folded into other crates; current status is in `docs/PARITY.md`, current direction in `docs/DIRECTION.md`.
+
 Status: **done and verified** for the scope below (branch of the search
 track agent, 2026-10-17). Every slice passed the full quality gate before
 it was committed. UI integration (the coordinator's job) is described in

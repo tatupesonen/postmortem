@@ -1,5 +1,7 @@
 # Track: image-formats (WP-6)
 
+> **Historical spec** from the parallel-agent period (2026-10-17). The work it describes is merged or folded into other crates; current status is in `docs/PARITY.md`, current direction in `docs/DIRECTION.md`.
+
 Virtual machine disk containers in `pm-image`, written in-house in pure
 Rust (no libvmdk/libvhdi/libqcow bindings, ADR-009 table in
 `docs/inventory/07-rust-ecosystem.md`).

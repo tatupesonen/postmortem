@@ -72,8 +72,10 @@ memory_mb = 256              # linear memory cap per instance
 fuel_per_call = 5000000000   # roughly instructions per process call
 ```
 
-A plugin has no file system, network, environment or clock access beyond
-the host calls. A panic, a trap, or an exhausted fuel budget fails that
+A plugin has no file system, network, environment variables or
+arguments: evidence and results go only through the host calls. WASI's
+clocks and random numbers are available (Rust's standard library needs
+them). A panic, a trap, or an exhausted fuel budget fails that
 one call (recorded as a module error); the instance is recreated and the
 job continues.
 

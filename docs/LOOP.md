@@ -20,11 +20,12 @@ Never modify it.
 
 ## One iteration
 
-1. **Orient** (keep it cheap): read `PROGRESS.md` `## Now` and `## Blockers`,
-   then only the `PLAN.md` milestone that holds the current task. Run
+1. **Orient** (keep it cheap): read `DIRECTION.md` (owner decisions), then
+   `PROGRESS.md` `## Now` and `## Blockers`, then only the `PLAN.md`
+   milestone that holds the current task. Run
    `git log --oneline -5` to confirm where we are.
-2. **Baseline**: run the quality gate (below). If it is red, fixing it *is* the
-   task for this iteration.
+2. **Baseline**: make sure the last pushed commit passed the quality gate
+   (below); if it is red, fixing it *is* the task for this iteration.
 3. **Pick work**: the current task in `## Now`, or else the first unchecked
    task in the earliest unfinished milestone. Work on a vertical slice that can
    be finished, tested and committed within the iteration. Split tasks in
@@ -33,24 +34,30 @@ Never modify it.
    Java sources it cites if behaviour is unclear. Port *behaviour*, not Java
    structure.
 5. **Implement** following the engineering rules below, tests included.
-6. **Gate**: the quality gate must pass.
+6. **Check while iterating, gate when done** (owner rule 2026-10-17):
+   use `cargo check`, targeted `cargo clippy -p <crate>` and the changed
+   crates' tests while working; run the full gate after a big feature,
+   before pushing it.
 7. **Record**: tick boxes in `PLAN.md`, update `## Now` with the precise next
    step, prepend a dated entry to `## Log` (what was done, what was learned,
    test counts), add an ADR for any non-obvious decision.
-8. **Commit**: `scripts/gate.sh && git add -A && git commit` in `postmortem/` with a conventional
-   message (`feat(fs-ntfs): …`) ending with the Co-Authored-By trailer. Then
-   push: `git push origin master master:parity-wip` (user decision
-   2026-10-17: finished work, including merged agent branches, goes straight
-   to `master`). Never add remotes.
+8. **Commit and push**: stage the files you changed explicitly (never
+   editor swap files), commit with a message that says what changed and
+   why, ending with the Co-Authored-By trailer, then
+   `git push origin master master:parity-wip` (owner decision: finished
+   work goes straight to `master`). Push a big feature only after a green
+   full gate. Never add remotes.
 9. **Continue**: if there is remaining work and context budget, go back to 3.
    Otherwise end the turn; the loop wakeup re-enters at step 1.
 
 ## Quality gate
 
 Run `scripts/gate.sh` from the repository root (fmt check, clippy
-with `-D warnings`, all tests). **Commit only as `scripts/gate.sh && git commit …`**
-so that a red gate can never be committed. **Never pipe the gate** (`gate.sh | tail` returns tail's exit
-status and lets a red gate through).
+with `-D warnings`, all tests), writing its output to a log file:
+`scripts/gate.sh > gate.log 2>&1; echo $?`. **Never pipe the gate**
+(`gate.sh | tail` returns tail's exit status and hides a red gate). UI
+flow tests occasionally time out under full-gate load; rerun the single
+test before treating it as a failure.
 
 UI snapshot tests (egui_kittest) and slow tests (large fixtures, fuzz corpora)
 may be gated behind `--features slow-tests`/`#[ignore]` and run at milestone
@@ -80,9 +87,10 @@ ends.
 - **Test parity with Autopsy**: before finishing a feature, check
   `docs/inventory/08-autopsy-tests.md` (and the Autopsy test sources it cites)
   for tests covering that area; port their cases and tick the checklist there.
-- **Golden regression harness**: like Autopsy's `test/` scripts, ingest the
-  fixture images end-to-end and compare a normalised case-DB dump against a
-  checked-in golden file (`insta`). Update goldens deliberately, never blindly.
+- **Golden regression files**: JSON goldens (e.g. `crates/pm-mcp/tests/golden/`)
+  are regenerated with `UPDATE_GOLDEN=1` and the diff reviewed before
+  committing — never blindly. A whole-case golden dump over the fixture
+  images (like Autopsy's `test/` scripts) is still to be built.
 - Integration-test crates (`tests/*.rs`) start with
   `#![allow(clippy::unwrap_used, clippy::expect_used, clippy::indexing_slicing, clippy::print_stderr, reason = "test code")]`
   because helper functions there are not covered by clippy.toml's test allowances.
@@ -96,14 +104,14 @@ ends.
   `fixtures/` created by documented scripts (`hdiutil`, `qemu-img`, …).
   Record fixture provenance in `fixtures/README.md`.
 - Property tests (`proptest`) for parsers/codecs ("never panics", round-trips).
-- Snapshot tests (`insta`) for reports and complex structured output.
+- Snapshot/golden files for reports and complex structured output.
 - UI: `egui_kittest` interaction tests for key flows.
 - Fuzz targets (`cargo fuzz`, in `fuzz/`) for every binary parser; a short
   smoke run at milestone ends.
 - Every fuzz crash/timeout is fixed, its input saved under
   `fuzz/regressions/<target>/`, and replayed by a normal `cargo test`.
-- Benchmarks (`divan`/`criterion`) for hot paths (hashing, NTFS MFT walk,
-  keyword search, table queries).
+- Benchmarks for hot paths as `#[ignore]` release tests (commands and
+  results in `PERF.md`); real-image runs with `postmortem ingest`.
 
 ## Stopping
 

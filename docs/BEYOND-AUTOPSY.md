@@ -13,14 +13,16 @@ Results use standard TSK artifact types where one fits; otherwise
 custom types named `PM_*` (Autopsy itself supports custom types, so
 reports and the UI handle them generically).
 
-Status: **[done]** implemented and tested · **[track]** assigned to a
-running agent track · **[next]** coordinator queue · **[later]**.
+Status: **[done]** implemented and tested · **[partial]** some of it
+done · **[next]** queued · **[later]**. (Statuses verified against the
+code 2026-10-18.)
 
 ## 1. System overview ("OS Info" on the Data Source Summary)
 
 Autopsy's `TSK_OS_INFO` has product name, version, owner, organisation,
-install date, computer name and a few more. Additionally **[track:
-windows-artifacts]**:
+install date, computer name and a few more. Additionally **[done]**
+(`TSK_OS_INFO` extended attributes, `PM_NETWORK_INTERFACE`,
+`PM_NETWORK_PROFILE`; install/upgrade history and auto-logon not yet):
 
 | Item | Source |
 |---|---|
@@ -39,11 +41,21 @@ account (from event logs, SAM, NTUSER timestamps), evidence of anti-forensics
 (cleared event logs 1102/104, time changes 4616, USN journal deleted,
 `fsutil`, CCleaner/BleachBit execution, VSS deletion).
 
-## 2. Windows event logs (EvtxECmd) — **[done: first cut]**
+## 2. Windows event logs (EvtxECmd) — **[partial]**
 
 Autopsy only reaches EVTX through Plaso. postmortem parses every
-`*.evtx` natively (`evtx` crate) and applies maps in the spirit of
-EvtxECmd's, producing:
+`*.evtx` (and legacy `.evt`) natively (`pm-evtlog`, `evtx` crate) and
+applies maps in the spirit of EvtxECmd's (`pm-evtlog/src/maps.rs`).
+
+**Done:** every mapped record becomes one generic `PM_EVENT_LOG` artifact
+(channel, event ID, provider, description, user, remote host,
+executable, payload fields) and a Log Entry timeline event; event-log
+clearing (1102/104) becomes a Likely Notable `TSK_INTERESTING_ITEM`
+("Anti-forensics"). MCP `query_event_logs` filters by channel, ID,
+provider, time and text.
+
+**Next:** typed artifacts and structured filters, as planned below (the
+field test showed substring filters are too blunt, e.g. logon type 10):
 
 - **Logons** (Security 4624/4625/4634/4647/4648/4672, 4778/4779 RDP
   reconnect/disconnect; TerminalServices 21/22/24/25; RDP 1149):
@@ -85,7 +97,14 @@ All of them become Timeline events.
 - **Volume Shadow Copies** (VSCMount): enumerate and expose snapshots as
   additional file systems of the volume (read-only) **[later]**.
 
-## 4. Program execution and presence — **[next, after pm-registry merges]**
+## 4. Program execution and presence — **[partial]**
+
+Done: ShimCache (`PM_SHIMCACHE`), Amcache file entries
+(`PM_AMCACHE_FILE`), RecentFileCache.bcf, BAM/DAM, Prefetch, UserAssist
+(all in Recent Activity as `TSK_PROG_RUN` or `PM_*` types). Not yet:
+SRUM, Windows Timeline, PowerShell history, scheduled tasks/autoruns
+overview.
+
 
 - **ShimCache / AppCompatCache** (AppCompatCacheParser): path, last
   modified, executed flag (XP–Win11 formats) → `TSK_PROG_RUN`-like
@@ -95,8 +114,9 @@ All of them become Timeline events.
   hash lookups of Amcache SHA-1s against hash sets.
 - **RecentFileCache.bcf** (Win7).
 - **BAM/DAM** (`bam\State\UserSettings`): last execution per user.
-- **Prefetch** **[track]**, **UserAssist** **[track]**, **SRUM**
-  **[track]** (app resource usage and network bytes per app).
+- **Prefetch** **[done]**, **UserAssist** **[done]**, **SRUM**
+  **[next]** (app resource usage and network bytes per app; needs an ESE
+  reader).
 - **Windows Timeline** `ActivitiesCache.db` (WxTCmd) → executed apps
   and opened files with focus durations.
 - **PowerShell history** `ConsoleHost_history.txt` per user.
@@ -104,7 +124,11 @@ All of them become Timeline events.
   and **Run/RunOnce/Winlogon/IFEO** autostart locations (persistence
   overview, Autoruns-like).
 
-## 5. User activity — **[next]**
+## 5. User activity — **[partial]**
+
+Done: Office MRU, TypedPaths/TypedURLs, RunMRU, recent-file MRUs, shell
+bags, jump lists, LNK. Not yet: the rest below.
+
 
 - Office MRU, Office TrustRecords (macros enabled), WordWheelQuery
   (Explorer searches), TypedPaths, LastVisitedPidlMRU, ComDlg32 MRUs.
@@ -202,7 +226,7 @@ Gaps open:
   the system's (Pacific); warn after Recent Activity reads the registry.
 - Peak memory 3 GB during the file phase; find out how much is heap.
 
-## 9. MCP server for AI assistants — **[next]**
+## 9. MCP server for AI assistants — **[done]**
 
 Autopsy 4.23 has an MCP server: 17 read-only query tools served over HTTP
 on localhost with a token, plus a stdio bridge. That set is a parity item
@@ -216,13 +240,13 @@ the evidence, and can optionally let it record findings.
 - **stdio** is the main transport: `postmortem mcp --case <dir>`. It opens
   the case read-only, using the case database's WAL mode, so it can run
   next to the GUI or after the GUI has closed. It needs no network.
-- **Streamable HTTP**, the Autopsy-compatible mode, runs while the GUI has
-  a case open.
+- **Streamable HTTP**, the Autopsy-compatible mode: `postmortem mcp
+  --case <dir> --http [--port N] [--token-file F]` **[done]**.
   - It binds to `127.0.0.1` only. Clients send a bearer token, which is
-    regenerated each session and stored in the user's settings folder with
-    `0600` permissions.
-  - Options › "AI: MCP Server" turns it on and off, sets the port, copies
-    the token, and shows a ready-made client config snippet.
+    regenerated each run and written with `0600` permissions.
+  - **[next]** Running it from the GUI: Options › "AI: MCP Server" to turn
+    it on and off, set the port, copy the token and show a client config
+    snippet.
 - It is a crate of its own, `pm-mcp`, built on the official Rust SDK
   (`rmcp`). It uses only `pm-case`, `pm-casedb`, `pm-search` and
   `pm-text`, and never the UI.
@@ -295,7 +319,8 @@ the evidence, and can optionally let it record findings.
 | `timeline_histogram` | Bucketed counts per event super-type, to find the busy periods. |
 | `events_around` | Events within ±N minutes of a time or a reference ("what happened around this download?"). |
 | `user_activity` | For one OS account: logons and sessions, program execution, recent documents, LNK files and jump lists, browser history and USB use, merged in time order. |
-| `program_execution` | One row per executable: first run, last run, run count, and the evidence for each (Prefetch, Amcache, ShimCache, UserAssist, BAM, SRUM). |
+| `get_server_status` | Server version, case, read-only state, enabled options and index status. |
+| `program_execution` **[next]** | One row per executable: first run, last run, run count, and the evidence for each (Prefetch, Amcache, ShimCache, UserAssist, BAM, SRUM). |
 | `usb_devices` | The combined USB device story from §6. |
 | `query_event_logs` | Channel, event ID, provider, time window and text. Uses the EvtxECmd-style field maps from §2. |
 | `read_registry_key` | Hive plus key path, giving values and subkeys with last-write time. Reads hives in the image, read-only. |

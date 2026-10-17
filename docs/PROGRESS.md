@@ -44,7 +44,7 @@ events (fd63f70), jump-list fix (3f83fcc), gallery on DB with MD5 dedup
   source processors / image formats / file systems, UI integration of
   all new modules (pm-ui is coordinator-owned), remaining UI parity.
 
-## Previous state (end of 2026-10-14)
+## Previous state (end of 2026-10-14) — historical snapshot, see the Log for later work
 
 ### What works (all on `master`)
 - **Evidence & file systems:** raw/split/EWF images, MBR/GPT, NTFS (TSK-exact,
@@ -121,6 +121,36 @@ events (fd63f70), jump-list fix (3f83fcc), gallery on DB with MD5 dedup
 _None._
 
 ## Log
+
+### 2026-10-18 — Field test, DB timeline, architecture review (solo)
+
+* Ran a real case: DFIR Madness "Stolen Szechuan Sauce" DESKTOP-SDN1RPT
+  through `postmortem ingest` (new headless CLI) and the MCP server;
+  answers match the published key (BEYOND-AUTOPSY §8). Ingest 4 min,
+  peak resident 3.25 GB.
+* Found and fixed: the DB timeline held only file times — data artifacts
+  now post TSK timeline events in their transaction (back-filled once for
+  older cases); Windows 10 jump-list times read from the wrong offset.
+* Timeline window, Image Gallery (MD5 de-duplication) now read the case
+  DB; schema v3 indexes all file time columns.
+* Examiner actions: Options › Hash Sets, Add File to Hash Set, Export
+  Table to CSV, Open in External Viewer, Delete Case, Open Case/Log
+  Folder. Communications Visualization Tool.
+* Architecture review recorded as ADR-023; Postgres plan as ADR-024;
+  owner decisions in `DIRECTION.md`. Docs verified against the code.
+
+### 2026-10-17 — Tracks merged; reports, plugins, MCP, email, geolocation
+
+Merged the search (pm-text, pm-search, Keyword Search), core file
+modules (File Type ID, Extension Mismatch, Encryption Detection,
+Interesting Files, Data Source Integrity), archives/carving (Embedded File
+Extractor, PhotoRec Carver), browsers (pm-browser, Recent Activity web),
+image formats (VHD, VHDX, VMDK, QCOW2) and MCP tracks. Added the
+WebAssembly plugin system (ADR-022), reports (HTML, Excel, files text,
+body file, tagged hashes, KML), Email Parser, GPX Parser and the
+Geolocation window, result tabs, keyword search UI with the Keyword Hits
+tree, Extracted Text viewer, tagging, hosts/persons, Options. Released
+v0.1.1.
 
 ### 2026-10-17 — WP-0 schema v2
 - Migration `0002_schema_v2.sql` + `pm-casedb` modules `scores`, `tags`,

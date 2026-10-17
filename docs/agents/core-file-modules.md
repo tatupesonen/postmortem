@@ -1,5 +1,7 @@
 # Track: core-file-modules (PLAN.md M4)
 
+> **Historical spec** from the parallel-agent period (2026-10-17). The work it describes is merged or folded into other crates; current status is in `docs/PARITY.md`, current direction in `docs/DIRECTION.md`.
+
 Autopsy's core file-level ingest modules, reimplemented on Linux after the
 first implementation was lost (the predecessor's unverified WIP was
 merged from `wip/filetype`, reviewed, fixed and completed).
