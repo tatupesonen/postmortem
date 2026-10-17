@@ -33,6 +33,7 @@ pm-ingest = { path = "crates/pm-ingest" }
 pm-modules = { path = "crates/pm-modules" }
 pm-hashdb = { path = "crates/pm-hashdb" }
 pm-filetype = { path = "crates/pm-filetype" }
+pm-encryption = { path = "crates/pm-encryption" }
 pm-evtlog = { path = "crates/pm-evtlog" }
 pm-ui = { path = "crates/pm-ui" }
 pm-registry = { path = "crates/pm-registry" }
@@ -54,6 +55,7 @@ crc32fast = "1.5.2"
 regex = "1.13.1"
 memchr = "2.8.3"
 roxmltree = "0.21.1"
+aes = "0.9.3"
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
 uuid = "1.28.0"
 

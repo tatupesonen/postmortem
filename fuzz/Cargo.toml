@@ -21,6 +21,7 @@ pm-registry = { path = "../crates/pm-registry" }
 pm-lnk = { path = "../crates/pm-lnk" }
 pm-prefetch = { path = "../crates/pm-prefetch" }
 pm-filetype = { path = "../crates/pm-filetype" }
+pm-encryption = { path = "../crates/pm-encryption" }
 
 [workspace]
 members = ["."]
@@ -112,6 +113,13 @@ bench = false
 [[bin]]
 name = "cfb_open"
 path = "fuzz_targets/cfb_open.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "encryption_check"
+path = "fuzz_targets/encryption_check.rs"
 test = false
 doc = false
 bench = false

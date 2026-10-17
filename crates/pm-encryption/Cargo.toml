@@ -1,0 +1,30 @@
+[package]
+name = "pm-encryption"
+description = "Encryption and password-protection checks: Autopsy's Encryption Detection rules with Apache POI / PDFBox / Jackcess password semantics"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[features]
+# Fixture builders (volume headers) for other crates' tests.
+builder = []
+
+[dependencies]
+pm-core.workspace = true
+pm-filetype.workspace = true
+thiserror.workspace = true
+tracing.workspace = true
+flate2.workspace = true
+md-5.workspace = true
+sha1.workspace = true
+sha2.workspace = true
+aes.workspace = true
+
+[dev-dependencies]
+pm-encryption = { path = ".", features = ["builder"] }
+pm-filetype = { workspace = true, features = ["builder"] }
+proptest.workspace = true
+
+[lints]
+workspace = true
