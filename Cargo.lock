@@ -4103,6 +4103,7 @@ dependencies = [
  "pm-case",
  "pm-casedb",
  "pm-core",
+ "pm-encryption",
  "pm-evtlog",
  "pm-filetype",
  "pm-hashdb",

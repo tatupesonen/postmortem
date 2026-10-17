@@ -3,6 +3,7 @@
 
 pub mod derive;
 pub mod embedded;
+pub mod encryption;
 pub mod event_logs;
 mod exif;
 pub mod ext_mismatch;
@@ -31,5 +32,6 @@ pub fn core_modules() -> Vec<Arc<dyn ModuleFactory>> {
         Arc::new(picture_analyzer::PictureAnalyzerFactory),
         Arc::new(ext_mismatch::ExtMismatchFactory),
         Arc::new(photorec::PhotoRecCarverFactory),
+        Arc::new(encryption::EncryptionFactory),
     ]
 }

@@ -17,3 +17,4 @@ builds. Re-measure when touching the paths below. Each benchmark is an
 | Zip extraction, 20 000 small members | — | 406 k members/s (Linux) | same | 2026-10-17 |
 | gzip, 256 MiB decoded | — | 377 MiB/s (Linux) | same | 2026-10-17 |
 | File type detection (`FileTypeDetector::detect`, mixed synthetic corpus: text, HTML, XML, PDF, PNG, JPEG, EXE, noise, OOXML/ODF/JAR/DOC/XLS) | — | 25.2 k files/s/thread, 177 MB/s (Linux VM, 8 vCPU) | `cargo test -p pm-filetype --release --test detect -- --ignored bench --nocapture` | 2026-10-17 |
+| Byte entropy (Encryption Detection, 256 MiB in memory) | — | 3.6 GB/s (Linux VM) | `cargo test -p pm-encryption --release --test bench -- --ignored --nocapture` | 2026-10-17 |

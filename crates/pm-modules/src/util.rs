@@ -141,6 +141,59 @@ impl Art {
     }
 }
 
+impl Art {
+    /// An analysis result on the data source itself (no file).
+    pub(crate) fn ds_result(
+        ctx: &JobContext,
+        module: &'static str,
+        ty: &str,
+        significance: Significance,
+    ) -> Self {
+        let mut s = Self::result(ctx, module, ty, 0, significance);
+        s.a.file_id = None;
+        s
+    }
+}
+
+/// Whether an artifact has every `(attribute, display value)`.
+fn has_attributes(ctx: &JobContext, artifact_id: i64, want: &[(&str, &str)]) -> bool {
+    let Ok(attrs) = ctx.case.db().attributes(artifact_id) else {
+        return false;
+    };
+    want.iter().all(|(name, value)| {
+        attrs
+            .iter()
+            .any(|a| a.name == *name && a.value.display() == *value)
+    })
+}
+
+/// Whether the file already has a `ty` artifact with these attributes
+/// (Autopsy's `Blackboard.artifactExists`), e.g. from an earlier job.
+pub(crate) fn file_result_exists(
+    ctx: &JobContext,
+    file_id: i64,
+    ty: &str,
+    want: &[(&str, &str)],
+) -> bool {
+    let type_id = art_type(ty);
+    ctx.case.db().artifacts_for_file(file_id).is_ok_and(|v| {
+        v.iter()
+            .any(|a| a.type_id == type_id && has_attributes(ctx, a.id, want))
+    })
+}
+
+/// The same for results on the data source itself.
+pub(crate) fn ds_result_exists(ctx: &JobContext, ty: &str, want: &[(&str, &str)]) -> bool {
+    let type_id = art_type(ty);
+    ctx.case
+        .db()
+        .artifacts_of_type(type_id, Some(ctx.ds_id), 0, 100_000)
+        .is_ok_and(|v| {
+            v.iter()
+                .any(|a| a.file_id.is_none() && has_attributes(ctx, a.id, want))
+        })
+}
+
 /// Lower-case hex.
 pub(crate) fn hex(b: &[u8]) -> String {
     pm_core::decode::to_hex(b)

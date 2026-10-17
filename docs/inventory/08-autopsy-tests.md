@@ -1389,11 +1389,11 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [x] port: EmbeddedFileTest.runTestContent — all extractable .txt hashed; protected entries not extracted or hashed
 
 ### Encryption detection
-- [ ] port: EncryptionDetectionTest.testBitlockerEncryption — BitLocker volume → TSK_ENCRYPTION_DETECTED, comment exactly "Bitlocker encryption detected."; other volumes none
-- [ ] port: EncryptionDetectionTest.testPasswordProtection — protected doc/xls/ppt/docx/xlsx/pptx/pdf/mdb/accdb (10 files) → DETECTED; unprotected → none
-- [ ] port: EncryptionDetectionTest.testVeraCryptSupport — unformatted high-entropy volume and ≥ 5 MiB container → TSK_ENCRYPTION_SUSPECTED
-- [ ] port: EncryptionDetectionTest.testSqlCipherEncryption — SQLCipher DBs → SUSPECTED; plain SQLite → none
-- [ ] port: encryption settings defaults — entropy 7.5, minimum size 5,242,880 B, 512-multiple, slack allowed
+- [x] port: EncryptionDetectionTest.testBitlockerEncryption — BitLocker volume → TSK_ENCRYPTION_DETECTED, comment exactly "Bitlocker encryption detected."; other volumes none
+- [x] port: EncryptionDetectionTest.testPasswordProtection — protected doc/xls/ppt/docx/xlsx/pptx/pdf/mdb/accdb (10 files) → DETECTED; unprotected → none
+- [x] port: EncryptionDetectionTest.testVeraCryptSupport — unformatted high-entropy volume and ≥ 5 MiB container → TSK_ENCRYPTION_SUSPECTED
+- [x] port: EncryptionDetectionTest.testSqlCipherEncryption — SQLCipher DBs → SUSPECTED; plain SQLite → none
+- [x] port: encryption settings defaults — entropy 7.5, minimum size 5,242,880 B, 512-multiple, slack allowed
 
 ### Hash lookup and keyword-list inputs
 - [ ] port (derive): parse `test/input/NSRL.txt-md5.idx` and `notablehashes.txt-md5.idx` — headers, 4 entries each, case-insensitive lookup, miss

@@ -8,14 +8,14 @@ merged from `wip/filetype`, reviewed, fixed and completed).
 |---|------|--------|
 | 1 | `pm-filetype` + File Type Identification module | done |
 | 2 | Extension Mismatch Detector | done |
-| 3 | Encryption Detection | not started |
+| 3 | Encryption Detection (+ `pm-encryption`) | done |
 | 4 | Interesting Files Identifier + reusable FilesSet engine (`pm-rules`) | not started |
 | 5 | Data Source Integrity (+ `pm-casedb/src/integrity.rs`) | not started |
 
 Pipeline order in `core_modules()` follows Autopsy's effective order
 (`PipelineConfig.xml`, then `IngestModuleFactoryLoader.coreModuleOrdering`
 for unlisted core modules): Hash Lookup, File Type Identification,
-Picture Analyzer, Extension Mismatch, Interesting Files, Encryption
+Embedded File Extractor, Picture Analyzer, Extension Mismatch, Interesting Files, PhotoRec, Encryption
 Detection; Data Source Integrity is a stage-2 data-source module.
 
 ## 1. File Type Identification
@@ -146,3 +146,86 @@ custom map).
 
 Gap: none known in behaviour. The settings UI (global map editor, "Add
 extension as matching MIME type" context action) is a coordinator to-do.
+## 3. Encryption Detection
+
+### `crates/pm-encryption` (new)
+
+Reusable checks, each answering what Autopsy learns from Tika/Jackcess:
+`Ok(true)` (an encrypted-document exception), `Ok(false)`, or a parse
+error (Autopsy logs it and flags nothing).
+
+* `entropy`: Autopsy's byte entropy, including its `size - 1` divisor;
+  streamed in 1 MiB reads with cancellation.
+* `volume`: Autopsy's BitLocker boot-sector rule (incl. its signed-byte
+  quirk that rejects 0x80 sectors/cluster), plus LUKS 1/2 and Core
+  Storage (FileVault 2) headers.
+* `office`: legacy Word/Excel/PowerPoint as Apache POI 5.3 opens them:
+  the FIB `fEncrypted` flag and table-stream `EncryptionInfo` (Word),
+  BOF/WRITEPROTECT/FILEPASS (Excel), CurrentUser → UserEditAtom →
+  PersistPtrHolder → DocumentEncryptionAtom (PowerPoint, ranged OLE reads);
+  XOR, binary RC4, RC4 CryptoAPI and AES "standard" verifiers tried with
+  POI's default password `VelvetSweatshop`; which POI exceptions Tika
+  reports as `EncryptedDocumentException` follows each extractor.
+* `pdf`: PDFBox 3.0.3's standard security handler with an empty password
+  (owner first, then user) for revisions 2–6 (RC4 40/128, AES-128,
+  AES-256 with algorithm 2.B); trailer discovery via `startxref`, classic
+  xref tables, xref streams (Flate + PNG predictors), `/Prev` chains,
+  hybrid `/XRefStm`, and a brute-force fallback like PDFBox's lenient
+  parser.
+* `access`: Jackcess 4.0.7 with `CryptCodecProvider`: Office-encrypted
+  ACCDB → protected; unsupported providers or unopenable files → not;
+  otherwise the de-obfuscated database password field (header mask +
+  creation-date mask).
+
+Verified against the real libraries: `scripts/fixtures/MakeEncrypted.java`
+writes 17 documents with POI/PDFBox (protected and unprotected DOC, XLS
+incl. Excel's default password, PPT, OOXML agile/standard, PDF owner-only
+and R2/R3/R4/R6) and prints real Tika 3.0.0's verdict for each; plus
+POI-written FILEPASS vectors; `AccessOracle.java` runs Autopsy's Jackcess
+path on Tika's Access test databases. `tests/oracle.rs` asserts every
+verdict (all identical).
+
+### `crates/pm-modules/src/encryption.rs`
+
+Module `encryption` ("Encryption Detection", "Looks for files with the
+specified minimum entropy.").
+
+* Settings (Autopsy defaults): `minimum_entropy` 7.5 (6.0–8.0),
+  `minimum_file_size` 5 242 880 bytes (≥ 1), `file_size_multiple_enforced`
+  true, `slack_files_allowed` true; invalid values fail start-up with
+  Autopsy's messages.
+* File level: skips unallocated space, directories, slack (unless
+  allowed), known files, unallocated metadata and Autopsy's (misspelt)
+  `/hiberfile.sys`, `/pagefile.sys`. `application/octet-stream` files of a
+  qualifying size (`.db` from 64 KiB) with entropy ≥ minimum →
+  `TSK_ENCRYPTION_SUSPECTED` (Likely Notable, "Suspected encryption due to
+  high entropy (%f)."); else protected OOXML / DOC / XLS / PPT / PDF /
+  Access → `TSK_ENCRYPTION_DETECTED` (Notable, "Password protection
+  detected."). Comment as `TSK_COMMENT` and justification; an inbox data
+  message "<type> Match: <name>" with "File: <path>" and the entropy.
+* Data-source level (stage 1, disk images): per volume, BitLocker →
+  DETECTED "Bitlocker encryption detected."; beyond Autopsy, LUKS →
+  DETECTED "LUKS encryption detected." and Core Storage → SUSPECTED; a
+  volume without a file system whose entropy reaches the minimum →
+  SUSPECTED; the first flagged volume ends the check (Autopsy). Volume
+  results are attached to the data source with the volume in
+  `TSK_DESCRIPTION` (no volume objects in the case database).
+* Re-ingest posts no duplicates (Autopsy would).
+
+Tests: 16 unit tests (crypto vectors incl. FIPS-197, entropy, BitLocker/
+LUKS/Core Storage rules, POI vectors, persist pointers, Access headers
+for Jet3/Jet4/ACE and Office providers, PDF objects/predictors), the
+oracle tests, proptests over corrupted fixtures and arbitrary bytes, fuzz
+target `encryption_check`; end-to-end: protected and unprotected
+documents, VeraCrypt-style containers and `.db` files with the size rules,
+settings validation, BitLocker / LUKS / random / zero volumes on
+partitioned disks.
+
+Gaps vs Autopsy: Agile-encrypted binary Office files and Office-encrypted
+ACCDBs are assumed not to open with the default/empty password (POI and
+Jackcess would verify it; such files do not exist in practice); an Access
+database with a password but a corrupt catalog is flagged (Jackcess
+fails to open it); the PDF check does not parse the document beyond the
+trailer and encryption dictionary (PDFBox may reject a broken PDF
+first); APFS (FileVault on APFS) volumes are not recognised.
+
