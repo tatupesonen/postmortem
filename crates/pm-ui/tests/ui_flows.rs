@@ -529,8 +529,8 @@ fn file_metadata_shows_hashes_after_analysis() {
     settle(&mut h, |h| {
         h.query_by_label_contains("secret_plan.docx").is_some()
     });
-    // The first match is the file itself, listed before its ADS.
-    click(&mut h, "setup.exe");
+    // The file itself, not its Zone.Identifier stream.
+    click_exact(&mut h, "🗋 setup.exe");
     click(&mut h, "File Metadata");
     let md5 = setup_exe_md5();
     settle(&mut h, |h| h.query_by_label(&md5).is_some());
@@ -886,4 +886,65 @@ fn archives_open_like_folders() {
     settle(&mut h, |h| {
         h.query_by_label_contains("48 × 32 px").is_some()
     });
+}
+
+/// Hosts: the image gets TSK's default host; Manage Hosts adds a host;
+/// the host menu associates the host with a new person.
+#[test]
+fn hosts_and_persons() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    wait_analysed(&mut h);
+    settle(&mut h, |h| {
+        h.query_all_by_label("🖥 demo.dd Host").next().is_some()
+    });
+
+    click(&mut h, "Case");
+    click_exact(&mut h, "Manage Hosts");
+    click_exact(&mut h, "New");
+    let field = h
+        .query_all(egui_kittest::kittest::by().role(egui::accesskit::Role::TextInput))
+        .next()
+        .expect("host name field");
+    field.focus();
+    field.type_text("Suspect phone");
+    h.run_steps(2);
+    click_exact(&mut h, "OK");
+    settle(&mut h, |h| {
+        h.query_all_by_label("🖥 Suspect phone").next().is_some()
+    });
+    click_exact(&mut h, "Close");
+
+    h.query_all_by_label("🖥 demo.dd Host")
+        .next()
+        .unwrap()
+        .click_secondary();
+    h.run_steps(2);
+    click(&mut h, "Associate with Person");
+    click_exact(&mut h, "New Person...");
+    let field = h
+        .query_all(egui_kittest::kittest::by().role(egui::accesskit::Role::TextInput))
+        .next()
+        .expect("person name field");
+    field.focus();
+    field.type_text("John Doe");
+    h.run_steps(2);
+    click_exact(&mut h, "OK");
+    // The host's menu now offers removing it from the person.
+    settle(&mut h, |h| {
+        if h.query_by_label_contains("Remove from Person").is_some() {
+            return true;
+        }
+        if let Some(n) = h.query_all_by_label("🖥 demo.dd Host").next() {
+            n.click_secondary();
+        }
+        false
+    });
+    let label = h
+        .query_by_label_contains("Remove from Person")
+        .map(|n| format!("{:?}", n.accesskit_node().label()));
+    assert_eq!(
+        label.as_deref(),
+        Some("Some(\"Remove from Person (John Doe)\")"),
+        "{label:?}"
+    );
 }
