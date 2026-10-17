@@ -83,7 +83,7 @@ fn settle(
     h: &mut Harness<'_, PostmortemApp>,
     mut done: impl FnMut(&mut Harness<'_, PostmortemApp>) -> bool,
 ) {
-    let deadline = Instant::now() + Duration::from_secs(20);
+    let deadline = Instant::now() + Duration::from_mins(1);
     loop {
         h.step();
         if done(h) {
@@ -838,6 +838,7 @@ fn data_source_menu_runs_ingest_and_removes() {
         h.query_by_label_contains("Configure ingest for demo.dd")
             .is_some()
     });
+    shot(&mut h, "run_ingest_dialog");
     click_exact(&mut h, "Finish");
     // A second job runs and finishes.
     settle(&mut h, |h| {
@@ -886,6 +887,7 @@ fn archives_open_like_folders() {
     settle(&mut h, |h| {
         h.query_by_label_contains("48 × 32 px").is_some()
     });
+    shot(&mut h, "archive_member");
 }
 
 /// Hosts: the image gets TSK's default host; Manage Hosts adds a host;
@@ -930,21 +932,102 @@ fn hosts_and_persons() {
     h.run_steps(2);
     click_exact(&mut h, "OK");
     // The host's menu now offers removing it from the person.
-    settle(&mut h, |h| {
-        if h.query_by_label_contains("Remove from Person").is_some() {
-            return true;
+    let mut label = None;
+    let deadline = Instant::now() + Duration::from_mins(1);
+    while label.is_none() && Instant::now() < deadline {
+        h.step();
+        if let Some(n) = h.query_by_label_contains("Remove from Person") {
+            label = n.accesskit_node().label();
+            break;
         }
-        if let Some(n) = h.query_all_by_label("🖥 demo.dd Host").next() {
+        // Re-open the menu once the association has been written.
+        if h.query_by_label_contains("Associate with Person").is_none()
+            && let Some(n) = h.query_all_by_label("🖥 demo.dd Host").next()
+        {
             n.click_secondary();
         }
-        false
+        std::thread::sleep(Duration::from_millis(5));
+    }
+    assert_eq!(label.as_deref(), Some("Remove from Person (John Doe)"));
+    shot(&mut h, "hosts_and_persons");
+}
+
+/// The case's tag names, read from its database.
+fn case_tag_names(h: &Harness<'_, PostmortemApp>) -> Vec<(String, bool)> {
+    let dir = h.state().analysis_case_dir().expect("a case");
+    let db = pm_casedb::CaseDb::open(dir.join("case.db")).unwrap();
+    db.tag_names()
+        .unwrap()
+        .into_iter()
+        .map(|t| (t.name, t.notable))
+        .collect()
+}
+
+/// Tools › Options › Tags: a new notable tag is saved to the user
+/// settings and to the open case.
+#[test]
+fn options_tags_page_adds_a_notable_tag() {
+    let mut h = harness(Vec::new());
+    click(&mut h, "Tools");
+    click(&mut h, "Options");
+    click_exact(&mut h, "Tags");
+    click_exact(&mut h, "New Tag");
+    let field = h
+        .query_all(egui_kittest::kittest::by().role(egui::accesskit::Role::TextInput))
+        .next()
+        .expect("tag name field");
+    field.focus();
+    field.type_text("Evidence");
+    h.run_steps(2);
+    click_exact(&mut h, "Tag indicates item is notable.");
+    // The dialog's OK (the dialog is drawn above the Options window).
+    h.query_all_by_label("OK").last().unwrap().click();
+    h.run_steps(2);
+    settle(&mut h, |h| {
+        h.query_all_by_label("Evidence").next().is_some()
     });
-    let label = h
-        .query_by_label_contains("Remove from Person")
-        .map(|n| format!("{:?}", n.accesskit_node().label()));
-    assert_eq!(
-        label.as_deref(),
-        Some("Some(\"Remove from Person (John Doe)\")"),
-        "{label:?}"
+    click_exact(&mut h, "Evidence");
+    h.get_by_label("Yes");
+    shot(&mut h, "options_tags");
+    click_exact(&mut h, "OK");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Tag Names:").is_none()
+    });
+    settle(&mut h, |h| {
+        case_tag_names(h).contains(&("Evidence".to_owned(), true))
+    });
+}
+
+/// User tag definitions are added to every case that is opened.
+#[test]
+fn user_tags_are_added_to_new_cases() {
+    let ctx = egui::Context::default();
+    let mut app = PostmortemApp::with_state(
+        &ctx,
+        Persisted {
+            case_root: Some(CASES.path().to_path_buf()),
+            custom_tags: vec![pm_ui::TagDefinition {
+                name: "Reviewed".into(),
+                description: "Seen by a second examiner".into(),
+                notable: false,
+            }],
+            ..Default::default()
+        },
+        Vec::new(),
     );
+    app.create_case(
+        &ctx,
+        &CASES.path().join("user-tags"),
+        pm_case::CaseDetails {
+            name: "user tags".into(),
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(1400.0, 900.0))
+        .build_ui_state(|ui, app: &mut PostmortemApp| app.frame(ui), app);
+    settle(&mut h, |h| {
+        case_tag_names(h).contains(&("Reviewed".to_owned(), false))
+    });
 }

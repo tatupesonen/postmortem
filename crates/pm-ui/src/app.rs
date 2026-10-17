@@ -41,6 +41,8 @@ pub struct Persisted {
     pub ingest: crate::add_source::IngestPrefs,
     /// Leave known files (e.g. NSRL) out of the Views tree (Autopsy default).
     pub hide_known_in_views: bool,
+    /// The user's tag names (Options › Tags), added to every opened case.
+    pub custom_tags: Vec<crate::tags_ui::TagDefinition>,
 }
 
 impl Default for Persisted {
@@ -54,6 +56,7 @@ impl Default for Persisted {
             recent_cases: Vec::new(),
             ingest: crate::add_source::IngestPrefs::default(),
             hide_known_in_views: true,
+            custom_tags: Vec::new(),
         }
     }
 }
@@ -125,6 +128,7 @@ pub struct PostmortemApp {
     file_search: Option<crate::file_search_ui::FileSearchWindow>,
     run_ingest: Option<crate::add_source::RunIngestDialog>,
     hosts_ui: crate::hosts_ui::HostsUi,
+    options: Option<crate::options_ui::OptionsWindow>,
     /// A data source awaiting removal confirmation `(id, name)`.
     confirm_remove: Option<(i64, String)>,
     removing: Option<Task<Result<(), String>>>,
@@ -192,6 +196,7 @@ impl PostmortemApp {
             file_search: None,
             run_ingest: None,
             hosts_ui: crate::hosts_ui::HostsUi::default(),
+            options: None,
             confirm_remove: None,
             removing: None,
             mime_types: crate::task::Cached::default(),
@@ -354,7 +359,10 @@ impl PostmortemApp {
         self.close_case(ctx);
         let dir = case.dir().to_path_buf();
         let title = format!("{} — postmortem", case.details().name);
-        self.analysis.lock().set_case(Arc::new(case));
+        let case = Arc::new(case);
+        self.tagging
+            .apply_definitions(ctx, &case, self.persisted.custom_tags.clone());
+        self.analysis.lock().set_case(case);
         self.persisted.recent_cases.retain(|r| r != &dir);
         self.persisted.recent_cases.insert(0, dir);
         self.persisted.recent_cases.truncate(10);
@@ -878,6 +886,11 @@ impl PostmortemApp {
                     .clicked()
                 {
                     self.open_discovery(ui.ctx());
+                    ui.close();
+                }
+                ui.separator();
+                if ui.button("⚙ Options").clicked() {
+                    self.open_options();
                     ui.close();
                 }
             });
@@ -1406,7 +1419,10 @@ impl PostmortemApp {
                 .filter(|t| t.category == cat)
                 .cloned()
                 .collect();
-            if of_cat.is_empty() {
+            let analysis = cat == pm_casedb::catalog::Category::AnalysisResult;
+            // OS Accounts sits under Analysis Results, so that section is
+            // never empty.
+            if of_cat.is_empty() && !analysis {
                 ui.weak(if live {
                     "Analysis is running…"
                 } else {
@@ -1420,7 +1436,28 @@ impl PostmortemApp {
                 let label = format!("{icon} {} ({})", t.display, crate::format::grouped(t.count));
                 self.tree_node(ui, &node, &label, false, |_, _| {});
             }
+            if analysis {
+                self.os_accounts_node(ui, case.as_ref());
+            }
         }
+    }
+
+    /// The OS Accounts node (its count comes with the case summary).
+    fn os_accounts_node(&mut self, ui: &mut egui::Ui, case: Option<&Arc<pm_case::Case>>) {
+        let Some(case) = case else {
+            return;
+        };
+        let loader = Arc::clone(case);
+        let count = self
+            .case_summary
+            .get(ui.ctx(), move || crate::case_nodes::load_summary(&loader))
+            .map(|s| crate::format::grouped(s.os_accounts));
+        let label = format!(
+            "{} OS Accounts ({})",
+            icons::OS_ACCOUNTS,
+            count.as_deref().unwrap_or("…")
+        );
+        self.tree_node(ui, &NodeId::OsAccounts, &label, false, |_, _| {});
     }
 
     /// A host node: its data sources (Autopsy lists the node's children).
@@ -1482,7 +1519,7 @@ impl PostmortemApp {
         }
     }
 
-    /// OS Accounts, Tags and Score (Autopsy's tree order after the results).
+    /// Tags and Score (Autopsy's tree order after the results).
     fn case_nodes_tree(&mut self, ui: &mut egui::Ui) {
         let Some(case) = self.analysis.lock().case().cloned() else {
             return;
@@ -1494,18 +1531,6 @@ impl PostmortemApp {
         else {
             return;
         };
-        ui.add_space(8.0);
-        self.tree_node(
-            ui,
-            &NodeId::OsAccounts,
-            &format!(
-                "{} OS Accounts ({})",
-                icons::OS_ACCOUNTS,
-                crate::format::grouped(sum.os_accounts)
-            ),
-            false,
-            |_, _| {},
-        );
         ui.add_space(8.0);
         ui.heading(format!("{} Tags", icons::TAGS));
         if sum.tags.is_empty() {
@@ -2495,6 +2520,55 @@ impl PostmortemApp {
             .set_hash_resolver(Some(crate::viewers::HashResolver(Arc::new(resolver))));
     }
 
+    /// Tools › Options.
+    pub fn open_options(&mut self) {
+        let p = &self.persisted;
+        self.options = Some(crate::options_ui::OptionsWindow::new(
+            crate::options_ui::Settings {
+                local_time: p.local_time,
+                hide_known_in_views: p.hide_known_in_views,
+                custom_tags: p.custom_tags.clone(),
+            },
+        ));
+    }
+
+    fn show_options(&mut self, ctx: &egui::Context) {
+        use crate::options_ui::OptionsAction;
+        let Some(w) = &mut self.options else {
+            return;
+        };
+        let running = self.analysis.lock().any_active();
+        let (settings, close) = match w.ui(ctx, running) {
+            OptionsAction::None => return,
+            OptionsAction::Close => (None, true),
+            OptionsAction::Apply(s) => (Some(s), false),
+            OptionsAction::ApplyAndClose(s) => (Some(s), true),
+        };
+        if close {
+            self.options = None;
+        }
+        let Some(s) = settings else {
+            return;
+        };
+        if s.local_time != self.persisted.local_time {
+            self.persisted.local_time = s.local_time;
+            self.apply_time_pref();
+        }
+        if s.hide_known_in_views != self.persisted.hide_known_in_views {
+            self.persisted.hide_known_in_views = s.hide_known_in_views;
+            self.view_counts.invalidate();
+            self.view_rows.clear();
+        }
+        if s.custom_tags != self.persisted.custom_tags {
+            let case = self.analysis.lock().case().cloned();
+            if let Some(case) = case {
+                self.tagging
+                    .apply_definitions(ctx, &case, s.custom_tags.clone());
+            }
+            self.persisted.custom_tags = s.custom_tags;
+        }
+    }
+
     /// Draws one frame (shared by eframe and UI tests).
     pub fn frame(&mut self, ui: &mut egui::Ui) {
         let ctx = ui.ctx().clone();
@@ -2508,6 +2582,9 @@ impl PostmortemApp {
         let case = self.analysis.lock().case().cloned();
         let errors = self.tagging.ui(&ctx, case.as_ref());
         self.errors.extend(errors);
+        for d in self.tagging.take_created() {
+            crate::tags_ui::upsert_definition(&mut self.persisted.custom_tags, d);
+        }
         if self.tagging.take_changed() {
             // Scores and tag columns changed.
             self.listings.clear();
@@ -2549,6 +2626,7 @@ impl PostmortemApp {
         self.show_discovery(&ctx);
         self.show_progress(&ctx);
         self.dialogs(&ctx);
+        self.show_options(&ctx);
         self.persisted.table = self.table.clone();
     }
 }
