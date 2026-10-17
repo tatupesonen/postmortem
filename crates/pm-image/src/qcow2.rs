@@ -162,7 +162,7 @@ pub fn parse(src: &dyn ReadAt) -> Result<QcowHeader, ImageError> {
             EXT_DATA_FILE => return Err(corrupt("external data files are not supported")),
             _ => {}
         }
-        off = off + 8 + len.next_multiple_of(8);
+        off = off.saturating_add(8 + len.next_multiple_of(8));
     }
     let backing_file = if backing_offset != 0 && backing_size != 0 {
         if backing_size > 1023 {
@@ -285,7 +285,10 @@ impl BlockMap for QcowMap {
         if l1_idx >= self.l1_size {
             return Ok((Run::Parent, (span - pos % span).min(avail)));
         }
-        let l1 = self.meta.u64_be(0, self.l1_offset + l1_idx * 8)? & OFFSET_MASK;
+        let l1 = self
+            .meta
+            .u64_be(0, self.l1_offset.saturating_add(l1_idx * 8))?
+            & OFFSET_MASK;
         if l1 == 0 {
             return Ok((Run::Parent, (span - pos % span).min(avail)));
         }

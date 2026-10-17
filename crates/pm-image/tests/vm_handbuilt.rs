@@ -485,3 +485,19 @@ fn qcow2_hand_patched_backing_reads() {
         "beyond a shorter backing file"
     );
 }
+
+/// Inputs that crashed the `{vhd,vhdx,vmdk,qcow2}_read` fuzz targets.
+#[test]
+fn fuzz_regressions() {
+    for target in ["vhd_read", "vhdx_read", "vmdk_read", "qcow2_read"] {
+        let dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../fuzz/regressions")
+            .join(target);
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            continue;
+        };
+        for e in entries {
+            open_any(std::fs::read(e.unwrap().path()).unwrap());
+        }
+    }
+}

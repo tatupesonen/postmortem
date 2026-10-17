@@ -29,6 +29,7 @@ builds. Re-measure when touching the paths below. Each benchmark is an
 | Inline matcher (5 built-in lists + 101 keywords), one thread | — | 38.9 MB/s | `cargo test -p pm-search --release --test bench -- --ignored matcher_throughput --nocapture` | 2026-10-17 |
 | Chunker (NFKC, lower-casing, Autopsy size rules), one thread | — | 132 MB/s (was 32.5 before the NFKC quick check and byte-buffer queue) | `cargo test -p pm-text --release --test bench -- --ignored --nocapture` | 2026-10-17 |
 | String extraction, 64 MiB binary: English-only / international (LATIN_2 + CYRILLIC) | — | 346 / 31 MB/s | same | 2026-10-17 |
+| Virtual disk sequential read, 1 GiB disk (¾ random, ¼ text), 1 MiB requests, warm page cache, content hashed and checked against the raw file: raw / VHD dynamic / VHD fixed / VHDX dynamic / VMDK monolithicSparse / VMDK 2 GB split sparse / VMDK flat / VMDK streamOptimized / QCOW2 / QCOW2 deflate-compressed / QCOW2 zstd-compressed | ≥ disk speed; memory independent of image size | 8 821 / 7 942 / 7 815 / 9 280 / 7 676 / 7 570 / 7 906 / 3 375 / 3 054 / 3 081 / 2 539 MiB/s; RSS growth ≤ 4.5 MiB (bounded table and grain caches) (Linux VM, 8 vCPU, one thread) | `cargo test -p pm-image --release --test vm_bench -- --ignored --nocapture` (needs `qemu-img`) | 2026-10-17 |
 
 ## Tika comparison harness
 

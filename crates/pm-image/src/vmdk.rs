@@ -327,7 +327,9 @@ impl VmdkMap {
         if gt_idx >= s.gd_entries {
             return Ok((self.absent(), avail));
         }
-        let gd = self.meta.u32_le(s.file, s.gd_offset + gt_idx * 4)?;
+        let gd = self
+            .meta
+            .u32_le(s.file, s.gd_offset.saturating_add(gt_idx * 4))?;
         if gd == 0 {
             return Ok((self.absent(), (gt_bytes - rel % gt_bytes).min(avail)));
         }
@@ -395,7 +397,7 @@ impl BlockMap for VmdkMap {
             Kind::Flat { file, offset } => Ok((
                 Run::Data {
                     src: Arc::clone(self.meta.file(*file)?),
-                    offset: offset + rel,
+                    offset: offset.saturating_add(rel),
                 },
                 avail,
             )),
@@ -507,7 +509,7 @@ fn read_descriptor(src: &dyn ReadAt, name: &str) -> Result<(Descriptor, bool), I
     if &magic == b"KDMV" {
         let h = parse_sparse(src)?;
         if h.descriptor_offset != 0 && h.descriptor_size != 0 {
-            let len = (h.descriptor_size * SECTOR).min(MAX_DESCRIPTOR);
+            let len = h.descriptor_size.saturating_mul(SECTOR).min(MAX_DESCRIPTOR);
             let off = h
                 .descriptor_offset
                 .checked_mul(SECTOR)

@@ -366,7 +366,7 @@ impl VhdxMap {
                     format!("VHDX BAT entry {index} beyond the BAT region"),
                 )
             })?;
-        self.meta.u64_le(0, self.bat_offset + off)
+        self.meta.u64_le(0, self.bat_offset.saturating_add(off))
     }
 }
 
@@ -390,7 +390,7 @@ impl BlockMap for VhdxMap {
             PAYLOAD_FULLY_PRESENT => Ok((
                 Run::Data {
                     src: Arc::clone(self.meta.file(0)?),
-                    offset: file_off + within,
+                    offset: file_off.saturating_add(within),
                 },
                 to_end,
             )),
@@ -406,14 +406,14 @@ impl BlockMap for VhdxMap {
                 let first = in_chunk / self.sector;
                 let last = (in_chunk + to_end - 1) / self.sector;
                 let bit = |s: u64| -> io::Result<bool> {
-                    let byte = self.meta.u8(0, bitmap + s / 8)?;
+                    let byte = self.meta.u8(0, bitmap.saturating_add(s / 8))?;
                     Ok(byte & (1 << (s % 8)) != 0)
                 };
                 let present = bit(first)?;
                 let mut s = first + 1;
                 while s <= last {
                     if s.is_multiple_of(8) && s + 7 <= last {
-                        let byte = self.meta.u8(0, bitmap + s / 8)?;
+                        let byte = self.meta.u8(0, bitmap.saturating_add(s / 8))?;
                         if byte == if present { 0xFF } else { 0x00 } {
                             s += 8;
                             continue;
@@ -429,7 +429,7 @@ impl BlockMap for VhdxMap {
                     (
                         Run::Data {
                             src: Arc::clone(self.meta.file(0)?),
-                            offset: file_off + within,
+                            offset: file_off.saturating_add(within),
                         },
                         len,
                     )

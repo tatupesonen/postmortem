@@ -264,7 +264,9 @@ impl BlockMap for VhdMap {
         if block >= self.max_entries {
             return Ok((absent, to_block_end));
         }
-        let entry = self.meta.u32_be(0, self.bat_offset + block * 4)?;
+        let entry = self
+            .meta
+            .u32_be(0, self.bat_offset.saturating_add(block * 4))?;
         if entry == UNALLOCATED {
             return Ok((absent, to_block_end));
         }
@@ -274,14 +276,14 @@ impl BlockMap for VhdMap {
         let first = within / SECTOR;
         let last = (within + to_block_end - 1) / SECTOR;
         let bit = |s: u64| -> io::Result<bool> {
-            let byte = self.meta.u8(0, start + s / 8)?;
+            let byte = self.meta.u8(0, start.saturating_add(s / 8))?;
             Ok(byte & (0x80 >> (s % 8)) != 0)
         };
         let present = bit(first)?;
         let mut s = first + 1;
         while s <= last {
             if s.is_multiple_of(8) && s + 7 <= last {
-                let byte = self.meta.u8(0, start + s / 8)?;
+                let byte = self.meta.u8(0, start.saturating_add(s / 8))?;
                 if byte == if present { 0xFF } else { 0x00 } {
                     s += 8;
                     continue;

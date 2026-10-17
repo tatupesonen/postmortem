@@ -68,11 +68,45 @@ Shared machinery:
   file content must read back through the container.
 * Fuzz: `fuzz/fuzz_targets/{vhd,vhdx,vmdk,qcow2}_read.rs` with seeds in
   `fuzz/seeds/<target>/` (qemu-made images plus tiny hand-made VHD/VHDX).
+  Smoke runs of 45-60 s each (2026-10-17): vhd 500 k runs, vhdx 58 k,
+  vmdk 76 k, qcow2 304 k execs. They found two integer overflows on
+  hostile header offsets (VHD BAT offset + index, VMDK descriptor size ×
+  512), now fixed with saturating arithmetic on every header-derived
+  offset. The inputs are in `fuzz/regressions/{vhd,vmdk}_read/` and
+  replayed by `vm_handbuilt::fuzz_regressions`.
 
 ## Benchmarks
 
-See `docs/PERF.md` ("Virtual disk formats"). Run with
-`cargo test --release -p pm-image --test vm_bench -- --ignored --nocapture`.
+`cargo test --release -p pm-image --test vm_bench -- --ignored --nocapture`
+(needs qemu-img; recorded in `docs/PERF.md`). The test reads a 1 GiB disk in
+1 MiB requests over a warm page cache, and checks that the content hash
+matches the raw file.
+
+| Format | MiB/s |
+|--------|------:|
+| raw file | 8 821 |
+| VHD dynamic / fixed | 7 942 / 7 815 |
+| VHDX dynamic | 9 280 |
+| VMDK monolithicSparse / 2 GB split sparse / flat | 7 676 / 7 570 / 7 906 |
+| VMDK streamOptimized (inflate) | 3 375 |
+| QCOW2 | 3 054 |
+| QCOW2 deflate / zstd compressed | 3 081 / 2 539 |
+
+RSS growth while reading is at most 4.5 MiB, from the bounded caches.
+QCOW2 is slower than the others because `qemu-img convert` writes clusters
+out of order (parallel coroutines), so fewer 64 KiB clusters coalesce into
+one large read.
+
+## Remaining work
+
+* Longer fuzz campaigns. Only short smoke runs have been done so far.
+* VMDK COWD/vmfsSparse and SESPARSE deltas (ESX snapshots).
+* VHDX log replay. Today a dirty log is only flagged.
+* VHDX `parent_linkage` check.
+* `pm-ui` Add Data Source filter: use `SUPPORTED_IMAGE_EXTS` and show the
+  `MissingParent` / `Encrypted` messages (owned by the UI track).
+* VM Extractor module (email-mobile track): it can now call
+  `pm_image::open` on extracted VMDK/VHD/VHDX files.
 
 ## Gaps vs TSK / libvmdk / libvhdi / Autopsy
 
