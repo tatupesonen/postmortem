@@ -765,3 +765,32 @@ fn tagging_files_feeds_tags_and_score_nodes() {
     settle(&mut h, |h| h.query_all_by_label("File").next().is_some());
     shot(&mut h, "tags_and_score");
 }
+
+/// Result tags: the result table's Add Result Tag menu tags the
+/// artifact; the Tags tree lists it under Result Tags.
+#[test]
+fn tagging_results_from_the_result_table() {
+    let mut h = harness(vec![DEMO.1.clone()]);
+    h.set_size(egui::vec2(1400.0, 1500.0));
+    wait_analysed(&mut h);
+    click(&mut h, "Web Downloads (1)");
+    settle(&mut h, |h| h.query_by_label_contains("1 results").is_some());
+    // The result row's source file cell.
+    let src = "setup.exe:Zone.Identifier";
+    settle(&mut h, |h| h.query_all_by_label(src).next().is_some());
+    h.query_all_by_label(src).next().unwrap().click_secondary();
+    h.run_steps(2);
+    click(&mut h, "Add Result Tag");
+    click_exact(&mut h, "Follow Up");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Follow Up (1)").is_some()
+    });
+    click(&mut h, "Follow Up (1)");
+    click(&mut h, "Result Tags (1)");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Source File Path").is_some()
+    });
+    // The row's Result Type cell (besides the tree node).
+    assert!(h.query_all_by_label("Web Downloads").count() >= 1);
+    shot(&mut h, "result_tags");
+}

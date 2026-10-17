@@ -1755,16 +1755,40 @@ impl PostmortemApp {
             }
             Some(Ok(r)) => Arc::clone(r),
         };
-        let title = case
-            .db()
-            .artifact_type_names()
-            .ok()
-            .and_then(|n| n.into_iter().find(|t| t.0 == type_id).map(|t| t.2))
+        // The title comes from the cached counts (no IO on the UI thread).
+        let title = self
+            .result_counts
+            .get(ui.ctx(), Some(&case), false)
+            .iter()
+            .find(|t| t.type_id == type_id)
+            .map(|t| t.display.clone())
             .unwrap_or_default();
-        if let Some(i) = self
-            .result_table
-            .ui(ui, &title, &rows, &self.prefs, self.result_selected)
+        let tags = self.tagging.catalog.get(ui.ctx(), Some(&case));
+        let ev = self.result_table.ui(
+            ui,
+            &title,
+            &rows,
+            &self.prefs,
+            self.result_selected,
+            Some(&tags),
+        );
+        if let Some((i, which, req)) = ev.tag
+            && let Some(r) = rows.rows.get(i)
         {
+            let target = match which {
+                crate::results::TagFor::Result => {
+                    Some(crate::tags_ui::TagTarget::Artifacts(vec![r.artifact.id]))
+                }
+                crate::results::TagFor::SourceFile => r
+                    .file
+                    .as_ref()
+                    .map(|f| crate::tags_ui::TagTarget::Files(vec![f.id])),
+            };
+            if let Some(target) = target {
+                self.tagging.request(ui.ctx(), &case, target, req);
+            }
+        }
+        if let Some(i) = ev.clicked {
             self.result_selected = Some(i);
             let content = rows
                 .rows
@@ -1964,12 +1988,28 @@ impl PostmortemApp {
         });
         // Ctrl+B: bookmark the selected file (Autopsy tags selected results
         // instead when the result view has a selection).
-        if bookmark
-            && let Some(case) = self.analysis.lock().case().cloned()
-            && let Some(id) = self.viewer.content().and_then(|c| c.row.file_id())
-        {
-            self.tagging
-                .bookmark(ctx, &case, crate::tags_ui::TagTarget::Files(vec![id]));
+        if bookmark && let Some(case) = self.analysis.lock().case().cloned() {
+            let result = match (&self.selected, self.result_selected) {
+                (Some(NodeId::Results { type_id }), Some(i)) => self
+                    .result_rows
+                    .get_mut(type_id)
+                    .and_then(Task::poll)
+                    .and_then(|r| r.as_ref().ok())
+                    .and_then(|rows| rows.rows.get(i))
+                    .map(|r| r.artifact.id),
+                _ => None,
+            };
+            let target = match result {
+                Some(a) => Some(crate::tags_ui::TagTarget::Artifacts(vec![a])),
+                None => self
+                    .viewer
+                    .content()
+                    .and_then(|c| c.row.file_id())
+                    .map(|f| crate::tags_ui::TagTarget::Files(vec![f])),
+            };
+            if let Some(t) = target {
+                self.tagging.bookmark(ctx, &case, t);
+            }
         }
         if open && self.has_case() {
             self.pick_image(ctx);
