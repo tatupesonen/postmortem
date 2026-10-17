@@ -47,10 +47,13 @@ pub use search::KeywordHitKey;
 pub use tags::{ArtifactTag, NewTagName, PROJECT_VIC, TagSet};
 
 /// Current schema version written by this build.
-pub const SCHEMA_VERSION: i64 = 2;
+pub const SCHEMA_VERSION: i64 = 3;
+/// Oldest schema readable without an upgrade: v3 only adds indexes.
+pub const MIN_READABLE_SCHEMA: i64 = 2;
 const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0001_initial.sql"),
     include_str!("../migrations/0002_schema_v2.sql"),
+    include_str!("../migrations/0003_timeline_indexes.sql"),
 ];
 /// Rows per transaction in bulk mode.
 const BULK_COMMIT_EVERY: usize = 50_000;
@@ -967,6 +970,9 @@ const FILE_INDEXES: &[(&str, &str)] = &[
     ("files_sha1", "ON files(sha1) WHERE sha1 IS NOT NULL"),
     ("files_sha256", "ON files(sha256) WHERE sha256 IS NOT NULL"),
     ("files_mtime", "ON files(mtime)"),
+    ("files_atime", "ON files(atime) WHERE atime IS NOT NULL"),
+    ("files_ctime", "ON files(ctime) WHERE ctime IS NOT NULL"),
+    ("files_crtime", "ON files(crtime) WHERE crtime IS NOT NULL"),
     ("files_size", "ON files(size) WHERE kind = 1"),
     (
         "files_deleted",

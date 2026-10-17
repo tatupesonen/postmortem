@@ -59,22 +59,39 @@ impl FileCategory {
     }
 
     /// Classifies by extension (MIME detection replaces this in M4).
+    /// Extensions of each category (lower case, without the dot); every
+    /// other extension is [`Self::Other`].
+    pub fn extensions(self) -> &'static [&'static str] {
+        match self {
+            Self::Images => &[
+                "jpg", "jpeg", "png", "gif", "bmp", "tif", "tiff", "webp", "heic", "heif", "ico",
+                "psd", "cr2", "nef", "dng", "svg",
+            ],
+            Self::Videos => &[
+                "mp4", "mov", "avi", "mkv", "wmv", "flv", "m4v", "3gp", "3g2", "webm", "mpg",
+                "mpeg",
+            ],
+            Self::Audio => &[
+                "mp3", "wav", "flac", "aac", "ogg", "m4a", "wma", "mid", "midi", "opus", "amr",
+            ],
+            Self::Documents => &[
+                "doc", "docx", "xls", "xlsx", "ppt", "pptx", "pdf", "txt", "rtf", "odt", "ods",
+                "odp", "csv", "html", "htm", "xml", "json", "md", "log", "css", "js", "wpd",
+            ],
+            Self::Executables => &[
+                "exe", "dll", "sys", "com", "scr", "msi", "bat", "cmd", "ps1", "vbs", "elf", "so",
+                "dylib", "sh",
+            ],
+            Self::Other => &[],
+        }
+    }
+
     pub fn from_name(name: &str) -> Self {
         let ext = extension(name).to_ascii_lowercase();
-        match ext.as_str() {
-            "jpg" | "jpeg" | "png" | "gif" | "bmp" | "tif" | "tiff" | "webp" | "heic" | "heif"
-            | "ico" | "psd" | "cr2" | "nef" | "dng" | "svg" => Self::Images,
-            "mp4" | "mov" | "avi" | "mkv" | "wmv" | "flv" | "m4v" | "3gp" | "3g2" | "webm"
-            | "mpg" | "mpeg" => Self::Videos,
-            "mp3" | "wav" | "flac" | "aac" | "ogg" | "m4a" | "wma" | "mid" | "midi" | "opus"
-            | "amr" => Self::Audio,
-            "doc" | "docx" | "xls" | "xlsx" | "ppt" | "pptx" | "pdf" | "txt" | "rtf" | "odt"
-            | "ods" | "odp" | "csv" | "html" | "htm" | "xml" | "json" | "md" | "log" | "css"
-            | "js" | "wpd" => Self::Documents,
-            "exe" | "dll" | "sys" | "com" | "scr" | "msi" | "bat" | "cmd" | "ps1" | "vbs"
-            | "elf" | "so" | "dylib" | "sh" => Self::Executables,
-            _ => Self::Other,
-        }
+        Self::ALL
+            .into_iter()
+            .find(|c| c.extensions().contains(&ext.as_str()))
+            .unwrap_or(Self::Other)
     }
 }
 

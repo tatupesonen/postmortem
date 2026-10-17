@@ -12,8 +12,8 @@
     "totalArtifacts": 20,
     "timeZones": "<redacted>",
     "timeSpan": {
-      "start": "2020-01-02T10:00:00Z",
-      "startEpoch": 1577959200,
+      "start": "2020-01-01T09:00:00Z",
+      "startEpoch": 1577869200,
       "end": "2022-05-10T18:30:00Z",
       "endEpoch": 1652207400
     },

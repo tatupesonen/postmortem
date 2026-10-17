@@ -10,6 +10,7 @@ license.workspace = true
 pm-core.workspace = true
 pm-fs.workspace = true
 pm-index.workspace = true
+pm-casedb.workspace = true
 jiff.workspace = true
 rayon.workspace = true
 tracing.workspace = true
@@ -20,6 +21,8 @@ pm-testkit.workspace = true
 proptest.workspace = true
 rstest.workspace = true
 pm-fs-ntfs.workspace = true
+pm-case.workspace = true
+tempfile.workspace = true
 
 [lints]
 workspace = true

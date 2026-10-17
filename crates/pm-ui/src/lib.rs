@@ -36,7 +36,6 @@ mod tags_ui;
 mod task;
 mod thumbs;
 mod timeline;
-mod timeline_artifacts;
 mod timeline_chart;
 mod timeline_details;
 mod viewers;

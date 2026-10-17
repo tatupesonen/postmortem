@@ -1,4 +1,8 @@
 //! Timeline window (Autopsy's Timeline tool), shown as its own native window.
+//!
+//! Everything comes from the case database ([`DbTimeline`]): counts, the
+//! event list and the overview are indexed queries run in the background,
+//! keyed by the range and filter on screen. Nothing is loaded up front.
 
 use std::collections::HashSet;
 use std::sync::Arc;
@@ -6,16 +10,17 @@ use std::sync::Arc;
 use egui::{Color32, Sense, Vec2};
 use egui_extras::{Column, TableBuilder};
 use jiff::tz::TimeZone;
+use pm_case::Case;
+use pm_timeline::db::{DbTimeline, Listing};
 use pm_timeline::{
     Bin, Category, CountsQuery, DeletedFilter, EventType, FileCategory, Filter, ListRow, TimeUnit,
     Timeline, TypeZoom,
 };
 
 use crate::format::DisplayPrefs;
-use crate::index::SharedIndex;
-use crate::model::{Content, DataSource, FileRow};
+use crate::model::Content;
 use crate::sortable::{Order, Sort, cmp_text};
-use crate::task::Task;
+use crate::task::{Keyed, Task};
 use crate::viewers::ViewerPanel;
 
 /// Zoom presets (Autopsy's "Zoom in/out to" menu), in seconds.
@@ -39,6 +44,9 @@ const PRESETS: [(&str, i64); 16] = [
 ];
 
 const MAX_BINS: usize = 400;
+/// Events listed per view (Autopsy pages its list; ours virtualises rows
+/// but still bounds what is read).
+const MAX_LIST: usize = 20_000;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Mode {
@@ -50,13 +58,13 @@ enum Mode {
 /// History entry: (range, filter).
 type State = ((i64, i64), Filter);
 
-/// Cached view data, keyed by everything that affects it.
+/// View data loaded in the background, keyed by what affects it.
 #[derive(Debug, Default)]
 struct Cache {
-    bins_key: Option<(i64, i64, TimeUnit, TypeZoom, String)>,
-    bins: Vec<Bin>,
-    rows_key: Option<(i64, i64, String)>,
-    rows: Vec<ListRow>,
+    bins: Keyed<(i64, i64, TimeUnit, TypeZoom, String), Vec<Bin>>,
+    rows: Keyed<(i64, i64, String), Listing>,
+    count: Keyed<(i64, i64, String), u64>,
+    overview: Keyed<(i64, i64), Vec<u64>>,
 }
 
 fn color(rgb: [u8; 3]) -> Color32 {
@@ -75,10 +83,9 @@ fn filter_key(f: &Filter) -> String {
 
 /// The timeline window's state.
 pub(crate) struct TimelineWindow {
-    sources: Vec<DataSource>,
-    index: SharedIndex,
-    building: Option<Task<Arc<Timeline>>>,
-    timeline: Option<Arc<Timeline>>,
+    case: Arc<Case>,
+    opening: Option<Task<Result<Arc<DbTimeline>, String>>>,
+    timeline: Option<Arc<DbTimeline>>,
     range: (i64, i64),
     filter: Filter,
     back: Vec<State>,
@@ -102,10 +109,6 @@ pub(crate) struct TimelineWindow {
     desc_level: crate::timeline_details::DescLevel,
     details: Option<(String, Vec<crate::timeline_details::Cluster>)>,
     detail_sel: Option<usize>,
-    /// Whole-span histogram for the range slider.
-    overview: Option<((i64, i64), Vec<u64>)>,
-    /// Case whose artifacts (web history, …) become events too.
-    case: Option<Arc<pm_case::Case>>,
 }
 
 impl std::fmt::Debug for TimelineWindow {
@@ -117,17 +120,11 @@ impl std::fmt::Debug for TimelineWindow {
 }
 
 impl TimelineWindow {
-    /// Creates the window; events are built once the shared index is ready.
-    pub(crate) fn new(
-        index: SharedIndex,
-        sources: Vec<DataSource>,
-        prefs: DisplayPrefs,
-        case: Option<Arc<pm_case::Case>>,
-    ) -> Self {
+    /// Creates the window over `case`'s timeline.
+    pub(crate) fn new(case: Arc<Case>, prefs: DisplayPrefs) -> Self {
         Self {
-            index,
-            sources,
-            building: None,
+            case,
+            opening: None,
             timeline: None,
             range: (0, 1),
             filter: Filter::default(),
@@ -145,19 +142,16 @@ impl TimelineWindow {
             viewer: ViewerPanel::default(),
             prefs,
             pending_focus: None,
-            overview: None,
-            case,
             desc_level: crate::timeline_details::DescLevel::default(),
             details: None,
             detail_sel: None,
         }
     }
 
-    /// Rebuilds the events (e.g. after analysis added artifacts).
+    /// Re-reads the timeline (e.g. after analysis added artifacts).
     pub(crate) fn invalidate(&mut self) {
         self.timeline = None;
-        self.building = None;
-        self.overview = None;
+        self.opening = None;
         self.details = None;
         self.cache = Cache::default();
     }
@@ -168,8 +162,8 @@ impl TimelineWindow {
         self.show((t - pad, t + pad + 1), self.filter.clone());
     }
 
-    /// Shows `range` restricted to one data source (Data Source Summary's
-    /// "View in Timeline").
+    /// Shows `range` restricted to one data source (case id; Data Source
+    /// Summary's "View in Timeline").
     pub(crate) fn focus_data_source(&mut self, ds: u32, range: (i64, i64)) {
         self.mode = Mode::Counts;
         let filter = Filter {
@@ -238,7 +232,8 @@ impl TimelineWindow {
             .unwrap_or_else(|| TimeUnit::for_range(self.range.0, self.range.1))
     }
 
-    fn bins(&mut self) -> &[Bin] {
+    /// Counts of the visible range (the last loaded while reloading).
+    fn bins(&mut self, ctx: &egui::Context) -> Arc<Vec<Bin>> {
         let unit = self.unit();
         let key = (
             self.range.0,
@@ -247,44 +242,74 @@ impl TimelineWindow {
             self.zoom,
             filter_key(&self.filter),
         );
-        if self.cache.bins_key.as_ref() != Some(&key) {
-            if let Some(t) = &self.timeline {
-                self.cache.bins = t.counts(&CountsQuery {
-                    start: self.range.0,
-                    end: self.range.1,
+        let Some(t) = self.timeline.clone() else {
+            return Arc::default();
+        };
+        let (range, filter, zoom, tz) = (
+            self.range,
+            self.filter.clone(),
+            self.zoom,
+            self.prefs.timezone.clone(),
+        );
+        self.cache
+            .bins
+            .get(ctx, &key, move || {
+                t.counts(&CountsQuery {
+                    start: range.0,
+                    end: range.1,
                     unit,
-                    tz: &self.prefs.timezone,
-                    filter: &self.filter,
-                    zoom: self.zoom,
+                    tz: &tz,
+                    filter: &filter,
+                    zoom,
                     max_bins: MAX_BINS,
-                });
-            }
-            self.cache.bins_key = Some(key);
-        }
-        &self.cache.bins
+                })
+                .map_err(|e| e.to_string())
+            })
+            .unwrap_or_default()
     }
 
-    fn rows(&mut self, range: (i64, i64)) -> &[ListRow] {
+    /// List rows of `range` (the last loaded while reloading).
+    fn rows(&mut self, ctx: &egui::Context, range: (i64, i64)) -> Arc<Listing> {
         let key = (range.0, range.1, filter_key(&self.filter));
-        if self.cache.rows_key.as_ref() != Some(&key) {
-            if let Some(t) = &self.timeline {
-                self.cache.rows = t.list(range.0, range.1, &self.filter);
-            }
-            self.cache.rows_key = Some(key);
+        let Some(t) = self.timeline.clone() else {
+            return Arc::default();
+        };
+        let filter = self.filter.clone();
+        let before = self.cache.rows.loading();
+        let rows = self
+            .cache
+            .rows
+            .get(ctx, &key, move || {
+                t.list(range.0, range.1, &filter, MAX_LIST)
+                    .map_err(|e| e.to_string())
+            })
+            .unwrap_or_default();
+        if !before && self.cache.rows.loading() {
             self.selected_row = None;
             self.event_order.clear();
         }
-        &self.cache.rows
+        rows
     }
 
-    fn content_for(&self, row: &ListRow) -> Option<Content> {
-        let t = self.timeline.as_ref()?;
-        let s = t.subject(row.subject)?;
-        let ds = self.sources.iter().find(|d| d.id as u32 == s.ds)?;
-        let fs = ds.fs(s.fs as usize)?;
-        Some(Content::from_fs(
-            Arc::clone(fs),
-            FileRow::from_fs(&**fs, s.inode, &s.path, !s.deleted),
+    /// Number of events in the visible range.
+    fn count(&mut self, ctx: &egui::Context) -> Option<u64> {
+        let key = (self.range.0, self.range.1, filter_key(&self.filter));
+        let t = self.timeline.clone()?;
+        let (range, filter) = (self.range, self.filter.clone());
+        self.cache
+            .count
+            .get(ctx, &key, move || {
+                t.count(range.0, range.1, &filter)
+                    .map_err(|e| e.to_string())
+            })
+            .map(|c| *c)
+    }
+
+    fn content_for(&self, listing: &Listing, row: &ListRow) -> Option<Content> {
+        let file = listing.subject(row.subject)?.file.as_ref()?;
+        Some(Content::from_case(
+            Arc::clone(&self.case),
+            crate::views::row_of(file),
         ))
     }
 
@@ -292,31 +317,28 @@ impl TimelineWindow {
 
     pub(crate) fn ui(&mut self, ui: &mut egui::Ui) {
         if self.timeline.is_none() {
-            let Some(idx) = self.index.ready_or_progress(ui) else {
-                return;
-            };
-            let (case, sources) = (self.case.clone(), self.sources.clone());
-            let task = self.building.get_or_insert_with(|| {
+            let case = Arc::clone(&self.case);
+            let task = self.opening.get_or_insert_with(|| {
                 Task::spawn(ui.ctx(), move || {
-                    let t = Timeline::from_index(&idx);
-                    let t = match &case {
-                        Some(c) => {
-                            let (events, subjects) = crate::timeline_artifacts::load(c, &sources);
-                            t.with(events, subjects)
-                        }
-                        None => t,
-                    };
-                    Arc::new(t)
+                    DbTimeline::open(Arc::clone(case.db()))
+                        .map(Arc::new)
+                        .map_err(|e| e.to_string())
                 })
             });
-            let Some(t) = task.poll() else {
-                ui.centered_and_justified(egui::Ui::spinner);
-                return;
+            let t = match task.poll() {
+                None => {
+                    ui.centered_and_justified(egui::Ui::spinner);
+                    return;
+                }
+                Some(Err(e)) => {
+                    ui.colored_label(ui.visuals().error_fg_color, e.clone());
+                    return;
+                }
+                Some(Ok(t)) => Arc::clone(t),
             };
-            let t = Arc::clone(t);
             self.range = t.span().unwrap_or((0, 1));
             self.timeline = Some(t);
-            self.building = None;
+            self.opening = None;
             if let Some((r, f)) = self.pending_focus.take() {
                 self.push(r, f);
             }
@@ -325,13 +347,11 @@ impl TimelineWindow {
             return;
         };
         if timeline.is_empty() {
-            ui.centered_and_justified(|ui| {
-                ui.heading("No timestamped events in these data sources.")
-            });
+            ui.centered_and_justified(|ui| ui.heading("No timestamped events in this case."));
             return;
         }
         self.shortcuts(ui);
-        egui::Panel::top("tl-toolbar").show(ui, |ui| self.toolbar(ui, &timeline));
+        egui::Panel::top("tl-toolbar").show(ui, |ui| self.toolbar(ui));
         egui::Panel::left("tl-filters")
             .resizable(true)
             .default_size(250.0)
@@ -358,7 +378,7 @@ impl TimelineWindow {
             }
             Mode::Details => {
                 let h = (ui.available_height() * 0.6).max(160.0);
-                self.details_view(ui, &timeline, h);
+                self.details_view(ui, h);
                 ui.separator();
                 let range = self.selection.unwrap_or(self.range);
                 self.event_table(ui, &timeline, range);
@@ -403,7 +423,7 @@ impl TimelineWindow {
         }
     }
 
-    fn toolbar(&mut self, ui: &mut egui::Ui, timeline: &Timeline) {
+    fn toolbar(&mut self, ui: &mut egui::Ui) {
         ui.horizontal_wrapped(|ui| {
             ui.label("View:");
             ui.selectable_value(&mut self.mode, Mode::Counts, "Counts");
@@ -487,18 +507,24 @@ impl TimelineWindow {
                 ui.separator();
             }
             let tz = self.tz().clone();
+            let count = self
+                .count(ui.ctx())
+                .map_or_else(|| "…".to_owned(), crate::format::grouped);
             ui.label(format!(
-                "{} — {}  ·  {} events",
+                "{} — {}  ·  {count} events",
                 TimeUnit::Seconds.label(self.range.0, &tz),
                 TimeUnit::Seconds.label(self.range.1 - 1, &tz),
-                crate::format::grouped(
-                    timeline.count(self.range.0, self.range.1, &self.filter) as u64
-                )
             ));
+            if self.cache.bins.loading() || self.cache.rows.loading() {
+                ui.spinner();
+            }
+            if let Some(e) = self.cache.bins.error().or(self.cache.rows.error()) {
+                ui.colored_label(ui.visuals().error_fg_color, e.to_owned());
+            }
         });
     }
 
-    fn filters(&mut self, ui: &mut egui::Ui, timeline: &Timeline) {
+    fn filters(&mut self, ui: &mut egui::Ui, timeline: &DbTimeline) {
         let mut f = self.filter.clone();
         egui::ScrollArea::vertical()
             .auto_shrink(false)
@@ -554,8 +580,10 @@ impl TimelineWindow {
                 ui.weak("No type selected = all types.");
                 ui.separator();
                 ui.strong("Data Sources");
-                for (i, name) in timeline.data_sources().iter().enumerate() {
-                    toggle(ui, &mut f.data_sources, i as u32, name);
+                for (id, name) in timeline.data_sources() {
+                    if let Ok(id) = u32::try_from(*id) {
+                        toggle(ui, &mut f.data_sources, id, name);
+                    }
                 }
                 ui.separator();
                 ui.strong("File Types");
@@ -588,7 +616,7 @@ impl TimelineWindow {
         let tz = self.tz().clone();
         let unit = self.unit();
         let series = Timeline::series(self.zoom);
-        let bins = self.bins().to_vec();
+        let bins = self.bins(ui.ctx());
         let events = crate::timeline_chart::stacked_bars(
             ui,
             height,
@@ -611,39 +639,48 @@ impl TimelineWindow {
                 }
             }
         }
-        // Autopsy's range slider over the whole span.
+        // Autopsy's range slider over the whole span (the coarsest unit
+        // that still shows its shape).
         let span = self.span();
-        if self.overview.as_ref().is_none_or(|o| o.0 != span)
-            && let Some(t) = &self.timeline
-        {
-            let all = Filter::default();
-            let bins = t.counts(&CountsQuery {
-                start: span.0,
-                end: span.1,
-                unit: TimeUnit::for_range(span.0, span.1).finer(),
-                tz: &tz,
-                filter: &all,
-                zoom: TypeZoom::Category,
-                max_bins: 240,
-            });
-            self.overview = Some((span, bins.iter().map(Bin::total).collect()));
-        }
-        if let Some((_, totals)) = &self.overview
-            && let Some(r) = crate::timeline_chart::overview(ui, totals, span, self.range, &tz)
+        let overview = self.timeline.clone().and_then(|t| {
+            let tz = tz.clone();
+            self.cache.overview.get(ui.ctx(), &span, move || {
+                let all = Filter::default();
+                let bins = t
+                    .counts(&CountsQuery {
+                        start: span.0,
+                        end: span.1,
+                        unit: TimeUnit::for_range(span.0, span.1),
+                        tz: &tz,
+                        filter: &all,
+                        zoom: TypeZoom::Category,
+                        max_bins: 240,
+                    })
+                    .map_err(|e| e.to_string())?;
+                Ok(bins.iter().map(Bin::total).collect())
+            })
+        });
+        if let Some(totals) = overview
+            && let Some(r) = crate::timeline_chart::overview(ui, &totals, span, self.range, &tz)
         {
             self.range = r;
             self.selection = None;
         }
     }
 
-    fn details_view(&mut self, ui: &mut egui::Ui, timeline: &Timeline, height: f32) {
+    fn details_view(&mut self, ui: &mut egui::Ui, height: f32) {
         use crate::timeline_details::{DetailsEvent, clusters, view};
         let range = self.range;
-        let key = format!("{range:?}{}{:?}", filter_key(&self.filter), self.desc_level);
+        let listing = self.rows(ui.ctx(), range);
+        let key = format!(
+            "{range:?}{}{:?}{}",
+            filter_key(&self.filter),
+            self.desc_level,
+            listing.rows.len()
+        );
         if self.details.as_ref().is_none_or(|d| d.0 != key) {
-            let rows = timeline.list(range.0, range.1, &self.filter);
             let gap = ((range.1 - range.0) / 80).max(1);
-            self.details = Some((key, clusters(&rows, timeline, self.desc_level, gap)));
+            self.details = Some((key, clusters(&listing, self.desc_level, gap)));
             self.detail_sel = None;
         }
         let tz = self.tz().clone();
@@ -664,7 +701,7 @@ impl TimelineWindow {
                                 subject: c.subject,
                                 kinds: vec![c.kind],
                             };
-                            let content = self.content_for(&row);
+                            let content = self.content_for(&listing, &row);
                             self.viewer.set_content(content);
                         }
                         None => self.selection = None,
@@ -678,14 +715,28 @@ impl TimelineWindow {
         }
     }
 
-    fn event_table(&mut self, ui: &mut egui::Ui, timeline: &Timeline, range: (i64, i64)) {
+    fn event_table(&mut self, ui: &mut egui::Ui, timeline: &DbTimeline, range: (i64, i64)) {
         let tz = self.tz().clone();
-        let rows = self.rows(range).to_vec();
+        let listing = self.rows(ui.ctx(), range);
+        let rows = &listing.rows;
+        let ds_name = |id: i64| {
+            timeline
+                .data_sources()
+                .iter()
+                .find(|d| d.0 == id)
+                .map_or("", |d| d.1.as_str())
+        };
         ui.horizontal(|ui| {
             ui.strong(format!(
                 "{} rows",
                 crate::format::grouped(rows.len() as u64)
             ));
+            if listing.truncated {
+                ui.weak(format!(
+                    "(first {} events; zoom in or filter to see the rest)",
+                    crate::format::grouped(MAX_LIST as u64)
+                ));
+            }
             if let Some((s, e)) = self.selection {
                 ui.weak(format!(
                     "selected bin: {} — {}",
@@ -701,7 +752,7 @@ impl TimelineWindow {
                 .collect::<Vec<_>>()
                 .join(", ")
         };
-        let subject = |r: &ListRow| timeline.subject(r.subject);
+        let subject = |r: &ListRow| listing.subject(r.subject);
         let order = self
             .event_order
             .get(0, rows.len(), self.event_sort, |a, b, col| {
@@ -712,14 +763,14 @@ impl TimelineWindow {
                 match col {
                     0 => a.time.cmp(&b.time),
                     1 => cmp_text(&kinds(a), &kinds(b)),
-                    2 => cmp_text(sa.map_or("", |s| &*s.path), sb.map_or("", |s| &*s.path)),
-                    3 => {
-                        let ds = |s: Option<&pm_timeline::Subject>| {
-                            s.and_then(|s| timeline.data_sources().get(s.ds as usize))
-                                .map_or("", String::as_str)
-                        };
-                        cmp_text(ds(sa), ds(sb))
-                    }
+                    2 => cmp_text(
+                        sa.map_or("", |s| &*s.description),
+                        sb.map_or("", |s| &*s.description),
+                    ),
+                    3 => cmp_text(
+                        sa.map_or("", |s| ds_name(s.ds_id)),
+                        sb.map_or("", |s| ds_name(s.ds_id)),
+                    ),
                     _ => sa
                         .is_some_and(|s| s.deleted)
                         .cmp(&sb.is_some_and(|s| s.deleted)),
@@ -763,7 +814,7 @@ impl TimelineWindow {
                             return;
                         };
                         let Some(r) = rows.get(i) else { return };
-                        let Some(s) = timeline.subject(r.subject) else {
+                        let Some(s) = listing.subject(r.subject) else {
                             return;
                         };
                         row.set_selected(self.selected_row == Some(i));
@@ -777,7 +828,7 @@ impl TimelineWindow {
                             };
                         });
                         row.col(|ui| {
-                            let text = egui::RichText::new(&*s.path);
+                            let text = egui::RichText::new(&*s.description);
                             ui.label(if s.deleted {
                                 text.color(ui.visuals().error_fg_color)
                             } else {
@@ -785,12 +836,7 @@ impl TimelineWindow {
                             });
                         });
                         row.col(|ui| {
-                            ui.label(
-                                timeline
-                                    .data_sources()
-                                    .get(s.ds as usize)
-                                    .map_or("", String::as_str),
-                            );
+                            ui.label(ds_name(s.ds_id));
                         });
                         row.col(|ui| {
                             ui.label(if s.deleted { "yes" } else { "" });
@@ -804,7 +850,7 @@ impl TimelineWindow {
         self.event_sort = sort;
         if let Some(i) = clicked {
             self.selected_row = Some(i);
-            let content = rows.get(i).and_then(|r| self.content_for(r));
+            let content = rows.get(i).and_then(|r| self.content_for(&listing, r));
             self.viewer.set_content(content);
         }
     }
@@ -837,19 +883,17 @@ mod tests {
     use egui_kittest::Harness;
     use egui_kittest::kittest::Queryable;
 
-    fn demo_sources() -> (tempfile::TempDir, Vec<DataSource>) {
+    fn demo_case() -> (tempfile::TempDir, Arc<Case>) {
         let dir = tempfile::tempdir().unwrap();
-        let path = dir.path().join("demo.dd");
-        std::fs::write(&path, pm_testkit::demo::demo_disk()).unwrap();
-        let evidence = pm_evidence::open(&path, &pm_evidence::OpenOptions::default()).unwrap();
-        (
-            dir,
-            vec![DataSource {
-                id: 0,
-                name: "demo.dd".into(),
-                evidence,
-            }],
+        let case = Case::create(dir.path().join("c"), pm_case::CaseDetails::default()).unwrap();
+        pm_case::add_image(
+            &case,
+            pm_testkit::demo::demo_disk_file(),
+            &pm_case::LoadOptions::default(),
+            &pm_case::LoadProgress::default(),
         )
+        .unwrap();
+        (dir, Arc::new(case))
     }
 
     fn shot(h: &mut Harness<'_, TimelineWindow>, name: &str) {
@@ -861,38 +905,44 @@ mod tests {
         }
     }
 
+    fn settle(
+        h: &mut Harness<'_, TimelineWindow>,
+        what: &str,
+        done: impl Fn(&Harness<'_, TimelineWindow>) -> bool,
+    ) {
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
+        loop {
+            h.step();
+            if done(h) {
+                break;
+            }
+            assert!(std::time::Instant::now() < deadline, "{what}");
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        h.run_steps(3);
+    }
+
     #[test]
-    fn timeline_builds_and_lists_events() {
-        let (_dir, sources) = demo_sources();
-        let ctx = egui::Context::default();
-        let index = SharedIndex::build(&ctx, &sources);
-        let win = TimelineWindow::new(index, sources, DisplayPrefs::default(), None);
+    fn timeline_reads_the_case_database() {
+        let (_dir, case) = demo_case();
+        let win = TimelineWindow::new(case, DisplayPrefs::default());
         let mut h = Harness::builder()
             .with_size(egui::vec2(1300.0, 850.0))
             .build_ui_state(|ui, w: &mut TimelineWindow| w.ui(ui), win);
-        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
-        while h.state().timeline.is_none() {
-            assert!(
-                std::time::Instant::now() < deadline,
-                "timeline did not build"
-            );
-            h.step();
-            std::thread::sleep(std::time::Duration::from_millis(10));
-        }
-        h.run_steps(4);
-        let t = h.state().timeline.clone().unwrap();
-        assert!(
-            t.len() > 40,
-            "demo disk yields MACB events, got {}",
-            t.len()
-        );
-        h.get_by_label_contains("events");
+        settle(&mut h, "timeline did not open", |h| {
+            h.state().timeline.is_some()
+        });
+        settle(&mut h, "counts did not load", |h| {
+            h.query_all_by_label_contains(" events").count() > 0
+                && h.query_all_by_label_contains("…").count() == 0
+        });
         shot(&mut h, "timeline_counts");
         // Zoom to the NTFS builder's fixed timestamp and switch to the list.
         h.state_mut().focus(1_622_505_000, 3600);
-        h.run_steps(4);
-        assert!(h.query_all_by_label_contains("setup.exe").count() >= 1);
-        assert!(h.query_all_by_label_contains("_").count() > 1);
+        settle(&mut h, "list did not load", |h| {
+            h.query_all_by_label_contains("setup.exe").count() >= 1
+        });
+        assert!(h.query_all_by_label_contains("_").count() > 1, "MACB rows");
         shot(&mut h, "timeline_list");
         // Details view: clustered stripes above the event table.
         h.state_mut().mode = Mode::Details;

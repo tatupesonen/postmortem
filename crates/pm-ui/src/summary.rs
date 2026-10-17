@@ -41,9 +41,9 @@ impl Tab {
 /// Something the summary wants the main window to do.
 #[derive(Debug)]
 pub(crate) enum Action {
-    /// Open the Timeline on `range` restricted to data source `ds`.
+    /// Open the Timeline on `range` restricted to the summarised data
+    /// source.
     ViewInTimeline {
-        ds: u32,
         range: (i64, i64),
     },
     ShowFile(Box<Content>),
@@ -364,7 +364,6 @@ fn activity(ui: &mut egui::Ui, idx: &FileIndex, ds: u32, prefs: &DisplayPrefs) -
     ui.button("⏱ View in Timeline")
         .clicked()
         .then_some(Action::ViewInTimeline {
-            ds,
             range: (start, last + DAY),
         })
 }

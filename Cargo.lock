@@ -5621,6 +5621,8 @@ name = "pm-timeline"
 version = "0.1.1"
 dependencies = [
  "jiff",
+ "pm-case",
+ "pm-casedb",
  "pm-core",
  "pm-fs",
  "pm-fs-ntfs",
@@ -5629,6 +5631,7 @@ dependencies = [
  "proptest",
  "rayon",
  "rstest",
+ "tempfile",
  "tracing",
 ]
 

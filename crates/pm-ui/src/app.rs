@@ -798,17 +798,11 @@ impl PostmortemApp {
 
     /// Opens (or focuses) the Timeline window, building events if needed.
     fn open_timeline(&mut self, ctx: &egui::Context) -> Option<Arc<Mutex<TimelineWindow>>> {
-        if self.sources.is_empty() {
-            self.errors
-                .push("Add a data source before opening the Timeline.".into());
-            return None;
-        }
+        let case = self.analysis.lock().case().cloned()?;
         if self.timeline.is_none() || self.timeline_closed.swap(false, Ordering::Relaxed) {
             self.timeline = Some(Arc::new(Mutex::new(TimelineWindow::new(
-                self.shared_index(ctx),
-                self.sources.clone(),
+                case,
                 self.prefs.clone(),
-                self.analysis.lock().case().cloned(),
             ))));
         }
         ctx.send_viewport_cmd_to(Self::timeline_viewport_id(), egui::ViewportCommand::Focus);
@@ -2515,8 +2509,10 @@ impl PostmortemApp {
         let index = self.shared_index(ui.ctx());
         match self.summary.ui(ui, &d, &index, &self.prefs) {
             Some(summary::Action::ShowFile(c)) => self.viewer.set_content(Some(*c)),
-            Some(summary::Action::ViewInTimeline { ds, range }) => {
-                if let Some(tl) = self.open_timeline(ui.ctx()) {
+            Some(summary::Action::ViewInTimeline { range }) => {
+                if let Some(tl) = self.open_timeline(ui.ctx())
+                    && let Ok(ds) = u32::try_from(ds_id)
+                {
                     tl.lock().focus_data_source(ds, range);
                 }
             }

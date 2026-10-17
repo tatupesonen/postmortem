@@ -86,7 +86,7 @@ impl CaseDb {
                 supported: SCHEMA_VERSION,
             });
         }
-        if version < SCHEMA_VERSION {
+        if version < crate::MIN_READABLE_SCHEMA {
             return Err(DbError::Invalid(format!(
                 "case database schema v{version} needs an upgrade to v{SCHEMA_VERSION}; open the case in postmortem once"
             )));
@@ -885,6 +885,13 @@ pub struct EventFilter {
     pub hash_hit_only: bool,
     pub file_id: Option<i64>,
     pub artifact_id: Option<i64>,
+    /// File events only: deleted (`Some(true)`) or allocated
+    /// (`Some(false)`) files.
+    pub deleted: Option<bool>,
+    /// File events only: these extensions (or all others when
+    /// `exclude_extensions`).
+    pub extensions: Vec<String>,
+    pub exclude_extensions: bool,
 }
 
 impl CaseDb {
@@ -1023,6 +1030,19 @@ impl CaseDb {
         if f.artifact_id.is_some() {
             w.push("0", []);
         }
+        match f.deleted {
+            Some(true) => w.push("(name_alloc = 0 OR meta_alloc = 0)", []),
+            Some(false) => w.push("name_alloc = 1 AND meta_alloc = 1", []),
+            None => {}
+        }
+        if !f.extensions.is_empty() {
+            let ph = vec!["?"; f.extensions.len()].join(", ");
+            let not = if f.exclude_extensions { "NOT " } else { "" };
+            w.push(
+                format!("extension {not}IN ({ph})"),
+                f.extensions.iter().map(|e| SqlValue::Text(e.clone())),
+            );
+        }
     }
 
     /// One keyset page of the virtual file-system events of one time
@@ -1132,13 +1152,20 @@ impl CaseDb {
                 c.query_row("SELECT MIN(time), MAX(time) FROM events", [], |r| {
                     Ok((r.get(0)?, r.get(1)?))
                 })?;
-            let fs: (Option<i64>, Option<i64>) = c.query_row(
-                "SELECT MIN(mtime), MAX(mtime) FROM files WHERE mtime > 0",
-                [],
-                |r| Ok((r.get(0)?, r.get(1)?)),
-            )?;
-            let lo = [ev.0, fs.0].into_iter().flatten().min();
-            let hi = [ev.1, fs.1].into_iter().flatten().max();
+            let mut lo = ev.0;
+            let mut hi = ev.1;
+            // Every time column: each is a timeline event type. MIN/MAX of
+            // an indexed column are single index lookups.
+            for col in TimeColumn::ALL {
+                let c_ = col.column();
+                let (a, b): (Option<i64>, Option<i64>) = c.query_row(
+                    &format!("SELECT MIN({c_}), MAX({c_}) FROM files WHERE {c_} IS NOT NULL"),
+                    [],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )?;
+                lo = [lo, a].into_iter().flatten().min();
+                hi = [hi, b].into_iter().flatten().max();
+            }
             Ok(lo.zip(hi))
         })
     }

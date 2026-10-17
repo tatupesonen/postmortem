@@ -134,6 +134,66 @@ impl<T: Send + Sync + 'static> Cached<T> {
     }
 }
 
+/// A value computed in the background for a key (a query): recomputed
+/// when the key changes, the previous value shown until the new one
+/// arrives, so views never blank while they reload.
+#[derive(Debug)]
+pub(crate) struct Keyed<K, T> {
+    key: Option<K>,
+    task: Option<Task<Result<T, String>>>,
+    current: Option<Arc<T>>,
+    error: Option<String>,
+}
+
+impl<K, T> Default for Keyed<K, T> {
+    fn default() -> Self {
+        Self {
+            key: None,
+            task: None,
+            current: None,
+            error: None,
+        }
+    }
+}
+
+impl<K: PartialEq + Clone, T: Send + Sync + 'static> Keyed<K, T> {
+    /// The value for `key` once loaded, else the previous one; starts
+    /// `load` when the key changed.
+    pub(crate) fn get(
+        &mut self,
+        ctx: &egui::Context,
+        key: &K,
+        load: impl FnOnce() -> Result<T, String> + Send + 'static,
+    ) -> Option<Arc<T>> {
+        if self.key.as_ref() != Some(key) {
+            self.key = Some(key.clone());
+            self.task = Some(Task::spawn(ctx, load));
+        }
+        if let Some(t) = &mut self.task
+            && t.poll().is_some()
+            && let Some(Task::Ready(r)) = self.task.take()
+        {
+            match r {
+                Ok(v) => {
+                    self.current = Some(Arc::new(v));
+                    self.error = None;
+                }
+                Err(e) => self.error = Some(e),
+            }
+        }
+        self.current.clone()
+    }
+
+    /// Whether the value for the current key is still being computed.
+    pub(crate) fn loading(&self) -> bool {
+        self.task.is_some()
+    }
+
+    pub(crate) fn error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
+}
+
 /// Runs `f` on the pool, counted in [`running`] (for fire-and-forget jobs
 /// that publish their own results).
 pub(crate) fn spawn_detached(f: impl FnOnce() + Send + 'static) {

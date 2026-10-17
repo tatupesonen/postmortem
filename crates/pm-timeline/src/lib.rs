@@ -6,6 +6,7 @@
 //! storage-agnostic: today it is built from the in-memory file index
 //! ([`Timeline::from_index`]), later from the case database.
 
+pub mod db;
 pub mod division;
 mod types;
 

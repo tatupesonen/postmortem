@@ -360,8 +360,7 @@ fn event_filter(args: &Args, text_key: &str) -> ToolResult<EventFilter> {
         text: args.str(text_key)?,
         tagged_only: args.flag("taggedOnly")?,
         hash_hit_only: args.flag("hashHitsOnly")?,
-        file_id: None,
-        artifact_id: None,
+        ..EventFilter::default()
     })
 }
 

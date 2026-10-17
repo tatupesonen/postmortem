@@ -149,7 +149,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Persons | TSK `PersonManager` | Done | Schema v2 + person UI on host nodes. |
 | OS accounts, realms, instances, attributes | TSK `OsAccountManager` | Done | Schema v2 with TSK merge rules; SAM/ProfileList feed it. |
 | Communication accounts + account_relationships | TSK `CommunicationsManager` | Done | Schema v2; written by the Email Parser via post_communication. |
-| Timeline events table (event types, 3 description levels, tagged/hash_hit flags) | TSK `TimelineManager`, `tsk_events` | Partial | Artifact events are written with every data artifact (`artifact_events.rs`, TSK `TimelineEventTypes` mappings, catch-all for the rest) and back-filled once for older cases. MCP and DB readers see them; the Timeline window still builds its events in memory (being moved to the DB). |
+| Timeline events table (event types, 3 description levels, tagged/hash_hit flags) | TSK `TimelineManager`, `tsk_events` | Done | Artifact events are written with every data artifact (TSK `TimelineEventTypes` mappings, catch-all for the rest; back-filled once for older cases); file-system events are the indexed `files` time columns (schema v3 indexes all four). The Timeline window, MCP and reports all read the database (`pm_timeline::db`). |
 | Ingest job records | TSK `ingest_jobs` | Done | `start/finish_ingest_job`. |
 | Reports table | TSK `reports` | Partial | Table only. |
 | Derived files / file re-injection | TSK `DerivedFile` | Done | ADR-016; `pm_modules::derive`. |

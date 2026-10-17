@@ -6,7 +6,8 @@ use std::collections::HashMap;
 
 use egui::{Align2, Color32, FontId, Pos2, Rect, Sense, Stroke, StrokeKind, Vec2};
 use jiff::tz::TimeZone;
-use pm_timeline::{EventType, ListRow, TimeUnit, Timeline};
+use pm_timeline::db::Listing;
+use pm_timeline::{EventType, TimeUnit};
 
 /// Autopsy's "Description Detail" zoom.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default)]
@@ -76,18 +77,13 @@ pub(crate) fn describe(full: &str, level: DescLevel) -> String {
 
 /// Groups and clusters events; `gap` is the largest time distance (s)
 /// between events of one cluster.
-pub(crate) fn clusters(
-    rows: &[ListRow],
-    timeline: &Timeline,
-    level: DescLevel,
-    gap: i64,
-) -> Vec<Cluster> {
+pub(crate) fn clusters(listing: &Listing, level: DescLevel, gap: i64) -> Vec<Cluster> {
     let mut groups: HashMap<(EventType, String), Vec<(i64, u32)>> = HashMap::new();
-    for r in rows {
-        let Some(s) = timeline.subject(r.subject) else {
+    for r in &listing.rows {
+        let Some(s) = listing.subject(r.subject) else {
             continue;
         };
-        let desc = describe(&s.path, level);
+        let desc = describe(&s.description, level);
         for k in &r.kinds {
             groups
                 .entry((*k, desc.clone()))
