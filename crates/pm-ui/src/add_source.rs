@@ -2,9 +2,10 @@
 //! page), and the ingest preferences it remembers.
 
 use std::path::PathBuf;
+use std::sync::Arc;
 
 use pm_case::LoadOptions;
-use pm_ingest::{FileFilter, JobSettings, ModuleSetting};
+use pm_ingest::{FileFilter, JobSettings, ModuleFactory, ModuleSetting};
 use pm_modules::hash_lookup::{HashLookupSettings, HashSetConfig, SetKind};
 use serde::{Deserialize, Serialize};
 
@@ -49,9 +50,14 @@ impl IngestPrefs {
         }
     }
 
-    /// Job settings for the built-in modules.
+    /// Job settings for the built-in modules and loaded plugins.
     pub(crate) fn job_settings(&self) -> JobSettings {
-        let modules = crate::plugins::modules()
+        self.job_settings_for(&crate::plugins::modules())
+    }
+
+    /// Job settings for `modules`.
+    pub(crate) fn job_settings_for(&self, modules: &[Arc<dyn ModuleFactory>]) -> JobSettings {
+        let modules = modules
             .iter()
             .map(|f| {
                 let info = f.info();

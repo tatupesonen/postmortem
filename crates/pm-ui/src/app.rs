@@ -3323,6 +3323,12 @@ impl PostmortemApp {
 impl eframe::App for PostmortemApp {
     fn ui(&mut self, ui: &mut egui::Ui, _frame: &mut eframe::Frame) {
         self.frame(ui);
+        if ui.ctx().cumulative_frame_nr() == 0 {
+            tracing::info!(
+                "first frame {} ms after start-up",
+                crate::STARTED.elapsed().as_millis()
+            );
+        }
     }
 
     fn save(&mut self, storage: &mut dyn eframe::Storage) {

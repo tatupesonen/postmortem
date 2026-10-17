@@ -191,6 +191,8 @@ impl Case {
         }
         let db = CaseDb::open(&db_path)?;
         db.ensure_project_vic_tags()?;
+        // Cases from postmortem 0.1.1 and older have no artifact events.
+        db.backfill_artifact_events()?;
         for sub in SUBDIRS {
             let p = dir.join(sub);
             std::fs::create_dir_all(&p).map_err(io_err(&p))?;

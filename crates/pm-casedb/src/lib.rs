@@ -11,6 +11,7 @@
 //! The SQL avoids SQLite-only features where practical so a PostgreSQL back
 //! end (multi-user cases, M11) can share it.
 
+mod artifact_events;
 mod browsers;
 pub mod catalog;
 pub mod communications;
@@ -729,6 +730,7 @@ fn insert_artifact(tx: &Connection, a: &NewArtifact) -> Result<i64> {
         let (text, int, double, blob) = value.columns();
         st.execute(params![id, type_id, source, text, int, double, blob])?;
     }
+    artifact_events::add_artifact_events(tx, id, a)?;
     Ok(id)
 }
 

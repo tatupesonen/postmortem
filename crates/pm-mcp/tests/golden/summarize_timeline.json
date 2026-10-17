@@ -5,11 +5,11 @@
     "startEpoch": 1577959200,
     "endTime": "2022-05-10T18:30:00Z",
     "endEpoch": 1652207400,
-    "totalEvents": 374,
+    "totalEvents": 379,
     "byCategory": {
       "File System": 373,
       "Web Activity": 1,
-      "Other": 0
+      "Other": 5
     }
   }
 }

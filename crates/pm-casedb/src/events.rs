@@ -114,8 +114,13 @@ pub struct EventRecord {
 /// Inserts events (idempotent: the same type, description and time is
 /// stored once).
 pub(crate) fn insert_events(c: &Connection, events: &[NewEvent]) -> Result<usize> {
-    let mut find = c.prepare_cached(
-        "SELECT id FROM event_descriptions WHERE full_description = ?1 AND file_id IS ?2 AND artifact_id IS ?3",
+    // Two lookups so each uses its index (`artifact_id IS ?` cannot use
+    // the partial artifact index).
+    let mut find_by_artifact = c.prepare_cached(
+        "SELECT id FROM event_descriptions WHERE artifact_id = ?3 AND full_description = ?1 AND file_id IS ?2",
+    )?;
+    let mut find_by_file = c.prepare_cached(
+        "SELECT id FROM event_descriptions WHERE file_id IS ?2 AND artifact_id IS NULL AND full_description = ?1",
     )?;
     let mut add_desc = c.prepare_cached(
         "INSERT INTO event_descriptions (full_description, med_description, short_description, ds_id, file_id, artifact_id, hash_hit, tagged) \
@@ -128,6 +133,11 @@ pub(crate) fn insert_events(c: &Connection, events: &[NewEvent]) -> Result<usize
     )?;
     let mut added = 0;
     for e in events {
+        let find = if e.artifact_id.is_some() {
+            &mut find_by_artifact
+        } else {
+            &mut find_by_file
+        };
         let existing: Option<i64> = find
             .query_row(params![e.full_description, e.file_id, e.artifact_id], |r| {
                 r.get(0)

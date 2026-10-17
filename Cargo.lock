@@ -5108,6 +5108,7 @@ dependencies = [
 name = "pm-casedb"
 version = "0.1.1"
 dependencies = [
+ "jiff",
  "parking_lot",
  "proptest",
  "rusqlite",

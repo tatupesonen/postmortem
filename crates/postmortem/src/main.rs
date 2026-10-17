@@ -5,6 +5,9 @@
 //! to that case as data sources (first segment of split/E01 sets). As in
 //! Autopsy, images can only be added to an open case.
 //!
+//! `postmortem ingest --case <CASE> <IMAGE>…` adds images and runs the
+//! ingest modules without the GUI (see `pm_ui::cli::USAGE`).
+//!
 //! `postmortem mcp --case <CASE>` serves the case to AI assistants over
 //! the Model Context Protocol (see `pm_mcp::cli::USAGE`).
 
@@ -25,6 +28,16 @@ fn main() -> std::process::ExitCode {
             )
             .init();
         return pm_mcp::cli::run(args.get(1..).unwrap_or_default());
+    }
+    if args.first().is_some_and(|a| a == "ingest") {
+        tracing_subscriber::fmt()
+            .with_writer(std::io::stderr)
+            .with_env_filter(
+                tracing_subscriber::EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| "warn,evtx=error".into()),
+            )
+            .init();
+        return pm_ui::cli::ingest(args.get(1..).unwrap_or_default());
     }
     tracing_subscriber::fmt()
         .with_env_filter(

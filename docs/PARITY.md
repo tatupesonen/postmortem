@@ -149,7 +149,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Persons | TSK `PersonManager` | Done | Schema v2 + person UI on host nodes. |
 | OS accounts, realms, instances, attributes | TSK `OsAccountManager` | Done | Schema v2 with TSK merge rules; SAM/ProfileList feed it. |
 | Communication accounts + account_relationships | TSK `CommunicationsManager` | Done | Schema v2; written by the Email Parser via post_communication. |
-| Timeline events table (event types, 3 description levels, tagged/hash_hit flags) | TSK `TimelineManager`, `tsk_events` | Partial | Schema v2 `events` + API; the Timeline UI still builds events in memory (WP-15). |
+| Timeline events table (event types, 3 description levels, tagged/hash_hit flags) | TSK `TimelineManager`, `tsk_events` | Partial | Artifact events are written with every data artifact (`artifact_events.rs`, TSK `TimelineEventTypes` mappings, catch-all for the rest) and back-filled once for older cases. MCP and DB readers see them; the Timeline window still builds its events in memory (being moved to the DB). |
 | Ingest job records | TSK `ingest_jobs` | Done | `start/finish_ingest_job`. |
 | Reports table | TSK `reports` | Partial | Table only. |
 | Derived files / file re-injection | TSK `DerivedFile` | Done | ADR-016; `pm_modules::derive`. |
@@ -384,7 +384,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | List view | `ui/listvew/*` | Done | Test `timeline_builds_and_lists_events`. |
 | Filters: event types, data sources, file types, text | `ui/filtering/*` | Partial | Done. The filter tree lacks Apply/Reset semantics and the "select only/others" menu. |
 | Filters: Tags, Hash Hits | `ui/filtering` | Missing | — |
-| Events from all artifact types (registry, LNK, prefetch, email, messages, GPS, …) | TSK `TimelineManager` event types | Partial | Web/EXIF events only. No persisted events table (§6). |
+| Events from all artifact types (registry, LNK, prefetch, email, messages, GPS, …) | TSK `TimelineManager` event types | Partial | Every data artifact type: TSK mappings (web, messages, email, calls, recent docs, programs, devices, EXIF, metadata, GPS, Wi-Fi, Bluetooth, calendar, …), event-log entries as Log Entry, catch-all for other standard/custom types. Analysis results get none, as in TSK. |
 | Overview range slider | `ui/TimeLineResultView` | Partial | Present; tests owed. |
 | History back/forward, zoom presets | `ViewFrame` | Done | — |
 | Add Event (manual, TSK_TL_EVENT) | `actions/AddManualEvent` | Missing | — |
@@ -557,7 +557,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Shared text index service (Solr replacement) | KWS `Server` | Missing | — |
 | Auto ingest (manifests, job queue, nodes, dashboard, control panel, AIN status, file exporter, shared config, case import, delete case) | `EXP/autoingest/*`, `EXP/configuration/*` | Missing | — |
 | Health Monitor (metrics DB, dashboard) | `A/healthmonitor/*` | Missing | — |
-| Command-line ingest (create case, add DS, run ingest w/ profile, list DS, reports, list profiles, JSON outputs) | `A/commandlineingest/*` | Missing | The `postmortem` binary only accepts `[CASE] [IMAGE…]` to open in the GUI. |
+| Command-line ingest (create case, add DS, run ingest w/ profile, list DS, reports, list profiles, JSON outputs) | `A/commandlineingest/*` | Partial | `postmortem ingest --case DIR [--enable/--disable ids] [--threads N] [IMAGE…]`: creates or opens the case, adds images, runs the GUI default modules and plugins, prints progress, module times and memory. No ingest profiles, report generation or JSON output yet. |
 | Open case from command line (positional `.aut`) | `CommandLineOpenCaseManager` | Done | `postmortem/src/main.rs`. |
 | MCP server (17 read-only tools: case summary, files, artifacts, analysis results, data sources, hosts, DS tree, tags, timeline, OS accounts, comms accounts/relationships, file content, children, reports) + stdio bridge | `A/mcp/*`, `Tools/autopsy-mcp-stdio` | Done | pm-mcp: the 17 tools plus search/pivot/timeline tools, stdio and HTTP (ADR-021). |
 | Feature access / admin gating | `A/featureaccess`, auto-ingest admin markers | Missing | — |

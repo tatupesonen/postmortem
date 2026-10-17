@@ -628,3 +628,104 @@ fn keyword_hit_groups_on_a_real_case() {
         );
     }
 }
+
+/// Data artifacts become timeline events as they are posted (TSK
+/// `TimelineManager`); analysis results do not; a case without them is
+/// back-filled once.
+#[test]
+fn artifacts_post_their_timeline_events() {
+    let (dir, db) = new_db();
+    let (ds, a, _) = populate(&db);
+    let attr = |n: &str| catalog::attribute_type_id(n).unwrap();
+    let mut run = data_artifact(ds, a, "TSK_PROG_RUN");
+    run.attributes = vec![
+        (
+            attr("TSK_PROG_NAME"),
+            Value::Text("COREUPDATER.EXE".into()),
+            "t".into(),
+        ),
+        (
+            attr("TSK_DATETIME"),
+            Value::DateTime(1_600_486_859),
+            "t".into(),
+        ),
+    ];
+    let run_id = db.add_artifact(&run).unwrap();
+    let evs = db.events_of_artifact(run_id).unwrap();
+    assert_eq!(evs.len(), 1);
+    assert_eq!(evs[0].type_id, types::PROGRAM_EXECUTION);
+    assert_eq!(evs[0].time, 1_600_486_859);
+    assert_eq!(evs[0].full_description, "COREUPDATER.EXE");
+    assert_eq!(evs[0].file_id, Some(a));
+
+    // Web history: one event per mapped time (accessed and created).
+    let mut web = data_artifact(ds, a, "TSK_WEB_HISTORY");
+    web.attributes = vec![
+        (
+            attr("TSK_URL"),
+            Value::Text("https://example.com/".into()),
+            "t".into(),
+        ),
+        (
+            attr("TSK_DOMAIN"),
+            Value::Text("example.com".into()),
+            "t".into(),
+        ),
+        (
+            attr("TSK_DATETIME_ACCESSED"),
+            Value::DateTime(200),
+            "t".into(),
+        ),
+        (
+            attr("TSK_DATETIME_CREATED"),
+            Value::DateTime(100),
+            "t".into(),
+        ),
+    ];
+    let web_id = db.add_artifact(&web).unwrap();
+    let mut kinds: Vec<i64> = db
+        .events_of_artifact(web_id)
+        .unwrap()
+        .iter()
+        .map(|e| e.type_id)
+        .collect();
+    kinds.sort_unstable();
+    assert_eq!(kinds, [types::WEB_HISTORY, types::WEB_HISTORY_CREATED]);
+
+    // Custom types: the catch-all, one event per date attribute.
+    let custom = db
+        .artifact_type("PM_THING", "Things", catalog::Category::DataArtifact)
+        .unwrap();
+    let when = db
+        .attribute_type("PM_WHEN", "When", catalog::ValueType::DateTime)
+        .unwrap();
+    let mut thing = data_artifact(ds, a, "TSK_PROG_RUN");
+    thing.type_id = custom;
+    thing.attributes = vec![(when, Value::DateTime(300), "t".into())];
+    let thing_id = db.add_artifact(&thing).unwrap();
+    let evs = db.events_of_artifact(thing_id).unwrap();
+    assert_eq!(evs.len(), 1);
+    assert_eq!(evs[0].type_id, types::CUSTOM_ARTIFACT_CATCH_ALL);
+    assert_eq!(evs[0].full_description, "Things: When");
+
+    // Analysis results get none.
+    let hit = db
+        .add_artifact(&result(
+            ds,
+            Some(a),
+            None,
+            Significance::Notable,
+            Priority::Normal,
+        ))
+        .unwrap();
+    assert!(db.events_of_artifact(hit).unwrap().is_empty());
+
+    // Back-fill: events removed (as in an old case) come back, once.
+    rusqlite::Connection::open(dir.path().join("case.db"))
+        .unwrap()
+        .execute_batch("DELETE FROM events; DELETE FROM event_descriptions;")
+        .unwrap();
+    assert_eq!(db.backfill_artifact_events().unwrap(), 4);
+    assert_eq!(db.events_of_artifact(run_id).unwrap().len(), 1);
+    assert_eq!(db.backfill_artifact_events().unwrap(), 0, "runs once");
+}

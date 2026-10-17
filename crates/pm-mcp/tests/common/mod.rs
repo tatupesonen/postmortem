@@ -18,7 +18,6 @@ use std::sync::{Arc, OnceLock};
 
 use pm_case::{Case, CaseDetails, Examiner, LoadOptions, LoadProgress, add_image};
 use pm_casedb::catalog::{Category, ValueType, artifact_type_id, attribute_type_id};
-use pm_casedb::events::NewEvent;
 use pm_casedb::{FileQuery, NewArtifact, Priority, Significance, Value};
 use pm_ingest::{Inbox, IngestProgress, JobSettings, ModuleFactory, ModuleSetting, run_job};
 use pm_mcp::{McpConfig, McpServer};
@@ -165,17 +164,8 @@ fn populate(case: &Case, demo: i64, bait: i64) {
             ],
         ))
         .unwrap();
-    db.add_events(&[NewEvent {
-        type_id: pm_casedb::events::types::WEB_HISTORY,
-        time: 1_622_505_480,
-        full_description: format!("https://example.com/setup.exe {INJECTION}"),
-        med_description: None,
-        short_description: None,
-        ds_id: demo,
-        file_id: Some(setup),
-        artifact_id: Some(web),
-    }])
-    .unwrap();
+    // Posting the artifact adds its Web History event (TSK TimelineManager).
+    assert_eq!(db.events_of_artifact(web).unwrap().len(), 1);
     // A notable interesting-item result.
     let mut hit = art(
         "TSK_INTERESTING_ITEM",

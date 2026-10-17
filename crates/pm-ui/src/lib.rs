@@ -10,6 +10,7 @@ mod app;
 mod case_nodes;
 mod case_tree;
 mod case_ui;
+pub mod cli;
 mod cvt_ui;
 mod discovery;
 mod file_search_ui;
@@ -57,7 +58,12 @@ pub(crate) const WORDMARK_ON_DARK_PNG: &[u8] =
 pub(crate) const WORDMARK_ON_LIGHT_PNG: &[u8] =
     include_bytes!("../../../assets/brand/postmortem-wordmark-on-light.png");
 
+/// When the UI started (for the start-up time logged on the first frame).
+pub(crate) static STARTED: std::sync::LazyLock<std::time::Instant> =
+    std::sync::LazyLock::new(std::time::Instant::now);
+
 pub fn run(open: Vec<PathBuf>) -> eframe::Result {
+    let _ = *STARTED;
     let mut viewport = egui::ViewportBuilder::default();
     if let Ok(icon) = eframe::icon_data::from_png_bytes(ICON_PNG) {
         viewport = viewport.with_icon(icon);

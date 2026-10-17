@@ -20,11 +20,11 @@
         "startEpoch": 1622462400,
         "end": "2021-06-01T00:00:00Z",
         "endEpoch": 1622505600,
-        "total": 16,
+        "total": 19,
         "byCategory": {
           "File System": 15,
           "Web Activity": 1,
-          "Other": 0
+          "Other": 3
         }
       },
       {
