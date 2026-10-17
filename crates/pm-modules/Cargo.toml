@@ -13,6 +13,9 @@ pm-ingest.workspace = true
 pm-hashdb.workspace = true
 pm-evtlog.workspace = true
 pm-filetype.workspace = true
+pm-encryption.workspace = true
+pm-rules.workspace = true
+roxmltree.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 serde.workspace = true
@@ -40,6 +43,7 @@ pm-registry = { workspace = true, features = ["builder"] }
 pm-lnk = { workspace = true, features = ["builder"] }
 pm-prefetch = { workspace = true, features = ["builder"] }
 pm-filetype = { workspace = true, features = ["builder"] }
+pm-encryption = { workspace = true, features = ["builder"] }
 pm-testkit.workspace = true
 tempfile.workspace = true
 proptest.workspace = true

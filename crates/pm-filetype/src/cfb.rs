@@ -362,6 +362,57 @@ impl<'a> Cfb<'a> {
         Ok(data)
     }
 
+    /// Reads up to `len` bytes of a stream from `offset` (fewer at its
+    /// end), without copying the sectors before it.
+    pub fn read_stream_range(
+        &self,
+        e: &Entry,
+        offset: u64,
+        len: usize,
+    ) -> Result<Vec<u8>, CfbError> {
+        if e.kind != 2 {
+            return Err(CfbError::Invalid("not a stream"));
+        }
+        let size = u64::from(e.size);
+        if offset >= size || len == 0 {
+            return Ok(Vec::new());
+        }
+        let want = usize::try_from((size - offset).min(len as u64)).unwrap_or(len);
+        if e.size < MINI_CUTOFF {
+            let all = self.read_stream(e, usize::MAX)?;
+            let start = usize::try_from(offset).unwrap_or(usize::MAX);
+            return Ok(all
+                .get(start..start.saturating_add(want))
+                .unwrap_or_default()
+                .to_vec());
+        }
+        let skip_blocks = offset / self.sector;
+        let mut in_block = usize::try_from(offset % self.sector).unwrap_or(0);
+        let mut lp = Loop::new(self.size, self.sector);
+        let mut cur = e.start;
+        for _ in 0..skip_blocks {
+            if cur == END_OF_CHAIN {
+                return Err(CfbError::Invalid("stream shorter than its size"));
+            }
+            lp.claim(cur)?;
+            cur = Self::next_in(&self.fat, cur)?;
+        }
+        let mut out = Vec::with_capacity(want);
+        while out.len() < want {
+            if cur == END_OF_CHAIN {
+                return Err(CfbError::Invalid("stream shorter than its size"));
+            }
+            lp.claim(cur)?;
+            let b = self.block(cur)?;
+            let part = b.get(in_block..).unwrap_or_default();
+            let take = part.len().min(want - out.len());
+            out.extend_from_slice(part.get(..take).unwrap_or_default());
+            in_block = 0;
+            cur = Self::next_in(&self.fat, cur)?;
+        }
+        Ok(out)
+    }
+
     /// Reads a mini-stream chain.
     fn read_mini(&self, start: i32, want: usize) -> Result<Vec<u8>, CfbError> {
         let root = self.root().ok_or(CfbError::Invalid("no root entry"))?;
@@ -665,6 +716,38 @@ mod tests {
         let root = c.root().unwrap().clone();
         assert!(c.find_recursively(&root, "INNER", 10));
         assert!(!c.find_recursively(&root, "INNER", 1));
+    }
+
+    #[test]
+    fn ranged_reads() {
+        let big: Vec<u8> = (0..20_000u32).map(|i| (i % 251) as u8).collect();
+        let file = build(&[
+            Stream::root("Big", &big),
+            Stream::root("Small", b"0123456789"),
+        ]);
+        let src = MemSource::new(file);
+        let c = Cfb::open(&src).unwrap();
+        let b = c.root_child("Big").unwrap();
+        for (off, len) in [
+            (0u64, 10usize),
+            (511, 3),
+            (512, 600),
+            (19_990, 50),
+            (5000, 0),
+        ] {
+            let want = big
+                .get(off as usize..(off as usize + len).min(big.len()))
+                .unwrap();
+            assert_eq!(
+                c.read_stream_range(b, off, len).unwrap(),
+                want,
+                "{off}+{len}"
+            );
+        }
+        assert!(c.read_stream_range(b, 20_000, 5).unwrap().is_empty());
+        let s = c.root_child("Small").unwrap();
+        assert_eq!(c.read_stream_range(s, 3, 4).unwrap(), b"3456");
+        assert_eq!(c.read_stream_range(s, 8, 40).unwrap(), b"89");
     }
 
     #[test]

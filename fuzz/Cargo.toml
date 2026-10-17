@@ -21,6 +21,7 @@ pm-registry = { path = "../crates/pm-registry" }
 pm-lnk = { path = "../crates/pm-lnk" }
 pm-prefetch = { path = "../crates/pm-prefetch" }
 pm-filetype = { path = "../crates/pm-filetype" }
+pm-encryption = { path = "../crates/pm-encryption" }
 pm-archive = { path = "../crates/pm-archive" }
 pm-carve = { path = "../crates/pm-carve" }
 pm-text = { path = "../crates/pm-text" }
@@ -193,6 +194,13 @@ bench = false
 [[bin]]
 name = "keyword_lists"
 path = "fuzz_targets/keyword_lists.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "encryption_check"
+path = "fuzz_targets/encryption_check.rs"
 test = false
 doc = false
 bench = false

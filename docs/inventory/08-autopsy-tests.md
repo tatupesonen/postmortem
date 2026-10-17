@@ -1376,7 +1376,7 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [ ] port: IngestFileFiltersTest.testCarvingWithExtRuleAndUnallocSpace — unallocated space included; carved files filtered; Unalloc_* processed
 - [x] port: IngestFileFiltersTest.testCarvingNoUnallocatedSpace — carver start-up error when unallocated space is excluded (exactly 1 error, module "PhotoRec Carver")
 - [ ] port: IngestFileFiltersTest.testEmbeddedJpg — extracted children obey the filter; derived/local directories typed
-- [ ] port: FilesSet condition semantics — ParentPath substring (case-insensitive, `parent + "/"`), Extension exact (leading dot stripped), FullName exact, meta-type FILES, ignoreUnallocated rejects UNALLOC/SLACK/UNUSED
+- [x] port: FilesSet condition semantics — ParentPath substring (case-insensitive, `parent + "/"`), Extension exact (leading dot stripped), FullName exact, meta-type FILES, ignoreUnallocated rejects UNALLOC/SLACK/UNUSED
 - [ ] port: ingest scheduler — `.`/`..` never processed; directories bypass the filter
 - [x] decide: directory MIME-type semantics (section 3 inconsistency), with an ADR (ADR-019: directories get none)
 
@@ -1389,11 +1389,11 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [x] port: EmbeddedFileTest.runTestContent — all extractable .txt hashed; protected entries not extracted or hashed
 
 ### Encryption detection
-- [ ] port: EncryptionDetectionTest.testBitlockerEncryption — BitLocker volume → TSK_ENCRYPTION_DETECTED, comment exactly "Bitlocker encryption detected."; other volumes none
-- [ ] port: EncryptionDetectionTest.testPasswordProtection — protected doc/xls/ppt/docx/xlsx/pptx/pdf/mdb/accdb (10 files) → DETECTED; unprotected → none
-- [ ] port: EncryptionDetectionTest.testVeraCryptSupport — unformatted high-entropy volume and ≥ 5 MiB container → TSK_ENCRYPTION_SUSPECTED
-- [ ] port: EncryptionDetectionTest.testSqlCipherEncryption — SQLCipher DBs → SUSPECTED; plain SQLite → none
-- [ ] port: encryption settings defaults — entropy 7.5, minimum size 5,242,880 B, 512-multiple, slack allowed
+- [x] port: EncryptionDetectionTest.testBitlockerEncryption — BitLocker volume → TSK_ENCRYPTION_DETECTED, comment exactly "Bitlocker encryption detected."; other volumes none
+- [x] port: EncryptionDetectionTest.testPasswordProtection — protected doc/xls/ppt/docx/xlsx/pptx/pdf/mdb/accdb (10 files) → DETECTED; unprotected → none
+- [x] port: EncryptionDetectionTest.testVeraCryptSupport — unformatted high-entropy volume and ≥ 5 MiB container → TSK_ENCRYPTION_SUSPECTED
+- [x] port: EncryptionDetectionTest.testSqlCipherEncryption — SQLCipher DBs → SUSPECTED; plain SQLite → none
+- [x] port: encryption settings defaults — entropy 7.5, minimum size 5,242,880 B, 512-multiple, slack allowed
 
 ### Hash lookup and keyword-list inputs
 - [ ] port (derive): parse `test/input/NSRL.txt-md5.idx` and `notablehashes.txt-md5.idx` — headers, 4 entries each, case-insensitive lookup, miss
@@ -1510,7 +1510,7 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 ### Derived (section 19)
 - [x] derive: file-type detection signature table tests (pm-filetype unit tests + 10,861-file differential run against Tika 3.0.0)
 - [ ] derive: hash DB formats (TSK idx, NSRL, EnCase, md5sum text) parse and lookup
-- [ ] derive: interesting-files rules — every condition type, exclusive rules, XML round-trip
-- [ ] derive: file extension mismatch table
+- [x] derive: interesting-files rules — every condition type, exclusive rules, XML round-trip
+- [x] derive: file extension mismatch table (pm-modules ext_mismatch unit + end-to-end tests)
 - [ ] derive: timeline filter combinations
 - [ ] derive: Recent Activity, email, EXIF, carving, VM extractor, data-source integrity, reports, tags (per-module inventories)

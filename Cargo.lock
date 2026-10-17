@@ -4110,6 +4110,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "pm-encryption"
+version = "0.1.0"
+dependencies = [
+ "aes 0.9.3",
+ "flate2",
+ "md-5 0.11.0",
+ "pm-core",
+ "pm-encryption",
+ "pm-filetype",
+ "proptest",
+ "sha1",
+ "sha2 0.11.1",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
 name = "pm-evidence"
 version = "0.1.0"
 dependencies = [
@@ -4325,6 +4342,7 @@ dependencies = [
  "pm-case",
  "pm-casedb",
  "pm-core",
+ "pm-encryption",
  "pm-evtlog",
  "pm-filetype",
  "pm-hashdb",
@@ -4332,12 +4350,14 @@ dependencies = [
  "pm-lnk",
  "pm-prefetch",
  "pm-registry",
+ "pm-rules",
  "pm-search",
  "pm-testkit",
  "pm-text",
  "pm-winartifacts",
  "proptest",
  "rars",
+ "roxmltree 0.21.1",
  "rusqlite",
  "serde",
  "serde_json",
@@ -4368,6 +4388,18 @@ dependencies = [
  "pm-core",
  "pm-registry",
  "proptest",
+ "thiserror 2.0.21",
+ "tracing",
+]
+
+[[package]]
+name = "pm-rules"
+version = "0.1.0"
+dependencies = [
+ "proptest",
+ "regex",
+ "roxmltree 0.21.1",
+ "serde",
  "thiserror 2.0.21",
  "tracing",
 ]

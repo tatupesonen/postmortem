@@ -25,6 +25,11 @@ fn demo_image() -> &'static PathBuf {
     .1
 }
 
+/// The demo disk image file the demo cases are built from.
+pub(crate) fn demo_image_path() -> &'static PathBuf {
+    demo_image()
+}
+
 pub(crate) struct DemoCase {
     _dir: tempfile::TempDir,
     pub(crate) case: Arc<Case>,
