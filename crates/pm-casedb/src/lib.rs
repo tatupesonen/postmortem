@@ -11,6 +11,7 @@
 //! The SQL avoids SQLite-only features where practical so a PostgreSQL back
 //! end (multi-user cases, M11) can share it.
 
+mod browsers;
 pub mod catalog;
 pub mod communications;
 mod derived;
@@ -23,6 +24,7 @@ mod scores;
 mod search;
 mod tags;
 mod windows_artifacts;
+pub use browsers::{ArtifactRow, NameFilter};
 
 use std::path::{Path, PathBuf};
 

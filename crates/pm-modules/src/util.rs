@@ -121,14 +121,6 @@ impl Art {
         }
     }
 
-    /// A date-time attribute (Unix seconds), left out when absent.
-    pub(crate) fn time(self, attr_name: &str, v: Option<i64>) -> Self {
-        match v {
-            Some(t) => self.value(attr_name, Value::DateTime(t)),
-            None => self,
-        }
-    }
-
     /// Posts it without a duplicate check (see `JobContext::post_artifact_unchecked`).
     pub(crate) fn post_unchecked(self, ctx: &JobContext) {
         ctx.post_artifact_unchecked(self.a);

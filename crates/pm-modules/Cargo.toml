@@ -32,6 +32,7 @@ pm-search.workspace = true
 pm-case.workspace = true
 pm-archive.workspace = true
 pm-carve.workspace = true
+pm-browser.workspace = true
 
 [dev-dependencies]
 encoding_rs.workspace = true
@@ -45,6 +46,8 @@ tempfile.workspace = true
 proptest.workspace = true
 fatfs.workspace = true
 zip = { version = "=8.6.0", default-features = false }
+pm-browser = { workspace = true, features = ["testing"] }
+plist = { version = "=1.10.1", default-features = false }
 
 [lints]
 workspace = true
