@@ -1118,6 +1118,19 @@ impl CaseDb {
         })
     }
 
+    /// The number of active accounts (optionally seen on one data source).
+    pub fn os_account_count(&self, ds_id: Option<i64>) -> Result<u64> {
+        self.read(|c| {
+            let n: i64 = c
+                .prepare_cached(
+                    "SELECT COUNT(*) FROM os_accounts WHERE db_status = 0 \
+                     AND (?1 IS NULL OR id IN (SELECT os_account_id FROM os_account_instances WHERE ds_id = ?1))",
+                )?
+                .query_row([ds_id], |r| r.get(0))?;
+            Ok(n.unsigned_abs())
+        })
+    }
+
     /// Active accounts seen on any data source of a host (TSK
     /// `getOsAccounts(Host)`).
     pub fn os_accounts_of_host(&self, host_id: i64) -> Result<Vec<OsAccount>> {

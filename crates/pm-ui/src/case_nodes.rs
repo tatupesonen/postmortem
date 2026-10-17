@@ -29,6 +29,8 @@ pub(crate) struct Summary {
     pub(crate) bad: u64,
     pub(crate) suspicious: u64,
     pub(crate) os_accounts: u64,
+    /// Generated reports (the Reports node).
+    pub(crate) reports: Vec<pm_casedb::Report>,
 }
 
 pub(crate) fn load_summary(case: &Case) -> Result<Summary, String> {
@@ -45,12 +47,12 @@ pub(crate) fn load_summary(case: &Case) -> Result<Summary, String> {
             results,
         });
     }
-    let os_accounts = db.os_accounts(None, 0, 100_000).map_err(err)?.len() as u64;
     Ok(Summary {
         tags,
         bad: db.score_count(true, None).map_err(err)?,
         suspicious: db.score_count(false, None).map_err(err)?,
-        os_accounts,
+        os_accounts: db.os_account_count(None).map_err(err)?,
+        reports: db.reports().map_err(err)?,
     })
 }
 

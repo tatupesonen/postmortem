@@ -8,6 +8,7 @@ license.workspace = true
 
 [dependencies]
 pm-search.workspace = true
+pm-report.workspace = true
 pm-text.workspace = true
 pm-core.workspace = true
 pm-fs.workspace = true

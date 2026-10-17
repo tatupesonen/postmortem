@@ -26,6 +26,7 @@ pub(crate) const SCORE: &str = "⚠";
 pub(crate) const SCORE_NOTABLE: &str = "🔴";
 /// S column / Score tree: likely notable ("Suspicious Items").
 pub(crate) const SCORE_SUSPICIOUS: &str = "🔶";
+pub(crate) const REPORTS: &str = "📄";
 /// C column: tagged, with a comment.
 pub(crate) const COMMENT: &str = "💬";
 /// C column: tagged, no comment.

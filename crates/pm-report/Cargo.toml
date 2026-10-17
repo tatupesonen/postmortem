@@ -1,0 +1,25 @@
+[package]
+name = "pm-report"
+description = "Reports: Autopsy's HTML and Excel table reports and the Files - Text report"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+
+[dependencies]
+pm-case.workspace = true
+pm-casedb.workspace = true
+pm-core.workspace = true
+thiserror.workspace = true
+jiff.workspace = true
+rust_xlsxwriter = { version = "=0.99.1", default-features = false }
+
+[dev-dependencies]
+pm-testkit.workspace = true
+pm-modules.workspace = true
+pm-ingest.workspace = true
+tempfile.workspace = true
+zip = { version = "=8.6.0", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+
+[lints]
+workspace = true

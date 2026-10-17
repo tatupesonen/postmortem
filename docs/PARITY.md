@@ -178,7 +178,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | OS Accounts node | `OsAccounts.java` | Done | Under Analysis Results (user choice). |
 | Tags node (tag › File Tags / Result Tags; hide other users' tags) | `Tags.java` | Partial | "Hide other users' tags" missing. |
 | Score node (Bad Items / Suspicious Items) | `ScoreContent.java` | Done | — |
-| Reports node (open/delete report) | `Reports.java` | Missing | — |
+| Reports node (open/delete report) | `Reports.java` | Done | Open, open folder, delete (from the case). |
 | Cyber Triage data node (`ct_errors`) | `CyberTriageData.java` | N/A? | Only for Cyber Triage-written DBs. |
 | Count throttled refresh, "counting…" threshold >1M | `RefreshThrottler`, `ViewsNode` | Partial | Counts refresh every 2 s during ingest. No 1M threshold. |
 | View Options gear popup (tree settings) | `DirectoryTreeTopComponent` | Missing | — |
@@ -479,11 +479,11 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Report wizard (module choice, data source selection, tags/artifact-type selection, file options, progress panel) | `report/infrastructure/*` | Missing | — |
+| Report wizard (module choice, data source selection, tags/artifact-type selection, file options, progress panel) | `report/infrastructure/*` | Partial | Module, data sources, all/tagged results, result types, file columns/delimiter; progress and cancel. Portable case options missing. |
 | Report profiles (saved configurations, used by CLI) | `ReportingConfig`, `ReportingConfigLoader` | Missing | — |
-| HTML report | `report/modules/html` | Missing | — |
-| Excel report | `report/modules/excel` | Missing | — |
-| Files – Text (TSV/CSV of files) | `report/modules/file` | Missing | — |
+| HTML report | `report/modules/html` | Partial | Autopsy's frameset layout, tables and columns; tagged-image thumbnails page missing. |
+| Excel report | `report/modules/excel` | Done | xlsx (rust_xlsxwriter): Summary + one sheet per data type. |
+| Files – Text (TSV/CSV of files) | `report/modules/file` | Done | All 13 columns, delimiter choice, UTF-8 with BOM. |
 | TSK body file | `report/modules/bodyfile` | Missing | — |
 | Google Earth KML | `report/modules/kml` | Missing | — |
 | CASE-UCO JSON-LD | `report/modules/caseuco` | Missing | — |
@@ -491,7 +491,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Data Source Summary report (XLSX) | `report/modules/datasourcesummaryexport` | Missing | — |
 | Portable Case (subset case, tags/interesting items, 7z/zip chunking) | `report/modules/portablecase` | Missing | — |
 | Report branding (agency logo, title, footer) | `ReportBranding`, Application options | Missing | — |
-| Reports node + DB registration | `datamodel/Reports` | Missing | The table exists. |
+| Reports node + DB registration | `datamodel/Reports` | Done | — |
 
 ## 27. Options dialog (Tools › Options)
 

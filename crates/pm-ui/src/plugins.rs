@@ -77,7 +77,7 @@ pub(crate) fn window(ctx: &egui::Context) -> bool {
                         if let Err(e) = std::fs::create_dir_all(&dir) {
                             tracing::warn!("cannot create {}: {e}", dir.display());
                         }
-                        open_folder(&dir);
+                        crate::platform::open(&dir);
                     }
                     if ui.button("Reload").clicked() {
                         reload(ctx);
@@ -122,19 +122,5 @@ pub(crate) fn window(ctx: &egui::Context) -> bool {
                 });
             });
         open
-    }
-}
-
-/// Opens a folder in the platform's file manager.
-fn open_folder(dir: &std::path::Path) {
-    let cmd = if cfg!(target_os = "windows") {
-        "explorer"
-    } else if cfg!(target_os = "macos") {
-        "open"
-    } else {
-        "xdg-open"
-    };
-    if let Err(e) = std::process::Command::new(cmd).arg(dir).spawn() {
-        tracing::warn!("cannot open {}: {e}", dir.display());
     }
 }

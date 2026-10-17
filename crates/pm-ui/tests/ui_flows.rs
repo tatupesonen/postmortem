@@ -1183,3 +1183,32 @@ fn plugins_window_lists_the_plugins_folder() {
     h.get_by_label("Reload");
     shot(&mut h, "plugins_window");
 }
+
+/// Generate Report: the wizard writes an HTML report and the Reports node
+/// lists it.
+#[test]
+fn generate_html_report_from_the_toolbar() {
+    let mut h = harness(vec![demo()]);
+    h.set_size(egui::vec2(1400.0, 1500.0));
+    wait_analysed(&mut h);
+    click(&mut h, "📄 Generate Report");
+    settle(&mut h, |h| h.query_by_label("HTML Report").is_some());
+    click_exact(&mut h, "Next >");
+    click_exact(&mut h, "Next >");
+    settle(&mut h, |h| h.query_by_label("All Results").is_some());
+    shot(&mut h, "report_wizard");
+    click_exact(&mut h, "Finish");
+    settle(&mut h, |h| h.query_by_label("Complete").is_some());
+    click_exact(&mut h, "Close");
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("HTML Report ")
+            .next()
+            .is_some()
+    });
+    let dir = h.state().analysis_case_dir().unwrap().join("Reports");
+    let found = std::fs::read_dir(&dir)
+        .unwrap()
+        .flatten()
+        .any(|d| d.path().join("HTML Report/report.html").is_file());
+    assert!(found, "report.html under {}", dir.display());
+}

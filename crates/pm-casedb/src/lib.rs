@@ -23,6 +23,8 @@ pub mod keyword_hits;
 pub mod mcp;
 mod model;
 pub mod os_accounts;
+mod reports;
+pub use reports::Report;
 mod scores;
 mod search;
 mod tags;

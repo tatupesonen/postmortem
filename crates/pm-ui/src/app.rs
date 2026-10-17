@@ -154,6 +154,9 @@ pub struct PostmortemApp {
     options: Option<crate::options_ui::OptionsWindow>,
     /// Tools › Plugins is open.
     plugins_open: bool,
+    /// Generate Report: the case's choices loading, then the wizard.
+    report_choices: Option<Task<Result<crate::report_ui::Choices, String>>>,
+    report_wizard: Option<crate::report_ui::ReportWizard>,
     /// A data source awaiting removal confirmation `(id, name)`.
     confirm_remove: Option<(i64, String)>,
     removing: Option<Task<Result<(), String>>>,
@@ -231,6 +234,8 @@ impl PostmortemApp {
             hosts_ui: crate::hosts_ui::HostsUi::default(),
             options: None,
             plugins_open: false,
+            report_choices: None,
+            report_wizard: None,
             confirm_remove: None,
             removing: None,
             mime_types: crate::task::Cached::default(),
@@ -929,6 +934,13 @@ impl PostmortemApp {
                     ui.close();
                 }
                 ui.separator();
+                if ui
+                    .add_enabled(self.has_case(), egui::Button::new("📄 Generate Report"))
+                    .clicked()
+                {
+                    self.open_report_wizard(ui.ctx());
+                    ui.close();
+                }
                 if ui.button("🧩 Plugins").clicked() {
                     self.plugins_open = true;
                     ui.close();
@@ -1042,6 +1054,13 @@ impl PostmortemApp {
                 && let Some(c) = self.viewer.content().cloned()
             {
                 self.open_popout(c);
+            }
+            if ui
+                .add_enabled(self.has_case(), egui::Button::new("📄 Generate Report"))
+                .on_hover_text("Generate a report about the case (Tools › Generate Report)")
+                .clicked()
+            {
+                self.open_report_wizard(ui.ctx());
             }
             ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
                 let open = self.keyword_panel.is_some();
@@ -1714,6 +1733,91 @@ impl PostmortemApp {
             false,
             |_, _| {},
         );
+        // Autopsy's Reports node: generated reports, opened on click.
+        ui.add_space(8.0);
+        ui.heading(format!("{} Reports", icons::REPORTS));
+        if sum.reports.is_empty() {
+            ui.weak("None");
+        }
+        let mut remove = None;
+        for r in &sum.reports {
+            let when = self
+                .prefs
+                .time(jiff::Timestamp::from_second(r.created_at).ok());
+            let path = std::path::PathBuf::from(&r.path);
+            ui.horizontal(|ui| {
+                ui.add_space(18.0);
+                let resp = ui
+                    .selectable_label(false, format!("{} {when}", r.display_name))
+                    .on_hover_text(&r.path);
+                if resp.clicked() {
+                    crate::platform::open(&path);
+                }
+                resp.context_menu(|ui| {
+                    if ui.button("Open Report").clicked() {
+                        crate::platform::open(&path);
+                        ui.close();
+                    }
+                    if ui.button("Open Containing Folder").clicked() {
+                        if let Some(dir) = path.parent() {
+                            crate::platform::open(dir);
+                        }
+                        ui.close();
+                    }
+                    if ui.button("Delete Report").clicked() {
+                        remove = Some(r.id);
+                        ui.close();
+                    }
+                });
+            });
+        }
+        if let Some(id) = remove
+            && let Err(e) = case.db().delete_report(id)
+        {
+            self.errors.push(e.to_string());
+        }
+        if remove.is_some() {
+            self.case_summary.refresh();
+        }
+    }
+
+    /// Tools › Generate Report: loads the case's choices in the background.
+    fn open_report_wizard(&mut self, ctx: &egui::Context) {
+        if let Some(case) = self.analysis.lock().case().cloned() {
+            self.report_choices = Some(Task::spawn(ctx, move || {
+                crate::report_ui::Choices::load(&case)
+            }));
+        }
+    }
+
+    fn report_wizard(&mut self, ctx: &egui::Context) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            self.report_wizard = None;
+            self.report_choices = None;
+            return;
+        };
+        if let Some(t) = &mut self.report_choices
+            && let Some(r) = t.poll()
+        {
+            match r {
+                Ok(choices) => {
+                    self.report_wizard = Some(crate::report_ui::ReportWizard::new(
+                        choices.clone(),
+                        self.prefs.timezone.clone(),
+                    ));
+                }
+                Err(e) => self.errors.push(e.clone()),
+            }
+            self.report_choices = None;
+        }
+        let Some(w) = &mut self.report_wizard else {
+            return;
+        };
+        match w.ui(ctx, &case) {
+            crate::report_ui::WizardAction::None => {}
+            crate::report_ui::WizardAction::Close => self.report_wizard = None,
+            crate::report_ui::WizardAction::Finished => self.case_summary.refresh(),
+        }
     }
 
     /// The table of an OS Accounts, Tags or Score node.
@@ -2976,6 +3080,7 @@ impl PostmortemApp {
         if self.plugins_open {
             self.plugins_open = crate::plugins::window(&ctx);
         }
+        self.report_wizard(&ctx);
         self.persisted.table = self.table.clone();
     }
 }
