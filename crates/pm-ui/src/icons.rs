@@ -31,6 +31,7 @@ pub(crate) const COMMENT: &str = "💬";
 /// C column: tagged, no comment.
 pub(crate) const TAGGED: &str = "🏷";
 pub(crate) const OS_ACCOUNTS: &str = "👥";
+pub(crate) const HOST: &str = "🖥";
 
 /// By Extension groups (`views::EXT_GROUPS` / `DOC_GROUPS` names).
 pub(crate) fn file_group(name: &str) -> &'static str {
@@ -156,6 +157,7 @@ mod tests {
             COMMENT,
             TAGGED,
             OS_ACCOUNTS,
+            HOST,
         ];
         for (name, _) in crate::views::EXT_GROUPS
             .iter()

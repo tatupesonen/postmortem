@@ -34,6 +34,8 @@ impl DataSource {
 /// Ids are case-database ids.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum NodeId {
+    /// A host under Data Sources (`None`: "Unknown Host").
+    Host(Option<i64>),
     DataSource(i64),
     /// A volume-system slot (partition or unallocated space).
     Volume {
@@ -70,7 +72,8 @@ impl NodeId {
     pub fn ds(&self) -> Option<i64> {
         match self {
             Self::DataSource(ds) | Self::Volume { ds, .. } | Self::Dir { ds, .. } => Some(*ds),
-            Self::Results { .. }
+            Self::Host(_)
+            | Self::Results { .. }
             | Self::View(_)
             | Self::TagFiles(_)
             | Self::TagResults(_)
