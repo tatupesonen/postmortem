@@ -20,6 +20,7 @@ pub mod keywords;
 pub mod matcher;
 pub mod names;
 pub mod plan;
+pub mod results;
 mod tld;
 pub mod tokenize;
 

@@ -11,13 +11,14 @@ use std::collections::HashSet;
 use std::sync::atomic::Ordering;
 
 use pm_casedb::communications::AccountInstanceSpec;
-use pm_casedb::{KeywordHitKey, NewArtifact, Priority, Significance, Value};
+use pm_casedb::{KeywordHitKey, Value};
 use pm_ingest::{IngestMessage, JobContext, MessageKind};
 use pm_search::keywords::{SEL_CARD, SearchType};
+use pm_search::results::{KeywordHitSpec, keyword_hit_artifact};
 use pm_search::{Hit, ObjRef, parse_track};
 
 use super::{Job, NAME};
-use crate::util::{art_type, attr};
+use crate::util::attr;
 
 /// Inbox messages per hit term and job (Autopsy
 /// `MAX_INBOX_NOTIFICATIONS_PER_KW_TERM`).
@@ -92,72 +93,19 @@ impl<'a> HitSink<'a> {
         let Some(e) = self.job.matcher.entries().get(h.entry) else {
             return;
         };
-        let m = || NAME.to_owned();
-        let keyword = h.hit.to_lowercase();
-        let mut attributes: Vec<(i64, Value, String)> = Vec::new();
-        let regexp;
-        let search_type;
-        if e.search_type == SearchType::Exact {
-            // LuceneQuery.createKeywordHitArtifact.
-            attributes.push((
-                attr("TSK_KEYWORD_PREVIEW"),
-                Value::Text(h.snippet.clone()),
-                m(),
-            ));
-            attributes.push((attr("TSK_KEYWORD"), Value::Text(keyword.clone()), m()));
-            if !e.list_name.trim().is_empty() {
-                attributes.push((attr("TSK_SET_NAME"), Value::Text(e.list_name.clone()), m()));
-            }
-            if let Some(sel) = e.selector.as_deref() {
-                let t = attr(sel);
-                if t != 0 {
-                    attributes.push((t, Value::Text(h.hit.clone()), m()));
-                }
-            }
-            search_type = 0;
-            regexp = None;
-            attributes.push((
-                attr("TSK_KEYWORD_SEARCH_TYPE"),
-                Value::Int(search_type),
-                m(),
-            ));
-        } else {
-            // RegexQuery.createKeywordHitArtifact.
-            attributes.push((attr("TSK_KEYWORD"), Value::Text(keyword.clone()), m()));
-            attributes.push((attr("TSK_KEYWORD_REGEXP"), Value::Text(e.term.clone()), m()));
-            regexp = Some(e.term.clone());
-            if !e.list_name.trim().is_empty() {
-                attributes.push((attr("TSK_SET_NAME"), Value::Text(e.list_name.clone()), m()));
-            }
-            attributes.push((
-                attr("TSK_KEYWORD_PREVIEW"),
-                Value::Text(h.snippet.clone()),
-                m(),
-            ));
-            search_type = if e.search_type == SearchType::Substring {
-                1
-            } else {
-                2
-            };
-        }
-        let assoc = self.associated_artifact();
-        if let Some(a) = assoc {
-            attributes.push((attr("TSK_ASSOCIATED_ARTIFACT"), Value::Int(a), m()));
-        }
-        if e.search_type != SearchType::Exact {
-            attributes.push((
-                attr("TSK_KEYWORD_SEARCH_TYPE"),
-                Value::Int(search_type),
-                m(),
-            ));
-        }
-        let key = KeywordHitKey {
-            keyword,
-            set_name: (!e.list_name.trim().is_empty()).then(|| e.list_name.clone()),
-            search_type: Some(search_type),
-            regexp,
-            associated_artifact: assoc,
-        };
+        let (artifact, key) = keyword_hit_artifact(&KeywordHitSpec {
+            ds_id: self.target.ds_id,
+            file_id: self.target.file_id,
+            associated_artifact: self.associated_artifact(),
+            list_name: &e.list_name,
+            term: &e.term,
+            search_type: e.search_type,
+            selector: e.selector.as_deref(),
+            hit: &h.hit,
+            snippet: &h.snippet,
+            module: NAME,
+            created_at: self.ctx.now(),
+        });
         if let Some(file_id) = self.target.file_id {
             let existing = self.existing.get_or_insert_with(|| {
                 self.ctx
@@ -173,18 +121,6 @@ impl<'a> HitSink<'a> {
                 return;
             }
         }
-        let artifact = NewArtifact {
-            type_id: art_type("TSK_KEYWORD_HIT"),
-            ds_id: self.target.ds_id,
-            file_id: self.target.file_id,
-            source_artifact_id: None,
-            score: Some((Significance::LikelyNotable, Priority::Normal)),
-            conclusion: None,
-            configuration: Some(e.list_name.clone()),
-            justification: None,
-            created_at: self.ctx.now(),
-            attributes,
-        };
         self.ctx.post_artifact_unchecked(artifact);
         self.posted += 1;
         self.job.stats.hits.fetch_add(1, Ordering::Relaxed);

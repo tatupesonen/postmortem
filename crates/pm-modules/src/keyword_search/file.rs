@@ -14,6 +14,7 @@ use pm_text::{
 use super::hits::{HitSink, Target};
 use super::metadata::metadata_attributes;
 use super::{Job, NAME, Status};
+use crate::file_type::{default_detector, mime_or_detect};
 use crate::util::Art;
 
 /// Where a run's text comes from.
@@ -52,14 +53,18 @@ impl std::fmt::Display for RunError {
 }
 
 /// Processes one file; returns its final status.
-pub(super) fn process(job: &Job, ctx: &JobContext, file: &IngestFile) -> Status {
-    let rec = &file.rec;
+pub(super) fn process(job: &Job, ctx: &JobContext, file: &mut IngestFile) -> Status {
     if ctx.is_cancelled() {
         return Status::Skipped;
     }
-    if rec.origin == Origin::VirtualDir || rec.kind == FileKindCode::Virtual {
+    if file.rec.origin == Origin::VirtualDir || file.rec.kind == FileKindCode::Virtual {
         return Status::Skipped;
     }
+    // Autopsy `FileTypeDetector.getMIMEType`: the type File Type
+    // Identification recorded, else detected now (and recorded).
+    let mime = mime_or_detect(file, default_detector()).map(|m| m.trim().to_ascii_lowercase());
+    let file: &IngestFile = file;
+    let rec = &file.rec;
     let obj = ObjRef::File(rec.id);
     let target = Target {
         obj,
@@ -79,10 +84,7 @@ pub(super) fn process(job: &Job, ctx: &JobContext, file: &IngestFile) -> Status 
     if !index_content || file.is_dir() || rec.size == 0 {
         return metadata_only(job, obj, rec.ds_id, &rec.name);
     }
-    let mime = file.mime().map_or_else(
-        || sniff_mime(file.head(), &rec.name).to_owned(),
-        |m| m.trim().to_ascii_lowercase(),
-    );
+    let mime = mime.unwrap_or_else(|| sniff_mime(file.head(), &rec.name).to_owned());
     if ARCHIVE_MIME_TYPES.contains(&mime.as_str()) {
         return metadata_only(job, obj, rec.ds_id, &rec.name);
     }

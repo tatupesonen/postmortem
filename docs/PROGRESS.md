@@ -6,10 +6,11 @@ Context: the project moved to a Linux VM (`/home/tatu/slop`). The paused
 agent worktrees from the Mac (search, core-file-modules, email-mobile,
 browsers, carving `.wip-derived/`) were **lost** (never pushed). The user
 chose to **reimplement** them here; `docs/agents/<track>.md` are the specs.
-Work is pushed to `origin/parity-wip` after each green commit (never to
-`master`). User-confirmed scope: everything incl. multi-user and WASM
-plugins; external-tool runners (aLEAPP/Plaso/Volatility) last; Cyber
-Triage lowest priority.
+Finished work merges straight to `master` and is pushed (`parity-wip`
+kept in sync). User-confirmed scope (2026-10-17): everything incl.
+multi-user (PostgreSQL via Docker/Podman for tests) and WASM plugins;
+external-tool runners (aLEAPP/iLEAPP/Plaso/Volatility) are OUT — port the
+valuable LEAPP parsers natively instead; Cyber Triage is OUT.
 
 Running now (3 agents in worktrees, coordinator merges):
 1. **search** — pm-text, pm-search, Keyword Search module (spec

@@ -69,8 +69,8 @@ Conventional messages (`feat(email): …`), several small commits are
 better than one huge one, each ending with
 `Co-Authored-By: Claude Opus 5.5 (1M context) <noreply@anthropic.com>`.
 Agents commit locally in their worktree only — never push, never add
-remotes. The coordinator merges into `master` and pushes to the
-`parity-wip` branch.
+remotes. The coordinator merges finished branches into `master` and
+pushes `master`.
 
 ## Final report
 List commits, what each feature covers, test counts, benchmark numbers,

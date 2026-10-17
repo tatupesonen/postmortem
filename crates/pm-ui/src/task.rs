@@ -63,6 +63,69 @@ impl<T: Send + 'static> Task<T> {
     }
 }
 
+/// A value loaded in the background and kept until it is refreshed:
+/// readers always get the last good value, never a blank while reloading.
+#[derive(Debug)]
+pub(crate) struct Cached<T> {
+    task: Option<Task<Result<T, String>>>,
+    current: Option<Arc<T>>,
+    stale: bool,
+    error: Option<String>,
+}
+
+impl<T> Default for Cached<T> {
+    fn default() -> Self {
+        Self {
+            task: None,
+            current: None,
+            stale: true,
+            error: None,
+        }
+    }
+}
+
+impl<T: Send + Sync + 'static> Cached<T> {
+    /// The last loaded value (`None` before the first load finishes);
+    /// starts `load` when stale.
+    pub(crate) fn get(
+        &mut self,
+        ctx: &egui::Context,
+        load: impl FnOnce() -> Result<T, String> + Send + 'static,
+    ) -> Option<Arc<T>> {
+        if let Some(t) = &mut self.task
+            && t.poll().is_some()
+            && let Some(Task::Ready(r)) = self.task.take()
+        {
+            match r {
+                Ok(v) => {
+                    self.current = Some(Arc::new(v));
+                    self.error = None;
+                }
+                Err(e) => self.error = Some(e),
+            }
+        }
+        if self.stale && self.task.is_none() {
+            self.stale = false;
+            self.task = Some(Task::spawn(ctx, load));
+        }
+        self.current.clone()
+    }
+
+    pub(crate) fn error(&self) -> Option<&str> {
+        self.error.as_deref()
+    }
+
+    /// Reloads on the next [`Self::get`], keeping the current value.
+    pub(crate) fn refresh(&mut self) {
+        self.stale = true;
+    }
+
+    /// Drops the value (e.g. the case closed).
+    pub(crate) fn clear(&mut self) {
+        *self = Self::default();
+    }
+}
+
 /// Runs `f` on the pool, counted in [`running`] (for fire-and-forget jobs
 /// that publish their own results).
 pub(crate) fn spawn_detached(f: impl FnOnce() + Send + 'static) {

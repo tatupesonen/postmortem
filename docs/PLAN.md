@@ -188,7 +188,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] NTFS bulk MFT enumeration (sequential chunked scan, parallel record parsing) feeding the loader
 - [ ] Loader: deferred secondary-index creation, ≥ 200 k files/s, bounded memory (streaming parent-id resolution)
 - [ ] DB-backed views replace `pm-index`: tree, File Types, Deleted, Discovery, Gallery, Data Source Summary via indexed SQL + precomputed aggregate tables
-- [ ] File-name/path search index in Tantivy (n-gram tokenizer) with sub-second substring search over 100 M names (shared `pm-search` crate with the M5 content index)
+- [x] File-name/path search index in Tantivy (n-gram tokenizer) with sub-second substring search over 100 M names (shared `pm-search` crate with the M5 content index) — `pm_search::names` (positional trigrams, exact substring/prefix/name/path queries, keyset paging, `catch_up`); 10 M names: 4–25 ms per selective query (docs/PERF.md); UI hook pending (coordinator)
 - [ ] Timeline: events table + pre-aggregated per-unit counts; counts view never scans events
 - [ ] Huge directory UX: keyset-paged listings, cached child counts
 - [ ] Memory/latency regression tests in CI for the 10 M-file synthetic case
@@ -220,9 +220,9 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 ### M4 — Ingest framework and core modules
 - [ ] `pm-ingest`: job settings, profiles, file filters, module factory API, staged pipelines (DS stage 1, file, artifact, result, DS stage 2), work-stealing scheduler with priorities, batched results, cancellation, progress snapshots, ingest inbox, ingest history in DB, run ingest on existing data sources
 - [ ] Hash Lookup (+ `pm-hashdb`: all formats, indexing, known/notable/no-change, Central Repo hash sets)
-- [ ] File Type Identification (`pm-filetype` + user-defined types)
+- [x] File Type Identification (`pm-filetype` + user-defined types)
 - [ ] Extension Mismatch Detector
-- [ ] Embedded File Extractor (zip, 7z, tar, gz/bz2/xz/zstd, rar if feasible, ISO, Office OLE/OOXML, PDF images; zip-bomb limits; password detection)
+- [x] Embedded File Extractor (zip, 7z, tar, gz/bz2/xz/zstd, rar if feasible, ISO, Office OLE/OOXML, PDF images; zip-bomb limits; password detection)
 - [ ] Picture Analyzer (EXIF → metadata + GPS artifacts, HEIC handling)
 - [ ] Encryption Detection (entropy, BitLocker/LUKS/FileVault/VeraCrypt signatures, password-protected Office/PDF/zip)
 - [ ] Interesting Files Identifier (full rule language, rule sets import/export)
@@ -230,9 +230,9 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Ingest UI: module config panels, progress panel, inbox, snapshot/diagnostics
 
 ### M5 — Text extraction and keyword search
-- [ ] `pm-text`: plain text with encoding detection, HTML, PDF, Office (OOXML, legacy OLE), RTF, SQLite, strings fallback, artifact text, language detection
-- [ ] `pm-search`: Tantivy schema, chunking (Autopsy parity), analyzers (CJK), exact/substring/regex, inline search during ingest, hit artifacts, highlighting
-- [ ] Keyword lists (built-ins with exact regexes, import/export incl. EnCase), credit-card validation (Luhn, BIN DB), account artifacts
+- [x] `pm-text`: plain text with encoding detection, HTML, PDF, Office (OOXML, legacy OLE), RTF, SQLite, strings fallback, artifact text, language detection — done except language detection (gap, docs/agents/search.md)
+- [x] `pm-search`: Tantivy schema, chunking (Autopsy parity), analyzers (CJK), exact/substring/regex, inline search during ingest, hit artifacts, highlighting
+- [x] Keyword lists (built-ins with exact regexes, import/export incl. EnCase), credit-card validation (Luhn, BIN DB), account artifacts
 - [ ] Ad-hoc keyword search UI, extracted-text viewer with hit navigation
 - [ ] OCR (pure-Rust `ocrs` or optional external Tesseract), machine translation provider interface
 
@@ -263,7 +263,8 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 - [ ] Report wizard and module API; HTML, XLSX, CSV/TSV, KML, body file, portable case, CASE/UCO, tagged hashes, data source summary; snapshots via insta
 
 ### M10 — Specialised modules
-- [ ] Android analyzer parsers (22 apps; inventory 03 §4) ported to Rust (table-driven query/mapping engine where it fits), GPX, DJI drones, VM extractor, YARA (yara-x), file carving (pure-Rust, PhotoRec-like signatures), LEAPP-equivalent iOS/Android parsers or external aLEAPP/iLEAPP runner, Plaso runner (optional external), object detection (optional), memory-image DSP (Volatility runner, optional)
+- [x] File carving (pure-Rust, PhotoRec-like signatures: `pm-carve` + PhotoRec Carver module)
+- [ ] Android analyzer parsers (22 apps; inventory 03 §4) ported to Rust (table-driven query/mapping engine where it fits), GPX, DJI drones, VM extractor, YARA (yara-x), LEAPP-equivalent iOS/Android parsers or external aLEAPP/iLEAPP runner, Plaso runner (optional external), object detection (optional), memory-image DSP (Volatility runner, optional)
 
 ### M11 — Multi-user and automation
 - [ ] PostgreSQL back end for `pm-casedb` (parity tests run against both back ends)

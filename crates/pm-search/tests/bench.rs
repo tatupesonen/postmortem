@@ -123,8 +123,13 @@ fn name_index_scale() {
     let mut rng = Rng(0x9E37_79B9_7F4A_7C15);
     let t = Instant::now();
     let mut batch = Vec::with_capacity(100_000);
+    let mut probe_name = String::new();
     for i in 1..=n {
-        batch.push(record(i, &mut rng));
+        let r = record(i, &mut rng);
+        if i == n / 3 {
+            probe_name.clone_from(&r.name);
+        }
+        batch.push(r);
         if batch.len() == 100_000 {
             ix.add_new(&batch).unwrap();
             batch.clear();
@@ -156,15 +161,8 @@ fn name_index_scale() {
             "prefix 'invoice_budget'",
             q("invoice_budget", NameMatch::Prefix, false),
         ),
-        (
-            "exact name",
-            q(
-                &format!("report_final_{}.txt", n / 3),
-                NameMatch::Exact,
-                false,
-            ),
-        ),
-        ("two characters 'q_'", q("dq", NameMatch::Substring, false)),
+        ("exact name", q(&probe_name, NameMatch::Exact, false)),
+        ("two characters 'xp'", q("xp", NameMatch::Substring, false)),
         (
             "path substring 'user42/secret'",
             q("user42/secret", NameMatch::Substring, true),

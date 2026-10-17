@@ -15,6 +15,9 @@ use serde::{Deserialize, Serialize};
 pub struct IngestPrefs {
     /// Ids of modules switched off.
     pub disabled: Vec<String>,
+    /// Ids of modules switched on that are off by default (Keyword
+    /// Search). Modules in neither list use their default.
+    pub enabled: Vec<String>,
     pub hash_lookup: HashLookupSettings,
     /// "All Files and Directories (Not Unallocated Space)".
     pub ignore_unallocated: bool,
@@ -23,15 +26,36 @@ pub struct IngestPrefs {
 }
 
 impl IngestPrefs {
+    /// Whether a module runs (an explicit choice, else its default).
+    pub(crate) fn is_enabled(&self, info: &pm_ingest::ModuleInfo) -> bool {
+        if self.disabled.iter().any(|d| d == info.id) {
+            false
+        } else {
+            self.enabled.iter().any(|d| d == info.id) || info.enabled_by_default
+        }
+    }
+
+    /// Records the user's choice for a module.
+    pub(crate) fn set_enabled(&mut self, id: &str, on: bool) {
+        self.disabled.retain(|d| d != id);
+        self.enabled.retain(|d| d != id);
+        if on {
+            self.enabled.push(id.to_owned());
+        } else {
+            self.disabled.push(id.to_owned());
+        }
+    }
+
     /// Job settings for the built-in modules.
     pub(crate) fn job_settings(&self) -> JobSettings {
         let modules = pm_modules::core_modules()
             .iter()
             .map(|f| {
-                let id = f.info().id;
+                let info = f.info();
+                let id = info.id;
                 ModuleSetting {
                     id: id.into(),
-                    enabled: !self.disabled.iter().any(|d| d == id),
+                    enabled: self.is_enabled(&info),
                     settings: if id == "hash_lookup" {
                         serde_json::to_value(&self.hash_lookup).unwrap_or_default()
                     } else {
@@ -230,43 +254,92 @@ impl AddSourceWizard {
     }
 
     fn step_two(&mut self, ui: &mut egui::Ui) {
-        egui::ScrollArea::vertical()
-            .max_height(420.0)
-            .min_scrolled_height(260.0)
-            .show(ui, |ui| {
-                for f in pm_modules::core_modules() {
-                    let info = f.info();
-                    let mut on = !self.prefs.disabled.iter().any(|d| d == info.id);
-                    if ui
-                        .checkbox(&mut on, egui::RichText::new(info.name).strong())
-                        .changed()
-                    {
-                        self.prefs.disabled.retain(|d| d != info.id);
-                        if !on {
-                            self.prefs.disabled.push(info.id.to_owned());
-                        }
-                    }
-                    ui.indent(info.id, |ui| {
-                        ui.weak(info.description);
-                        if info.id == "hash_lookup" && on {
-                            hash_sets_ui(ui, &mut self.prefs.hash_lookup);
-                        }
-                    });
-                    ui.add_space(4.0);
+        modules_page(ui, &mut self.prefs);
+    }
+}
+
+/// Autopsy's "Configure Ingest" page: modules with their settings and the
+/// file filter (shared by the Add Data Source and Run Ingest Modules
+/// wizards).
+pub(crate) fn modules_page(ui: &mut egui::Ui, prefs: &mut IngestPrefs) {
+    egui::ScrollArea::vertical()
+        .max_height(420.0)
+        .min_scrolled_height(260.0)
+        .show(ui, |ui| {
+            for f in pm_modules::core_modules() {
+                let info = f.info();
+                let mut on = prefs.is_enabled(&info);
+                if ui
+                    .checkbox(&mut on, egui::RichText::new(info.name).strong())
+                    .changed()
+                {
+                    prefs.set_enabled(info.id, on);
                 }
+                ui.indent(info.id, |ui| {
+                    ui.weak(info.description);
+                    if info.id == "hash_lookup" && on {
+                        hash_sets_ui(ui, &mut prefs.hash_lookup);
+                    }
+                });
+                ui.add_space(4.0);
+            }
+        });
+    ui.separator();
+    ui.label("Run ingest modules on:");
+    ui.radio_value(
+        &mut prefs.ignore_unallocated,
+        false,
+        "All Files, Directories, and Unallocated Space",
+    );
+    ui.radio_value(
+        &mut prefs.ignore_unallocated,
+        true,
+        "All Files and Directories (Not Unallocated Space)",
+    );
+}
+
+/// What the Run Ingest Modules dialog asks for.
+#[derive(Debug)]
+pub(crate) enum RunAction {
+    None,
+    Cancel,
+    Run(Box<(i64, JobSettings, IngestPrefs)>),
+}
+
+/// Autopsy's "Run Ingest Modules" wizard on an existing data source.
+#[derive(Debug)]
+pub(crate) struct RunIngestDialog {
+    pub(crate) ds_id: i64,
+    pub(crate) ds_name: String,
+    pub(crate) prefs: IngestPrefs,
+}
+
+impl RunIngestDialog {
+    pub(crate) fn ui(&mut self, ctx: &egui::Context) -> RunAction {
+        let mut action = RunAction::None;
+        egui::Modal::new(egui::Id::new("run-ingest")).show(ctx, |ui| {
+            ui.set_width(640.0);
+            ui.heading("Run Ingest Modules");
+            ui.label(format!("Configure ingest for {}", self.ds_name));
+            ui.separator();
+            modules_page(ui, &mut self.prefs);
+            ui.separator();
+            ui.horizontal(|ui| {
+                if ui.button("Cancel").clicked() {
+                    action = RunAction::Cancel;
+                }
+                ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+                    if ui.button("Finish").clicked() {
+                        action = RunAction::Run(Box::new((
+                            self.ds_id,
+                            self.prefs.job_settings(),
+                            self.prefs.clone(),
+                        )));
+                    }
+                });
             });
-        ui.separator();
-        ui.label("Run ingest modules on:");
-        ui.radio_value(
-            &mut self.prefs.ignore_unallocated,
-            false,
-            "All Files, Directories, and Unallocated Space",
-        );
-        ui.radio_value(
-            &mut self.prefs.ignore_unallocated,
-            true,
-            "All Files and Directories (Not Unallocated Space)",
-        );
+        });
+        action
     }
 }
 
@@ -346,7 +419,12 @@ mod tests {
     fn prefs_map_to_job_settings() {
         let mut p = IngestPrefs::default();
         let s = p.job_settings();
-        assert!(s.modules.iter().all(|m| m.enabled));
+        // Every module runs by default unless it is off by default.
+        for f in pm_modules::core_modules() {
+            let info = f.info();
+            let m = s.modules.iter().find(|m| m.id == info.id).unwrap();
+            assert_eq!(m.enabled, info.enabled_by_default, "{}", info.id);
+        }
         assert!(!s.filter.ignore_unallocated);
         p.disabled.push("hash_lookup".into());
         p.ignore_unallocated = true;
@@ -355,6 +433,24 @@ mod tests {
         assert!(!h.enabled);
         assert!(s.filter.ignore_unallocated);
         assert_eq!(h.settings["calculate_hashes"], serde_json::json!(true));
+    }
+
+    #[test]
+    fn off_by_default_modules_need_an_explicit_choice() {
+        let info = pm_ingest::ModuleInfo {
+            id: "keyword_search",
+            name: "Keyword Search",
+            description: "",
+            version: "1",
+            enabled_by_default: false,
+        };
+        let mut p = IngestPrefs::default();
+        assert!(!p.is_enabled(&info), "default off");
+        p.set_enabled("keyword_search", true);
+        assert!(p.is_enabled(&info));
+        p.set_enabled("keyword_search", false);
+        assert!(!p.is_enabled(&info));
+        assert_eq!(p.enabled, Vec::<String>::new());
     }
 
     #[test]

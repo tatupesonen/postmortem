@@ -1,10 +1,14 @@
 //! postmortem's built-in ingest modules: Rust ports of Autopsy's core
 //! analysers (ADR-013), run by the `pm-ingest` framework.
 
+pub mod derive;
+pub mod embedded;
 pub mod event_logs;
 mod exif;
+pub mod file_type;
 pub mod hash_lookup;
 pub mod keyword_search;
+pub mod photorec;
 pub mod picture_analyzer;
 pub mod recent_activity;
 mod util;
@@ -22,7 +26,10 @@ pub fn core_modules() -> Vec<Arc<dyn ModuleFactory>> {
         Arc::new(recent_activity::RecentActivityFactory),
         Arc::new(event_logs::EventLogFactory),
         Arc::new(hash_lookup::HashLookupFactory),
+        Arc::new(file_type::FileTypeFactory),
+        Arc::new(embedded::EmbeddedFileExtractorFactory),
         Arc::new(picture_analyzer::PictureAnalyzerFactory),
         Arc::new(keyword_search::KeywordSearchFactory),
+        Arc::new(photorec::PhotoRecCarverFactory),
     ]
 }

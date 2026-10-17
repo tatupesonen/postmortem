@@ -1374,19 +1374,19 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [ ] port: IngestFileFiltersTest.testExtAndDirWithTwoRules — OR across rules
 - [ ] port: IngestFileFiltersTest.testFullFileNameRule — full-name rule (case-insensitive)
 - [ ] port: IngestFileFiltersTest.testCarvingWithExtRuleAndUnallocSpace — unallocated space included; carved files filtered; Unalloc_* processed
-- [ ] port: IngestFileFiltersTest.testCarvingNoUnallocatedSpace — carver start-up error when unallocated space is excluded (exactly 1 error, module "PhotoRec Carver")
+- [x] port: IngestFileFiltersTest.testCarvingNoUnallocatedSpace — carver start-up error when unallocated space is excluded (exactly 1 error, module "PhotoRec Carver")
 - [ ] port: IngestFileFiltersTest.testEmbeddedJpg — extracted children obey the filter; derived/local directories typed
 - [ ] port: FilesSet condition semantics — ParentPath substring (case-insensitive, `parent + "/"`), Extension exact (leading dot stripped), FullName exact, meta-type FILES, ignoreUnallocated rejects UNALLOC/SLACK/UNUSED
 - [ ] port: ingest scheduler — `.`/`..` never processed; directories bypass the filter
-- [ ] decide: directory MIME-type semantics (section 3 inconsistency), with an ADR
+- [x] decide: directory MIME-type semantics (section 3 inconsistency), with an ADR (ADR-019: directories get none)
 
 ### Embedded file extraction
-- [ ] port: EmbeddedFileTest.runTestEncryptionAndZipBomb — protected zips → TSK_ENCRYPTION_DETECTED; depth bomb (> MAX_DEPTH 4) and ratio bomb (≥ 600) → TSK_INTERESTING_ITEM set "Possible Zip Bomb"; other files no artefacts
-- [ ] port: EmbeddedFileTest.runTestExtension — zip named .txt is extracted
-- [ ] port: EmbeddedFileTest.runTestBigFolder — 1000 extracted files, names file1..file1000.txt, MD5 098f6bcd4621d373cade4e832627b4f6
-- [ ] port: EmbeddedFileTest.runTestDeepFolder — 25-deep directories inside an archive; name-ordered child listing
-- [ ] port: EmbeddedFileTest.runTestEmbeddedFile — nested zips, paths `/<parent>/<archive>/<entry>`
-- [ ] port: EmbeddedFileTest.runTestContent — all extractable .txt hashed; protected entries not extracted or hashed
+- [x] port: EmbeddedFileTest.runTestEncryptionAndZipBomb — protected zips → TSK_ENCRYPTION_DETECTED; depth bomb (> MAX_DEPTH 4) and ratio bomb (≥ 600) → TSK_INTERESTING_ITEM set "Possible Zip Bomb"; other files no artefacts
+- [x] port: EmbeddedFileTest.runTestExtension — zip named .txt is extracted
+- [x] port: EmbeddedFileTest.runTestBigFolder — 1000 extracted files, names file1..file1000.txt, MD5 098f6bcd4621d373cade4e832627b4f6
+- [x] port: EmbeddedFileTest.runTestDeepFolder — 25-deep directories inside an archive; name-ordered child listing
+- [x] port: EmbeddedFileTest.runTestEmbeddedFile — nested zips, paths `/<parent>/<archive>/<entry>`
+- [x] port: EmbeddedFileTest.runTestContent — all extractable .txt hashed; protected entries not extracted or hashed
 
 ### Encryption detection
 - [ ] port: EncryptionDetectionTest.testBitlockerEncryption — BitLocker volume → TSK_ENCRYPTION_DETECTED, comment exactly "Bitlocker encryption detected."; other volumes none
@@ -1397,7 +1397,7 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 
 ### Hash lookup and keyword-list inputs
 - [ ] port (derive): parse `test/input/NSRL.txt-md5.idx` and `notablehashes.txt-md5.idx` — headers, 4 entries each, case-insensitive lookup, miss
-- [ ] port (derive): import `test/input/notablekeywords.xml` — BOM, list name/flags/timestamps, 10 literal terms incl. Arabic; export round-trip
+- [x] port (derive): import `test/input/notablekeywords.xml` — BOM, list name/flags/timestamps, 10 literal terms incl. Arabic; export round-trip
 
 ### Central repository
 - [ ] port: CorrelationAttributeNormalizerTest.testValidateMd5 — 5 cases
@@ -1448,12 +1448,12 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [ ] port: CommonAttributeSearchInterCaseTest.testTwo — USB thresholds (100 → 13, 20 → 0, 90 → 2; only if the synthetic fixture reproduces them)
 
 ### Keyword search
-- [ ] port: CreditCardValidatorTest.testLengthMatchesBin — IIN length table (Amex, Verve, Visa, Visa Electron vectors)
-- [ ] port: CreditCardValidatorTest.testIsValidCCN12..19 (8 methods) — grouping, separators, Luhn vectors
-- [ ] port: CCN IIN range-map "last insert wins" semantics; decide on the `29` typo (ADR)
-- [ ] port: MiniChunkHelperTest.isMiniChunkID / getBaseChunkID — if the chunk-ID scheme is kept
-- [ ] port: LanguageSpecificContentQueryHelperTest.makeQueryString / findNthIndexOf / buildTermfreqQuery — semantics we keep (multi-field OR; n-th occurrence)
-- [ ] port (derive): built-in regex lists (phone, IP, email, URL, CCN) positive and negative strings
+- [x] port: CreditCardValidatorTest.testLengthMatchesBin — IIN length table (Amex, Verve, Visa, Visa Electron vectors)
+- [x] port: CreditCardValidatorTest.testIsValidCCN12..19 (8 methods) — grouping, separators, Luhn vectors
+- [x] port: CCN IIN range-map "last insert wins" semantics; decide on the `29` typo (ADR) — kept the typo for parity (ADR-020)
+- [x] port: MiniChunkHelperTest.isMiniChunkID / getBaseChunkID — if the chunk-ID scheme is kept
+- [ ] port: LanguageSpecificContentQueryHelperTest.makeQueryString / findNthIndexOf / buildTermfreqQuery — semantics we keep (multi-field OR; n-th occurrence) — n/a for now: no language-specific fields (Japanese analysis is a documented gap)
+- [x] port (derive): built-in regex lists (phone, IP, email, URL, CCN) positive and negative strings
 - [ ] port (derive): literal/substring/regex matching and case options
 
 ### Data source summary
@@ -1508,7 +1508,7 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [ ] build: integration-test style YAML outputs for summary queries (UserActivitySummaryTests equivalent) diffed against gold
 
 ### Derived (section 19)
-- [ ] derive: file-type detection signature table tests
+- [x] derive: file-type detection signature table tests (pm-filetype unit tests + 10,861-file differential run against Tika 3.0.0)
 - [ ] derive: hash DB formats (TSK idx, NSRL, EnCase, md5sum text) parse and lookup
 - [ ] derive: interesting-files rules — every condition type, exclusive rules, XML round-trip
 - [ ] derive: file extension mismatch table

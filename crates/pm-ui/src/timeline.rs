@@ -282,10 +282,10 @@ impl TimelineWindow {
         let s = t.subject(row.subject)?;
         let ds = self.sources.iter().find(|d| d.id as u32 == s.ds)?;
         let fs = ds.fs(s.fs as usize)?;
-        Some(Content {
-            fs: Arc::clone(fs),
-            row: FileRow::from_fs(&**fs, s.inode, &s.path, !s.deleted),
-        })
+        Some(Content::from_fs(
+            Arc::clone(fs),
+            FileRow::from_fs(&**fs, s.inode, &s.path, !s.deleted),
+        ))
     }
 
     // ------------------------------------------------------------------ UI

@@ -371,7 +371,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Plaso (log2timeline/psort → TSK_TL_EVENT) | `A/modules/plaso` | Missing | Untracked. Optional external. |
 | Object Detection (OpenCV Haar) | `EXP/objectdetection` | Missing | Untracked. |
 | Volatility memory DSP | `EXP/volatilityDSP` | Missing | Untracked. |
-| Malware Scan (Cyber Triage cloud), CT options/licence | `CT/malwarescan/*`, `CT/ctoptions/*`, `CT/ctapi/*` | Missing (N/A?) | Proprietary cloud service. Needs a product decision. |
+| Malware Scan (Cyber Triage cloud), CT options/licence | `CT/malwarescan/*`, `CT/ctoptions/*`, `CT/ctapi/*` | N/A (decided) | Proprietary cloud service; out of scope (user decision 2026-10-17). |
 | Sample/example modules | `A/examples/*`, `pythonExamples/*` | N/A? | Become WASM plugin templates (§32). |
 
 ## 18. Timeline (`A/timeline`)
@@ -817,4 +817,4 @@ Each package fits one agent. Every UI package touches `pm-ui`, which `RULES.md` 
 - Key sources: `A/python/*`, `pythonExamples/*`, ADR-013, inventory 03 §4.
 - Dependencies: a stable ingest/report API.
 
-**Product decision needed (not a work package):** Cyber Triage Malware Scan / CT options / CT data node (`CT/**`). This is a proprietary cloud service; decide whether it is excluded or replaced by a local equivalent such as YARA + reputation hash sets.
+**Decided 2026-10-17:** Cyber Triage (`CT/**`) is out of scope. External-tool runners (aLEAPP/iLEAPP, Plaso, Volatility; part of WP-20) are out of scope; the valuable LEAPP parsers are ported natively in Rust instead.

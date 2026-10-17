@@ -39,6 +39,8 @@ pm-registry = { path = "crates/pm-registry" }
 pm-lnk = { path = "crates/pm-lnk" }
 pm-prefetch = { path = "crates/pm-prefetch" }
 pm-winartifacts = { path = "crates/pm-winartifacts" }
+pm-archive = { path = "crates/pm-archive" }
+pm-carve = { path = "crates/pm-carve" }
 pm-text = { path = "crates/pm-text" }
 pm-search = { path = "crates/pm-search" }
 
@@ -53,8 +55,20 @@ rayon = "1.12.0"
 crossbeam-channel = "0.5.17"
 parking_lot = "0.12.5"
 crc32fast = "1.5.2"
+regex = "1.13.1"
+memchr = "2.8.3"
 flate2 = { version = "1.1.10", default-features = false, features = ["zlib-rs"] }
 uuid = "1.28.0"
+
+# Archives, embedded files and carving (pm-archive, pm-carve)
+aho-corasick = "1.1.5"
+encoding_rs = "0.8.35"
+chardetng = "1.0.0"
+bzip2 = "0.6.1"
+lzma-rust2 = { version = "0.21.0", default-features = false, features = ["std", "xz", "optimization"] }
+ruzstd = "0.9.0"
+sevenz-rust2 = { version = "0.23.0", default-features = false, features = ["aes256", "bzip2", "ppmd", "deflate"] }
+rars = "0.9.4"
 
 # GUI
 egui = "0.36.2"

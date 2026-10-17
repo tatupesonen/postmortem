@@ -234,7 +234,8 @@ pub(crate) fn load_rows(case: &Case, view: &View, hide_known: bool) -> Result<Vi
     }
     let truncated = records.len() > MAX_ROWS;
     records.truncate(MAX_ROWS);
-    let rows = records.iter().map(row_of).collect();
+    let mut rows: Vec<FileRow> = records.iter().map(row_of).collect();
+    crate::tags_ui::annotate(case, &mut rows)?;
     Ok(ViewRows {
         rows,
         records,
@@ -292,6 +293,8 @@ pub(crate) fn row_of(f: &FileRecord) -> FileRow {
         meta: Some(meta),
         size: f.size,
         path: f.path(),
+        file: Some(Arc::new(f.clone())),
+        annotations: None,
     }
 }
 
