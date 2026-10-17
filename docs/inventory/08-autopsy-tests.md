@@ -1511,6 +1511,6 @@ Tick each line when an equivalent postmortem test exists and passes. Lines marke
 - [x] derive: file-type detection signature table tests (pm-filetype unit tests + 10,861-file differential run against Tika 3.0.0)
 - [ ] derive: hash DB formats (TSK idx, NSRL, EnCase, md5sum text) parse and lookup
 - [ ] derive: interesting-files rules — every condition type, exclusive rules, XML round-trip
-- [ ] derive: file extension mismatch table
+- [x] derive: file extension mismatch table (pm-modules ext_mismatch unit + end-to-end tests)
 - [ ] derive: timeline filter combinations
 - [ ] derive: Recent Activity, email, EXIF, carving, VM extractor, data-source integrity, reports, tags (per-module inventories)

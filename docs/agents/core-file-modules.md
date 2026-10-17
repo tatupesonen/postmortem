@@ -7,7 +7,7 @@ merged from `wip/filetype`, reviewed, fixed and completed).
 | # | Item | Status |
 |---|------|--------|
 | 1 | `pm-filetype` + File Type Identification module | done |
-| 2 | Extension Mismatch Detector | not started |
+| 2 | Extension Mismatch Detector | done |
 | 3 | Encryption Detection | not started |
 | 4 | Interesting Files Identifier + reusable FilesSet engine (`pm-rules`) | not started |
 | 5 | Data Source Integrity (+ `pm-casedb/src/integrity.rs`) | not started |
@@ -115,3 +115,34 @@ unallocated blocks, slack < 4096 bytes and non-regular objects).
   declared 8-bit encodings are read as Latin-1 (names are ASCII anyway).
 * Only Tika's streaming ZIP path is ported (Autopsy never gives Tika a
   file-backed stream).
+
+## 2. Extension Mismatch Detector
+
+`crates/pm-modules/src/ext_mismatch.rs`, module `ext_mismatch`
+("Extension Mismatch Detector", "Flags files that have a non-standard
+extension based on their file type."), after the Picture Analyzer.
+
+* Settings: `skip_files_without_extension` (true), `skip_known_files`
+  (true), `check_type` (`all` / `no_text_files` / `only_media_and_exe`,
+  default the latter with Autopsy's 28 `MEDIA_AND_EXE_MIME_TYPES`) and
+  `mismatch_map` (MIME type → allowed extensions; `null` = Autopsy's
+  default `mismatch_config.xml`, embedded verbatim in
+  `crates/pm-modules/data/`, 65 types). `parse_config` / `write_config`
+  read and write Autopsy's XML (a type without `<ext>` is listed but not
+  checked; a later signature replaces an earlier one).
+* Skips known files (option), unallocated space and slack, non-regular
+  objects, and files whose name or metadata is unallocated. The MIME type
+  comes from `mime_or_detect`.
+* A mismatch posts `TSK_EXT_MISMATCH_DETECTED` (Likely Notable,
+  justification "File has MIME type of <type>", no attributes),
+  de-duplicated on re-ingest (Autopsy itself would duplicate it). The job
+  ends with "File Extension Mismatch Results" when any file was compared.
+
+Tests: 5 unit tests (default config, XML round trip and errors, an
+18-row `compareSigTypeToExt` decision table, settings serde, proptest on
+the XML reader) and 3 end-to-end tests (default settings incl. known and
+deleted files and the summary, every check mode and skip option, a
+custom map).
+
+Gap: none known in behaviour. The settings UI (global map editor, "Add
+extension as matching MIME type" context action) is a coordinator to-do.

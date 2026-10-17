@@ -3716,6 +3716,7 @@ dependencies = [
  "pm-testkit",
  "pm-winartifacts",
  "proptest",
+ "roxmltree 0.21.1",
  "rusqlite",
  "serde",
  "serde_json",

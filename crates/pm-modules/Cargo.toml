@@ -13,6 +13,7 @@ pm-ingest.workspace = true
 pm-hashdb.workspace = true
 pm-evtlog.workspace = true
 pm-filetype.workspace = true
+roxmltree.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 serde.workspace = true

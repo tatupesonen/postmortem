@@ -3,6 +3,7 @@
 
 pub mod event_logs;
 mod exif;
+pub mod ext_mismatch;
 pub mod file_type;
 pub mod hash_lookup;
 pub mod picture_analyzer;
@@ -24,5 +25,6 @@ pub fn core_modules() -> Vec<Arc<dyn ModuleFactory>> {
         Arc::new(hash_lookup::HashLookupFactory),
         Arc::new(file_type::FileTypeFactory),
         Arc::new(picture_analyzer::PictureAnalyzerFactory),
+        Arc::new(ext_mismatch::ExtMismatchFactory),
     ]
 }

@@ -108,6 +108,11 @@ impl Art {
         self
     }
 
+    pub(crate) fn justification(mut self, j: impl Into<String>) -> Self {
+        self.a.justification = Some(j.into());
+        self
+    }
+
     /// A text attribute, left out when empty (Autopsy skips null values).
     pub(crate) fn text_opt(self, attr_name: &str, v: Option<String>) -> Self {
         match v.filter(|s| !s.is_empty()) {
