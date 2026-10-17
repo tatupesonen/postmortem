@@ -83,7 +83,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Auto-ingest DSP confidence ordering (`AutoIngestDataSourceProcessor.canProcess`) | `A/datasourceprocessors/DataSourceProcessorUtility` | Missing | Needed for the CLI and auto-ingest. |
 | Unallocated-space virtual files (`$Unalloc`, chunked) | TSK + `AddImageTask` | Done | `pm-case/src/load.rs` (`chunk_ranges`), with tests. |
 | `$OrphanFiles` virtual dirs | TSK | Done | Tested for FAT/NTFS/exFAT. |
-| `$CarvedFiles` virtual dir | TSK/PhotoRec | In progress (derived-and-carving) | — |
+| `$CarvedFiles` virtual dir | TSK/PhotoRec | Done | — |
 | Slack files (`-slack`) | TSK `SlackFile` | Missing | `PLAN.md` M1 item unchecked. Schema has `origin 6 slack`. |
 | Data-source time zone (FAT local times) | `ImageFilePanel` | Done | — |
 
@@ -95,10 +95,10 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | EWF v1 E01/s01 (multi-segment, stored hashes, header metadata) | `GeneralFilter.ENCASE_IMAGE_EXTS`, TSK/libewf | Done | Verified against ewfacquire, with a fuzz target (`fuzz_targets/ewf_read.rs`). |
 | EWF2 Ex01 / Lx01 | TSK/libewf | Missing | Sniffed only; returns `Unsupported`. |
 | L01 logical evidence | `LogicalEvidenceFilePanel` | Missing | See §2. |
-| VMDK (sparse, flat, descriptor, split) | `GeneralFilter.VIRTUAL_MACHINE_EXTS`, TSK/libvmdk | Missing | Sniffed only. Also needed by the VM Extractor (email-mobile track). |
-| VHD (fixed/dynamic/differencing) | same | Missing | Sniffed only. |
-| VHDX | same | Missing | Sniffed only. |
-| QCOW2 | TSK (libqcow), not in Autopsy's file filter | Missing | Sniffed only. |
+| VMDK (sparse, flat, descriptor, split) | `GeneralFilter.VIRTUAL_MACHINE_EXTS`, TSK/libvmdk | Done | In-house reader (pm-image), with parents; differential tests against qemu-img. |
+| VHD (fixed/dynamic/differencing) | same | Done | In-house reader with parent chains. |
+| VHDX | same | Done | In-house reader with parent chains. |
+| QCOW2 | TSK (libqcow), not in Autopsy's file filter | Done | In-house reader with backing files. |
 | DMG (UDIF) | Not in Autopsy | Missing | In the postmortem `PLAN.md` only. |
 | AFF / AFF4 | TSK optional; not in Autopsy's file filter | Missing | Low priority. |
 | Image metadata (acquisition details, device id, image hashes) | TSK `tsk_image_info` | Partial | EWF header metadata is parsed. The `data_sources` columns exist. No Image Details panel (§9). |
@@ -115,7 +115,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Pools: APFS container | TSK pools, `PoolNode` | Missing | Needs `pm-fs-apfs`. |
 | Pools: LVM | TSK pools | Missing | — |
 | BitLocker decryption (password / recovery key) | TSK, `ImageFilePanel` password, CLI `--key` | Missing | Encryption *detection* is in progress (core-file-modules). Unlock is untracked. |
-| LUKS / FileVault / Core Storage detection | TSK (detect) | In progress (core-file-modules: Encryption Detection) | Detection only; unlock is not planned. |
+| LUKS / FileVault / Core Storage detection | TSK (detect) | Done | Detection only (pm-encryption); unlock is not planned. |
 
 ## 5. File systems (`pm-fs-*`)
 
@@ -142,17 +142,17 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 |---|---|---|---|
 | Objects/files/VS/FS/data sources schema + bulk loader | TSK schema | Done | `migrations/0001_initial.sql`, about 205k rows/s. Tests in `pm-casedb/tests`. |
 | Standard artifact/attribute type catalogue (incl. custom types) | TSK `BlackboardArtifact.Type` | Done | 226 TSK_ entries in `catalog.rs`, plus the `custom_types` test. |
-| Artifacts with score/conclusion/justification/configuration, review status | TSK analysis results | Partial | Columns exist. Review-status UI is missing (§8). |
-| Aggregate score per object (incl. tags, artifacts as objects) | TSK `tsk_aggregate_score` | Partial | `file_score` = max significance of the file's artifacts only. Not stored. Ignores notable tags and scores of artifact objects. |
-| Tags (tag names, tag sets, file/artifact tags, byte-range tags) | TSK tags | Partial | DB API + test (`tags_and_notable`). No UI (§11). |
-| Hosts | TSK `HostManager` | Partial | Table only. |
-| Persons | TSK `PersonManager` | Missing | — |
-| OS accounts, realms, instances, attributes | TSK `OsAccountManager` | Missing | Schema absent. Blocks SAM/ProfileList output (windows-artifacts), OS Accounts UI and CR OS-account correlation. |
+| Artifacts with score/conclusion/justification/configuration, review status | TSK analysis results | Partial | Scores, conclusion, justification and configuration shown; review-status UI missing. |
+| Aggregate score per object (incl. tags, artifacts as objects) | TSK `tsk_aggregate_score` | Done | Schema v2 `scores` table, TSK ordering, tags included. |
+| Tags (tag names, tag sets, file/artifact tags, byte-range tags) | TSK tags | Partial | Files and results with sets and scores; byte-range tags missing. |
+| Hosts | TSK `HostManager` | Done | Schema v2 + Manage Hosts UI. |
+| Persons | TSK `PersonManager` | Done | Schema v2 + person UI on host nodes. |
+| OS accounts, realms, instances, attributes | TSK `OsAccountManager` | Done | Schema v2 with TSK merge rules; SAM/ProfileList feed it. |
 | Communication accounts + account_relationships | TSK `CommunicationsManager` | Missing | Schema absent. Blocks Communications (§19). email-mobile can only emit TSK_ACCOUNT artifacts. |
-| Timeline events table (event types, 3 description levels, tagged/hash_hit flags) | TSK `TimelineManager`, `tsk_events` | Missing | The timeline is built in memory (`pm-timeline` from `pm-index` + artifacts). |
+| Timeline events table (event types, 3 description levels, tagged/hash_hit flags) | TSK `TimelineManager`, `tsk_events` | Partial | Schema v2 `events` + API; the Timeline UI still builds events in memory (WP-15). |
 | Ingest job records | TSK `ingest_jobs` | Done | `start/finish_ingest_job`. |
 | Reports table | TSK `reports` | Partial | Table only. |
-| Derived files / file re-injection | TSK `DerivedFile` | In progress (derived-and-carving) | — |
+| Derived files / file re-injection | TSK `DerivedFile` | Done | ADR-016; `pm_modules::derive`. |
 | PostgreSQL back end | TSK | Missing | M11. |
 | Autopsy case importer (TSK DB → pm) | — | Missing | Stretch goal in `PLAN.md`. |
 
@@ -161,7 +161,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
 | Data Sources → content hierarchy (image → volumes → dirs; VS/FS/root inlined) | `datamodel/ContentChildren`, node classes | Partial | `pm-ui/src/model.rs` reads the evidence directly, not the DB. No host level. No derived/local/carved/artifact-child nodes. |
-| Hosts level under Data Sources; "Unknown Host" | `DataSourcesNode`, `HostNode` | Missing | — |
+| Hosts level under Data Sources; "Unknown Host" | `DataSourcesNode`, `HostNode` | Done | — |
 | Group by Person/Host layout (per-DS filtered subtrees) | `AutopsyTreeChildFactory`, `PersonNode`, `DataSourceGroupingNode` | Missing | — |
 | File Views › By Extension (Images, Videos, Audio, Archives, Databases, Documents…, Executable) with counts | `FileTypesByExtension` | Done | `pm-ui/src/views.rs`, from the case DB. Test `views_list_files_by_type_from_the_case_database`. |
 | File Views › By MIME Type | `FileTypesByMimeType` | Partial | Implemented; empty until File Type ID lands (in progress). |
@@ -169,15 +169,15 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | File Views › File Size (50–200 MB, 200 MB–1 GB, 1 GB+) | `FileSize` | Done | — |
 | Hide known files in Views / in Data Sources; hide slack | `KnownAndSlackFilterBase`, View prefs | Partial | Only "hide known in Views", in the View menu. |
 | Data Artifacts / Analysis Results type nodes with counts (refresh during ingest) | `DataArtifacts`, `AnalysisResults` | Done | `pm-ui/src/results.rs`. Test `analysis_results_are_listed_and_open_the_source_file`. |
-| Keyword Hits subtree (list › term › hits) | `datamodel/KeywordHits` | Missing | Needed once the search track lands. |
+| Keyword Hits subtree (list › term › hits) | `datamodel/KeywordHits` | Done | List › keyword › match, Autopsy grouping rules. |
 | Hashset Hits by set name | `HashsetHits` | Missing | Currently a flat list. |
 | Interesting Items / Interesting File/Artifact hits by set | `InterestingHits` | Missing | — |
 | E-Mail Messages by account › folder | `EmailExtracted` | Missing | — |
 | Communication Accounts by type; credit cards By File / By BIN (BIN DB) | `datamodel/accounts/Accounts`, `ranges.csv` | Missing | The search track does card validation; the tree is untracked. |
 | TSK_MALWARE filtered to notable | `AnalysisResults` | Missing | — |
-| OS Accounts node | `OsAccounts.java` | Missing | Schema blocker. |
-| Tags node (tag › File Tags / Result Tags; hide other users' tags) | `Tags.java` | Missing | — |
-| Score node (Bad Items / Suspicious Items) | `ScoreContent.java` | Missing | — |
+| OS Accounts node | `OsAccounts.java` | Done | Under Analysis Results (user choice). |
+| Tags node (tag › File Tags / Result Tags; hide other users' tags) | `Tags.java` | Partial | "Hide other users' tags" missing. |
+| Score node (Bad Items / Suspicious Items) | `ScoreContent.java` | Done | — |
 | Reports node (open/delete report) | `Reports.java` | Missing | — |
 | Cyber Triage data node (`ct_errors`) | `CyberTriageData.java` | N/A? | Only for Cyber Triage-written DBs. |
 | Count throttled refresh, "counting…" threshold >1M | `RefreshThrottler`, `ViewsNode` | Partial | Counts refresh every 2 s during ingest. No 1M threshold. |
@@ -194,7 +194,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Column chooser, reorder, multi-key sort, per-node-type persistence | `ResultViewerPersistence` | Missing | — |
 | File row columns parity: Known, Location, MD5, SHA-256, MIME type, Original Name (translated), hidden extras (Mode, UID, GID, Meta Addr…) | `AbstractAbstractFileNode` | Partial | Name, times, size, flags, extension and inode only. |
 | Artifact row columns (Source Name, Score/Conclusion/Justification, per-attribute columns, Data Source, File Path…) | `BlackboardArtifactNode.createSheet` | Partial | Attribute columns plus source file. No score columns, Data Source column, or the email/mismatch special cases. |
-| S / C / O columns (async) | `GetSCOTask`, `SCOData` | Missing | Needs aggregate score, tags and CR. |
+| S / C / O columns (async) | `GetSCOTask`, `SCOData` | Partial | S and C done; O needs the Central Repository. |
 | Paging (page size pref, go-to page) | `BaseChildFactory` paging | Missing | Virtualisation replaces it for files; results have a hard cap. |
 | Save Table as CSV / Export Selected Rows to CSV | `ExportCSVAction` | Missing | — |
 | Thumbnail tab (S/M/L, 200/page, sort chooser) | `DataResultViewerThumbnail`, `SortChooser` | Missing | Thumbnails exist only in the Gallery/Discovery windows. |
@@ -214,12 +214,12 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | View in Directory (from result rows / tags) | `ViewContextAction` | Partial | Result rows open the source file in the viewer. They do not navigate the tree. |
 | View Source Result / View Associated Content / View Artifact / View OS Account | `ViewSourceArtifactAction`, `ViewAssociatedContentAction`, `actions/ViewArtifactAction`, `ViewOsAccountAction` | Missing | — |
 | Copy Path | (NetBeans copy) | Done | — |
-| Add File Tag / Add Result Tag / Replace / Remove (with comment), Bookmark Ctrl+B | `A/actions/*Tag*`, `GetTagNameAndCommentDialog` | Missing | — |
+| Add File Tag / Add Result Tag / Replace / Remove (with comment), Bookmark Ctrl+B | `A/actions/*Tag*`, `GetTagNameAndCommentDialog` | Done | Includes Ctrl+B Bookmark and Tag and Comment. |
 | Add File(s) to Hash Set | `hashdatabase/AddContentToHashDbAction` | Missing | `pm-hashdb` can write kdb (`add`). |
 | Image Details / Volume Details / File System Details | `ImageDetailsPanel`, `VolumeDetailsPanel`, `FileSystemDetailsPanel` | Missing | — |
 | Run Ingest Modules (on a data source) | `ingest/runIngestModuleWizard/*`, `RunIngestModulesAction` | Missing | The `pm-ingest` API supports it; no UI. |
 | Remove Data Source | `DeleteDataSourceAction` | Missing (UI) | API done. |
-| Open File Search by Attributes (on a data source) | `FileSearchTreeAction` | Missing | — |
+| Open File Search by Attributes (on a data source) | `FileSearchTreeAction` | Done | — |
 | View Summary Information (on a data source) | `ViewSummaryInformationAction` | Partial | Selecting a DS shows the summary. |
 | Drag-and-drop image to add | — | Done | Postmortem extra. |
 
@@ -231,7 +231,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Hex viewer (paging, go-to offset, copy, launch external hex editor) | `DataContentViewerHex` | Partial | Virtualised with go-to (`viewers/hex.rs`). No selection/copy and no external editor. |
 | Strings (scripts/encodings: Latin, CJK…, language selection) | `textcontentviewer/StringsTextViewer`, `coreutils/StringExtract` | Partial | ASCII and UTF-16LE only. No script selection. |
 | Text (plain) | `textcontentviewer` | Done | BOM detection, with tests. |
-| Extracted Text viewer (indexed text, hit highlighting, next/prev hit, pages) | `KWS/ExtractedTextViewer`, `HighlightedText` | In progress (search: engine) / Missing (UI) | — |
+| Extracted Text viewer (indexed text, hit highlighting, next/prev hit, pages) | `KWS/ExtractedTextViewer`, `HighlightedText` | Done | Indexed pages or on-the-fly extraction; hit highlighting and navigation. |
 | Translation sub-viewer | `texttranslation/ui/TranslatedTextViewer` | Missing | — |
 | Application › Picture (zoom, rotate, fit, region tags) | `MediaViewImagePanel`, `imagetagging/*` | Partial | Zoom/fit only. No rotate and no image-region tags (`contentviewertags`). |
 | Application › Audio/Video player | `MediaPlayerPanel` (GStreamer) | Missing | — |
@@ -254,10 +254,10 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
 | Default tag names (Bookmark, Follow Up, Notable Item) | `TagNameDefinition` | Done | Seeded in the migration. |
-| Tag file / artifact with comment; replace; delete | `TagsManager`, `A/actions/*` | Partial | DB API exists for files only (`tag_file`/`untag_file`). No artifact-tag API and no UI. |
-| Custom tag names + notable flag (Options › Tags) | `TagOptionsPanel`, `TagNameDialog` | Missing | — |
-| Tag sets (Project VIC categories) | `TagSetDefinition` | Missing | Table exists. |
-| Notable tag → item score / CR known-bad | `TagsManager`, CR listeners | Missing | — |
+| Tag file / artifact with comment; replace; delete | `TagsManager`, `A/actions/*` | Done | — |
+| Custom tag names + notable flag (Options › Tags) | `TagOptionsPanel`, `TagNameDialog` | Done | Tools › Options › Tags. |
+| Tag sets (Project VIC categories) | `TagSetDefinition` | Done | Created on case open; exclusive within a set. |
+| Notable tag → item score / CR known-bad | `TagsManager`, CR listeners | Partial | Score done; CR known-bad needs the Central Repository. |
 | Image region tags (content viewer tags) | `contentviewertags/ContentViewerTagManager` | Missing | — |
 | Per-examiner tags, "show only current user's tags" | View prefs | Missing | — |
 
@@ -268,7 +268,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Module factory API, file + data-source modules, staged DS modules | `IngestModuleFactory`, `IngestJobExecutor` | Done | `pm-ingest`, 10 integration tests. |
 | Priority scheduling (user folders first, unalloc last), N workers, cancellation | `IngestTasksScheduler` | Done | Tested. |
 | Data-artifact ingest pipeline & analysis-result pipeline | `DataArtifactIngestModule`, `AnalysisResultIngestModule` (KWS indexing of artifacts, CR artifact module) | Missing | Not in any track; `pm-ingest` is owned by derived-and-carving. Needed by the search and CR work. |
-| Derived-file re-injection into running jobs | `IngestJobExecutor.addFiles` | In progress (derived-and-carving) | — |
+| Derived-file re-injection into running jobs | `IngestJobExecutor.addFiles` | Done | — |
 | Standard file filters (all / not unallocated) | `FilesSetsManager` standard filters | Done | `FileFilter`, tested. |
 | Custom file ingest filters (FilesSet rules) | `FilesSetsManager`, `IngestOptionsPanel` › File Filters | Partial | The FilesSet engine is in progress (core-file-modules). Wiring into `pm-ingest`, the UI and 7 `IngestFileFiltersTest` ports are untracked. |
 | Ingest profiles | `ingest/profile/IngestProfiles`, `ProfileSettingsPanel` | Missing | — |
@@ -289,20 +289,20 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Hash Lookup (known/notable sets, calculate MD5 w/o sets, inbox per hit, TSK_HASHSET_HIT) | `modules/hashdatabase/HashDbIngestModule` | Done | `pm-modules/src/hash_lookup.rs`, with 4 end-to-end tests. |
 | Hash set formats: kdb, NSRL RDS v2/v3, md5sum, HashKeeper, EnCase, idx | `hashdatabase/*Parser`, TSK | Done | `pm-hashdb`, with tests. Port of the 08 `test/input` idx fixtures still owed. |
 | Hash Sets options panel (create, import, index, delete, add hashes dialog, import into CR) | `HashLookupSettingsPanel`, `HashDbCreateDatabaseDialog`, `HashDbImportDatabaseDialog`, `AddHashValuesToDatabaseDialog` | Partial | "Add Hash Set…" exists in the wizard only. No global manager, create, add-hashes or CR import. |
-| File Type Identification (Tika-equivalent) | `modules/filetypeid` | In progress (core-file-modules) | — |
-| User-defined file types (Options › File Types) | `filetypeid/FileTypeIdGlobalSettingsPanel`, `AddFileTypeSignatureDialog` | In progress (engine) / Missing (UI) | — |
-| Extension Mismatch Detector (+ options panel table) | `modules/fileextmismatch` | In progress (core-file-modules) / Missing (UI) | — |
-| Embedded File Extractor (archives, Office, PDF images, zip bomb, password detection) | `modules/embeddedfileextractor` | In progress (derived-and-carving) | — |
+| File Type Identification (Tika-equivalent) | `modules/filetypeid` | Done | Matches Tika 3.0.0 on 10 861 test files; ~23× faster. |
+| User-defined file types (Options › File Types) | `filetypeid/FileTypeIdGlobalSettingsPanel`, `AddFileTypeSignatureDialog` | Partial | Engine done; Options › File Types UI missing. |
+| Extension Mismatch Detector (+ options panel table) | `modules/fileextmismatch` | Partial | Module done; options table UI missing. |
+| Embedded File Extractor (archives, Office, PDF images, zip bomb, password detection) | `modules/embeddedfileextractor` | Done | Password prompt UI missing. |
 | Picture Analyzer: EXIF → TSK_METADATA_EXIF + USER_CONTENT_SUSPECTED | `modules/pictureanalyzer/impls/EXIFProcessor` | Partial | Done; tests owed (no end-to-end ingest test). |
 | Picture Analyzer: HEIC/HEIF → JPEG derived files | `pictureanalyzer/impls/HEICProcessor` | Missing | Needs derived files and a HEIC decoder (external). |
-| Encryption Detection (entropy, BitLocker/VeraCrypt/SQLCipher, protected Office/PDF/Access) | `modules/encryptiondetection` | In progress (core-file-modules) | — |
-| Interesting Files Identifier (+ rule-set editor, import/export XML) | `modules/interestingitems` | In progress (engine) / Missing (options UI) | — |
-| Data Source Integrity (verify/compute image hashes, TSK_VERIFICATION_FAILED) | `modules/dataSourceIntegrity` | In progress (core-file-modules) | The DSP hash-entry UI is missing (§2). |
-| PhotoRec Carver | `modules/photoreccarver` | In progress (derived-and-carving) | — |
+| Encryption Detection (entropy, BitLocker/VeraCrypt/SQLCipher, protected Office/PDF/Access) | `modules/encryptiondetection` | Done | — |
+| Interesting Files Identifier (+ rule-set editor, import/export XML) | `modules/interestingitems` | Partial | Module and FilesSet engine done; rule-set editor UI missing. |
+| Data Source Integrity (verify/compute image hashes, TSK_VERIFICATION_FAILED) | `modules/dataSourceIntegrity` | Partial | Module done; DSP hash-entry UI missing (§2). |
+| PhotoRec Carver | `modules/photoreccarver` | Done | 17 of PhotoRec's ~300 types (native carver). |
 | Scalpel Carver (disabled in Autopsy) | `ScalpelCarver/` | N/A? | Not registered in Autopsy. |
 | Central Repository ingest module | `centralrepository/ingestmodule` | Missing | §25. |
-| Keyword Search ingest module | `KWS/KeywordSearchIngestModule` | In progress (search) | §15. |
-| Email Parser | `TB/*` | In progress (email-mobile) | §16. |
+| Keyword Search ingest module | `KWS/KeywordSearchIngestModule` | Done | §15. |
+| Email Parser | `TB/*` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
 | Recent Activity | `RA/*` | Partial / In progress | §14. |
 
 ## 14. Recent Activity (`RA/`)
@@ -311,24 +311,24 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 |---|---|---|---|
 | RA framework (ordered extractors, temp copies, inbox lines, re-run idempotence) | `RAImageIngestModule`, `Extract` | Partial | `recent_activity/mod.rs`: 2 steps (Chromium, IE), idempotent. Not done: TSK_ASSOCIATED_OBJECT links and download TSK_PATH_ID. Tests owed. |
 | Chromium family: history, downloads, cookies, bookmarks, logins, autofill | `Chromium.java` | Partial | Implemented; zero tests (chromium.rs). The browsers track owns the tests. |
-| Chromium: favicons, web-form addresses, extensions (+ malicious list), cache | `Chromium.java`, `ChromeCacheExtractor`, `malicious_chrome_extensions.csv` | In progress (browsers) | — |
+| Chromium: favicons, web-form addresses, extensions (+ malicious list), cache | `Chromium.java`, `ChromeCacheExtractor`, `malicious_chrome_extensions.csv` | Done | — |
 | Internet Explorer: index.dat history, Favorites, cookies | `ExtractIE.java` (pasco) | Partial | Native parser plus 3 unit tests. Not done: pasco2 test ports (08 §14) and a diff against pasco. Browsers track. |
-| Firefox (places, cookies, downloads, form history, logins, bookmarks) | `Firefox.java` | In progress (browsers) | — |
-| Safari (history, bookmarks, downloads plist, binary cookies) | `ExtractSafari.java`, `BinaryCookieReader` | In progress (browsers) | — |
-| Edge legacy / IE10+ WebCache (ESE) | `ExtractEdge.java` | In progress (browsers) | — |
+| Firefox (places, cookies, downloads, form history, logins, bookmarks) | `Firefox.java` | Done | — |
+| Safari (history, bookmarks, downloads plist, binary cookies) | `ExtractSafari.java`, `BinaryCookieReader` | Done | — |
+| Edge legacy / IE10+ WebCache (ESE) | `ExtractEdge.java` | Missing | Needs an ESE reader (drafted, not merged). |
 | Web search queries (SEUQA mappings) | `SearchEngineURLQueryAnalyzer`, `SEUQAMappings.xml` | Partial | Implemented with 1 unit test. |
-| Public suffix list domain extraction | `Util.extractDomain` / CR normalizer | In progress (browsers: PSL) | — |
+| Public suffix list domain extraction | `Util.extractDomain` / CR normalizer | Done | — |
 | Web account types (admin/mod/user roles) | `ExtractWebAccountType.java` | Missing | Not in the browsers scope as listed. |
 | Domain categorisation (default CSV, priority categoriser, custom categories) | `DomainCategoryRunner`, `DefaultDomainCategorizer`, `default_domain_categories.csv` | Missing | Untracked. |
 | Custom Web Categories options panel (import/export) | `A/url/analytics/domaincategorization/*` | Missing | Untracked. |
-| Windows Registry analyses (OS info, USB + USB ID DB, installed programs, MRUs, shellbags, BAM, Bluetooth, WiFi, network drives, WSL, SAM accounts) | `ExtractRegistry.java`, `ShellBagParser`, `UsbDeviceIdMapper` | In progress (windows-artifacts) | SAM/ProfileList → OS accounts is blocked by the schema (§6). |
-| Recycle Bin ($I/$R, re-created deleted file) | `ExtractRecycleBin.java` | In progress (windows-artifacts) | The re-created file needs derived/virtual file support. |
-| Jump Lists (AutomaticDestinations → derived LNKs) | `ExtractJumpLists.java` | In progress (windows-artifacts) | Needs derived files. |
-| LNK recent documents | `RecentDocumentsByLnk.java` | In progress (windows-artifacts) | — |
-| Prefetch | `ExtractPrefetch.java` | In progress (windows-artifacts) | — |
-| SRUM | `ExtractSru.java` | In progress (windows-artifacts) | — |
-| Zone.Identifier → downloads | `ExtractZoneIdentifier.java` | In progress (windows-artifacts) | — |
-| Data source usage | `DataSourceUsageAnalyzer.java` | In progress (windows-artifacts) | — |
+| Windows Registry analyses (OS info, USB + USB ID DB, installed programs, MRUs, shellbags, BAM, Bluetooth, WiFi, network drives, WSL, SAM accounts) | `ExtractRegistry.java`, `ShellBagParser`, `UsbDeviceIdMapper` | Partial | Merged and tested on generated data; real-image verification pending. |
+| Recycle Bin ($I/$R, re-created deleted file) | `ExtractRecycleBin.java` | Partial | Merged and tested on generated data; real-image verification pending. |
+| Jump Lists (AutomaticDestinations → derived LNKs) | `ExtractJumpLists.java` | Partial | Merged and tested on generated data; real-image verification pending. |
+| LNK recent documents | `RecentDocumentsByLnk.java` | Partial | Merged and tested on generated data; real-image verification pending. |
+| Prefetch | `ExtractPrefetch.java` | Partial | Merged and tested on generated data; real-image verification pending. |
+| SRUM | `ExtractSru.java` | Missing | — |
+| Zone.Identifier → downloads | `ExtractZoneIdentifier.java` | Partial | Merged and tested on generated data; real-image verification pending. |
+| Data source usage | `DataSourceUsageAnalyzer.java` | Partial | Merged and tested on generated data; real-image verification pending. |
 | OS detection by marker files (macOS, Android, Linux distros) | `ExtractOs.java` | Missing | Not explicitly in any track; Data source usage depends on it. Confirm with windows-artifacts. |
 | Thumbcache extraction (derived thumbnails) | `ExtractThumbcache.java` | Missing | Not in the windows-artifacts list. |
 
@@ -336,32 +336,32 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Text extraction: plain/HTML/PDF/Office/RTF/SQLite/strings fallback, artifact text, metadata → TSK_METADATA | `A/textextractors/*`, Tika | In progress (search: pm-text) | — |
-| Indexing (chunking, Tantivy), inline search during ingest | `Chunker`, `Ingester`, `InlineSearcher` | In progress (search) | Indexing of data artifacts needs the data-artifact pipeline (§12). |
-| Keyword lists (built-ins: phone, IP, email, URL, credit card), exact/substring/regex, TSK_KEYWORD_HIT | `KeywordSearchList`, `XmlKeywordSearchList` | In progress (search) | — |
-| Keyword list import/export (XML, EnCase) | `EnCaseKeywordSearchList` | In progress (search) | Assumed in scope; confirm. |
-| Credit cards (Luhn, IIN/BIN DB, TSK_ACCOUNT) | `CreditCardValidator`, `datamodel/ranges.csv` | In progress (search) | The BIN tree view (§7) is untracked. |
-| Language detection / Japanese (CJK) analysers | `LanguageDetector`, `LanguageSpecificContent*` | In progress (search)? | Confirm with search. |
-| File-name search index (Tantivy n-gram) | `PLAN.md` scale track | In progress (search) | — |
-| Ad-hoc search UI: toolbar Keyword Search + Keyword Lists dropdowns, results node | `DropdownToolbar`, `DropdownSingleTermSearchPanel`, `DropdownListSearchPanel`, `AdHocSearch*` | Missing (UI) | — |
+| Text extraction: plain/HTML/PDF/Office/RTF/SQLite/strings fallback, artifact text, metadata → TSK_METADATA | `A/textextractors/*`, Tika | Done | pm-text. |
+| Indexing (chunking, Tantivy), inline search during ingest | `Chunker`, `Ingester`, `InlineSearcher` | Done | Artifact text is indexed in the data-source stage. |
+| Keyword lists (built-ins: phone, IP, email, URL, credit card), exact/substring/regex, TSK_KEYWORD_HIT | `KeywordSearchList`, `XmlKeywordSearchList` | Done | — |
+| Keyword list import/export (XML, EnCase) | `EnCaseKeywordSearchList` | Partial | Engine done; Options › Keyword Search lists UI missing. |
+| Credit cards (Luhn, IIN/BIN DB, TSK_ACCOUNT) | `CreditCardValidator`, `datamodel/ranges.csv` | Done | BIN tree view (§7) missing. |
+| Language detection / Japanese (CJK) analysers | `LanguageDetector`, `LanguageSpecificContent*` | Missing | Not implemented. |
+| File-name search index (Tantivy n-gram) | `PLAN.md` scale track | Done | Used by File Search by Attributes is pending. |
+| Ad-hoc search UI: toolbar Keyword Search + Keyword Lists dropdowns, results node | `DropdownToolbar`, `DropdownSingleTermSearchPanel`, `DropdownListSearchPanel`, `AdHocSearch*` | Partial | Single-term panel, result tabs, save results done; Keyword Lists dropdown missing. |
 | Keyword Search options (lists editor, string extraction scripts, general: NSRL skip, snippets, OCR) | `GlobalListSettingsPanel`, `KeywordSearchGlobalLanguageSettingsPanel`, `KeywordSearchGlobalSearchSettingsPanel` | Missing (UI) | — |
 | Keyword search job settings panel | `KeywordSearchJobSettingsPanel` | Missing (UI) | — |
 | OCR (Tesseract) for images/PDF | `textextractors/TikaTextExtractor` OCR, `textextractors/configs` | Missing | Not listed in the search scope; `PLAN.md` M5. |
 | Extract Unique Words report | `KWS/ExtractAllTermsReport` | Missing | — |
-| String extraction for unallocated/binary (script selection) | `coreutils/StringExtract`, `StringsConfig` | In progress (search)? | Confirm. |
+| String extraction for unallocated/binary (script selection) | `coreutils/StringExtract`, `StringsConfig` | Done | — |
 
 ## 16. Email, mobile & specialised modules
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| MBOX / EML / PST/OST / vCard parsing, attachments as derived files | `TB/MboxParser`, `EMLParser`, `PstParser`, `VcardParser`, `MimeJ4MessageParser` | In progress (email-mobile) | — |
-| Email threading (JWZ) | `TB/EmailMessageThreader` | In progress (email-mobile) | — |
-| Email accounts & relationships (CommunicationsManager) | `TB/ThunderbirdMboxFileIngestModule` | In progress (email-mobile) | Blocked by the schema: no accounts/relationships tables (§6). |
-| Android Analyzer, 22 app parsers (contacts, call log, SMS, Tango, WWF, Google Maps, browser/cache location, IMO, Xender, Zapya, SHAREit, LINE, WhatsApp, TextNow, Skype, Viber, FB Messenger, Samsung Internet/Opera, OruxMaps, installed apps) | `IPM/android/*.py` | In progress (email-mobile) | — |
-| GPX Parser | `IPM/GPX_Module` | In progress (email-mobile) | — |
-| DJI Drone Analyzer | `A/modules/drones` | In progress (email-mobile) | — |
-| YARA Analyzer + YARA options panel (rule sets) | `A/modules/yara`, `yara/ui/*` | In progress (email-mobile: engine) / Missing (options UI) | — |
-| Virtual Machine Extractor (VMDK/VHD in DS → new data sources + ingest) | `A/modules/vmextractor` | In progress (email-mobile) | Depends on VMDK/VHD readers (§3, untracked) and the add-DS/ingest-job API. |
+| MBOX / EML / PST/OST / vCard parsing, attachments as derived files | `TB/MboxParser`, `EMLParser`, `PstParser`, `VcardParser`, `MimeJ4MessageParser` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| Email threading (JWZ) | `TB/EmailMessageThreader` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| Email accounts & relationships (CommunicationsManager) | `TB/ThunderbirdMboxFileIngestModule` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| Android Analyzer, 22 app parsers (contacts, call log, SMS, Tango, WWF, Google Maps, browser/cache location, IMO, Xender, Zapya, SHAREit, LINE, WhatsApp, TextNow, Skype, Viber, FB Messenger, Samsung Internet/Opera, OruxMaps, installed apps) | `IPM/android/*.py` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| GPX Parser | `IPM/GPX_Module` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| DJI Drone Analyzer | `A/modules/drones` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| YARA Analyzer + YARA options panel (rule sets) | `A/modules/yara`, `yara/ui/*` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
+| Virtual Machine Extractor (VMDK/VHD in DS → new data sources + ingest) | `A/modules/vmextractor` | Missing | The email-mobile track was lost; to be redone on pm-plugin-api. |
 
 ## 17. External-tool / experimental modules
 
@@ -456,7 +456,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| File Search by Attributes (name, size, dates M/A/C/Cr + zone, known status, MIME, MD5, data source, deleted only) | `A/filesearch/*` | Missing | `CaseDb::query_files` / `FileQuery` cover much of the backend. |
+| File Search by Attributes (name, size, dates M/A/C/Cr + zone, known status, MIME, MD5, data source, deleted only) | `A/filesearch/*` | Done | All filters; result tabs. |
 | File Search by MD5 Hash (Tools) | `hashdatabase/HashDbSearchPanel`, `HashDbSearchAction` | Missing | Index `files_md5` exists. |
 
 ## 25. Central Repository & cross-case (`A/centralrepository`, `A/commonpropertiessearch`, `A/allcasessearch`)
@@ -497,7 +497,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Options dialog shell | NetBeans options | Missing | Only View-menu toggles exist. |
+| Options dialog shell | NetBeans options | Done | Tools › Options (View, Tags). |
 | Application (logo, temp dir, max log files, heap dump path, JVM/Solr memory) | `AutopsyOptionsPanel` | Missing | JVM/Solr memory is N/A? for Rust. |
 | View (keep preferred viewer, hide known/slack in both trees, time zone list, hide others' tags, hide SCO, translated names, page size, group by host) | `ViewPreferencesPanel` | Partial | Theme, local/UTC and hide known in Views only. |
 | Ingest (settings, file filters, profiles) | `IngestOptionsPanel` | Missing | — |
@@ -509,7 +509,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | File Extension Mismatch | `FileExtMismatchSettingsPanel` | Missing (UI) | Engine is in progress. |
 | File Types | `FileTypeIdGlobalSettingsPanel` | Missing (UI) | — |
 | Interesting Files | `InterestingItemsDefsPanel` | Missing (UI) | — |
-| Tags | `TagOptionsPanel` | Missing | — |
+| Tags | `TagOptionsPanel` | Done | — |
 | External Viewer | `ExternalViewerGlobalSettingsPanel` | Missing | — |
 | Central Repository | `EamOptionsPanel` | Missing | — |
 | Image Gallery | `ImageGalleryOptionsPanel` | Missing | — |
@@ -559,7 +559,7 @@ Method: I enumerated every NetBeans module and package in `/home/tatu/slop/autop
 | Health Monitor (metrics DB, dashboard) | `A/healthmonitor/*` | Missing | — |
 | Command-line ingest (create case, add DS, run ingest w/ profile, list DS, reports, list profiles, JSON outputs) | `A/commandlineingest/*` | Missing | The `postmortem` binary only accepts `[CASE] [IMAGE…]` to open in the GUI. |
 | Open case from command line (positional `.aut`) | `CommandLineOpenCaseManager` | Done | `postmortem/src/main.rs`. |
-| MCP server (17 read-only tools: case summary, files, artifacts, analysis results, data sources, hosts, DS tree, tags, timeline, OS accounts, comms accounts/relationships, file content, children, reports) + stdio bridge | `A/mcp/*`, `Tools/autopsy-mcp-stdio` | Missing | Design (parity set plus extensions) in `docs/BEYOND-AUTOPSY.md` §8. |
+| MCP server (17 read-only tools: case summary, files, artifacts, analysis results, data sources, hosts, DS tree, tags, timeline, OS accounts, comms accounts/relationships, file content, children, reports) + stdio bridge | `A/mcp/*`, `Tools/autopsy-mcp-stdio` | Done | pm-mcp: the 17 tools plus search/pivot/timeline tools, stdio and HTTP (ADR-021). |
 | Feature access / admin gating | `A/featureaccess`, auto-ingest admin markers | Missing | — |
 
 ## 31. Acquisition & triage tools
