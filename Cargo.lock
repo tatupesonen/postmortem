@@ -3535,7 +3535,9 @@ name = "pm-filetype"
 version = "0.1.0"
 dependencies = [
  "flate2",
+ "memchr",
  "pm-core",
+ "pm-filetype",
  "proptest",
  "regex",
  "serde",
@@ -3705,6 +3707,7 @@ dependencies = [
  "pm-casedb",
  "pm-core",
  "pm-evtlog",
+ "pm-filetype",
  "pm-hashdb",
  "pm-ingest",
  "pm-lnk",

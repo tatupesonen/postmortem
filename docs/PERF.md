@@ -12,3 +12,4 @@ builds. Re-measure when touching the paths below. Each benchmark is an
 | Add data source, synthetic 1 M-name tree (walk + writer + index rebuild) | ≥ 150 k rows/s | 205 k rows/s (1 M rows in 4.88 s, 211 MB DB) | `cargo test -p pm-case --release --test case -- --ignored load_rate --nocapture` | 2026-10-14 |
 | Children of a 911-entry directory after load | < 20 ms | 1.7 ms | same | 2026-10-14 |
 | Extension counts over 1 M rows | < 100 ms | 46 ms | same | 2026-10-14 |
+| File type detection (`FileTypeDetector::detect`, mixed synthetic corpus: text, HTML, XML, PDF, PNG, JPEG, EXE, noise, OOXML/ODF/JAR/DOC/XLS) | — | 25.2 k files/s/thread, 177 MB/s (Linux VM, 8 vCPU) | `cargo test -p pm-filetype --release --test detect -- --ignored bench --nocapture` | 2026-10-17 |

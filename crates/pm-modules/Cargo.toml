@@ -12,6 +12,7 @@ pm-casedb.workspace = true
 pm-ingest.workspace = true
 pm-hashdb.workspace = true
 pm-evtlog.workspace = true
+pm-filetype.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 serde.workspace = true
@@ -31,6 +32,7 @@ pm-winartifacts.workspace = true
 pm-registry = { workspace = true, features = ["builder"] }
 pm-lnk = { workspace = true, features = ["builder"] }
 pm-prefetch = { workspace = true, features = ["builder"] }
+pm-filetype = { workspace = true, features = ["builder"] }
 pm-case.workspace = true
 pm-testkit.workspace = true
 tempfile.workspace = true

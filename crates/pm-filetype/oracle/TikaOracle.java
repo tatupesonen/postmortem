@@ -3,8 +3,7 @@
 // path \t detect(stream) \t detect(stream, name). The stream is not
 // file-backed, like Autopsy's ReadContentInputStream.
 //
-//   javac -cp tika-app-3.0.0.jar -d out TikaOracle.java
-//   java -cp tika-app-3.0.0.jar:out TikaOracle < paths.txt > tika.tsv
+//   java -cp tika-app-3.0.0.jar TikaOracle.java < paths.txt > tika.tsv
 
 import java.io.BufferedReader;
 import java.io.File;

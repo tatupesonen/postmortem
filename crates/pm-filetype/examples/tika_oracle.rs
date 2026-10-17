@@ -1,7 +1,11 @@
 //! Differential-test driver: reads file paths from stdin and prints
 //! `path \t detect(stream) \t detect(stream, name)` like
-//! `oracle/TikaOracle.java` does with real Tika (see `oracle/README.md`).
-#![allow(clippy::print_stdout, clippy::unwrap_used, reason = "command-line tool")]
+//! `oracle/TikaOracle.java` does with real Tika (`oracle/run.sh` runs both).
+#![allow(
+    clippy::print_stdout,
+    clippy::unwrap_used,
+    reason = "command-line tool"
+)]
 
 use std::io::{BufRead, Write};
 
@@ -19,7 +23,8 @@ fn main() {
                     .map(|n| n.to_string_lossy().into_owned())
                     .unwrap_or_default();
                 let p1 = pm_filetype::tika_detect(&src, None).unwrap_or_else(|_| "ERROR".into());
-                let p2 = pm_filetype::tika_detect(&src, Some(&name)).unwrap_or_else(|_| "ERROR".into());
+                let p2 =
+                    pm_filetype::tika_detect(&src, Some(&name)).unwrap_or_else(|_| "ERROR".into());
                 (p1, p2)
             }
             Err(_) => ("ERROR".into(), "ERROR".into()),

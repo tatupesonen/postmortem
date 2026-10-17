@@ -49,6 +49,34 @@ impl DemoCase {
         }
     }
 
+    /// A case holding one data source built from raw image bytes.
+    pub(crate) fn with_image(image: &[u8]) -> Self {
+        let dir = tempfile::tempdir().unwrap();
+        let img = dir.path().join("image.dd");
+        std::fs::write(&img, image).unwrap();
+        let case = Case::create(dir.path().join("case"), CaseDetails::default()).unwrap();
+        let s = add_image(
+            &case,
+            &img,
+            &LoadOptions::default(),
+            &LoadProgress::default(),
+        )
+        .unwrap();
+        Self {
+            _dir: dir,
+            case: Arc::new(case),
+            ds_id: s.ds_id,
+        }
+    }
+
+    /// The file at `path` (`/dir/name`).
+    pub(crate) fn file(&self, path: &str) -> FileRecord {
+        self.files()
+            .into_iter()
+            .find(|f| f.path() == path)
+            .unwrap_or_else(|| panic!("no file {path}"))
+    }
+
     pub(crate) fn files(&self) -> Vec<FileRecord> {
         self.case
             .db()
@@ -75,6 +103,53 @@ impl DemoCase {
         )
         .unwrap();
         (s, inbox)
+    }
+}
+
+/// An artifact with its attributes as `name → display value`.
+pub(crate) type ArtifactDump = (
+    pm_casedb::ArtifactRecord,
+    std::collections::BTreeMap<String, String>,
+);
+
+impl DemoCase {
+    /// Every artifact of type `ty` in the data source.
+    pub(crate) fn artifacts(&self, ty: &str) -> Vec<ArtifactDump> {
+        let db = self.case.db();
+        let Some(type_id) = pm_casedb::catalog::artifact_type_id(ty) else {
+            panic!("unknown artifact type {ty}");
+        };
+        db.artifacts_of_type(type_id, Some(self.ds_id), 0, 1_000_000)
+            .unwrap()
+            .into_iter()
+            .map(|a| {
+                let attrs = db
+                    .attributes(a.id)
+                    .unwrap()
+                    .into_iter()
+                    .map(|x| (x.name, x.value.display()))
+                    .collect();
+                (a, attrs)
+            })
+            .collect()
+    }
+
+    /// Runs one module with the given settings.
+    pub(crate) fn run_one(
+        &self,
+        factory: Arc<dyn ModuleFactory>,
+        settings: serde_json::Value,
+    ) -> (JobSummary, Arc<Inbox>) {
+        let id = factory.info().id.to_owned();
+        let job = JobSettings {
+            modules: vec![pm_ingest::ModuleSetting {
+                id,
+                enabled: true,
+                settings,
+            }],
+            ..JobSettings::default()
+        };
+        self.run(&job, vec![factory])
     }
 }
 

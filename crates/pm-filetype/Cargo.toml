@@ -16,9 +16,11 @@ thiserror.workspace = true
 tracing.workspace = true
 serde.workspace = true
 regex.workspace = true
+memchr.workspace = true
 flate2.workspace = true
 
 [dev-dependencies]
+pm-filetype = { path = ".", features = ["builder"] }
 serde_json.workspace = true
 proptest.workspace = true
 

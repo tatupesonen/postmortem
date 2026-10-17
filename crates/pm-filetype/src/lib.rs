@@ -34,9 +34,9 @@ pub use autopsy::{
 pub use db::{DbError, MAGIC_PREFIX_LEN, MimeDb};
 pub use magic::MagicError;
 pub use tika::detect as tika_detect;
-#[cfg(any(test, feature = "builder"))]
-pub use zip::build_zip;
 pub use zip::has_encrypted_entry;
+#[cfg(any(test, feature = "builder"))]
+pub use zip::{ZipBuilder, build_zip};
 
 /// A detector failed the way a Tika detector throws; Autopsy then records
 /// `application/octet-stream`.

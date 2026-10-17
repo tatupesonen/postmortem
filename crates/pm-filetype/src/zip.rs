@@ -254,8 +254,10 @@ impl<'a> Walker<'a> {
         Ok(())
     }
 
-    /// Inflates from `start`: up to `max` output bytes; returns the output
-    /// and, when the stream ended, the compressed bytes consumed.
+    /// Inflates from `start`, keeping up to `max` output bytes; returns the
+    /// output and, when the stream ended, the compressed bytes consumed.
+    /// `max == 0` inflates to the end of the stream (skipping an entry
+    /// whose size is in a data descriptor).
     fn inflate(&mut self, start: u64, max: usize) -> Result<(Vec<u8>, Option<u64>), ZipErr> {
         self.r.seek(start);
         let mut d = Decompress::new(false);
@@ -291,7 +293,7 @@ impl<'a> Walker<'a> {
             if status == Status::StreamEnd {
                 return Ok((out, Some(d.total_in())));
             }
-            if out.len() >= max {
+            if max > 0 && out.len() >= max {
                 return Ok((out, None));
             }
             if produced == 0 && d.total_in() == before_in && used < have {
@@ -867,55 +869,148 @@ pub fn has_encrypted_entry(src: &dyn ReadAt) -> bool {
     false
 }
 
-/// Builds a ZIP file for tests: `(name, data, stored)`.
+/// One entry of a ZIP built by [`ZipBuilder`].
+#[cfg(any(test, feature = "builder"))]
+#[derive(Debug, Clone)]
+struct BuildEntry {
+    name: String,
+    data: Vec<u8>,
+    deflate: bool,
+    data_descriptor: bool,
+    encrypted: bool,
+}
+
+/// Builds ZIP files for tests: stored or deflated entries, optionally
+/// with data descriptors (sizes after the data) or the encryption flag
+/// (the data is written as given).
+#[cfg(any(test, feature = "builder"))]
+#[derive(Debug, Clone, Default)]
+pub struct ZipBuilder {
+    entries: Vec<BuildEntry>,
+}
+
+#[cfg(any(test, feature = "builder"))]
+impl ZipBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// A stored entry.
+    #[must_use]
+    pub fn stored(self, name: &str, data: &[u8]) -> Self {
+        self.entry(name, data, false, false, false)
+    }
+
+    /// A deflated entry.
+    #[must_use]
+    pub fn deflated(self, name: &str, data: &[u8]) -> Self {
+        self.entry(name, data, true, false, false)
+    }
+
+    /// An entry with every option.
+    #[must_use]
+    pub fn entry(
+        mut self,
+        name: &str,
+        data: &[u8],
+        deflate: bool,
+        data_descriptor: bool,
+        encrypted: bool,
+    ) -> Self {
+        self.entries.push(BuildEntry {
+            name: name.to_owned(),
+            data: data.to_vec(),
+            deflate,
+            data_descriptor,
+            encrypted,
+        });
+        self
+    }
+
+    pub fn build(&self) -> Vec<u8> {
+        use std::io::Write;
+        let mut out = Vec::new();
+        let mut central = Vec::new();
+        for e in &self.entries {
+            let off = out.len() as u32;
+            let mut flags = u16::from(e.encrypted);
+            if e.data_descriptor {
+                flags |= 0x08;
+            }
+            let method = if e.deflate { DEFLATED } else { STORED };
+            let body = if e.deflate {
+                let mut enc =
+                    flate2::write::DeflateEncoder::new(Vec::new(), flate2::Compression::default());
+                let _ = enc.write_all(&e.data);
+                enc.finish().unwrap_or_default()
+            } else {
+                e.data.clone()
+            };
+            let crc = crc32(&e.data);
+            let (csize, size) = (body.len() as u32, e.data.len() as u32);
+            let local_sizes = if e.data_descriptor {
+                [0u8; 12]
+            } else {
+                let mut s = [0u8; 12];
+                s[..4].copy_from_slice(&crc.to_le_bytes());
+                s[4..8].copy_from_slice(&csize.to_le_bytes());
+                s[8..].copy_from_slice(&size.to_le_bytes());
+                s
+            };
+            out.extend_from_slice(LFH);
+            out.extend_from_slice(&20u16.to_le_bytes());
+            out.extend_from_slice(&flags.to_le_bytes());
+            out.extend_from_slice(&method.to_le_bytes());
+            out.extend_from_slice(&[0; 4]);
+            out.extend_from_slice(&local_sizes);
+            out.extend_from_slice(&(e.name.len() as u16).to_le_bytes());
+            out.extend_from_slice(&0u16.to_le_bytes());
+            out.extend_from_slice(e.name.as_bytes());
+            out.extend_from_slice(&body);
+            if e.data_descriptor {
+                out.extend_from_slice(DD);
+                out.extend_from_slice(&crc.to_le_bytes());
+                out.extend_from_slice(&csize.to_le_bytes());
+                out.extend_from_slice(&size.to_le_bytes());
+            }
+            central.extend_from_slice(CFH);
+            central.extend_from_slice(&20u16.to_le_bytes());
+            central.extend_from_slice(&20u16.to_le_bytes());
+            central.extend_from_slice(&flags.to_le_bytes());
+            central.extend_from_slice(&method.to_le_bytes());
+            central.extend_from_slice(&[0; 4]);
+            central.extend_from_slice(&crc.to_le_bytes());
+            central.extend_from_slice(&csize.to_le_bytes());
+            central.extend_from_slice(&size.to_le_bytes());
+            central.extend_from_slice(&(e.name.len() as u16).to_le_bytes());
+            central.extend_from_slice(&[0; 12]);
+            central.extend_from_slice(&off.to_le_bytes());
+            central.extend_from_slice(e.name.as_bytes());
+        }
+        let cd_off = out.len() as u32;
+        let n = self.entries.len() as u16;
+        out.extend_from_slice(&central);
+        out.extend_from_slice(EOCD);
+        out.extend_from_slice(&[0; 4]);
+        out.extend_from_slice(&n.to_le_bytes());
+        out.extend_from_slice(&n.to_le_bytes());
+        out.extend_from_slice(&(central.len() as u32).to_le_bytes());
+        out.extend_from_slice(&cd_off.to_le_bytes());
+        out.extend_from_slice(&[0; 2]);
+        out
+    }
+}
+
+/// Builds a ZIP of stored entries; those named in `encrypt` carry the
+/// encryption flag.
 #[cfg(any(test, feature = "builder"))]
 pub fn build_zip(entries: &[(&str, &[u8])], encrypt: &[&str]) -> Vec<u8> {
-    let mut out = Vec::new();
-    let mut central = Vec::new();
-    for (name, data) in entries {
-        let off = out.len() as u32;
-        let flags = u16::from(encrypt.contains(name));
-        let crc = crc32(data);
-        let mut h = Vec::new();
-        h.extend_from_slice(LFH);
-        h.extend_from_slice(&20u16.to_le_bytes());
-        h.extend_from_slice(&flags.to_le_bytes());
-        h.extend_from_slice(&0u16.to_le_bytes());
-        h.extend_from_slice(&[0; 4]);
-        h.extend_from_slice(&crc.to_le_bytes());
-        h.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        h.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        h.extend_from_slice(&(name.len() as u16).to_le_bytes());
-        h.extend_from_slice(&0u16.to_le_bytes());
-        h.extend_from_slice(name.as_bytes());
-        out.extend_from_slice(&h);
-        out.extend_from_slice(data);
-        let mut c = Vec::new();
-        c.extend_from_slice(CFH);
-        c.extend_from_slice(&20u16.to_le_bytes());
-        c.extend_from_slice(&20u16.to_le_bytes());
-        c.extend_from_slice(&flags.to_le_bytes());
-        c.extend_from_slice(&0u16.to_le_bytes());
-        c.extend_from_slice(&[0; 4]);
-        c.extend_from_slice(&crc.to_le_bytes());
-        c.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        c.extend_from_slice(&(data.len() as u32).to_le_bytes());
-        c.extend_from_slice(&(name.len() as u16).to_le_bytes());
-        c.extend_from_slice(&[0; 12]);
-        c.extend_from_slice(&off.to_le_bytes());
-        c.extend_from_slice(name.as_bytes());
-        central.extend(c);
-    }
-    let cd_off = out.len() as u32;
-    out.extend_from_slice(&central);
-    out.extend_from_slice(EOCD);
-    out.extend_from_slice(&[0; 4]);
-    out.extend_from_slice(&(entries.len() as u16).to_le_bytes());
-    out.extend_from_slice(&(entries.len() as u16).to_le_bytes());
-    out.extend_from_slice(&(central.len() as u32).to_le_bytes());
-    out.extend_from_slice(&cd_off.to_le_bytes());
-    out.extend_from_slice(&[0; 2]);
-    out
+    entries
+        .iter()
+        .fold(ZipBuilder::new(), |b, (name, data)| {
+            b.entry(name, data, false, false, encrypt.contains(name))
+        })
+        .build()
 }
 
 #[cfg(any(test, feature = "builder"))]
@@ -1022,6 +1117,42 @@ mod tests {
             det(&[("Index/Document.iwa", b"")]).as_deref(),
             Some("application/vnd.apple.unknown.13")
         );
+    }
+
+    #[test]
+    /// Tika's `testWORD_3imgs.docx` / `testXPSWithDataDescriptor.xps`:
+    /// large deflated entries with data descriptors (and a stored one)
+    /// before `[Content_Types].xml` are skipped to reach it.
+    fn data_descriptors_before_content_types() {
+        // Incompressible, so input and output both exceed one buffer.
+        let mut noise = Vec::with_capacity(200_000);
+        let mut x = 0x1234_5678u32;
+        for _ in 0..200_000 {
+            x ^= x << 13;
+            x ^= x >> 17;
+            x ^= x << 5;
+            noise.push(x as u8);
+        }
+        let ct = br#"<?xml version="1.0"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>"#;
+        for stored_dd in [false, true] {
+            let z = ZipBuilder::new()
+                .entry("word/media/image1.png", &noise, true, true, false)
+                .entry(
+                    "word/media/thumb.jpg",
+                    &noise[..5000],
+                    false,
+                    stored_dd,
+                    false,
+                )
+                .entry("word/document.xml", &vec![b'a'; 100_000], true, true, false)
+                .entry("[Content_Types].xml", ct, true, true, false)
+                .build();
+            assert_eq!(
+                detect(&MemSource::new(z)).as_deref(),
+                Some("application/vnd.openxmlformats-officedocument.wordprocessingml.document"),
+                "stored data descriptor: {stored_dd}"
+            );
+        }
     }
 
     #[test]

@@ -9,6 +9,49 @@ use regex::bytes::Regex;
 /// Size of the window regex magics run on (`MagicDetector` uses 8 KiB).
 const REGEX_WINDOW: usize = 8 * 1024;
 
+/// The bytes magics are evaluated on, plus one lazily built zero-padded
+/// copy shared by every regex magic (Tika pads its regex window with
+/// zeros past the end of the data).
+#[derive(Debug)]
+pub(crate) struct Input<'a> {
+    data: &'a [u8],
+    /// Length of the padded copy (the widest regex window of the
+    /// database); larger windows get their own buffer.
+    pad_to: usize,
+    padded: std::cell::OnceCell<Vec<u8>>,
+}
+
+impl<'a> Input<'a> {
+    pub(crate) fn new(data: &'a [u8], pad_to: usize) -> Self {
+        Self {
+            data,
+            pad_to,
+            padded: std::cell::OnceCell::new(),
+        }
+    }
+
+    /// `len` bytes from `begin`, zero-padded past the end of the data.
+    fn window(&self, begin: usize, len: usize) -> std::borrow::Cow<'_, [u8]> {
+        let end = begin.saturating_add(len);
+        let padded = self.padded.get_or_init(|| {
+            let mut v = self.data.to_vec();
+            v.resize(self.data.len().max(self.pad_to), 0);
+            v
+        });
+        if let Some(w) = padded.get(begin..end) {
+            return std::borrow::Cow::Borrowed(w);
+        }
+        let mut buf = vec![0u8; len];
+        for (d, s) in buf
+            .iter_mut()
+            .zip(self.data.get(begin..).unwrap_or_default())
+        {
+            *d = *s;
+        }
+        std::borrow::Cow::Owned(buf)
+    }
+}
+
 /// Why a magic could not be compiled.
 #[derive(Debug, Clone, PartialEq, Eq, thiserror::Error)]
 #[error("invalid magic {0}")]
@@ -218,8 +261,18 @@ impl MagicMatch {
         self.pattern.len()
     }
 
+    /// How many (zero-padded) bytes a regex magic looks at.
+    pub(crate) fn regex_extent(&self) -> usize {
+        if self.regex.is_some() {
+            self.end + REGEX_WINDOW
+        } else {
+            0
+        }
+    }
+
     /// `MagicDetector.detect` on the magic prefix.
-    pub(crate) fn eval(&self, data: &[u8]) -> bool {
+    pub(crate) fn eval(&self, input: &Input<'_>) -> bool {
+        let data = input.data;
         if data.len() < self.begin {
             return false;
         }
@@ -230,19 +283,14 @@ impl MagicMatch {
             self.pattern.len()
         };
         let avail = data.get(self.begin..).unwrap_or_default();
-        let buf_len = length + range;
         if let Some(m) = &self.regex {
-            let mut buf = vec![0u8; buf_len];
-            for (d, s) in buf.iter_mut().zip(avail) {
-                *d = *s;
-            }
-            return eval_regex(m, &buf, range);
+            return eval_regex(m, &input.window(self.begin, length + range), range);
         }
         if avail.len() < length {
             return false;
         }
         let at = |k: usize| avail.get(k).copied().unwrap_or(0);
-        (0..=range).any(|i| {
+        let matches_at = |i: usize| {
             self.mask
                 .iter()
                 .zip(&self.pattern)
@@ -254,7 +302,22 @@ impl MagicMatch {
                     }
                     b == *p
                 })
-        })
+        };
+        // Fast path: find the candidate starts by their (unmasked,
+        // non-zero) first byte. Zero padding past the data cannot start a
+        // match then, so only positions inside the data are candidates.
+        if range > 0
+            && let (Some(&0xFF), Some(&p)) = (self.mask.first(), self.pattern.first())
+            && p != 0
+        {
+            let hay = avail.get(..avail.len().min(range + 1)).unwrap_or_default();
+            return if self.ignore_case && p.is_ascii_lowercase() {
+                memchr::memchr2_iter(p, p.to_ascii_uppercase(), hay).any(matches_at)
+            } else {
+                memchr::memchr_iter(p, hay).any(matches_at)
+            };
+        }
+        (0..=range).any(matches_at)
     }
 }
 
@@ -484,14 +547,19 @@ pub(crate) enum Clause {
 }
 
 impl Clause {
-    pub(crate) fn eval(&self, data: &[u8]) -> bool {
+    pub(crate) fn eval(&self, data: &Input<'_>) -> bool {
         match self {
             Self::Match(m) => m.eval(data),
             Self::And(c) => c.iter().all(|c| c.eval(data)),
             Self::Or(c) => c.iter().any(|c| c.eval(data)),
-            Self::MinShould(min, c) => {
+            Self::MinShould(min, clauses) => {
                 let mut n = 0;
-                for c in c {
+                for (k, c) in clauses.iter().enumerate() {
+                    // Clauses have no side effects: stop once the rest
+                    // cannot reach the minimum.
+                    if n + (clauses.len() - k) < *min {
+                        return false;
+                    }
                     if c.eval(data) {
                         n += 1;
                         if n >= *min {
@@ -500,6 +568,16 @@ impl Clause {
                     }
                 }
                 false
+            }
+        }
+    }
+
+    /// The widest zero-padded window a regex magic in the tree reads.
+    pub(crate) fn regex_extent(&self) -> usize {
+        match self {
+            Self::Match(m) => m.regex_extent(),
+            Self::And(c) | Self::Or(c) | Self::MinShould(_, c) => {
+                c.iter().map(Self::regex_extent).max().unwrap_or(0)
             }
         }
     }
@@ -548,6 +626,10 @@ impl fmt::Display for Clause {
 mod tests {
     use super::*;
 
+    fn ev(m: &MagicMatch, d: &[u8]) -> bool {
+        m.eval(&Input::new(d, 0))
+    }
+
     fn m(kind: &str, offset: &str, value: &str, mask: Option<&str>) -> MagicMatch {
         MagicMatch::new("x/y", kind, Some(offset), Some(value), mask).unwrap()
     }
@@ -577,29 +659,29 @@ mod tests {
     #[test]
     fn matching() {
         let pdf = m("string", "0", "%PDF-", None);
-        assert!(pdf.eval(b"%PDF-1.4"));
-        assert!(!pdf.eval(b"%PDF"));
+        assert!(ev(&pdf, b"%PDF-1.4"));
+        assert!(!ev(&pdf, b"%PDF"));
         let ranged = m("string", "2:4", "AB", None);
-        assert!(ranged.eval(b"xxxxAB"));
-        assert!(!ranged.eval(b"xxxxxAB"));
+        assert!(ev(&ranged, b"xxxxAB"));
+        assert!(!ev(&ranged, b"xxxxxAB"));
         // Zero padding past the end for later positions.
         let z = m("string", "0:2", "A\\0", None);
-        assert!(z.eval(b"xxA"));
+        assert!(ev(&z, b"xxA"));
         let masked = m("big16", "0", "0xFF00", Some("0xFF00"));
-        assert!(masked.eval(&[0xFF, 0x12]));
+        assert!(ev(&masked, &[0xFF, 0x12]));
         let ic = m("stringignorecase", "0", "<HTML", None);
-        assert!(ic.eval(b"<hTmL>"));
+        assert!(ev(&ic, b"<hTmL>"));
         assert_eq!(ic.size(), 5);
     }
 
     #[test]
     fn regexes() {
         let r = m("regex", "0", "BZh[1-9]", None);
-        assert!(r.eval(b"BZh91AY"));
-        assert!(!r.eval(b"BZh0"));
+        assert!(ev(&r, b"BZh91AY"));
+        assert!(!ev(&r, b"BZh0"));
         let dot = m("regex", "0", "a.b", None);
-        assert!(!dot.eval(b"a\rb"));
-        assert!(dot.eval(b"axb"));
+        assert!(!ev(&dot, b"a\rb"));
+        assert!(ev(&dot, b"axb"));
         let ai = m(
             "regex",
             "0:8192",
@@ -608,11 +690,11 @@ mod tests {
         );
         let mut d = vec![b'x'; 5000];
         d.extend_from_slice(b"\n%AI5_FileFormat 3\n");
-        assert!(ai.eval(&d));
-        assert!(!ai.eval(&d[..5000]));
+        assert!(ev(&ai, &d));
+        assert!(!ev(&ai, &d[..5000]));
         // Windows are zero padded.
         let nul = m("regex", "0", "ab\\\\x00", None);
-        assert!(nul.eval(b"ab"));
+        assert!(ev(&nul, b"ab"));
     }
 
     #[test]

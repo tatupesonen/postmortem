@@ -10,7 +10,7 @@
 //! duplicate attributes and namespace binding. It reports start and end
 //! tags (with resolved namespaces) and skips character data.
 
-use std::collections::{HashMap, HashSet};
+use std::collections::HashMap;
 
 /// Why reading stopped.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -94,6 +94,50 @@ fn is_xml_char(c: char) -> bool {
 
 fn is_ws(c: char) -> bool {
     matches!(c, ' ' | '\t' | '\r' | '\n')
+}
+
+/// Nesting limit for entity references inside entity values.
+const MAX_ENTITY_DEPTH: u32 = 16;
+/// Total replacement text one reference may expand to (a billion-laughs
+/// guard; Xerces fails such documents too).
+const MAX_ENTITY_TEXT: usize = 64 * 1024;
+
+/// The five predefined entities.
+fn predefined(name: &str) -> Option<&'static str> {
+    Some(match name {
+        "lt" => "<",
+        "gt" => ">",
+        "amp" => "&",
+        "quot" => "\"",
+        "apos" => "'",
+        _ => return None,
+    })
+}
+
+/// An entity value literal with its character references expanded
+/// (general entity references stay, to be expanded where the entity is
+/// used).
+fn expand_char_refs(literal: &str) -> Result<String, XmlError> {
+    let mut out = String::with_capacity(literal.len());
+    let mut rest = literal;
+    while let Some(i) = rest.find("&#") {
+        out.push_str(rest.get(..i).unwrap_or_default());
+        let after = rest.get(i + 2..).unwrap_or_default();
+        let end = after.find(';').ok_or(XmlError::Malformed)?;
+        let digits = after.get(..end).unwrap_or_default();
+        let v = match digits.strip_prefix('x') {
+            Some(h) => u32::from_str_radix(h, 16),
+            None => digits.parse(),
+        }
+        .map_err(|_| XmlError::Malformed)?;
+        let c = char::from_u32(v)
+            .filter(|c| is_xml_char(*c))
+            .ok_or(XmlError::Malformed)?;
+        out.push(c);
+        rest = after.get(end + 1..).unwrap_or_default();
+    }
+    out.push_str(rest);
+    Ok(out)
 }
 
 /// Decoded document text plus whether decoding stopped at bad bytes.
@@ -247,8 +291,10 @@ pub(crate) struct Reader<'a> {
     seen_root: bool,
     root_closed: bool,
     started: bool,
-    /// General entities declared in the internal subset.
-    entities: HashSet<String>,
+    /// General entities declared in the internal subset: the replacement
+    /// text of internal ones (character references expanded), `None` for
+    /// external ones. The first declaration of a name wins.
+    entities: HashMap<String, Option<String>>,
     /// Undeclared entities are tolerated (external subset or PE refs).
     lenient_entities: bool,
 }
@@ -269,7 +315,7 @@ impl<'a> Reader<'a> {
             seen_root: false,
             root_closed: false,
             started: false,
-            entities: HashSet::new(),
+            entities: HashMap::new(),
             lenient_entities: false,
         }
     }
@@ -527,7 +573,13 @@ impl<'a> Reader<'a> {
                     self.skip_ws();
                     if !self.starts("%") {
                         let n = self.name()?;
-                        self.entities.insert(n.to_owned());
+                        self.skip_ws();
+                        let value = if self.starts("\"") || self.starts("'") {
+                            Some(expand_char_refs(self.quoted()?)?)
+                        } else {
+                            None
+                        };
+                        self.entities.entry(n.to_owned()).or_insert(value);
                     }
                 }
                 // Skip to the closing '>' outside quotes.
@@ -550,7 +602,7 @@ impl<'a> Reader<'a> {
     }
 
     /// Expands one reference after `&`; returns its text.
-    fn reference(&mut self) -> Result<String, XmlError> {
+    fn reference(&mut self, in_attr: bool) -> Result<String, XmlError> {
         if self.starts("#x") {
             self.pos += 2;
             let r = self.rest();
@@ -580,15 +632,51 @@ impl<'a> Reader<'a> {
         }
         let n = self.name()?;
         self.expect(";")?;
-        Ok(match n {
-            "lt" => "<".into(),
-            "gt" => ">".into(),
-            "amp" => "&".into(),
-            "quot" => "\"".into(),
-            "apos" => "'".into(),
-            _ if self.entities.contains(n) || self.lenient_entities => String::new(),
-            _ => return Err(XmlError::Malformed),
-        })
+        if let Some(c) = predefined(n) {
+            return Ok(c.to_owned());
+        }
+        let mut budget = MAX_ENTITY_TEXT;
+        self.entity_text(n, in_attr, 0, &mut budget)
+    }
+
+    /// The replacement text of general entity `name`, nested references
+    /// expanded (an undeclared or external entity gives nothing when the
+    /// document has an external subset or parameter-entity references,
+    /// which Xerces does not read for detection). In an attribute value,
+    /// markup in the replacement text is an error.
+    fn entity_text(
+        &self,
+        name: &str,
+        in_attr: bool,
+        depth: u32,
+        budget: &mut usize,
+    ) -> Result<String, XmlError> {
+        let value = match self.entities.get(name) {
+            Some(Some(v)) => v,
+            Some(None) => return Ok(String::new()),
+            None if self.lenient_entities => return Ok(String::new()),
+            None => return Err(XmlError::Malformed),
+        };
+        // Xerces rejects recursive entities and caps expansion.
+        if depth > MAX_ENTITY_DEPTH || (in_attr && value.contains('<')) {
+            return Err(XmlError::Malformed);
+        }
+        *budget = budget.checked_sub(value.len()).ok_or(XmlError::Malformed)?;
+        let mut out = String::with_capacity(value.len());
+        let mut rest = value.as_str();
+        while let Some(i) = rest.find('&') {
+            out.push_str(rest.get(..i).unwrap_or_default());
+            let after = rest.get(i + 1..).unwrap_or_default();
+            let end = after.find(';').ok_or(XmlError::Malformed)?;
+            let inner = after.get(..end).unwrap_or_default();
+            match predefined(inner) {
+                Some(c) => out.push_str(c),
+                None => out.push_str(&self.entity_text(inner, in_attr, depth + 1, budget)?),
+            }
+            rest = after.get(end + 1..).unwrap_or_default();
+        }
+        out.push_str(rest);
+        Ok(out)
     }
 
     fn attr_value(&mut self) -> Result<String, XmlError> {
@@ -602,7 +690,16 @@ impl<'a> Reader<'a> {
             match c {
                 c if c == q => return Ok(v),
                 '<' => return Err(XmlError::Malformed),
-                '&' => v.push_str(&self.reference()?),
+                '&' => {
+                    let char_ref = self.starts("#");
+                    let text = self.reference(true)?;
+                    if char_ref {
+                        v.push_str(&text);
+                    } else {
+                        // Entity text is normalised like literal text.
+                        v.extend(text.chars().map(|c| if is_ws(c) { ' ' } else { c }));
+                    }
+                }
                 '\t' | '\n' | '\r' => v.push(' '),
                 c if !is_xml_char(c) => return Err(XmlError::Malformed),
                 c => v.push(c),
@@ -794,7 +891,7 @@ impl<'a> Reader<'a> {
                     Some('<') => break,
                     Some('&') => {
                         self.pos += 1;
-                        let v = self.reference()?;
+                        let v = self.reference(false)?;
                         text.push_str(&v);
                     }
                     Some(c) => {
@@ -926,6 +1023,42 @@ mod tests {
             b.extend_from_slice(&u.to_le_bytes());
         }
         assert_eq!(root_element(&b), Some((String::new(), "x".into())));
+    }
+
+    /// Internal entities in namespace declarations (RDF/OWL style, Tika's
+    /// `test-difficult-rdf*.xml`).
+    #[test]
+    fn entity_expansion() {
+        let rdf = "http://www.w3.org/1999/02/22-rdf-syntax-ns#";
+        assert_eq!(
+            root(&format!(
+                "<!DOCTYPE rdf:RDF [<!ENTITY rdf '{rdf}'>]>\n<rdf:RDF xmlns:rdf=\"&rdf;\">"
+            )),
+            Some((rdf.into(), "RDF".into()))
+        );
+        // Nested references, character references, first declaration wins.
+        assert_eq!(
+            root(
+                "<!DOCTYPE r [<!ENTITY a 'u&#x3A;'><!ENTITY b '&a;x'><!ENTITY a 'z'>]><r xmlns='&b;#'/>"
+            ),
+            Some(("u:x#".into(), "r".into()))
+        );
+        // Markup in an attribute's entity, recursion, a billion laughs.
+        assert_eq!(root("<!DOCTYPE r [<!ENTITY a '<b/>'>]><r x='&a;'/>"), None);
+        assert_eq!(root("<!DOCTYPE r [<!ENTITY a '&a;'>]><r x='&a;'/>"), None);
+        let mut laughs = String::from("<!DOCTYPE r [<!ENTITY l0 'hahahahahahahahahaha'>");
+        for i in 1..10 {
+            let refs = format!("&l{};", i - 1).repeat(10);
+            std::fmt::Write::write_fmt(&mut laughs, format_args!("<!ENTITY l{i} '{refs}'>"))
+                .unwrap();
+        }
+        laughs.push_str("]><r x='&l9;'/>");
+        assert_eq!(root(&laughs), None);
+        // An external entity gives no text.
+        assert_eq!(
+            root("<!DOCTYPE r [<!ENTITY e SYSTEM 'e.xml'>]><r xmlns='u&e;'/>"),
+            Some(("u".into(), "r".into()))
+        );
     }
 
     #[test]

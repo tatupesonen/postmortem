@@ -5,7 +5,7 @@ use std::sync::OnceLock;
 
 use regex::Regex;
 
-use crate::magic::{Clause, MagicError, MagicMatch};
+use crate::magic::{Clause, Input, MagicError, MagicMatch};
 use crate::media::{self, Registry};
 use crate::text;
 use crate::xml::{self, Event, Reader};
@@ -105,6 +105,8 @@ pub struct MimeDb {
     octet: usize,
     text: usize,
     html: Option<usize>,
+    /// Zero-padded length regex magics need (shared per detection).
+    pad_to: usize,
 }
 
 /// Loader errors.
@@ -155,6 +157,7 @@ impl MimeDb {
             octet: 0,
             text: 0,
             html: None,
+            pad_to: 0,
         };
         db.octet = db.add(media::OCTET_STREAM);
         db.text = db.add(media::TEXT_PLAIN);
@@ -409,6 +412,12 @@ impl MimeDb {
         xmls.sort_by(|&a, &b| db.name(a).cmp(db.name(b)));
         db.xmls = xmls;
         db.html = db.lookup(media::TEXT_HTML);
+        db.pad_to = db
+            .magics
+            .iter()
+            .map(|m| m.clause.regex_extent())
+            .max()
+            .unwrap_or(0);
         Ok(db)
     }
 
@@ -423,13 +432,14 @@ impl MimeDb {
         if data.is_empty() {
             return vec![self.octet];
         }
+        let input = Input::new(data, self.pad_to);
         let mut result: Vec<usize> = Vec::with_capacity(1);
         let mut current: i32 = -1;
         for m in &self.magics {
             if current > 0 && current > m.priority {
                 break;
             }
-            if m.clause.eval(data) {
+            if m.clause.eval(&input) {
                 result.push(m.ty);
                 current = m.priority;
             }
@@ -464,7 +474,7 @@ impl MimeDb {
                         self.magics
                             .iter()
                             .filter(|m| m.ty == h)
-                            .any(|m| m.clause.eval(data))
+                            .any(|m| m.clause.eval(&input))
                     });
                     *slot = if is_html {
                         self.html.unwrap_or(self.text)

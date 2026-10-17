@@ -33,8 +33,12 @@ fn fail(msg: &str) -> Failure {
     Failure(format!("bplist: {msg}"))
 }
 
-/// dd-plist `parseUnsignedInt` (masked to 32 bits).
+/// dd-plist `parseUnsignedInt` (masked to 32 bits). An empty range is 0
+/// without touching the array, whatever its (even negative) position.
 fn uint(b: &[u8], start: i64, end: i64) -> Result<i64, Failure> {
+    if end <= start {
+        return Ok(0);
+    }
     let (s, e) = (usize::try_from(start), usize::try_from(end));
     let (Ok(s), Ok(e)) = (s, e) else {
         return Err(fail("index"));
@@ -435,9 +439,18 @@ mod tests {
         assert!(detect_bytes(&c).is_err());
     }
 
+    /// dd-plist's `github-issue72.plist`: a trailer shifted by one byte
+    /// gives offset and reference sizes of 0, so every offset reads as 0
+    /// and the "top object" is the `b` of the header (a UTF-16 string).
+    /// dd-plist accepts it; so does Tika.
     #[test]
-    fn debug_issue72() {
-        let b = std::fs::read("/home/tatu/slop/reference/dd-plist/test-files/github-issue72.plist").unwrap();
-        println!("RESULT {:?}", detect_bytes(&b));
+    fn zero_offset_size() {
+        let mut b = b"bplist00".to_vec();
+        let mut trailer = [0u8; 32];
+        trailer[15] = 1;
+        // A table offset far outside the file is never dereferenced.
+        trailer[27] = 0xBD;
+        b.extend_from_slice(&trailer);
+        assert_eq!(detect_bytes(&b).unwrap(), "application/x-bplist");
     }
 }
