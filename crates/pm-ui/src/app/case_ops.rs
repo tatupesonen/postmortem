@@ -118,6 +118,7 @@ impl PostmortemApp {
         self.tz_check.clear();
         self.notes = None;
         self.pivot = None;
+        self.overview.clear();
         self.listings.clear();
         self.selected = None;
         self.back.clear();
@@ -313,6 +314,14 @@ impl PostmortemApp {
             let due = self.change_watch.poll(&changes, watch, live);
             if !due.counts {
                 continue;
+            }
+            // The overview summarises results, scores, sources and notes.
+            if matches!(
+                watch,
+                Watch::Results | Watch::Annotations | Watch::Sources | Watch::Notes
+            ) && due.rows
+            {
+                self.overview.refresh();
             }
             // Each component knows which changes concern it.
             self.results.on_change(watch, due);

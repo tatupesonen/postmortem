@@ -263,7 +263,12 @@ fn browse_demo_disk_and_view_picture() {
         h.state().data_source_count() > 0 && !h.state().is_loading()
     });
 
-    // Data-source summary is shown first.
+    // The Case Overview is shown first; the data source opens its summary.
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Look first").is_some()
+    });
+    shot(&mut h, "case_overview");
+    click_exact(&mut h, "🖴 demo.dd");
     settle(&mut h, |h| {
         h.query_by_label_contains("Allocated files").is_some()
     });
@@ -334,6 +339,7 @@ fn data_source_summary_tabs() {
     let mut h = harness(vec![demo()]);
     wait_analysed(&mut h);
     settle(&mut h, |h| h.state().data_source_count() > 0);
+    click_exact(&mut h, "🖴 demo.dd");
     settle(&mut h, |h| {
         h.query_by_label_contains("Allocated files").is_some()
     });

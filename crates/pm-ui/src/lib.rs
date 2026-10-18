@@ -26,6 +26,7 @@ mod model;
 mod notes_ui;
 mod options_hashsets;
 mod options_ui;
+mod overview;
 mod palette;
 mod pivot;
 mod platform;

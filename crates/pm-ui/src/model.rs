@@ -68,6 +68,8 @@ pub enum NodeId {
     OsAccounts,
     /// A list, keyword or match under Analysis Results › Keyword Hits.
     KeywordHits(pm_casedb::keyword_hits::KeywordHitFilter),
+    /// The Case Overview dashboard.
+    Overview,
 }
 
 impl NodeId {
@@ -85,6 +87,7 @@ impl NodeId {
             | Self::TagResults(_)
             | Self::Score { .. }
             | Self::OsAccounts
+            | Self::Overview
             | Self::KeywordHits(_) => None,
         }
     }

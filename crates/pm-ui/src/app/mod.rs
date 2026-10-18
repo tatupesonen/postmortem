@@ -134,6 +134,8 @@ pub struct PostmortemApp {
     pivot: Option<crate::pivot::PivotWindow>,
     /// Tools › Notes.
     notes: Option<crate::notes_ui::NotesWindow>,
+    /// The Case Overview dashboard's data.
+    overview: crate::task::Cached<crate::overview::Overview>,
     /// Results selected in the result table shown last frame.
     marked_results: Vec<i64>,
     /// Data of the tree and result panes, each refreshed from the change
@@ -222,6 +224,7 @@ impl PostmortemApp {
             palette: crate::palette::Palette::default(),
             pivot: None,
             notes: None,
+            overview: crate::task::Cached::default(),
             marked_results: Vec::new(),
             results: crate::results::ResultData::default(),
             views: crate::views::ViewData::default(),

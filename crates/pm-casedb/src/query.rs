@@ -1670,3 +1670,42 @@ impl CaseDb {
         })
     }
 }
+
+impl CaseDb {
+    /// The most frequent values of text attribute `attribute` on results
+    /// of type `artifact_type`, with their counts (e.g. the top web
+    /// domains), most frequent first.
+    pub fn top_values(
+        &self,
+        artifact_type: &str,
+        attribute: &str,
+        limit: usize,
+    ) -> Result<Vec<(String, u64)>> {
+        self.read(|c| {
+            let mut st = c.prepare_cached(
+                "SELECT at.value_text, COUNT(*) AS n FROM attributes at \
+                 JOIN artifacts a ON a.id = at.artifact_id \
+                 WHERE at.type_id = (SELECT id FROM attribute_types WHERE name = ?2) \
+                   AND a.type_id = (SELECT id FROM artifact_types WHERE name = ?1) \
+                   AND at.value_text IS NOT NULL AND at.value_text <> '' \
+                 GROUP BY at.value_text ORDER BY n DESC, at.value_text LIMIT ?3",
+            )?;
+            let rows = st
+                .query_map(
+                    params![
+                        artifact_type,
+                        attribute,
+                        i64::try_from(limit).unwrap_or(i64::MAX)
+                    ],
+                    |r| {
+                        Ok((
+                            r.get::<_, String>(0)?,
+                            r.get::<_, i64>(1)?.max(0).cast_unsigned(),
+                        ))
+                    },
+                )?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+    }
+}

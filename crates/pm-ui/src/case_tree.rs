@@ -79,10 +79,6 @@ impl CaseTree {
         self.sources.iter()
     }
 
-    pub(crate) fn first(&self) -> Option<&DsTree> {
-        self.sources.first()
-    }
-
     pub(crate) fn is_empty(&self) -> bool {
         self.sources.is_empty()
     }

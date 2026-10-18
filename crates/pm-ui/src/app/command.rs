@@ -111,7 +111,7 @@ impl PostmortemApp {
     }
 
     /// Runs a palette choice.
-    fn run_action(&mut self, ctx: &egui::Context, action: Action) {
+    pub(super) fn run_action(&mut self, ctx: &egui::Context, action: Action) {
         match action {
             Action::Tool(t) => self.open_tool(ctx, t),
             Action::Navigate(node) => self.navigate(node),

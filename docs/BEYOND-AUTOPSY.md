@@ -201,7 +201,12 @@ otherwise.
    the HTML report's summary. Screenshots in notes are not done.
 6. **Triage dashboard** on case open: OS and users, programs, USB
    devices, top domains, notable hits, encryption, timeline density,
-   time-zone warnings.
+   time-zone warnings. **[done 2026-10-18]**: Case Overview at the top of
+   the tree, shown when a case opens (`pm-ui/src/overview.rs`): systems
+   (OS, computer, owner, time zone, install date), notable counts, notes
+   and findings, "Look first" result types, users, top web domains, USB
+   devices, events per year; every line opens its node, tool or a pivot.
+   The time-zone warning is the dialog from item 0.2.1.
 7. **Saved filters and views** per case and globally.
 8. **Review state**: seen/reviewed marks and unseen counts per node, so a
    case can be worked to zero.

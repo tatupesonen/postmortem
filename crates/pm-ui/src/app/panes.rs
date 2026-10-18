@@ -551,6 +551,31 @@ impl PostmortemApp {
             | NodeId::Score { .. }
             | NodeId::OsAccounts => self.node_view(ui, &node),
             NodeId::View(v) => self.view_table(ui, v),
+            NodeId::Overview => self.overview_page(ui),
+        }
+    }
+
+    /// The Case Overview dashboard.
+    pub(super) fn overview_page(&mut self, ui: &mut egui::Ui) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        let data = self
+            .overview
+            .get(ui.ctx(), move || crate::overview::load(&case));
+        let Some(data) = data else {
+            if let Some(e) = self.overview.error() {
+                ui.colored_label(ui.visuals().error_fg_color, e.to_owned());
+            } else {
+                ui.horizontal(|ui| {
+                    ui.spinner();
+                    ui.label("Summarising the case…");
+                });
+            }
+            return;
+        };
+        if let Some(action) = crate::overview::ui(ui, &data) {
+            self.run_action(ui.ctx(), action);
         }
     }
 

@@ -47,6 +47,16 @@ impl PostmortemApp {
 
     pub(super) fn tree(&mut self, ui: &mut egui::Ui) {
         egui::ScrollArea::both().auto_shrink(false).show(ui, |ui| {
+            if self.has_case() {
+                let on = self.selected == Some(NodeId::Overview);
+                if ui
+                    .selectable_label(on, egui::RichText::new("📋 Case Overview").heading())
+                    .clicked()
+                {
+                    self.navigate(NodeId::Overview);
+                }
+                ui.add_space(4.0);
+            }
             ui.heading(format!("{} Data Sources", icons::DATA_SOURCES));
             if !self.has_data_sources() {
                 ui.weak(if self.has_case() {
@@ -66,10 +76,9 @@ impl PostmortemApp {
             if trees.is_empty() && self.case_sources.loading() {
                 ui.spinner();
             }
-            if self.selected.is_none()
-                && let Some(first) = trees.first()
-            {
-                self.navigate(NodeId::DataSource(first.ds.id));
+            // A case with data sources opens on its overview.
+            if self.selected.is_none() && !trees.is_empty() {
+                self.navigate(NodeId::Overview);
             }
             // Autopsy's default layout: Data Sources › host › data source.
             let mut host_action = None;
