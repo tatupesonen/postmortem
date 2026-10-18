@@ -1872,3 +1872,32 @@ fn results_are_marked_seen() {
             && h.query_all_by_label("Not seen yet").count() == 3
     });
 }
+
+/// The Results and Annotations viewer tabs list what is known about the
+/// selected file; Go to result opens the result.
+#[test]
+fn results_and_annotations_tabs() {
+    let mut h = harness(vec![demo()]);
+    h.set_size(egui::vec2(1400.0, 1300.0));
+    wait_analysed(&mut h);
+    settle(&mut h, |h| h.state().data_source_count() > 0);
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    click(&mut h, "setup.exe:Zone.Identifier");
+    click_exact(&mut h, "Results");
+    settle(&mut h, |h| {
+        h.query_by_label("Data Artifacts").is_some()
+            && h.query_all_by_label_contains("Web Downloads").count() >= 2
+    });
+    shot(&mut h, "results_tab");
+    click_exact(&mut h, "Annotations");
+    settle(&mut h, |h| h.query_by_label_contains("Tags (0)").is_some());
+    click_exact(&mut h, "Results");
+    click_exact(&mut h, "Go to result");
+    settle(&mut h, |h| h.query_by_label_contains("1 results").is_some());
+}

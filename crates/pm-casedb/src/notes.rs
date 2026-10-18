@@ -90,6 +90,19 @@ impl CaseDb {
         })
     }
 
+    /// Notes about one file or result, newest first.
+    pub fn notes_about(&self, kind: ObjKind, id: i64) -> Result<Vec<Note>> {
+        self.read(|c| {
+            let mut st = c.prepare_cached(&format!(
+                "SELECT {NOTE_COLS} FROM notes WHERE ref_kind = ?1 AND ref_id = ?2 ORDER BY created_at DESC, id DESC"
+            ))?;
+            let rows = st
+                .query_map(params![kind as i64, id], Note::from_row)?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+    }
+
     /// Every note, newest first (`findings_only`: those marked findings).
     pub fn notes(&self, findings_only: bool) -> Result<Vec<Note>> {
         self.read(|c| {

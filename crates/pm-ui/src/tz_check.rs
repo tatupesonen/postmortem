@@ -127,7 +127,9 @@ impl TimeZoneCheck {
                 if let Err(e) = case.mark_time_zone_reviewed(m.ds_id) {
                     self.error = Some(e.to_string());
                 }
-                self.found.refresh();
+                // Drop the answered warning now; a refresh would keep
+                // showing it until the reload lands.
+                self.found.clear();
             }
             None => {}
         }

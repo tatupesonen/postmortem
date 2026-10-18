@@ -8,6 +8,7 @@ mod extracted;
 mod hex;
 mod image_view;
 mod metadata;
+mod related;
 mod strings;
 mod text;
 
@@ -33,16 +34,20 @@ pub(crate) enum Tab {
     Text,
     Application,
     Metadata,
+    Results,
+    Annotations,
 }
 
 impl Tab {
-    pub(crate) const ALL: [Self; 6] = [
+    pub(crate) const ALL: [Self; 8] = [
         Self::Hex,
         Self::Strings,
         Self::Extracted,
         Self::Text,
         Self::Application,
         Self::Metadata,
+        Self::Results,
+        Self::Annotations,
     ];
 
     pub(crate) fn label(self) -> &'static str {
@@ -53,6 +58,8 @@ impl Tab {
             Self::Text => "Text",
             Self::Application => "Application",
             Self::Metadata => "File Metadata",
+            Self::Results => "Results",
+            Self::Annotations => "Annotations",
         }
     }
 }
@@ -142,6 +149,10 @@ pub(crate) struct ViewerPanel {
     info: Option<crate::task::Task<Option<CaseFileInfo>>>,
     /// The shown file's hashes must be (re)loaded.
     hashes_stale: bool,
+    /// Results and Annotations tabs.
+    related: related::RelatedView,
+    /// A result to open, asked for in the Results tab.
+    open: Option<related::Open>,
 }
 
 impl Default for ViewerPanel {
@@ -161,6 +172,8 @@ impl Default for ViewerPanel {
             image: ImageView::default(),
             info: None,
             hashes_stale: false,
+            related: related::RelatedView::default(),
+            open: None,
         }
     }
 }
@@ -246,6 +259,24 @@ impl ViewerPanel {
             .is_some_and(|t| t.peek().is_some_and(Option::is_some))
     }
 
+    /// The shown file's case and id (case rows, or found by the loader).
+    fn case_file_id(&self) -> Option<(Arc<pm_case::Case>, i64)> {
+        let c = self.content.as_ref()?;
+        if let Some((case, f)) = c.case_file() {
+            return Some((Arc::clone(case), f.id));
+        }
+        self.info
+            .as_ref()
+            .and_then(|t| t.peek())
+            .and_then(Option::as_ref)
+            .map(|i| (Arc::clone(&i.case), i.record.id))
+    }
+
+    /// A result the Results tab asked to open (taken once).
+    pub(crate) fn take_open(&mut self) -> Option<i64> {
+        self.open.take().map(|related::Open::Artifact(id)| id)
+    }
+
     fn supports(&self, tab: Tab) -> bool {
         match tab {
             Tab::Metadata => self.content.is_some(),
@@ -254,6 +285,7 @@ impl ViewerPanel {
                 .as_ref()
                 .is_some_and(|c| !c.row.is_dir() && (c.case_file().is_some() || self.info_ready())),
             Tab::Application => self.kind == Sniffed::Picture,
+            Tab::Results | Tab::Annotations => self.case_file_id().is_some(),
             Tab::Hex | Tab::Strings | Tab::Text => {
                 matches!(self.source, Some(Ok(_))) && self.kind != Sniffed::Empty
             }
@@ -333,6 +365,16 @@ impl ViewerPanel {
                     None => {
                         ui.weak("No text available for this file.");
                     }
+                }
+            }
+            (Tab::Results, _) => {
+                if let Some((case, id)) = self.case_file_id() {
+                    self.open = self.related.results_ui(ui, &case, id, prefs).or(self.open);
+                }
+            }
+            (Tab::Annotations, _) => {
+                if let Some((case, id)) = self.case_file_id() {
+                    self.related.annotations_ui(ui, &case, id, prefs);
                 }
             }
             (Tab::Text, Some(src)) => self.text.ui(ui, &src),

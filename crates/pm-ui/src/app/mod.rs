@@ -354,6 +354,9 @@ impl PostmortemApp {
                 // whole panel so loading states (a spinner) do not shrink it.
                 ui.set_min_size(ui.available_size());
                 self.viewer.ui(ui, &self.prefs);
+                if let Some(id) = self.viewer.take_open() {
+                    self.reveal_artifact(id);
+                }
             });
         egui::CentralPanel::default().show(ui, |ui| self.results(ui));
         self.popouts(&ctx);
