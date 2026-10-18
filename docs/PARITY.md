@@ -1,6 +1,6 @@
 # postmortem ↔ Autopsy parity matrix
 
-Audit date: 2026-10-15; statuses kept up to date with each feature since, last verified against the code on 2026-10-18 (master `f5815f7`, 999 tests). Counts: about 107 Done, 101 Partial, 169 Missing.
+Audit date: 2026-10-15; statuses kept up to date with each feature since, last verified against the code on 2026-10-18 (master `f5815f7`, 999 tests). Counts: about 108 Done, 101 Partial, 168 Missing.
 
 Method: I enumerated every NetBeans module and package in `../autopsy`, including `@OptionsPanelController`, `IngestModuleFactory`, `DataSourceProcessor`, `DataContentViewer`/`DataResultViewer` and report-module registrations. I cross-checked against `docs/inventory/01–08`, then read the postmortem crates (`crates/*`), `PLAN.md`, `PROGRESS.md` and `agents/RULES.md`.
 
@@ -38,7 +38,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 2. **Biggest missing areas:** Central Repository (§25), multi-user and
    auto-ingest (§30, ADR-024), PST/OST e-mail, Android/iOS parsers, Edge
    legacy/SRUM (ESE reader), content viewers for SQLite/plist/registry/
-   PDF/HTML/media, the Context viewer and the per-type artifact viewers, portable case and CASE/UCO reports, ingest profiles,
+   PDF/HTML/media and the per-type artifact viewers, portable case and CASE/UCO reports, ingest profiles,
    more file systems (HFS+, APFS, ISO9660/UDF).
 3. **Test parity:** most of the 126-item checklist in
    `docs/inventory/08-autopsy-tests.md §20` is still to be ticked
@@ -252,7 +252,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Data Artifacts viewer (artifacts of a file; per-type sub-viewers) | `DataArtifactContentViewer`, `artifactviewers/*` | Partial | Results tab (`pm-ui/viewers/related.rs`): every data artifact on the file with its attributes, and Go to result. Missing: the per-type sub-viewers (General Purpose, Message with attachments, Contact, Call Log). |
 | Analysis Results viewer (score, conclusion, justification per result) | `analysisresults/*` | Done | Results tab, Analysis Results section: score, conclusion, configuration, justification and attributes per result. |
 | Annotations viewer (tags, CR comments, hash/interesting hits) | `annotations/*` | Partial | Annotations tab: the file's score, tags (comment, examiner) and the examiner's notes; hash and interesting hits show in the Results tab. Missing: Central Repository comments (§25). |
-| Context viewer (source/usage: downloaded from, attached to, associated artifacts) | `contextviewer/*` | Missing | — |
+| Context viewer (source/usage: downloaded from, attached to, associated artifacts) | `contextviewer/*` | Done | Context tab (`pm-ui/viewers/related.rs`): Source (Downloaded from, Attached to) and Usage (Recent Documents, Program Execution) from `KAAMOS_ASSOCIATED_OBJECT` links, ordered by time, Go to Result; enabled only when the file has context. File Metadata's "Downloaded From" row as in Autopsy. |
 | OS Account viewer | `osaccount/*` | Missing | — |
 | Other Occurrences viewer (CR) | `centralrepository/contentviewer/*` | Missing | See §25. |
 | Pop-out content viewer windows | `DataContentTopComponent` | Done | Deferred viewports. |

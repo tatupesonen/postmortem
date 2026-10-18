@@ -139,6 +139,9 @@ pub(super) fn ui(
                         row(ui, "Object ID", f.id.to_string());
                         row(ui, "Origin", format!("{:?}", f.origin));
                     }
+                    if let Some(url) = hashes.and_then(|i| i.download_source.as_deref()) {
+                        row(ui, "Downloaded From", url);
+                    }
                 });
             let Some(fs) = fs else {
                 return;

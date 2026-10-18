@@ -297,6 +297,7 @@ impl PostmortemApp {
                     pm_casedb::Known::Unknown => "Unknown".into(),
                 },
                 mime: f.mime.clone(),
+                download_source: crate::viewers::related::download_source(&case, f.id),
                 record: Arc::new(f),
             })
         };
@@ -329,6 +330,9 @@ impl PostmortemApp {
             self.views.on_change(watch, due);
             self.nodes.on_change(watch, due);
             self.searches.on_change(watch, due);
+            if matches!(watch, Watch::Results | Watch::Annotations | Watch::Notes) && due.rows {
+                self.viewer.refresh_related();
+            }
             match watch {
                 Watch::Files if due.rows => {
                     self.listings.clear();

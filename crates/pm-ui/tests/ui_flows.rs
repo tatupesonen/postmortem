@@ -1901,3 +1901,43 @@ fn results_and_annotations_tabs() {
     click_exact(&mut h, "Go to result");
     settle(&mut h, |h| h.query_by_label_contains("1 results").is_some());
 }
+
+/// The Context tab: the web download that the Zone.Identifier recorded
+/// says where setup.exe came from; files without context keep it disabled.
+#[test]
+fn context_tab_shows_download_source() {
+    let mut h = harness(vec![demo()]);
+    h.set_size(egui::vec2(1400.0, 1300.0));
+    wait_analysed(&mut h);
+    settle(&mut h, |h| h.state().data_source_count() > 0);
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Downloads"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    click_exact(&mut h, "🗋 setup.exe");
+    settle(&mut h, |h| {
+        h.query_by_label("Context").is_some_and(|n| !n.accesskit_node().is_disabled())
+    });
+    click_exact(&mut h, "Context");
+    settle(&mut h, |h| h.query_by_label("Downloaded from:").is_some());
+    h.get_by_label_contains("URL https://example.com/setup.exe");
+    shot(&mut h, "context_tab");
+    // File Metadata names the source too, as Autopsy's does.
+    click_exact(&mut h, "File Metadata");
+    settle(&mut h, |h| h.query_by_label("Downloaded From").is_some());
+    h.get_by_label("https://example.com/setup.exe");
+    click_exact(&mut h, "Context");
+    // The tab stays chosen for files with context, and gives way otherwise.
+    click(&mut h, "🗋 secret_plan.docx");
+    settle(&mut h, |h| {
+        h.query_by_label("Context").is_some_and(|n| n.accesskit_node().is_disabled())
+            && h.query_by_label("Downloaded from:").is_none()
+    });
+    click_exact(&mut h, "🗋 setup.exe");
+    settle(&mut h, |h| h.query_by_label("Downloaded from:").is_some());
+    click_exact(&mut h, "Go to Result");
+    settle(&mut h, |h| h.query_by_label_contains("1 results").is_some());
+}

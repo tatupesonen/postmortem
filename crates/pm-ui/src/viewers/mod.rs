@@ -8,7 +8,7 @@ mod extracted;
 mod hex;
 mod image_view;
 mod metadata;
-mod related;
+pub(crate) mod related;
 mod strings;
 mod text;
 
@@ -36,10 +36,11 @@ pub(crate) enum Tab {
     Metadata,
     Results,
     Annotations,
+    Context,
 }
 
 impl Tab {
-    pub(crate) const ALL: [Self; 8] = [
+    pub(crate) const ALL: [Self; 9] = [
         Self::Hex,
         Self::Strings,
         Self::Extracted,
@@ -48,6 +49,7 @@ impl Tab {
         Self::Metadata,
         Self::Results,
         Self::Annotations,
+        Self::Context,
     ];
 
     pub(crate) fn label(self) -> &'static str {
@@ -60,6 +62,7 @@ impl Tab {
             Self::Metadata => "File Metadata",
             Self::Results => "Results",
             Self::Annotations => "Annotations",
+            Self::Context => "Context",
         }
     }
 }
@@ -111,6 +114,8 @@ pub(crate) struct CaseFileInfo {
     pub(crate) known: String,
     /// Detected by File Type Identification.
     pub(crate) mime: Option<String>,
+    /// The URL a web download or cache entry says the file came from.
+    pub(crate) download_source: Option<String>,
 }
 
 type LookupFn = dyn Fn(&Content) -> Option<CaseFileInfo> + Send + Sync;
@@ -151,8 +156,10 @@ pub(crate) struct ViewerPanel {
     hashes_stale: bool,
     /// Results and Annotations tabs.
     related: related::RelatedView,
-    /// A result to open, asked for in the Results tab.
+    /// A result to open, asked for in the Results or Context tab.
     open: Option<related::Open>,
+    /// Whether the shown file has Context lines; `None` while loading.
+    has_context: Option<bool>,
 }
 
 impl Default for ViewerPanel {
@@ -173,6 +180,7 @@ impl Default for ViewerPanel {
             info: None,
             hashes_stale: false,
             related: related::RelatedView::default(),
+            has_context: None,
             open: None,
         }
     }
@@ -246,6 +254,7 @@ impl ViewerPanel {
         };
         self.content = content;
         self.refresh_hashes();
+        self.has_context = None;
         self.tab = self
             .pinned
             .filter(|t| self.supports(*t))
@@ -272,7 +281,13 @@ impl ViewerPanel {
             .map(|i| (Arc::clone(&i.case), i.record.id))
     }
 
-    /// A result the Results tab asked to open (taken once).
+    /// Reloads the Results, Annotations and Context tabs (results, tags or
+    /// notes changed).
+    pub(crate) fn refresh_related(&mut self) {
+        self.related.invalidate();
+    }
+
+    /// A result the Results or Context tab asked to open (taken once).
     pub(crate) fn take_open(&mut self) -> Option<i64> {
         self.open.take().map(|related::Open::Artifact(id)| id)
     }
@@ -286,6 +301,7 @@ impl ViewerPanel {
                 .is_some_and(|c| !c.row.is_dir() && (c.case_file().is_some() || self.info_ready())),
             Tab::Application => self.kind == Sniffed::Picture,
             Tab::Results | Tab::Annotations => self.case_file_id().is_some(),
+            Tab::Context => self.has_context == Some(true),
             Tab::Hex | Tab::Strings | Tab::Text => {
                 matches!(self.source, Some(Ok(_))) && self.kind != Sniffed::Empty
             }
@@ -308,6 +324,17 @@ impl ViewerPanel {
 
     pub(crate) fn ui(&mut self, ui: &mut egui::Ui, prefs: &DisplayPrefs) {
         self.load_info(ui.ctx(), prefs);
+        self.has_context = match self.case_file_id() {
+            Some((case, id)) => self.related.has_context(ui.ctx(), &case, id),
+            None => Some(false),
+        };
+        // A pinned Context tab applies once the file is known to have
+        // context; until then (and for files without) the preferred tab.
+        match self.has_context {
+            Some(false) if self.tab == Tab::Context => self.tab = self.preferred(),
+            Some(true) if self.pinned == Some(Tab::Context) => self.tab = Tab::Context,
+            _ => {}
+        }
         ui.horizontal(|ui| {
             for tab in Tab::ALL {
                 let enabled = self.supports(tab);
@@ -375,6 +402,11 @@ impl ViewerPanel {
             (Tab::Annotations, _) => {
                 if let Some((case, id)) = self.case_file_id() {
                     self.related.annotations_ui(ui, &case, id, prefs);
+                }
+            }
+            (Tab::Context, _) => {
+                if let Some((case, id)) = self.case_file_id() {
+                    self.open = self.related.context_ui(ui, &case, id, prefs).or(self.open);
                 }
             }
             (Tab::Text, Some(src)) => self.text.ui(ui, &src),

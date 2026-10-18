@@ -222,6 +222,13 @@ impl<K: PartialEq + Clone, T: Send + Sync + 'static> Keyed<K, T> {
         self.task.is_some()
     }
 
+    /// Recomputes on the next `get` (the data changed); the current value
+    /// is shown until then.
+    pub(crate) fn invalidate(&mut self) {
+        self.key = None;
+        self.task = None;
+    }
+
     pub(crate) fn error(&self) -> Option<&str> {
         self.error.as_deref()
     }
