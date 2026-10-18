@@ -18,6 +18,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::ops::Bound;
 use std::path::Path;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{Duration, Instant};
 
@@ -44,7 +45,12 @@ use crate::tokenize::{TRIGRAMS, WORDS, word_terms};
 use crate::{ObjRef, SearchError, register_tokenizers};
 
 /// Writer heap (shared by its threads).
-const WRITER_HEAP: usize = 256 * 1024 * 1024;
+const WRITER_HEAP: usize = 128 * 1024 * 1024;
+/// Text queued for the writer's indexing threads. Tantivy queues up to
+/// 10,000 documents; a text chunk is ~32 KB in three fields, so without a
+/// byte limit the queue alone reached ~1 GB while ingest threads produced
+/// faster than the writer indexed.
+const QUEUE_BUDGET: usize = 64 * 1024 * 1024;
 const WRITER_THREADS: usize = 4;
 /// `maybe_commit` commits at most this often.
 const COMMIT_INTERVAL: Duration = Duration::from_mins(1);
@@ -200,7 +206,8 @@ pub struct IndexStats {
 pub struct ContentIndex {
     reader: IndexReader,
     /// `None` when another process holds the writer lock (read-only).
-    writer: RwLock<Option<IndexWriter>>,
+    writer: RwLock<Option<IndexWriter<QueuedDoc>>>,
+    queue: Arc<Budget>,
     f: Fields,
     last_commit: Mutex<Instant>,
     uncommitted: AtomicU64,
@@ -259,16 +266,23 @@ impl ContentIndex {
         Ok(Self {
             reader,
             writer: RwLock::new(writer),
+            queue: Arc::new(Budget::new(QUEUE_BUDGET)),
             f,
             last_commit: Mutex::new(Instant::now()),
             uncommitted: AtomicU64::new(0),
         })
     }
 
-    fn add(&self, doc: TantivyDocument) -> Result<(), SearchError> {
+    fn add(&self, doc: TantivyDocument, bytes: usize) -> Result<(), SearchError> {
+        // Wait for room before taking the writer, so a commit is not held
+        // up by producers waiting for the queue.
+        let permit = Budget::acquire(&self.queue, bytes);
         let w = self.writer.read();
         let w = w.as_ref().ok_or(SearchError::ReadOnly)?;
-        w.add_document(doc)?;
+        w.add_document(QueuedDoc {
+            doc,
+            _permit: permit,
+        })?;
         self.uncommitted.fetch_add(1, Ordering::Relaxed);
         Ok(())
     }
@@ -303,7 +317,7 @@ impl ContentIndex {
         d.add_text(self.f.body, c.text);
         d.add_u64(self.f.base, c.base as u64);
         d.add_u64(self.f.base_lower, c.base_lower as u64);
-        self.add(d)
+        self.add(d, 3 * c.text.len())
     }
 
     /// Indexes an object's summary: its name (searchable like text) and
@@ -326,7 +340,7 @@ impl ContentIndex {
         d.add_u64(self.f.base, name.len() as u64);
         d.add_u64(self.f.base_lower, name.to_lowercase().len() as u64);
         d.add_u64(self.f.chunks, u64::from(chunks));
-        self.add(d)
+        self.add(d, 4 * name.len())
     }
 
     /// Makes everything added so far searchable.
@@ -822,9 +836,101 @@ impl SegmentCollector for CandidateSegment {
     }
 }
 
+/// A byte budget for documents queued in the index writer.
+#[derive(Debug)]
+struct Budget {
+    max: usize,
+    used: Mutex<usize>,
+    freed: parking_lot::Condvar,
+}
+
+impl Budget {
+    fn new(max: usize) -> Self {
+        Self {
+            max,
+            used: Mutex::new(0),
+            freed: parking_lot::Condvar::new(),
+        }
+    }
+
+    /// Takes `bytes` of the budget, waiting while the queue is full (a
+    /// document larger than the budget waits for an empty queue).
+    fn acquire(this: &Arc<Self>, bytes: usize) -> Permit {
+        let mut used = this.used.lock();
+        while *used > 0 && *used + bytes > this.max {
+            this.freed.wait(&mut used);
+        }
+        *used += bytes;
+        Permit {
+            budget: Arc::clone(this),
+            bytes,
+        }
+    }
+}
+
+/// Returns its bytes to the budget when the writer drops the document,
+/// which it does once the document is indexed (or discarded).
+#[derive(Debug)]
+struct Permit {
+    budget: Arc<Budget>,
+    bytes: usize,
+}
+
+impl Drop for Permit {
+    fn drop(&mut self) {
+        let mut used = self.budget.used.lock();
+        *used = used.saturating_sub(self.bytes);
+        self.budget.freed.notify_all();
+    }
+}
+
+/// A document with its share of the queue budget.
+#[derive(Debug)]
+struct QueuedDoc {
+    doc: TantivyDocument,
+    _permit: Permit,
+}
+
+impl tantivy::Document for QueuedDoc {
+    type Value<'a> = <TantivyDocument as tantivy::Document>::Value<'a>;
+    type FieldsValuesIter<'a> = <TantivyDocument as tantivy::Document>::FieldsValuesIter<'a>;
+
+    fn iter_fields_and_values(&self) -> Self::FieldsValuesIter<'_> {
+        self.doc.iter_fields_and_values()
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn queue_budget_waits_for_indexed_documents() {
+        let b = Arc::new(Budget::new(100));
+        let first = Budget::acquire(&b, 80);
+        let (tx, rx) = std::sync::mpsc::channel();
+        let waiter = {
+            let b = Arc::clone(&b);
+            std::thread::spawn(move || {
+                let p = Budget::acquire(&b, 40);
+                tx.send(()).unwrap();
+                p
+            })
+        };
+        assert!(
+            rx.recv_timeout(Duration::from_millis(100)).is_err(),
+            "over budget: waits"
+        );
+        drop(first);
+        rx.recv_timeout(Duration::from_secs(5)).expect("released");
+        let second = waiter.join().unwrap();
+        // A document larger than the whole budget still goes through alone.
+        drop(second);
+        let big = Budget::acquire(&b, 500);
+        assert_eq!(*b.used.lock(), 500);
+        drop(big);
+        assert_eq!(*b.used.lock(), 0);
+    }
 
     fn index() -> (tempfile::TempDir, ContentIndex) {
         let dir = tempfile::tempdir().unwrap();
