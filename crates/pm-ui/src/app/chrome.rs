@@ -9,6 +9,19 @@ use crate::task::{self, Task};
 
 use super::PostmortemApp;
 
+/// Number keys 1..9.
+const DIGITS: [egui::Key; 9] = [
+    egui::Key::Num1,
+    egui::Key::Num2,
+    egui::Key::Num3,
+    egui::Key::Num4,
+    egui::Key::Num5,
+    egui::Key::Num6,
+    egui::Key::Num7,
+    egui::Key::Num8,
+    egui::Key::Num9,
+];
+
 impl PostmortemApp {
     /// The wordmark texture for the current theme (decoded on first use and
     /// again when the theme flips).
@@ -287,6 +300,10 @@ impl PostmortemApp {
                     }
                     ui.close();
                 }
+                if ui.button("Keyboard Shortcuts").clicked() {
+                    self.shortcuts_open = true;
+                    ui.close();
+                }
                 if ui.button("About postmortem").clicked() {
                     self.about_open = true;
                     ui.close();
@@ -506,52 +523,91 @@ impl PostmortemApp {
         );
     }
 
+    /// What Ctrl+B and the tag keys act on: the selected results, else
+    /// the selected files, else the viewed file.
+    fn shortcut_target(&mut self) -> Option<crate::tags_ui::TagTarget> {
+        let result = match (&self.selected, self.result_selected) {
+            (Some(NodeId::Results { type_id }), Some(i)) => self
+                .results
+                .rows
+                .get_mut(&crate::results::ResultKey::Type(*type_id))
+                .and_then(Task::poll)
+                .and_then(|r| r.as_ref().ok())
+                .and_then(|rows| rows.rows.get(i))
+                .map(|r| r.artifact.id),
+            _ => None,
+        };
+        let viewed = self.viewer.content().and_then(|c| c.row.file_id());
+        match result {
+            Some(a) if self.marked_results.len() > 1 && self.marked_results.contains(&a) => Some(
+                crate::tags_ui::TagTarget::Artifacts(self.marked_results.clone()),
+            ),
+            Some(a) => Some(crate::tags_ui::TagTarget::Artifacts(vec![a])),
+            None if self.marked_files.len() > 1
+                && viewed.is_none_or(|v| self.marked_files.contains(&v)) =>
+            {
+                Some(crate::tags_ui::TagTarget::Files(self.marked_files.clone()))
+            }
+            None => viewed.map(|f| crate::tags_ui::TagTarget::Files(vec![f])),
+        }
+    }
+
     pub(super) fn shortcuts(&mut self, ctx: &egui::Context) {
-        let (open, back, fwd, bookmark, palette) = ctx.input_mut(|i| {
+        let typing = ctx.egui_wants_keyboard_input();
+        let (open, back, fwd, bookmark, palette, external, tab, quick) = ctx.input_mut(|i| {
+            let digit = |i: &mut egui::InputState, m: egui::Modifiers| {
+                DIGITS.iter().position(|k| i.consume_key(m, *k))
+            };
             (
                 i.consume_key(egui::Modifiers::COMMAND, egui::Key::O),
                 i.consume_key(egui::Modifiers::ALT, egui::Key::ArrowLeft),
                 i.consume_key(egui::Modifiers::ALT, egui::Key::ArrowRight),
                 i.consume_shortcut(&crate::tags_ui::bookmark_shortcut()),
                 i.consume_key(egui::Modifiers::COMMAND, egui::Key::K),
+                i.consume_key(egui::Modifiers::COMMAND, egui::Key::E),
+                digit(i, egui::Modifiers::COMMAND),
+                if typing {
+                    None
+                } else {
+                    digit(i, egui::Modifiers::NONE)
+                },
             )
         });
         if palette {
             self.palette.open();
         }
-        // Ctrl+B: bookmark the selected file (Autopsy tags selected results
-        // instead when the result view has a selection).
-        if bookmark && let Some(case) = self.analysis.lock().case().cloned() {
-            let result = match (&self.selected, self.result_selected) {
-                (Some(NodeId::Results { type_id }), Some(i)) => self
-                    .results
-                    .rows
-                    .get_mut(&crate::results::ResultKey::Type(*type_id))
-                    .and_then(Task::poll)
-                    .and_then(|r| r.as_ref().ok())
-                    .and_then(|rows| rows.rows.get(i))
-                    .map(|r| r.artifact.id),
-                _ => None,
-            };
-            let viewed = self.viewer.content().and_then(|c| c.row.file_id());
-            let target = match result {
-                // Several results selected: all of them.
-                Some(a) if self.marked_results.len() > 1 && self.marked_results.contains(&a) => {
-                    Some(crate::tags_ui::TagTarget::Artifacts(
-                        self.marked_results.clone(),
-                    ))
+        // Ctrl+1..9: the result tabs (Listing, then the searches).
+        if let Some(n) = tab
+            && let Some(t) = self.result_tab_list().get(n)
+        {
+            self.searches.tab = *t;
+        }
+        let case = if bookmark || quick.is_some() || external {
+            self.analysis.lock().case().cloned()
+        } else {
+            None
+        };
+        if let Some(case) = case {
+            // Ctrl+E: the viewed file in the external viewer.
+            if external && let Some(c) = self.viewer.content().cloned() {
+                self.open_external(ctx, &case, c);
+            }
+            // Ctrl+B bookmarks, 1..9 apply the numbered tags of the Add
+            // Tag menu, to the selection (results before files).
+            if let Some(target) = self.shortcut_target() {
+                if bookmark {
+                    self.tagging.bookmark(ctx, &case, target);
+                } else if let Some(n) = quick {
+                    let cat = self.tagging.catalog.get(ctx, Some(&case));
+                    if let Some(t) = crate::tags_ui::quick_tags(&cat).get(n) {
+                        self.tagging.request(
+                            ctx,
+                            &case,
+                            target,
+                            crate::tags_ui::TagRequest::Apply(t.id),
+                        );
+                    }
                 }
-                Some(a) => Some(crate::tags_ui::TagTarget::Artifacts(vec![a])),
-                // Several files selected in the table: all of them.
-                None if self.marked_files.len() > 1
-                    && viewed.is_none_or(|v| self.marked_files.contains(&v)) =>
-                {
-                    Some(crate::tags_ui::TagTarget::Files(self.marked_files.clone()))
-                }
-                None => viewed.map(|f| crate::tags_ui::TagTarget::Files(vec![f])),
-            };
-            if let Some(t) = target {
-                self.tagging.bookmark(ctx, &case, t);
             }
         }
         if open && self.has_case() {

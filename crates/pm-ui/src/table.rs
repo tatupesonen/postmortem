@@ -198,7 +198,15 @@ pub struct TableState {
     #[serde(skip)]
     reveal: Option<i64>,
     #[serde(skip)]
-    order: Option<(usize, Col, bool, Vec<usize>)>,
+    /// Display order: (rows, sort column, ascending, filter) it was
+    /// computed for, and the row indices.
+    order: Option<(usize, Col, bool, String, Vec<usize>)>,
+    /// Ctrl+F: only rows whose name contains this (case-insensitive).
+    #[serde(skip)]
+    filter: String,
+    /// The filter row is shown; `.1`: focus it this frame.
+    #[serde(skip)]
+    filtering: (bool, bool),
 }
 
 impl Default for TableState {
@@ -209,6 +217,8 @@ impl Default for TableState {
             sel: crate::selection::Selection::default(),
             reveal: None,
             order: None,
+            filter: String::new(),
+            filtering: (false, false),
         }
     }
 }
@@ -218,11 +228,53 @@ impl TableState {
     pub fn reset(&mut self) {
         self.sel.clear();
         self.order = None;
+        self.filter.clear();
+        self.filtering = (false, false);
     }
 
     /// Focuses file `file_id` (and scrolls to it) when its row appears.
     pub(crate) fn reveal(&mut self, file_id: i64) {
         self.reveal = Some(file_id);
+    }
+
+    /// Ctrl+F opens a name filter above the table; Escape or × closes it.
+    fn filter_row(&mut self, ui: &mut egui::Ui, total: usize) {
+        if !ui.ctx().egui_wants_keyboard_input()
+            && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::F))
+        {
+            self.filtering = (true, true);
+        }
+        if !self.filtering.0 {
+            return;
+        }
+        ui.horizontal(|ui| {
+            let label = ui.label("Filter:");
+            let edit = ui
+                .add(
+                    egui::TextEdit::singleline(&mut self.filter)
+                        .hint_text("Part of a name")
+                        .desired_width(240.0),
+                )
+                .labelled_by(label.id);
+            if std::mem::take(&mut self.filtering.1) {
+                edit.request_focus();
+            }
+            if let Some(o) = &self.order
+                && !self.filter.is_empty()
+            {
+                ui.weak(format!("{} of {total}", o.4.len()));
+            }
+            let esc = edit.has_focus() && ui.input(|i| i.key_pressed(egui::Key::Escape));
+            if ui
+                .small_button("×")
+                .on_hover_text("Close the filter")
+                .clicked()
+                || esc
+            {
+                self.filter.clear();
+                self.filtering = (false, false);
+            }
+        });
     }
 
     /// Whether `r` is selected.
@@ -254,16 +306,20 @@ impl TableState {
         let tags = menus.tags;
         let mut ev = TableEvents::default();
         let key = rows.as_ptr() as usize;
-        let stale = !matches!(&self.order, Some((k, c, a, _)) if *k == key && *c == self.sort && *a == self.ascending);
+        self.filter_row(ui, rows.len());
+        let stale = !matches!(&self.order, Some((k, c, a, f, _)) if *k == key && *c == self.sort && *a == self.ascending && *f == self.filter);
         if stale {
-            self.order = Some((
-                key,
-                self.sort,
-                self.ascending,
-                sorted_indices(rows, self.sort, self.ascending),
-            ));
+            let mut order = sorted_indices(rows, self.sort, self.ascending);
+            if !self.filter.is_empty() {
+                let needle = self.filter.to_lowercase();
+                order.retain(|&i| {
+                    rows.get(i)
+                        .is_some_and(|r| r.name.to_lowercase().contains(&needle))
+                });
+            }
+            self.order = Some((key, self.sort, self.ascending, self.filter.clone(), order));
         }
-        let order = self.order.as_ref().map(|o| o.3.clone()).unwrap_or_default();
+        let order = self.order.as_ref().map(|o| o.4.clone()).unwrap_or_default();
 
         // Keyboard navigation: arrows move the selection, Enter opens.
         let sel_pos = self.sel.focus.and_then(|s| {
@@ -271,10 +327,12 @@ impl TableState {
                 .iter()
                 .position(|&i| rows.get(i).is_some_and(|r| key_of(r) == s))
         });
+        // J/K step like the arrows (without modifiers).
         let (down, up, enter, shift) = ui.input(|i| {
+            let plain = |k| i.modifiers.is_none() && i.key_pressed(k);
             (
-                i.key_pressed(egui::Key::ArrowDown),
-                i.key_pressed(egui::Key::ArrowUp),
+                i.key_pressed(egui::Key::ArrowDown) || plain(egui::Key::J),
+                i.key_pressed(egui::Key::ArrowUp) || plain(egui::Key::K),
                 i.key_pressed(egui::Key::Enter),
                 i.modifiers.shift,
             )
@@ -622,7 +680,7 @@ impl TableState {
     ) -> String {
         let order = match &self.order {
             Some((k, ..)) if *k == rows.as_ptr() as usize => {
-                self.order.as_ref().map(|o| o.3.clone())
+                self.order.as_ref().map(|o| o.4.clone())
             }
             _ => None,
         }

@@ -396,12 +396,59 @@ impl PostmortemApp {
                 }
                 ui.label(format!("Version {}", env!("CARGO_PKG_VERSION")));
                 ui.label("A digital forensics platform written in Rust,");
-                ui.label("inspired by Autopsy®®.");
+                ui.label("inspired by Autopsy®.");
                 ui.add_space(8.0);
                 ui.button("Close").clicked()
             });
             if r.inner || r.should_close() {
                 self.about_open = false;
+            }
+        }
+        if self.shortcuts_open {
+            let r = egui::Modal::new(egui::Id::new("shortcuts")).show(ctx, |ui| {
+                ui.heading("Keyboard Shortcuts");
+                ui.add_space(4.0);
+                let fmt = |m: egui::Modifiers, k: egui::Key| {
+                    ctx.format_shortcut(&egui::KeyboardShortcut::new(m, k))
+                };
+                let cmd = egui::Modifiers::COMMAND;
+                let rows: Vec<(String, &str)> = vec![
+                    (
+                        fmt(cmd, egui::Key::K),
+                        "Command palette: tools, nodes, files, file:N / artifact:N",
+                    ),
+                    (fmt(cmd, egui::Key::O), "Add Data Source"),
+                    (fmt(egui::Modifiers::ALT, egui::Key::ArrowLeft), "Back"),
+                    (fmt(egui::Modifiers::ALT, egui::Key::ArrowRight), "Forward"),
+                    ("↑ ↓  /  J K".into(), "Previous / next row"),
+                    ("Shift+↑ ↓".into(), "Extend the selection"),
+                    ("Ctrl/⌘+click, Shift+click".into(), "Select several rows"),
+                    (fmt(cmd, egui::Key::A), "Select all rows"),
+                    (fmt(cmd, egui::Key::F), "Filter the table by name"),
+                    (fmt(cmd, egui::Key::B), "Bookmark the selection"),
+                    ("1 … 9".into(), "Apply the numbered tag (see Add Tag menus)"),
+                    (
+                        fmt(cmd, egui::Key::E),
+                        "Open the viewed file in the external viewer",
+                    ),
+                    (format!("{} … 9", fmt(cmd, egui::Key::Num1)), "Result tabs"),
+                    ("Enter".into(), "Open the selected row"),
+                ];
+                egui::Grid::new("shortcut-list")
+                    .num_columns(2)
+                    .striped(true)
+                    .show(ui, |ui| {
+                        for (keys, what) in &rows {
+                            ui.monospace(keys);
+                            ui.label(*what);
+                            ui.end_row();
+                        }
+                    });
+                ui.add_space(8.0);
+                ui.button("Close").clicked()
+            });
+            if r.inner || r.should_close() {
+                self.shortcuts_open = false;
             }
         }
         if !self.errors.is_empty() {

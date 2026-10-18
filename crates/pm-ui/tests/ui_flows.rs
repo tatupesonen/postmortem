@@ -1657,3 +1657,49 @@ fn command_palette_opens_tools_and_references() {
             && h.query_by_label_contains("Go to").is_none()
     });
 }
+
+/// Ctrl+F filters the listing by name, J steps to a row and the number
+/// keys apply the numbered tags (2 = Follow Up in a new case).
+#[test]
+fn table_filter_row_keys_and_tag_numbers() {
+    let mut h = harness(vec![demo()]);
+    h.set_size(egui::vec2(1400.0, 1500.0));
+    wait_analysed(&mut h);
+    settle(&mut h, |h| h.state().data_source_count() > 0);
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Pictures"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    click_exact(&mut h, "🗀 Pictures");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("🗋 sunset.bmp").is_some()
+    });
+    press(&mut h, egui::Key::F, egui::Modifiers::COMMAND);
+    type_focused(&mut h, "thumb");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("🗋 sunset.bmp").is_none()
+            && h.query_by_label_contains("🗋 thumb.bmp").is_some()
+    });
+    h.get_by_label_contains("1 of 2");
+    shot(&mut h, "table_filter");
+    h.get_by_label_contains("🗋 thumb.bmp").click();
+    h.run_steps(2);
+    press(&mut h, egui::Key::Num2, egui::Modifiers::NONE);
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Follow Up (1)").is_some()
+    });
+    // Without the filter, K steps up to the row before (sunset.bmp).
+    click_exact(&mut h, "×");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("🗋 sunset.bmp").is_some()
+    });
+    press(&mut h, egui::Key::K, egui::Modifiers::NONE);
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("/Users/alice/Pictures/sunset.bmp")
+            .next()
+            .is_some()
+    });
+}

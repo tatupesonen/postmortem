@@ -101,6 +101,8 @@ pub struct PostmortemApp {
     next_popout: u64,
     errors: Vec<String>,
     about_open: bool,
+    /// Help › Keyboard Shortcuts.
+    shortcuts_open: bool,
     exports: Vec<Task<Result<String, String>>>,
     /// Decoded wordmark texture and whether it is the dark-theme variant.
     wordmark: Option<(bool, egui::TextureHandle)>,
@@ -193,6 +195,7 @@ impl PostmortemApp {
             next_popout: 0,
             errors: Vec::new(),
             about_open: false,
+            shortcuts_open: false,
             exports: Vec::new(),
             wordmark: None,
             timeline: None,

@@ -796,6 +796,24 @@ impl PostmortemApp {
     }
 
     /// The result pane's tabs: Listing, then one per search (closable).
+    /// The result tabs in order (Ctrl+1..9).
+    pub(super) fn result_tab_list(&self) -> Vec<ResultTab> {
+        std::iter::once(ResultTab::Listing)
+            .chain(
+                self.searches
+                    .file
+                    .iter()
+                    .map(|s| ResultTab::FileSearch(s.number)),
+            )
+            .chain(
+                self.searches
+                    .keyword
+                    .iter()
+                    .map(|s| ResultTab::KeywordSearch(s.number)),
+            )
+            .collect()
+    }
+
     pub(super) fn result_tabs(&mut self, ui: &mut egui::Ui) {
         let mut tabs = vec![(ResultTab::Listing, "Listing".to_owned())];
         tabs.extend(self.searches.file.iter().map(|s| {

@@ -151,12 +151,31 @@ pub(crate) enum TagRequest {
     },
 }
 
+/// The top-level tag names of the Add Tag menu, in its order (custom
+/// names sorted, then the standard ones); the first nine have the number
+/// keys 1..9.
+pub(crate) fn quick_tags(cat: &TagCatalog) -> Vec<&TagName> {
+    let mut custom: Vec<&TagName> = cat
+        .names
+        .iter()
+        .filter(|t| t.tag_set_id.is_none() && !STANDARD_TAGS.contains(&t.name.as_str()))
+        .collect();
+    custom.sort_by(|a, b| a.name.cmp(&b.name));
+    custom.extend(
+        STANDARD_TAGS
+            .iter()
+            .filter_map(|n| cat.by_name(n).filter(|t| t.tag_set_id.is_none())),
+    );
+    custom
+}
+
 /// Autopsy's Add Tag submenu, in its order: custom names (sorted), then
 /// the standard names, then one submenu per tag set, then "Tag and
 /// Comment..." and "New Tag...".
 pub(crate) fn add_menu(ui: &mut egui::Ui, label: &str, cat: &TagCatalog) -> Option<TagRequest> {
     let mut out = None;
     ui.menu_button(label, |ui| {
+        let quick: Vec<i64> = quick_tags(cat).iter().take(9).map(|t| t.id).collect();
         let item = |ui: &mut egui::Ui, t: &TagName, out: &mut Option<TagRequest>| {
             let text = if t.notable {
                 format!("{}{NOTABLE_LABEL}", t.name)
@@ -166,6 +185,8 @@ pub(crate) fn add_menu(ui: &mut egui::Ui, label: &str, cat: &TagCatalog) -> Opti
             let mut b = egui::Button::new(text);
             if t.name == BOOKMARK {
                 b = b.shortcut_text(ui.ctx().format_shortcut(&bookmark_shortcut()));
+            } else if let Some(n) = quick.iter().position(|id| *id == t.id) {
+                b = b.shortcut_text((n + 1).to_string());
             }
             if ui.add(b).clicked() {
                 *out = Some(TagRequest::Apply(t.id));

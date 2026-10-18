@@ -178,7 +178,10 @@ otherwise.
    2026-10-18]** (`pm-ui/src/palette.rs`, `app/command.rs`): tools, data
    sources, views, result types, tags, score nodes and file names (name
    index); `file:N`, `artifact:N` and `ds:N` open that item (Go to
-   reference for MCP citations). The other shortcuts are next.
+   reference for MCP citations). **[shortcuts done 2026-10-18]**: Ctrl+E,
+   Ctrl+F (name filter above file tables), Ctrl+1–9 (result tabs), J/K,
+   1–9 for the first nine Add Tag menu entries (numbered there), Ctrl+A;
+   Help › Keyboard Shortcuts lists them.
 3. **Global quick search**: one box over file names, paths, hashes,
    artifact values, the keyword index and accounts, results grouped by
    kind.
