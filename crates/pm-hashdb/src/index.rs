@@ -162,6 +162,9 @@ pub(crate) fn for_each_entry(
     }
 }
 
+/// Runs merged at once (open files and read buffers).
+const MAX_FAN_IN: usize = 64;
+
 /// Builds the index for `source`; returns the number of records.
 pub(crate) fn build(
     source: &Path,
@@ -204,6 +207,25 @@ pub(crate) fn build(
         } else {
             if !buf.is_empty() {
                 spill(&mut buf, &mut runs)?;
+            }
+            // Merge at most MAX_FAN_IN runs at a time: each open run is a
+            // file handle and a read buffer.
+            let mut pass = 0usize;
+            while runs.len() > MAX_FAN_IN {
+                let mut next = Vec::with_capacity(runs.len().div_ceil(MAX_FAN_IN));
+                for (g, group) in runs.chunks(MAX_FAN_IN).enumerate() {
+                    let p = dest.with_extension(format!("pmidx.pass{pass}.{g}"));
+                    let f = File::create(&p).map_err(|e| HashDbError::io(&p, e))?;
+                    let mut out = BufWriter::with_capacity(1 << 20, f);
+                    merge(group, &mut out, &p)?;
+                    out.flush().map_err(|e| HashDbError::io(&p, e))?;
+                    next.push(p);
+                }
+                for r in &runs {
+                    let _ = std::fs::remove_file(r);
+                }
+                runs = next;
+                pass += 1;
             }
             merge(&runs, &mut w, &tmp)?
         };
