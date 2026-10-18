@@ -20,6 +20,28 @@ Releases since 0.2.0 (2026-10-18; tags per feature, semver in
 * 0.2.4: Pivot window, Notes with findings in the HTML report
   (schema v4), tree nodes keep their open state.
 
+Since 0.2.6 (on master, untagged): Results and Annotations viewer tabs
+(`pm-ui/viewers/related.rs`), Context viewer tab plus File Metadata's
+"Downloaded From" row; the time-zone warning closes at once when kept.
+
+IN PROGRESS, branch `sqlite-viewer-wip` (not on master): Autopsy's SQLite
+content viewer, `pm-ui/src/viewers/sqlite.rs`, shown in the Application
+tab for files starting `SQLite format 3\0` (`Sniffed::Sqlite`).
+* Done there: temp copy with `-wal`/`-journal` companions (case siblings
+  via `child_named`), opened by `pm_browser::sqlite::open`; table picker,
+  100-row pages, "N entries", Export to CSV (rfd, background task), a
+  column header's right-click "Display as" (Raw, Unix s/ms, WebKit µs,
+  Mac absolute). `copy_out` moved to `model.rs`; pm-ui now depends on
+  pm-browser, rusqlite and (non-dev) tempfile. Clippy clean; unit tests
+  in `sqlite.rs` pass.
+* To do: UI test `sqlite_viewer_pages_tables` (ui_flows.rs, `#[ignore]`d)
+  times out because `click_exact("🖴 Browser")` on the logical-set tree
+  node does not open its folder; find the right labels for the logical
+  set's children (dump labels after the click), then un-ignore, run the
+  pm-ui tests, merge to master, update PARITY.md §10 (SQLite viewer →
+  Done) and tag a patch release.
+* Then: Registry viewer (pm-registry exists), plist, PDF/HTML viewers.
+
 Machine notes: heavy jobs run through `~/slop/heavy.sh` (own systemd
 unit, memory capped); systemd-oomd killed the terminal scope otherwise.
 
