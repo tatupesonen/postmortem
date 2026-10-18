@@ -22,13 +22,13 @@
 
 ## Features
 
-- **Evidence:** raw, split and E01 disk images and VMDK, VHD, VHDX and QCOW2 virtual disks; NTFS, FAT, exFAT and ext file systems, including deleted files
+- **Evidence:** raw, split and E01 disk images and VMDK, VHD, VHDX and QCOW2 virtual disks; local disks; logical files and folders, including L01 logical evidence files; unallocated space images; XRY text exports; Autopsy logical imager results. NTFS, FAT, exFAT and ext file systems are read, including deleted files
 - **Analysis:** web activity, Windows registry, event logs, jump lists and prefetch, hash sets (MD5, SHA-1, SHA-256), file type detection, keyword search, e-mail (MBOX, EML, vCard), archives, carving, encryption detection, EXIF and GPS
 - **Review:** timeline, file discovery, image gallery (duplicates shown once), communications, geolocation map, tags, result tabs, pop-out viewers
 - **Reports:** HTML, Excel, KML, body file, file lists and tagged-hash sets
 - **AI agents:** a built-in [MCP](https://modelcontextprotocol.io) server lets Claude and other assistants search and cite a case
 - **Plugins:** sandboxed WebAssembly ingest modules, written against the same API as the built-in parsers
-- **Command line:** `postmortem ingest` creates a case and analyses images without the GUI
+- **Command line:** `postmortem ingest` creates a case and analyses any of these data sources without the GUI
 
 Evidence is only ever read, never modified.
 
