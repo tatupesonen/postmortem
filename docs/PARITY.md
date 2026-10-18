@@ -1,6 +1,6 @@
 # postmortem ↔ Autopsy parity matrix
 
-Audit date: 2026-10-15; statuses kept up to date with each feature since, last verified against the code on 2026-10-18 (master `f5815f7`, 999 tests). Counts: about 106 Done, 99 Partial, 172 Missing.
+Audit date: 2026-10-15; statuses kept up to date with each feature since, last verified against the code on 2026-10-18 (master `f5815f7`, 999 tests). Counts: about 107 Done, 101 Partial, 169 Missing.
 
 Method: I enumerated every NetBeans module and package in `../autopsy`, including `@OptionsPanelController`, `IngestModuleFactory`, `DataSourceProcessor`, `DataContentViewer`/`DataResultViewer` and report-module registrations. I cross-checked against `docs/inventory/01–08`, then read the postmortem crates (`crates/*`), `PLAN.md`, `PROGRESS.md` and `agents/RULES.md`.
 
@@ -38,8 +38,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 2. **Biggest missing areas:** Central Repository (§25), multi-user and
    auto-ingest (§30, ADR-024), PST/OST e-mail, Android/iOS parsers, Edge
    legacy/SRUM (ESE reader), content viewers for SQLite/plist/registry/
-   PDF/HTML/media and the Data Artifacts/Analysis Results/Annotations/
-   Context viewers, portable case and CASE/UCO reports, ingest profiles,
+   PDF/HTML/media, the Context viewer and the per-type artifact viewers, portable case and CASE/UCO reports, ingest profiles,
    more file systems (HFS+, APFS, ISO9660/UDF).
 3. **Test parity:** most of the 126-item checklist in
    `docs/inventory/08-autopsy-tests.md §20` is still to be ticked
@@ -250,9 +249,9 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Application › Binary plist viewer | `PListViewer` | Missing | — |
 | Application › Windows Registry viewer (rejview tree + values) | `WindowsRegistryViewer`, `A/rejview/*` | Missing | The hive parser exists (`pm-registry`, MCP `read_registry_key`); the viewer does not. |
 | File Metadata viewer (name, path, type, MIME, size, times, MD5/SHA-256, known, internal id, istat output) | `contentviewers/Metadata` | Partial | Name, path, type, MIME, size, known, flags, inode, sequence, attributes, mode, link count, object id, origin, times and hashes (MD5/SHA-1/SHA-256) from the case. Missing: data source row and the istat-style block. |
-| Data Artifacts viewer (artifacts of a file; per-type sub-viewers) | `DataArtifactContentViewer`, `artifactviewers/*` | Missing | Includes the default table, General Purpose (web), Message (email/SMS with attachments), Contact and Call Log viewers. |
-| Analysis Results viewer (score, conclusion, justification per result) | `analysisresults/*` | Missing | — |
-| Annotations viewer (tags, CR comments, hash/interesting hits) | `annotations/*` | Missing | — |
+| Data Artifacts viewer (artifacts of a file; per-type sub-viewers) | `DataArtifactContentViewer`, `artifactviewers/*` | Partial | Results tab (`pm-ui/viewers/related.rs`): every data artifact on the file with its attributes, and Go to result. Missing: the per-type sub-viewers (General Purpose, Message with attachments, Contact, Call Log). |
+| Analysis Results viewer (score, conclusion, justification per result) | `analysisresults/*` | Done | Results tab, Analysis Results section: score, conclusion, configuration, justification and attributes per result. |
+| Annotations viewer (tags, CR comments, hash/interesting hits) | `annotations/*` | Partial | Annotations tab: the file's score, tags (comment, examiner) and the examiner's notes; hash and interesting hits show in the Results tab. Missing: Central Repository comments (§25). |
 | Context viewer (source/usage: downloaded from, attached to, associated artifacts) | `contextviewer/*` | Missing | — |
 | OS Account viewer | `osaccount/*` | Missing | — |
 | Other Occurrences viewer (CR) | `centralrepository/contentviewer/*` | Missing | See §25. |
