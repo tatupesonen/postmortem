@@ -1,7 +1,7 @@
 //! Autopsy's MCP tools: same names, arguments and,
 //! where it does not conflict with the `evidence` rule, result fields.
 
-use pm_casedb::mcp::{
+use pm_casedb::query::{
     ArtifactFilter, AttrPredicate, FileCursor, FileFilter, FileOrder, ScoreClass, SortKey, TagRow,
     TimeColumn,
 };
@@ -422,7 +422,7 @@ fn case_summary(ctx: &Ctx<'_>, _: &Args) -> ToolResult<Output> {
     let mut zones: Vec<&str> = sources.iter().map(|d| d.timezone.as_str()).collect();
     zones.sort_unstable();
     zones.dedup();
-    let span = db.mcp_time_span()?;
+    let span = db.time_span()?;
     let index = ctx.index().ok().map(|ix| ix.content().stats());
     let index = match index {
         Some(Ok(s)) => json!({"available": true, "objects": s.objects, "chunks": s.chunks}),
@@ -436,8 +436,8 @@ fn case_summary(ctx: &Ctx<'_>, _: &Args) -> ToolResult<Output> {
         "created": ctx.case().created(),
         "readOnly": ctx.case().is_read_only(),
         "dataSources": sources.len(),
-        "totalFiles": db.mcp_file_count(None)?,
-        "totalArtifacts": db.mcp_artifact_count(None)?,
+        "totalFiles": db.file_count(None)?,
+        "totalArtifacts": db.artifact_count(None)?,
         "timeZones": zones,
         "timeSpan": span.map(|(a, b)| json!({
             "start": iso_json(Some(a)), "startEpoch": a, "end": iso_json(Some(b)), "endEpoch": b,
@@ -523,7 +523,7 @@ pub(crate) fn file_page(
     let after = args.cursor()?.map(|c| file_cursor(&c)).transpose()?;
     let rows = ctx
         .db()
-        .mcp_files(filter, order, desc, after.as_ref(), limit + 1)?;
+        .files(filter, order, desc, after.as_ref(), limit + 1)?;
     Page::from_items(rows, limit, |f| {
         Ok(Row {
             value: if brief { file_brief(f) } else { file_row(f) },
@@ -579,7 +579,7 @@ pub(crate) fn artifact_page(
 ) -> ToolResult<Page> {
     let limit = args.limit(DEFAULT_LIMIT, MAX_LIMIT)?;
     let after = args.cursor()?.and_then(|c| c.as_i64());
-    let rows = ctx.db().mcp_artifacts(filter, after, false, limit + 1)?;
+    let rows = ctx.db().artifacts(filter, after, false, limit + 1)?;
     Page::from_items(rows, limit, |a| {
         Ok(Row {
             value: artifact_row(ctx, a, true)?,
@@ -694,7 +694,7 @@ fn ds_tree(ctx: &Ctx<'_>, d: &pm_casedb::DataSourceRecord) -> ToolResult<Value> 
     let mut node = data_source_row(d);
     let all_fs = db.file_systems(d.id)?;
     let mut vs_nodes = Vec::new();
-    for vs in db.mcp_volume_systems(d.id)? {
+    for vs in db.volume_systems(d.id)? {
         let mut vols = Vec::new();
         for (vid, v) in &vs.volumes {
             let mut fss = Vec::new();
@@ -782,7 +782,7 @@ fn query_tags(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
             a.get(1)?.as_i64()?,
         ))
     });
-    let rows = db.mcp_tags(tag_id, after, limit + 1)?;
+    let rows = db.tags(tag_id, after, limit + 1)?;
     Page::from_items(rows, limit, |t| {
         Ok(match t {
             TagRow::File(t) => {
@@ -894,7 +894,7 @@ fn comm_accounts(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
         .into_iter()
         .map(|t| (t.id, t.display_name))
         .collect();
-    let rows = ctx.db().mcp_accounts(ty, after, limit + 1)?;
+    let rows = ctx.db().accounts(ty, after, limit + 1)?;
     Page::from_items(rows, limit, |(a, n)| {
         Ok(Row {
             value: json!({
@@ -988,7 +988,7 @@ fn object_children(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
             let mut rows = Vec::new();
             let mut more = false;
             if phase == 0 {
-                let kids = db.mcp_files(
+                let kids = db.files(
                     &FileFilter {
                         parent_id: Some(id),
                         ..Default::default()
@@ -1016,7 +1016,7 @@ fn object_children(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
             if !more && rows.len() < limit {
                 let after_art = if phase == 1 { Some(after) } else { None };
                 let left = limit - rows.len();
-                let arts = db.mcp_artifacts(
+                let arts = db.artifacts(
                     &ArtifactFilter {
                         file_id: Some(id),
                         ..Default::default()
@@ -1059,7 +1059,7 @@ fn object_children(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
                 _ => None,
             };
             let after = cursor.and_then(|c| c.as_i64());
-            let kids = db.mcp_artifacts(
+            let kids = db.artifacts(
                 &ArtifactFilter {
                     source_artifact_id: Some(id),
                     ..Default::default()
@@ -1173,7 +1173,7 @@ fn report_path(ctx: &Ctx<'_>, path: &str) -> std::path::PathBuf {
 fn list_reports(ctx: &Ctx<'_>, _: &Args) -> ToolResult<Output> {
     let rows: Vec<Value> = ctx
         .db()
-        .mcp_reports()?
+        .report_rows()?
         .iter()
         .map(|r| {
             let size = std::fs::metadata(report_path(ctx, &r.path))
@@ -1198,7 +1198,7 @@ fn report_content(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
     let id = args.req_i64("objectId")?;
     let r = ctx
         .db()
-        .mcp_reports()?
+        .report_rows()?
         .into_iter()
         .find(|r| r.id == id)
         .ok_or_else(|| ToolError::NotFound(format!("report {id}")))?;

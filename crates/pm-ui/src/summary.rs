@@ -6,7 +6,7 @@ use std::sync::Arc;
 
 use egui::{Color32, Pos2, Sense, Shape, Stroke, Vec2};
 use pm_case::Case;
-use pm_casedb::mcp::{EventFilter, EventKeyset, TimeColumn, VolumeSystemRow};
+use pm_casedb::query::{EventFilter, EventKeyset, TimeColumn, VolumeSystemRow};
 use pm_casedb::summary::DataSourceCounts;
 use pm_casedb::{DataSourceRecord, FileRecord, FileSystemRecord};
 use pm_timeline::FileCategory;
@@ -91,7 +91,7 @@ impl SummaryData {
                 regular_only: true,
                 ..EventFilter::default()
             };
-            db.mcp_file_events(col, &f, EventKeyset::Start, true, 10)
+            db.file_events(col, &f, EventKeyset::Start, true, 10)
         };
         let recent = [
             recent_of(TimeColumn::Modified).map_err(e)?,
@@ -115,10 +115,7 @@ impl SummaryData {
                     TimeColumn::Accessed,
                     TimeColumn::Created,
                 ] {
-                    for (b, n) in db
-                        .mcp_file_event_histogram(col, &f, start, DAY)
-                        .map_err(e)?
-                    {
+                    for (b, n) in db.file_event_histogram(col, &f, start, DAY).map_err(e)? {
                         if let Some(d) = usize::try_from(b).ok().and_then(|b| days.get_mut(b)) {
                             *d += n;
                         }
@@ -133,7 +130,7 @@ impl SummaryData {
             recent,
             activity,
             file_systems: db.file_systems(ds_id).map_err(e)?,
-            volume_systems: db.mcp_volume_systems(ds_id).map_err(e)?,
+            volume_systems: db.volume_systems(ds_id).map_err(e)?,
         })
     }
 }

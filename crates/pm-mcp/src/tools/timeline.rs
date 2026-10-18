@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet};
 
 use pm_casedb::FileRecord;
 use pm_casedb::events::EventRecord;
-use pm_casedb::mcp::{ArtifactFilter, EventFilter, EventKeyset, TimeColumn};
+use pm_casedb::query::{ArtifactFilter, EventFilter, EventKeyset, TimeColumn};
 use serde_json::{Value, json};
 
 use super::{CURSOR, DS, LIMIT, ToolSpec, tool};
@@ -232,7 +232,7 @@ fn merged(
     let want_stored = types.is_none_or(|_| !stored_types.is_empty());
     if want_stored {
         all.extend(
-            db.mcp_events(&stored_types, f, keyset(cursor, 0, desc), desc, limit + 1)?
+            db.events(&stored_types, f, keyset(cursor, 0, desc), desc, limit + 1)?
                 .into_iter()
                 .map(Ev::Stored),
         );
@@ -242,9 +242,7 @@ fn merged(
             if types.is_some_and(|t| !t.contains(&col.event_type())) {
                 continue;
             }
-            for rec in
-                db.mcp_file_events(col, f, keyset(cursor, rank(col), desc), desc, limit + 1)?
-            {
+            for rec in db.file_events(col, f, keyset(cursor, rank(col), desc), desc, limit + 1)? {
                 let t = rec
                     .times
                     .get(col.index())
@@ -299,7 +297,7 @@ fn event_row(
             let tagged = !ctx.db().file_tags(f.id)?.is_empty();
             let hash_hit = !ctx
                 .db()
-                .mcp_artifacts(
+                .artifacts(
                     &ArtifactFilter {
                         file_id: Some(f.id),
                         type_ids: vec![10],
@@ -428,7 +426,7 @@ fn histogram(
     let mut f = f.clone();
     f.start = Some(start);
     f.end = Some(end);
-    for (b, ty, c) in ctx.db().mcp_event_histogram(&f, start, width)? {
+    for (b, ty, c) in ctx.db().event_histogram(&f, start, width)? {
         if types.is_some_and(|t| !t.contains(&ty)) {
             continue;
         }
@@ -440,7 +438,7 @@ fn histogram(
         if types.is_some_and(|t| !t.contains(&col.event_type())) {
             continue;
         }
-        for (b, c) in ctx.db().mcp_file_event_histogram(col, &f, start, width)? {
+        for (b, c) in ctx.db().file_event_histogram(col, &f, start, width)? {
             if let Some(slot) = usize::try_from(b).ok().and_then(|b| out.get_mut(b)) {
                 *slot.entry(FILE_SYSTEM).or_default() += c;
             }
@@ -450,7 +448,7 @@ fn histogram(
 }
 
 fn span_or_window(ctx: &Ctx<'_>, f: &EventFilter) -> ToolResult<Option<(i64, i64)>> {
-    let span = ctx.db().mcp_time_span()?;
+    let span = ctx.db().time_span()?;
     let start = f.start.or(span.map(|s| s.0));
     let end = f.end.or(span.map(|s| s.1.saturating_add(1)));
     Ok(start.zip(end).filter(|(a, b)| b > a))
@@ -524,7 +522,7 @@ fn ref_time(ctx: &Ctx<'_>, r: Ref) -> ToolResult<i64> {
     let db = ctx.db();
     match r {
         Ref::Event(id) => db
-            .mcp_event(id)?
+            .event(id)?
             .map(|e| e.time)
             .ok_or_else(|| ToolError::NotFound(r.to_string())),
         Ref::Artifact(id) => {

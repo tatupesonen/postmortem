@@ -1,7 +1,7 @@
 //! Artifact, pivot, communications, places and coverage tools.
 
 use pm_casedb::ObjKind;
-use pm_casedb::mcp::{
+use pm_casedb::query::{
     ArtifactFilter, AttrPredicate, EventFilter, EventKeyset, FileCursor, FileFilter, FileOrder,
     SortKey,
 };
@@ -150,7 +150,7 @@ pub(super) fn tools() -> Vec<ToolSpec> {
 fn list_artifact_types(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
     let rows: Vec<Value> = ctx
         .db()
-        .mcp_artifact_type_counts(args.i64("dataSourceId")?)?
+        .artifact_type_counts(args.i64("dataSourceId")?)?
         .into_iter()
         .map(|t| {
             json!({
@@ -207,7 +207,7 @@ fn get_artifact(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
         }
     }
     let results: Vec<Value> = db
-        .mcp_artifacts(
+        .artifacts(
             &ArtifactFilter {
                 source_artifact_id: Some(id),
                 ..Default::default()
@@ -277,7 +277,7 @@ fn related_page(
             key: SortKey::None,
             id,
         });
-        let rows = db.mcp_files(&filter, FileOrder::Id, false, c.as_ref(), limit + 1)?;
+        let rows = db.files(&filter, FileOrder::Id, false, c.as_ref(), limit + 1)?;
         Page::from_items(rows, limit, |f| {
             Ok(Row {
                 value: file_brief(f),
@@ -286,7 +286,7 @@ fn related_page(
         })
     };
     let art_page = |filter: ArtifactFilter| -> ToolResult<Page> {
-        let rows = db.mcp_artifacts(&filter, after, false, limit + 1)?;
+        let rows = db.artifacts(&filter, after, false, limit + 1)?;
         Page::from_items(rows, limit, |a| {
             Ok(Row {
                 value: artifact_row(ctx, a, true)?,
@@ -360,7 +360,7 @@ fn related_page(
                     })
                 })
                 .unwrap_or(EventKeyset::Start);
-            let rows = db.mcp_events(&[], &f, ks, false, limit + 1)?;
+            let rows = db.events(&[], &f, ks, false, limit + 1)?;
             Page::from_items(rows, limit, |e| {
                 Ok(Row {
                     value: json!({"ref": Ref::Event(e.id).to_string(), "time": iso_json(Some(e.time)), "timeEpoch": e.time,
@@ -486,7 +486,7 @@ fn list_notable(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
             ),
         };
         let reasons: Vec<Value> = db
-            .mcp_artifacts(&reasons_filter, None, false, 5)?
+            .artifacts(&reasons_filter, None, false, 5)?
             .iter()
             .map(|a| artifact_row(ctx, a, true))
             .collect::<Result<_, _>>()?;
@@ -621,7 +621,7 @@ fn get_messages(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
         let after = args
             .cursor()?
             .and_then(|c| Some((c.get(0)?.as_i64()?, c.get(1)?.as_i64()?)));
-        let rows = db.mcp_relationships(acc.id, other, &[1], after, limit + 1)?;
+        let rows = db.relationships(acc.id, other, &[1], after, limit + 1)?;
         return Page::from_items(rows, limit, |(dt, art, _)| {
             let a = db
                 .artifact(*art)?
@@ -758,7 +758,7 @@ fn geolocation_points(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
 fn list_ingest_jobs(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
     let rows: Vec<Value> = ctx
         .db()
-        .mcp_ingest_jobs(args.i64("dataSourceId")?, MAX_LIMIT)?
+        .ingest_jobs(args.i64("dataSourceId")?, MAX_LIMIT)?
         .into_iter()
         .map(|j| {
             json!({

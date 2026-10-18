@@ -2,7 +2,7 @@
 //! strings and image previews.
 
 use base64::Engine as _;
-use pm_casedb::mcp::{ArtifactFilter, FileFilter, FileOrder};
+use pm_casedb::query::{ArtifactFilter, FileFilter, FileOrder};
 use pm_casedb::{FileRecord, ObjKind};
 use pm_search::{ObjRef, PageText};
 use pm_text::{Chunk, ChunkingSink, Stop, StringSink};
@@ -151,7 +151,7 @@ fn file_metadata(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
     }
     let streams = match (f.fs_id, f.inode) {
         (Some(fs), Some(inode)) => db
-            .mcp_files(
+            .files(
                 &FileFilter {
                     inode: Some((fs, inode)),
                     exclude_id: Some(f.id),
@@ -169,7 +169,7 @@ fn file_metadata(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
     };
     let score = db.score(ObjKind::File, f.id)?;
     let reasons: Vec<Value> = db
-        .mcp_artifacts(
+        .artifacts(
             &ArtifactFilter {
                 file_id: Some(f.id),
                 analysis: Some(true),
@@ -193,7 +193,7 @@ fn file_metadata(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
                    "createdTime": iso_json(Some(t.created_at)), "evidence": {"comment": t.comment}})
         })
         .collect();
-    let (owner_uid, owner_account) = db.mcp_file_owner(f.id)?;
+    let (owner_uid, owner_account) = db.file_owner(f.id)?;
     let owner = match owner_account {
         Some(id) => db.os_account(id)?.map(|a| {
             json!({"ref": Ref::OsAccount(a.id).to_string(),
@@ -221,7 +221,7 @@ fn file_metadata(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
         .map(|(n, val)| json!({"type": n, "value": crate::rows::db_value(val)}))
         .collect();
     let artifacts = db
-        .mcp_artifacts(
+        .artifacts(
             &ArtifactFilter {
                 file_id: Some(f.id),
                 analysis: Some(false),

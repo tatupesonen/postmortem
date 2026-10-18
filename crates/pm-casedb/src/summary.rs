@@ -4,7 +4,7 @@
 
 use rusqlite::params;
 
-use crate::mcp::TimeColumn;
+use crate::query::TimeColumn;
 use crate::{CaseDb, Result};
 
 /// File counts of a data source (the Types tab).

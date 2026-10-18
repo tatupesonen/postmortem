@@ -37,7 +37,7 @@ committed.
   `summarise_thread`.
 
 ### Shared-crate additions (no schema change)
-* `pm-casedb/src/mcp.rs`: `CaseDb::open_read_only`, `is_read_only`;
+* `pm-casedb/src/query.rs` (was `mcp.rs`): `CaseDb::open_read_only`, `is_read_only`;
   keyset-paged, filterable `mcp_files` (every Autopsy `query_files`
   filter plus all four times, tag, score, hash-set hit, extension
   mismatch, inside-folder, ADS of an inode; orders id/size/name/mtime/

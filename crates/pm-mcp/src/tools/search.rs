@@ -1,7 +1,7 @@
 //! Search tools: keyword index, file-name index, structured file search,
 //! keyword lists and hash lookups.
 
-use pm_casedb::mcp::{ArtifactFilter, FileFilter, TimeColumn};
+use pm_casedb::query::{ArtifactFilter, FileFilter, TimeColumn};
 use pm_casedb::{FileKindCode, FileRecord, Known};
 use pm_search::{NameMatch, NameQuery, ObjRef, SearchType, TextQuery};
 use serde_json::{Value, json};
@@ -491,20 +491,20 @@ fn lookup_hash(ctx: &Ctx<'_>, args: &Args) -> ToolResult<Output> {
     };
     let limit = args.limit(DEFAULT_LIMIT, MAX_LIMIT)?;
     let after = args.cursor()?.and_then(|c| c.as_i64());
-    let cursor = after.map(|id| pm_casedb::mcp::FileCursor {
-        key: pm_casedb::mcp::SortKey::None,
+    let cursor = after.map(|id| pm_casedb::query::FileCursor {
+        key: pm_casedb::query::SortKey::None,
         id,
     });
-    let files = ctx.db().mcp_files(
+    let files = ctx.db().files(
         &f,
-        pm_casedb::mcp::FileOrder::Id,
+        pm_casedb::query::FileOrder::Id,
         false,
         cursor.as_ref(),
         limit + 1,
     )?;
     let set_name = ctx.attribute_type("KAAMOS_SET_NAME")?.map(|t| t.0);
     let page = Page::from_items(files, limit, |file| {
-        let hits = ctx.db().mcp_artifacts(
+        let hits = ctx.db().artifacts(
             &ArtifactFilter {
                 file_id: Some(file.id),
                 type_ids: vec![10],

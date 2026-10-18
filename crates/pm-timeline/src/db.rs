@@ -11,7 +11,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use pm_casedb::events::types as ev;
-use pm_casedb::mcp::{EventFilter, EventKeyset, TimeColumn};
+use pm_casedb::query::{EventFilter, EventKeyset, TimeColumn};
 use pm_casedb::{CaseDb, FileRecord, Result};
 
 use crate::{Bin, Category, CountsQuery, DeletedFilter, EventType, FileCategory, Filter, ListRow};
@@ -119,7 +119,7 @@ impl DbTimeline {
             .into_iter()
             .map(|d| (d.id, d.name))
             .collect();
-        let span = db.mcp_time_span()?.map(|(a, b)| (a, b.saturating_add(1)));
+        let span = db.time_span()?.map(|(a, b)| (a, b.saturating_add(1)));
         Ok(Self {
             db,
             data_sources,
@@ -202,14 +202,14 @@ impl DbTimeline {
         let mut out = Vec::new();
         for f in &plan.filters {
             for &c in &plan.columns {
-                for (b, n) in self.db.mcp_file_event_histogram(c, f, origin, width)? {
+                for (b, n) in self.db.file_event_histogram(c, f, origin, width)? {
                     out.push((origin + b * width, type_of_column(c), n));
                 }
             }
             if plan.files_only || plan.stored.as_ref().is_some_and(Vec::is_empty) {
                 continue;
             }
-            for (b, ty, n) in self.db.mcp_event_histogram(f, origin, width)? {
+            for (b, ty, n) in self.db.event_histogram(f, origin, width)? {
                 let t = event_type_of(ty);
                 if plan.stored.as_ref().is_none_or(|s| s.contains(&t)) {
                     out.push((origin + b * width, t, n));
@@ -276,7 +276,7 @@ impl DbTimeline {
             for &c in &plan.columns {
                 let page = self
                     .db
-                    .mcp_file_events(c, f, EventKeyset::Start, false, limit)?;
+                    .file_events(c, f, EventKeyset::Start, false, limit)?;
                 truncated |= page.len() >= limit;
                 for rec in page {
                     let Some(t) = rec.times.get(c.index()).copied().flatten().map(|t| t.0) else {
@@ -298,9 +298,7 @@ impl DbTimeline {
                     .filter(|&i| s.contains(&event_type_of(i)))
                     .collect()
             });
-            let page = self
-                .db
-                .mcp_events(&ids, f, EventKeyset::Start, false, limit)?;
+            let page = self.db.events(&ids, f, EventKeyset::Start, false, limit)?;
             truncated |= page.len() >= limit;
             for e in page {
                 events.push((

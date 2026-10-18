@@ -1,6 +1,7 @@
-//! Read helpers for the MCP server (`pm-mcp`): read-only opening and
-//! keyset-paged, filterable queries over files, artifacts, tags, events,
-//! communications, ingest jobs and reports. No schema changes.
+//! The case's read and query layer, shared by the GUI, the timeline, the
+//! MCP server (`pm-mcp`) and reports: read-only opening and keyset-paged,
+//! filterable queries over files, artifacts, tags, events, communications,
+//! ingest jobs and reports.
 //!
 //! Every list query takes a keyset cursor and a limit and is ordered by an
 //! indexed key where one exists (ADR-014). Filters on columns without an
@@ -177,7 +178,7 @@ impl ScoreClass {
     }
 }
 
-/// Conditions for [`CaseDb::mcp_files`] (all `AND`ed).
+/// Conditions for [`CaseDb::files`] (all `AND`ed).
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct FileFilter {
     pub ds_id: Option<i64>,
@@ -352,7 +353,7 @@ impl FileFilter {
     }
 }
 
-/// Sort orders of [`CaseDb::mcp_files`].
+/// Sort orders of [`CaseDb::files`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum FileOrder {
     #[default]
@@ -413,7 +414,7 @@ pub struct FileCursor {
 
 impl CaseDb {
     /// One keyset page of files matching `f`, sorted by `order` (then id).
-    pub fn mcp_files(
+    pub fn files(
         &self,
         f: &FileFilter,
         order: FileOrder,
@@ -471,7 +472,7 @@ impl CaseDb {
     }
 
     /// The owner of a file: `(owner uid / SID, OS account id)`.
-    pub fn mcp_file_owner(&self, file_id: i64) -> Result<(Option<String>, Option<i64>)> {
+    pub fn file_owner(&self, file_id: i64) -> Result<(Option<String>, Option<i64>)> {
         self.read(|c| {
             Ok(
                 c.prepare_cached("SELECT owner_uid, os_account_id FROM files WHERE id = ?1")?
@@ -483,7 +484,7 @@ impl CaseDb {
     }
 
     /// Number of file rows (all data sources, or one).
-    pub fn mcp_file_count(&self, ds_id: Option<i64>) -> Result<u64> {
+    pub fn file_count(&self, ds_id: Option<i64>) -> Result<u64> {
         self.read(|c| {
             let n: i64 = c
                 .prepare_cached("SELECT COUNT(*) FROM files WHERE (?1 IS NULL OR ds_id = ?1)")?
@@ -493,7 +494,7 @@ impl CaseDb {
     }
 
     /// Number of artifact rows (all data sources, or one).
-    pub fn mcp_artifact_count(&self, ds_id: Option<i64>) -> Result<u64> {
+    pub fn artifact_count(&self, ds_id: Option<i64>) -> Result<u64> {
         self.read(|c| {
             let n: i64 = c
                 .prepare_cached("SELECT COUNT(*) FROM artifacts WHERE (?1 IS NULL OR ds_id = ?1)")?
@@ -592,7 +593,7 @@ impl AttrPredicate {
     }
 }
 
-/// Conditions for [`CaseDb::mcp_artifacts`] (all `AND`ed).
+/// Conditions for [`CaseDb::artifacts`] (all `AND`ed).
 #[derive(Debug, Clone, Default, PartialEq)]
 pub struct ArtifactFilter {
     /// Data artifacts (`Some(false)`) or analysis results (`Some(true)`).
@@ -672,7 +673,7 @@ pub struct ArtifactTypeCount {
 
 impl CaseDb {
     /// One keyset page of artifacts matching `f`, by id.
-    pub fn mcp_artifacts(
+    pub fn artifacts(
         &self,
         f: &ArtifactFilter,
         after_id: Option<i64>,
@@ -705,7 +706,7 @@ impl CaseDb {
 
     /// Artifact types in use with their counts (optionally for one data
     /// source), by id.
-    pub fn mcp_artifact_type_counts(&self, ds_id: Option<i64>) -> Result<Vec<ArtifactTypeCount>> {
+    pub fn artifact_type_counts(&self, ds_id: Option<i64>) -> Result<Vec<ArtifactTypeCount>> {
         self.read(|c| {
             let mut st = c.prepare_cached(
                 "SELECT t.id, t.name, t.display_name, t.category, n.cnt FROM artifact_types t \
@@ -796,7 +797,7 @@ impl CaseDb {
     /// One keyset page of tags (file tags first, then result tags, each by
     /// id), optionally of one tag name. `after` is `(0 file | 1 result,
     /// tag id)`.
-    pub fn mcp_tags(
+    pub fn tags(
         &self,
         tag_name_id: Option<i64>,
         after: Option<(u8, i64)>,
@@ -901,7 +902,7 @@ pub struct EventFilter {
 impl CaseDb {
     /// One keyset page of stored (artifact) events of the given types
     /// (empty: all), ordered by `(time, id)`.
-    pub fn mcp_events(
+    pub fn events(
         &self,
         type_ids: &[i64],
         f: &EventFilter,
@@ -975,7 +976,7 @@ impl CaseDb {
     }
 
     /// One stored event by id.
-    pub fn mcp_event(&self, id: i64) -> Result<Option<EventRecord>> {
+    pub fn event(&self, id: i64) -> Result<Option<EventRecord>> {
         self.read(|c| {
             Ok(c.prepare_cached(
                 "SELECT e.id, e.type_id, e.time, d.full_description, d.med_description, d.short_description, d.ds_id, \
@@ -1054,7 +1055,7 @@ impl CaseDb {
 
     /// One keyset page of the virtual file-system events of one time
     /// column (ADR-018), ordered by `(time, file id)`.
-    pub fn mcp_file_events(
+    pub fn file_events(
         &self,
         col: TimeColumn,
         f: &EventFilter,
@@ -1083,7 +1084,7 @@ impl CaseDb {
 
     /// Stored-event counts per `(bucket, event type)` with
     /// `bucket = (time - origin) / width`.
-    pub fn mcp_event_histogram(
+    pub fn event_histogram(
         &self,
         f: &EventFilter,
         origin: i64,
@@ -1126,7 +1127,7 @@ impl CaseDb {
     }
 
     /// File-system event counts of one time column per bucket.
-    pub fn mcp_file_event_histogram(
+    pub fn file_event_histogram(
         &self,
         col: TimeColumn,
         f: &EventFilter,
@@ -1153,7 +1154,7 @@ impl CaseDb {
     }
 
     /// `(min, max)` time of stored events and file `mtime`s.
-    pub fn mcp_time_span(&self) -> Result<Option<(i64, i64)>> {
+    pub fn time_span(&self) -> Result<Option<(i64, i64)>> {
         self.read(|c| {
             let ev: (Option<i64>, Option<i64>) =
                 c.query_row("SELECT MIN(time), MAX(time) FROM events", [], |r| {
@@ -1183,7 +1184,7 @@ impl CaseDb {
 impl CaseDb {
     /// One keyset page of communication accounts (by id), optionally of
     /// one type, with their relationship counts.
-    pub fn mcp_accounts(
+    pub fn accounts(
         &self,
         type_id: Option<i64>,
         after_id: i64,
@@ -1217,7 +1218,7 @@ impl CaseDb {
     /// One keyset page of the relationships of `account_id` (with
     /// `other`, when given) of the given kinds (empty: all), ordered by
     /// `(date, artifact id)`: `(date, source artifact id, kind)`.
-    pub fn mcp_relationships(
+    pub fn relationships(
         &self,
         account_id: i64,
         other: Option<i64>,
@@ -1303,7 +1304,7 @@ pub struct VolumeSystemRow {
 
 impl CaseDb {
     /// Ingest jobs (optionally of one data source), newest first.
-    pub fn mcp_ingest_jobs(&self, ds_id: Option<i64>, limit: usize) -> Result<Vec<IngestJobRow>> {
+    pub fn ingest_jobs(&self, ds_id: Option<i64>, limit: usize) -> Result<Vec<IngestJobRow>> {
         self.read(|c| {
             let mut st = c.prepare_cached(
                 "SELECT id, ds_id, started_at, ended_at, status, settings FROM ingest_jobs \
@@ -1335,7 +1336,7 @@ impl CaseDb {
     }
 
     /// Generated reports, by id.
-    pub fn mcp_reports(&self) -> Result<Vec<ReportRow>> {
+    pub fn report_rows(&self) -> Result<Vec<ReportRow>> {
         self.read(|c| {
             let mut st = c.prepare_cached(
                 "SELECT id, path, module, display_name, created_at FROM reports ORDER BY id",
@@ -1357,7 +1358,7 @@ impl CaseDb {
 
     /// Volume systems of a data source with their volumes (volume ids
     /// paired with the records).
-    pub fn mcp_volume_systems(&self, ds_id: i64) -> Result<Vec<VolumeSystemRow>> {
+    pub fn volume_systems(&self, ds_id: i64) -> Result<Vec<VolumeSystemRow>> {
         self.read(|c| {
             let mut st = c.prepare_cached(
                 "SELECT id, kind, sector_size FROM volume_systems WHERE ds_id = ?1 ORDER BY id",
@@ -1386,7 +1387,7 @@ impl CaseDb {
     }
 
     /// File-system ids within a volume.
-    pub fn mcp_file_systems_of_volume(&self, volume_id: i64) -> Result<Vec<i64>> {
+    pub fn file_systems_of_volume(&self, volume_id: i64) -> Result<Vec<i64>> {
         self.read(|c| {
             let mut st =
                 c.prepare_cached("SELECT id FROM file_systems WHERE volume_id = ?1 ORDER BY id")?;
@@ -1453,7 +1454,7 @@ mod tests {
         let ro = CaseDb::open_read_only(dir.path().join("case.db")).unwrap();
         assert!(ro.is_read_only());
         assert!(ro.set_meta("x", "y").is_err());
-        assert_eq!(ro.mcp_file_count(None).unwrap(), 4);
+        assert_eq!(ro.file_count(None).unwrap(), 4);
     }
 
     #[test]
@@ -1471,7 +1472,7 @@ mod tests {
                 let mut cur: Option<FileCursor> = None;
                 loop {
                     let page = db
-                        .mcp_files(&FileFilter::default(), order, desc, cur.as_ref(), 1)
+                        .files(&FileFilter::default(), order, desc, cur.as_ref(), 1)
                         .unwrap();
                     let Some(last) = page.last() else { break };
                     cur = Some(FileCursor {
@@ -1494,7 +1495,7 @@ mod tests {
             name_contains: Some("%".into()),
             ..Default::default()
         };
-        let rows = db.mcp_files(&f, FileOrder::Id, false, None, 10).unwrap();
+        let rows = db.files(&f, FileOrder::Id, false, None, 10).unwrap();
         assert_eq!(rows.len(), 1);
         assert_eq!(rows[0].name, "d%.txt");
         let f = FileFilter {
@@ -1502,9 +1503,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            db.mcp_files(&f, FileOrder::Id, false, None, 10)
-                .unwrap()
-                .len(),
+            db.files(&f, FileOrder::Id, false, None, 10).unwrap().len(),
             1
         );
         let f = FileFilter {
@@ -1512,9 +1511,7 @@ mod tests {
             ..Default::default()
         };
         assert_eq!(
-            db.mcp_files(&f, FileOrder::Id, false, None, 10)
-                .unwrap()
-                .len(),
+            db.files(&f, FileOrder::Id, false, None, 10).unwrap().len(),
             1
         );
     }
@@ -1549,7 +1546,7 @@ mod tests {
             }],
             ..Default::default()
         };
-        assert_eq!(db.mcp_artifacts(&f, None, false, 10).unwrap().len(), 1);
+        assert_eq!(db.artifacts(&f, None, false, 10).unwrap().len(), 1);
         let f = ArtifactFilter {
             analysis: Some(false),
             attrs: vec![AttrPredicate::IntRange {
@@ -1559,8 +1556,8 @@ mod tests {
             }],
             ..Default::default()
         };
-        assert_eq!(db.mcp_artifacts(&f, None, false, 10).unwrap().len(), 1);
-        let counts = db.mcp_artifact_type_counts(None).unwrap();
+        assert_eq!(db.artifacts(&f, None, false, 10).unwrap().len(), 1);
+        let counts = db.artifact_type_counts(None).unwrap();
         assert_eq!(counts.len(), 1);
         assert_eq!(counts[0].count, 2);
         assert_eq!(
@@ -1577,11 +1574,11 @@ mod tests {
         let (_d, db, _) = db();
         let f = EventFilter::default();
         let all = db
-            .mcp_file_events(TimeColumn::Modified, &f, EventKeyset::Start, false, 10)
+            .file_events(TimeColumn::Modified, &f, EventKeyset::Start, false, 10)
             .unwrap();
         assert_eq!(all.len(), 4);
         let rest = db
-            .mcp_file_events(
+            .file_events(
                 TimeColumn::Modified,
                 &f,
                 EventKeyset::After {
@@ -1594,7 +1591,7 @@ mod tests {
             .unwrap();
         assert_eq!(rest.len(), 2);
         let h = db
-            .mcp_file_event_histogram(TimeColumn::Created, &f, 4990, 5)
+            .file_event_histogram(TimeColumn::Created, &f, 4990, 5)
             .unwrap();
         assert_eq!(h.iter().map(|x| x.1).sum::<u64>(), 4);
     }

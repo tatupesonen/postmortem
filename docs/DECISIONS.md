@@ -493,17 +493,23 @@ Gallery lists pictures from the DB.
    Data Source Summary and Discovery to DB queries, then delete
    `sources`, `SharedIndex` and the `pm-index` file walk (keep
    `FileCategory` in a shared crate).
-2. `pm-ui/src/app.rs` (~3,400 lines) holds every tool's state and ~60
+2. **[done 2026-10-18]** `pm-ui/src/app.rs` (~3,400 lines) holds every tool's state and ~60
    manual `invalidate()`/`refresh()` calls. Add a **case change bus**
    (Autopsy `Case.Events`): `CaseDb` bumps per-domain generation counters
    (files, artifacts, tags, events, data sources, reports, accounts) on
    commit; views refresh when their counter moves. Then split `app.rs`
-   into feature modules that own their state.
-3. UI `Task`s share rayon's global pool with heavy work (a WASM compile
+   into feature modules that own their state. Done: the bus
+   (`pm_casedb::changes`, published after the commit is visible,
+   7aa6980), `app/` split by concern (78bdbb0), and result, view,
+   case-node and search data owned by components with their own
+   `on_change` (3e6993c). Tool windows still live as fields of the
+   window.
+3. **[done 2026-10-18, 5aa7a7c]** UI `Task`s share rayon's global pool with heavy work (a WASM compile
    once starved the UI). Give UI queries their own small pool.
-4. `pm-casedb/src/mcp.rs` has become the general read/query layer
-   (timeline, file filters, keyset paging) used beyond MCP. Rename it
-   (`query`), drop the `mcp_` prefixes; MCP-specific shaping stays in
+4. **[done 2026-10-18]** `pm-casedb/src/mcp.rs` had become the general read/query layer
+   (timeline, file filters, keyset paging) used beyond MCP. Renamed
+   `pm-casedb/src/query.rs` without the `mcp_` prefixes
+   (`mcp_reports` → `report_rows`); MCP-specific shaping stays in
    `pm-mcp`.
 5. Two module APIs coexist (`ModuleFactory` and `pm-plugin-api`);
    continue moving built-in modules onto `pm-plugin-api` (ADR-022).
