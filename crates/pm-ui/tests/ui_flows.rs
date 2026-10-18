@@ -116,6 +116,7 @@ fn settle_timeout() -> Duration {
 }
 
 /// Steps until `done` holds (background tasks finish off-thread).
+#[track_caller]
 fn settle(
     h: &mut Harness<'_, PostmortemApp>,
     mut done: impl FnMut(&mut Harness<'_, PostmortemApp>) -> bool,
@@ -147,6 +148,7 @@ fn settle(
 
 /// Waits until background analysis has finished (the status bar shows
 /// the file being analysed, which would match label queries for paths).
+#[track_caller]
 fn wait_analysed(h: &mut Harness<'_, PostmortemApp>) {
     settle(h, |h| {
         h.query_by_label_contains("Analysed demo.dd").is_some()
@@ -166,6 +168,7 @@ fn shot(h: &mut Harness<'_, PostmortemApp>, name: &str) {
 /// Clicks the first node whose label contains `label` (the tree renders
 /// before the table, so tree nodes win when both show the same name).
 /// Waits for the node to appear: listings load on background threads.
+#[track_caller]
 fn click(h: &mut Harness<'_, PostmortemApp>, label: &str) {
     settle(h, |h| h.query_all_by_label_contains(label).next().is_some());
     h.query_all_by_label_contains(label)
@@ -176,6 +179,7 @@ fn click(h: &mut Harness<'_, PostmortemApp>, label: &str) {
 }
 
 /// Clicks the first node whose label is exactly `label`.
+#[track_caller]
 fn click_exact(h: &mut Harness<'_, PostmortemApp>, label: &str) {
     settle(h, |h| h.query_all_by_label(label).next().is_some());
     h.query_all_by_label(label)
@@ -885,14 +889,9 @@ fn add_logical_files_from_the_wizard() {
     click_exact(&mut h, "Logical Files");
     click_exact(&mut h, "Next ›");
     for p in ["docs", "loose.txt"] {
-        h.get_all_by_role(egui::accesskit::Role::TextInput)
-            .next()
-            .unwrap()
-            .click();
-        h.run_steps(1);
-        h.get_all_by_role(egui::accesskit::Role::TextInput)
-            .next()
-            .unwrap()
+        h.get_by_label("Path:").focus();
+        h.run_steps(2);
+        h.get_by_label("Path:")
             .type_text(&dir.path().join(p).display().to_string());
         h.run_steps(1);
         click_exact(&mut h, "Add Path");

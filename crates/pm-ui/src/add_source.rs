@@ -535,11 +535,14 @@ impl AddSourceWizard {
             }
         });
         ui.horizontal(|ui| {
-            let edit = ui.add(
-                egui::TextEdit::singleline(&mut self.typed)
-                    .hint_text("Or type a path")
-                    .desired_width(400.0),
-            );
+            let label = ui.label("Path:");
+            let edit = ui
+                .add(
+                    egui::TextEdit::singleline(&mut self.typed)
+                        .hint_text("Or type a path")
+                        .desired_width(360.0),
+                )
+                .labelled_by(label.id);
             let enter = edit.lost_focus() && ui.input(|i| i.key_pressed(egui::Key::Enter));
             if (ui
                 .add_enabled(!self.typed.trim().is_empty(), egui::Button::new("Add Path"))

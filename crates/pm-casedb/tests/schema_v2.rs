@@ -761,6 +761,64 @@ fn committed_writes_bump_their_domains() {
     assert_eq!(ch.generation(Domain::Files), files, "rolled back");
 }
 
+/// A generation moves only once its commit is visible to readers: a view
+/// that reloads as soon as it sees the change must read the new state.
+#[test]
+fn published_changes_are_visible_to_readers() {
+    use pm_casedb::changes::Domain;
+    use std::sync::atomic::{AtomicBool, Ordering};
+    let (_dir, db) = new_db();
+    let (ds, _, _) = populate(&db);
+    let db = std::sync::Arc::new(db);
+    let size_of = move |db: &CaseDb| -> i64 {
+        db.read(|c| {
+            Ok(c.query_row(
+                "SELECT COALESCE(MAX(size), 0) FROM files WHERE ds_id = ?1",
+                [ds],
+                |r| r.get(0),
+            )?)
+        })
+        .unwrap()
+    };
+    let done = std::sync::Arc::new(AtomicBool::new(false));
+    let watcher = {
+        let (db, done) = (std::sync::Arc::clone(&db), std::sync::Arc::clone(&done));
+        std::thread::spawn(move || {
+            let ch = std::sync::Arc::clone(db.changes());
+            let mut seen = ch.generation(Domain::Files);
+            let mut stale = 0;
+            while !done.load(Ordering::Acquire) {
+                let g = ch.generation(Domain::Files);
+                if g != seen {
+                    seen = g;
+                    // The writer stores the generation's number as size.
+                    if size_of(&db) < i64::try_from(g).unwrap() {
+                        stale += 1;
+                    }
+                }
+            }
+            stale
+        })
+    };
+    for _ in 0..300 {
+        let g = db.changes().generation(Domain::Files);
+        db.write(|tx| {
+            tx.execute(
+                "UPDATE files SET size = ?2 WHERE id = (SELECT MIN(id) FROM files WHERE ds_id = ?1)",
+                rusqlite::params![ds, i64::try_from(g).unwrap() + 1],
+            )?;
+            Ok(())
+        })
+        .unwrap();
+    }
+    done.store(true, Ordering::Release);
+    assert_eq!(
+        watcher.join().unwrap(),
+        0,
+        "a reader saw a generation before its data"
+    );
+}
+
 /// Cases made before the KAAMOS_ type namespace are refused.
 #[test]
 fn cases_without_the_kaamos_namespace_are_refused() {

@@ -183,9 +183,18 @@ impl CaseDb {
         out
     }
 
+    /// The writer connection; releasing it publishes what it committed on
+    /// the change bus.
+    fn writer(&self) -> Writer<'_> {
+        Writer {
+            conn: self.writer.lock(),
+            changes: &self.changes,
+        }
+    }
+
     /// Runs `f` inside one write transaction (committed on `Ok`).
     pub fn write<T>(&self, f: impl FnOnce(&rusqlite::Transaction<'_>) -> Result<T>) -> Result<T> {
-        let mut conn = self.writer.lock();
+        let mut conn = self.writer();
         let tx = conn.transaction()?;
         let out = f(&tx)?;
         tx.commit()?;
@@ -195,12 +204,13 @@ impl CaseDb {
     /// Bulk-insert mode: large transactions committed every
     /// `BULK_COMMIT_EVERY` rows (and at the end).
     pub fn bulk<T>(&self, f: impl FnOnce(&mut Bulk<'_>) -> Result<T>) -> Result<T> {
-        let conn = self.writer.lock();
+        let conn = self.writer();
         conn.execute_batch("BEGIN")?;
         let mut b = Bulk {
             conn: &conn,
             pending: 0,
             ids: &self.file_ids,
+            changes: &self.changes,
         };
         match f(&mut b) {
             Ok(v) => {
@@ -218,7 +228,7 @@ impl CaseDb {
     /// maintenance dominates insert cost at scale). Pair with
     /// [`Self::rebuild_file_indexes`].
     pub fn defer_file_indexes(&self) -> Result<()> {
-        let conn = self.writer.lock();
+        let conn = self.writer();
         for (name, _) in FILE_INDEXES {
             conn.execute_batch(&format!("DROP INDEX IF EXISTS {name}"))?;
         }
@@ -228,7 +238,7 @@ impl CaseDb {
     /// (Re)creates the secondary indexes on `files` and refreshes planner
     /// statistics.
     pub fn rebuild_file_indexes(&self) -> Result<()> {
-        let conn = self.writer.lock();
+        let conn = self.writer();
         for (name, ddl) in FILE_INDEXES {
             conn.execute_batch(&format!("CREATE INDEX IF NOT EXISTS {name} {ddl}"))?;
         }
@@ -333,7 +343,7 @@ impl CaseDb {
     /// would probe each referencing column, which is quadratic while the
     /// secondary indexes are deferred (e.g. when a load is cancelled).
     pub fn delete_data_source(&self, ds_id: i64) -> Result<()> {
-        let mut conn = self.writer.lock();
+        let mut conn = self.writer();
         conn.pragma_update(None, "foreign_keys", "OFF")?;
         let out = (|| -> Result<()> {
             let tx = conn.transaction()?;
@@ -830,6 +840,7 @@ pub struct Bulk<'c> {
     conn: &'c Connection,
     pending: usize,
     ids: &'c FileIds,
+    changes: &'c changes::Changes,
 }
 
 impl Bulk<'_> {
@@ -863,7 +874,9 @@ impl Bulk<'_> {
     fn tick(&mut self) -> Result<()> {
         self.pending += 1;
         if self.pending >= BULK_COMMIT_EVERY {
-            self.conn.execute_batch("COMMIT; BEGIN")?;
+            self.conn.execute_batch("COMMIT")?;
+            self.changes.publish();
+            self.conn.execute_batch("BEGIN")?;
             self.pending = 0;
         }
         Ok(())
@@ -1056,4 +1069,31 @@ pub(crate) const ARTIFACT_COLS: &str = "id, type_id, ds_id, file_id, source_arti
 
 pub(crate) fn opt_u64(r: &Row<'_>, i: usize) -> rusqlite::Result<Option<u64>> {
     Ok(r.get::<_, Option<i64>>(i)?.map(|v| v.max(0) as u64))
+}
+
+/// The locked writer connection. Dropping it publishes the changes its
+/// transactions committed (see [`changes::Changes::publish`]).
+struct Writer<'a> {
+    conn: parking_lot::MutexGuard<'a, Connection>,
+    changes: &'a changes::Changes,
+}
+
+impl std::ops::Deref for Writer<'_> {
+    type Target = Connection;
+
+    fn deref(&self) -> &Connection {
+        &self.conn
+    }
+}
+
+impl std::ops::DerefMut for Writer<'_> {
+    fn deref_mut(&mut self) -> &mut Connection {
+        &mut self.conn
+    }
+}
+
+impl Drop for Writer<'_> {
+    fn drop(&mut self) {
+        self.changes.publish();
+    }
 }

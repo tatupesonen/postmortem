@@ -93,6 +93,8 @@ pub struct Changes {
     generations: [AtomicU64; Domain::ALL.len()],
     /// Domains touched by the open transaction.
     pending: AtomicU32,
+    /// Domains of committed transactions not yet published.
+    committed: AtomicU32,
 }
 
 impl Changes {
@@ -109,8 +111,12 @@ impl Changes {
         domains.iter().map(|&d| self.generation(d)).sum()
     }
 
-    fn publish(&self) {
-        let bits = self.pending.swap(0, Ordering::AcqRel);
+    /// Publishes the domains of committed transactions. Called after the
+    /// COMMIT returned: SQLite's commit hook runs *before* the commit is
+    /// visible to other connections, so a view woken from the hook could
+    /// reload the old state and never hear of the change again.
+    pub(crate) fn publish(&self) {
+        let bits = self.committed.swap(0, Ordering::AcqRel);
         for d in Domain::ALL {
             if bits & d.bit() != 0
                 && let Some(g) = self.generations.get(d as usize)
@@ -130,7 +136,8 @@ impl Changes {
         }))?;
         let on_commit = Arc::clone(self);
         conn.commit_hook(Some(move || {
-            on_commit.publish();
+            let bits = on_commit.pending.swap(0, Ordering::AcqRel);
+            on_commit.committed.fetch_or(bits, Ordering::AcqRel);
             // false: let the commit proceed.
             false
         }))?;
