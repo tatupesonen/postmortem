@@ -1709,3 +1709,28 @@ impl CaseDb {
         })
     }
 }
+
+impl CaseDb {
+    /// Files whose MD5, SHA-1 or SHA-256 (by the digest's length) is
+    /// `digest`, through the hash indexes.
+    pub fn files_with_hash(&self, digest: &[u8], limit: usize) -> Result<Vec<FileRecord>> {
+        let column = match digest.len() {
+            16 => "md5",
+            20 => "sha1",
+            32 => "sha256",
+            _ => return Ok(Vec::new()),
+        };
+        self.read(|c| {
+            let mut st = c.prepare_cached(&format!(
+                "SELECT {FILE_COLS} FROM files WHERE {column} = ?1 ORDER BY id LIMIT ?2"
+            ))?;
+            let rows = st
+                .query_map(
+                    params![digest, i64::try_from(limit).unwrap_or(i64::MAX)],
+                    FileRecord::from_row,
+                )?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+    }
+}

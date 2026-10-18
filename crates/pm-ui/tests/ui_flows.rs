@@ -1777,3 +1777,40 @@ fn notes_about_a_file() {
     h.get_by_label("Finding");
     shot(&mut h, "notes");
 }
+
+/// IOC Search: a known MD5 is found (hashes come from Hash Lookup) and
+/// opens its file; an unknown one is not.
+#[test]
+fn ioc_search_finds_a_hash() {
+    let md5 = setup_exe_md5();
+    let mut h = harness(vec![demo()]);
+    h.set_size(egui::vec2(1400.0, 1000.0));
+    wait_analysed(&mut h);
+    settle(&mut h, |h| h.state().data_source_count() > 0);
+    click(&mut h, "Tools");
+    click(&mut h, "IOC Search");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("one per line").is_some()
+    });
+    h.query_all_by_role(egui::accesskit::Role::MultilineTextInput)
+        .next()
+        .expect("indicator box")
+        .focus();
+    type_focused(
+        &mut h,
+        &format!("{md5}\n00000000000000000000000000000000\n"),
+    );
+    click(&mut h, "Search 2 indicators");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("1 of 2 indicators found")
+            .is_some()
+    });
+    click(&mut h, &md5);
+    click_exact(&mut h, "setup.exe");
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("/Users/alice/Downloads/setup.exe")
+            .next()
+            .is_some()
+    });
+    shot(&mut h, "ioc_search");
+}

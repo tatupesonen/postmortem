@@ -118,6 +118,7 @@ impl PostmortemApp {
         self.tz_check.clear();
         self.notes = None;
         self.pivot = None;
+        self.ioc = None;
         self.overview.clear();
         self.listings.clear();
         self.selected = None;

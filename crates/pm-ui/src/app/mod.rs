@@ -134,6 +134,8 @@ pub struct PostmortemApp {
     pivot: Option<crate::pivot::PivotWindow>,
     /// Tools › Notes.
     notes: Option<crate::notes_ui::NotesWindow>,
+    /// Tools › IOC Search.
+    ioc: Option<crate::ioc::IocWindow>,
     /// The Case Overview dashboard's data.
     overview: crate::task::Cached<crate::overview::Overview>,
     /// Results selected in the result table shown last frame.
@@ -224,6 +226,7 @@ impl PostmortemApp {
             palette: crate::palette::Palette::default(),
             pivot: None,
             notes: None,
+            ioc: None,
             overview: crate::task::Cached::default(),
             marked_results: Vec::new(),
             results: crate::results::ResultData::default(),

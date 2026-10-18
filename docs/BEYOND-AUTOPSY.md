@@ -214,6 +214,10 @@ otherwise.
    collapse repeated identical events (dozens of WMI 5858 entries in one
    second); exclude by type or text.
 10. **IOC import**: paste hashes, domains, IPs or names; one result list.
+    **[done 2026-10-18]**: Tools › IOC Search (`pm-ui/src/ioc.rs`):
+    classifies each line (MD5/SHA-1/SHA-256, IP, e-mail, domain, name;
+    defanged forms restored), hashes through the files' hash indexes,
+    the rest through Pivot; hits open their file or result.
 11. **Results while ingest runs** (partly there).
 
 ### Field test: DFIR Madness "Stolen Szechuan Sauce", DESKTOP-SDN1RPT (2026-10-18)

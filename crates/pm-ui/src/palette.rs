@@ -32,10 +32,11 @@ pub(crate) enum Tool {
     Plugins,
     Options,
     Notes,
+    IocSearch,
 }
 
 impl Tool {
-    const ALL: [(Self, &'static str); 15] = [
+    const ALL: [(Self, &'static str); 16] = [
         (Self::NewCase, "New Case…"),
         (Self::OpenCase, "Open Case…"),
         (Self::AddDataSource, "Add Data Source…"),
@@ -51,6 +52,7 @@ impl Tool {
         (Self::Plugins, "Plugins"),
         (Self::Options, "Options"),
         (Self::Notes, "Notes"),
+        (Self::IocSearch, "IOC Search (hashes, IPs, domains, names)"),
     ];
 }
 

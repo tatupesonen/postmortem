@@ -323,6 +323,7 @@ impl PostmortemApp {
         self.command_palette(ctx);
         self.pivot_window(ctx);
         self.notes_window(ctx);
+        self.ioc_window(ctx);
         self.file_search_window(ctx);
         self.keyword_panel(ctx);
         let case = self.analysis.lock().case().cloned();
@@ -576,5 +577,25 @@ impl PostmortemApp {
         self.notes
             .get_or_insert_with(crate::notes_ui::NotesWindow::default)
             .note_about(kind, id, label);
+    }
+
+    /// Tools › IOC Search: hits open their file or result.
+    fn ioc_window(&mut self, ctx: &egui::Context) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            self.ioc = None;
+            return;
+        };
+        let Some(w) = self.ioc.as_mut() else {
+            return;
+        };
+        let (chosen, keep) = w.ui(ctx, &case);
+        if !keep {
+            self.ioc = None;
+        }
+        match chosen {
+            Some(crate::pivot::Open::File(id)) => self.reveal_file(id),
+            Some(crate::pivot::Open::Artifact(id)) => self.reveal_artifact(id),
+            None => {}
+        }
     }
 }

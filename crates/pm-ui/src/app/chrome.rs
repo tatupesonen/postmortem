@@ -199,6 +199,13 @@ impl PostmortemApp {
                         .get_or_insert_with(crate::notes_ui::NotesWindow::default);
                     ui.close();
                 }
+                if ui
+                    .add_enabled(self.has_case(), egui::Button::new("🎯 IOC Search"))
+                    .clicked()
+                {
+                    self.ioc.get_or_insert_with(crate::ioc::IocWindow::default);
+                    ui.close();
+                }
                 ui.separator();
                 if ui.button("⚙ Ingest Progress").clicked() {
                     self.progress_open = true;

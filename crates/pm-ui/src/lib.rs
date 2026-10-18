@@ -21,6 +21,7 @@ mod geo_ui;
 mod grid;
 mod hosts_ui;
 mod icons;
+mod ioc;
 mod keyword_search_ui;
 mod model;
 mod notes_ui;
