@@ -194,6 +194,9 @@ pub struct TableState {
     /// The selected rows and the focused one (shown in the viewer).
     #[serde(skip)]
     sel: crate::selection::Selection<RowKey>,
+    /// A file to focus and scroll to once its listing is shown.
+    #[serde(skip)]
+    reveal: Option<i64>,
     #[serde(skip)]
     order: Option<(usize, Col, bool, Vec<usize>)>,
 }
@@ -204,6 +207,7 @@ impl Default for TableState {
             sort: Col::Name,
             ascending: true,
             sel: crate::selection::Selection::default(),
+            reveal: None,
             order: None,
         }
     }
@@ -214,6 +218,11 @@ impl TableState {
     pub fn reset(&mut self) {
         self.sel.clear();
         self.order = None;
+    }
+
+    /// Focuses file `file_id` (and scrolls to it) when its row appears.
+    pub(crate) fn reveal(&mut self, file_id: i64) {
+        self.reveal = Some(file_id);
     }
 
     /// Whether `r` is selected.
@@ -271,6 +280,18 @@ impl TableState {
             )
         });
         let mut scroll_to = None;
+        if let Some(id) = self.reveal
+            && let Some((p, i, r)) = order.iter().enumerate().find_map(|(p, &i)| {
+                rows.get(i)
+                    .filter(|r| r.file_id() == Some(id))
+                    .map(|r| (p, i, r))
+            })
+        {
+            self.reveal = None;
+            self.sel.select_one(key_of(r));
+            ev.selected = Some(i);
+            scroll_to = Some(p);
+        }
         if !ui.ctx().egui_wants_keyboard_input()
             && !order.is_empty()
             && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::A))

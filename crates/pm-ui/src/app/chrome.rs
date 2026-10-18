@@ -166,6 +166,19 @@ impl PostmortemApp {
                 }
             });
             ui.menu_button("Tools", |ui| {
+                if ui
+                    .add(egui::Button::new("⌕ Command Palette…").shortcut_text(
+                        ui.ctx().format_shortcut(&egui::KeyboardShortcut::new(
+                            egui::Modifiers::COMMAND,
+                            egui::Key::K,
+                        )),
+                    ))
+                    .clicked()
+                {
+                    self.palette.open();
+                    ui.close();
+                }
+                ui.separator();
                 if ui.button("⚙ Ingest Progress").clicked() {
                     self.progress_open = true;
                     ui.close();
@@ -494,14 +507,18 @@ impl PostmortemApp {
     }
 
     pub(super) fn shortcuts(&mut self, ctx: &egui::Context) {
-        let (open, back, fwd, bookmark) = ctx.input_mut(|i| {
+        let (open, back, fwd, bookmark, palette) = ctx.input_mut(|i| {
             (
                 i.consume_key(egui::Modifiers::COMMAND, egui::Key::O),
                 i.consume_key(egui::Modifiers::ALT, egui::Key::ArrowLeft),
                 i.consume_key(egui::Modifiers::ALT, egui::Key::ArrowRight),
                 i.consume_shortcut(&crate::tags_ui::bookmark_shortcut()),
+                i.consume_key(egui::Modifiers::COMMAND, egui::Key::K),
             )
         });
+        if palette {
+            self.palette.open();
+        }
         // Ctrl+B: bookmark the selected file (Autopsy tags selected results
         // instead when the result view has a selection).
         if bookmark && let Some(case) = self.analysis.lock().case().cloned() {

@@ -25,6 +25,7 @@ mod keyword_search_ui;
 mod model;
 mod options_hashsets;
 mod options_ui;
+mod palette;
 mod platform;
 mod plugins;
 mod report_ui;

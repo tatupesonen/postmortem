@@ -320,6 +320,7 @@ impl PostmortemApp {
     }
 
     pub(super) fn dialogs(&mut self, ctx: &egui::Context) {
+        self.command_palette(ctx);
         self.file_search_window(ctx);
         self.keyword_panel(ctx);
         let case = self.analysis.lock().case().cloned();

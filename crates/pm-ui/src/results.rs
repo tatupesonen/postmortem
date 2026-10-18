@@ -376,9 +376,16 @@ pub(crate) struct ResultTable {
     /// Selected rows by artifact id: kept when the rows reload (after
     /// tagging); another listing gets a new table.
     sel: crate::selection::Selection<i64>,
+    /// A result to focus and scroll to once its row appears.
+    reveal: Option<i64>,
 }
 
 impl ResultTable {
+    /// Focuses result `artifact_id` (and scrolls to it) when it is shown.
+    pub(crate) fn reveal(&mut self, artifact_id: i64) {
+        self.reveal = Some(artifact_id);
+    }
+
     /// Draws the table; `selected` and the returned clicked row are
     /// indices into `data.rows`.
     pub(crate) fn ui(
@@ -424,6 +431,15 @@ impl ResultTable {
             self.sel.select_all(&keys);
         }
         let mut ev = ResultEvents::default();
+        let mut scroll_to = None;
+        if let Some(id) = self.reveal
+            && let Some(p) = keys.iter().position(|k| *k == id)
+        {
+            self.reveal = None;
+            self.sel.select_one(id);
+            ev.clicked = order.get(p).copied();
+            scroll_to = Some(p);
+        }
         let mut sort = self.sort;
         crate::sortable::hscroll(ui, "results-h", |ui| {
             let mut table = TableBuilder::new(ui)
@@ -441,6 +457,9 @@ impl ResultTable {
                     ResultCol::Attr(_) => Column::initial(180.0).at_least(60.0).clip(true),
                     ResultCol::Path => Column::remainder().at_least(240.0).clip(true),
                 });
+            }
+            if let Some(p) = scroll_to {
+                table = table.scroll_to_row(p, None);
             }
             table
                 .header(22.0, |mut h| {

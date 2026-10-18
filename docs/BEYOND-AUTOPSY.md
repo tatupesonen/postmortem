@@ -174,7 +174,11 @@ otherwise.
    Ctrl+F find in the current view, Alt+←/→ back/forward, Ctrl+1–9 result
    tabs, J/K row stepping with the viewer following, number keys for the
    user's own tags; a **command palette** (Ctrl+K) that jumps to any
-   node, file, artifact type, tool or action by name.
+   node, file, artifact type, tool or action by name. **[palette done
+   2026-10-18]** (`pm-ui/src/palette.rs`, `app/command.rs`): tools, data
+   sources, views, result types, tags, score nodes and file names (name
+   index); `file:N`, `artifact:N` and `ds:N` open that item (Go to
+   reference for MCP citations). The other shortcuts are next.
 3. **Global quick search**: one box over file names, paths, hashes,
    artifact values, the keyword index and accounts, results grouped by
    kind.

@@ -146,6 +146,11 @@ impl<T: Send + Sync + 'static> Cached<T> {
         self.error.as_deref()
     }
 
+    /// The last loaded value, without starting a load.
+    pub(crate) fn peek(&self) -> Option<Arc<T>> {
+        self.current.clone()
+    }
+
     /// Reloads on the next [`Self::get`], keeping the current value.
     pub(crate) fn refresh(&mut self) {
         self.stale = true;

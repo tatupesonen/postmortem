@@ -1570,3 +1570,90 @@ fn multi_select_in_result_tables() {
         h.query_by_label_contains("Bookmark (3)").is_some()
     });
 }
+
+/// Types into the focused text field (the palette focuses its own).
+fn type_focused(h: &mut Harness<'_, PostmortemApp>, text: &str) {
+    h.run_steps(2);
+    h.query_all_by_role(egui::accesskit::Role::TextInput)
+        .find(egui_kittest::Node::is_focused)
+        .expect("a focused text field")
+        .type_text(text);
+    h.run_steps(2);
+}
+
+fn press(h: &mut Harness<'_, PostmortemApp>, key: egui::Key, modifiers: egui::Modifiers) {
+    h.event(egui::Event::Key {
+        key,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers,
+    });
+    h.run_steps(2);
+}
+
+/// Ctrl+K opens tools by name and goes to `file:N` / `artifact:N`.
+#[test]
+fn command_palette_opens_tools_and_references() {
+    let case_file = case_with_history("palette");
+    let db = pm_casedb::CaseDb::open_read_only(case_file.with_file_name("case.db")).unwrap();
+    let sunset = db
+        .query_files(
+            &pm_casedb::FileQuery {
+                name_contains: Some("sunset.bmp".into()),
+                ..pm_casedb::FileQuery::default()
+            },
+            0,
+            10,
+        )
+        .unwrap()
+        .into_iter()
+        .find(|f| f.parent_path.ends_with("Pictures/"))
+        .unwrap();
+    let history = db
+        .artifacts_of_type(
+            pm_casedb::catalog::artifact_type_id("KAAMOS_WEB_HISTORY").unwrap(),
+            None,
+            0,
+            10,
+        )
+        .unwrap();
+    drop(db);
+    let mut h = harness_with(vec![case_file], false);
+    h.set_size(egui::vec2(1400.0, 1000.0));
+    settle(&mut h, |h| {
+        h.state().data_source_count() > 0 && !h.state().is_loading()
+    });
+
+    // A file reference opens its folder with the file focused.
+    press(&mut h, egui::Key::K, egui::Modifiers::COMMAND);
+    type_focused(&mut h, &format!("file:{}", sunset.id));
+    shot(&mut h, "palette");
+    press(&mut h, egui::Key::Enter, egui::Modifiers::NONE);
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("/Users/alice/Pictures/sunset.bmp")
+            .next()
+            .is_some()
+    });
+
+    // A result reference opens its type.
+    press(&mut h, egui::Key::K, egui::Modifiers::COMMAND);
+    type_focused(&mut h, &format!("artifact:{}", history[1].id));
+    press(&mut h, egui::Key::Enter, egui::Modifiers::NONE);
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("Web History")
+            .next()
+            .is_some()
+            && h.query_by_label("https://a.example/").is_some()
+    });
+
+    // Tools by name.
+    press(&mut h, egui::Key::K, egui::Modifiers::COMMAND);
+    type_focused(&mut h, "geoloc");
+    shot(&mut h, "palette_tools");
+    press(&mut h, egui::Key::Enter, egui::Modifiers::NONE);
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("Geolocation").count() >= 2
+            && h.query_by_label_contains("Go to").is_none()
+    });
+}
