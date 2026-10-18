@@ -159,11 +159,13 @@ pub(crate) struct TableEvents {
     pub(crate) marked: Vec<usize>,
 }
 
-/// A row's identity in a listing: inode and stream.
-type RowKey = (u64, Option<u32>);
+/// A row's identity in a listing: the case file id, then inode and stream
+/// (carved, derived and logical files have no inode: keying by inode alone
+/// made every such row one selection).
+type RowKey = (Option<i64>, u64, Option<u32>);
 
 fn key_of(r: &FileRow) -> RowKey {
-    (r.inode, r.stream)
+    (r.file_id(), r.inode, r.stream)
 }
 
 /// Row keys in display order.
@@ -258,7 +260,7 @@ impl TableState {
         let sel_pos = self.sel.focus.and_then(|s| {
             order
                 .iter()
-                .position(|&i| rows.get(i).is_some_and(|r| (r.inode, r.stream) == s))
+                .position(|&i| rows.get(i).is_some_and(|r| key_of(r) == s))
         });
         let (down, up, enter, shift) = ui.input(|i| {
             (
@@ -656,6 +658,49 @@ pub(crate) fn csv_field(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rows_without_inodes_are_told_apart() {
+        // Carved and logical files have no inode; their file ids differ.
+        let rec = |id: i64, name: &str| pm_casedb::FileRecord {
+            id,
+            ds_id: 1,
+            fs_id: None,
+            parent_id: None,
+            origin: pm_casedb::Origin::Carved,
+            inode: None,
+            stream: None,
+            name: name.into(),
+            parent_path: "/$CarvedFiles/".into(),
+            kind: pm_casedb::FileKindCode::Regular,
+            name_alloc: true,
+            meta_alloc: true,
+            meta_flags: 0,
+            size: 10,
+            times: [None; 4],
+            mode: None,
+            uid: None,
+            gid: None,
+            seq: None,
+            attributes: None,
+            extension: "jpg".into(),
+            mime: None,
+            md5: None,
+            sha1: None,
+            sha256: None,
+            known: pm_casedb::Known::Unknown,
+            derived_from: None,
+            local_path: None,
+        };
+        let a = crate::views::row_of(&rec(1, "a.jpg"));
+        let b = crate::views::row_of(&rec(2, "b.jpg"));
+        assert_eq!(a.inode, b.inode, "both without an inode");
+        assert_ne!(key_of(&a), key_of(&b));
+        let mut t = TableState::default();
+        t.sel.select_one(key_of(&a));
+        assert!(t.is_marked(&a));
+        assert!(!t.is_marked(&b), "clicking one row selects only it");
+    }
 
     use pm_fs::{FileKind, Metadata};
 
