@@ -1703,3 +1703,28 @@ fn table_filter_row_keys_and_tag_numbers() {
             .is_some()
     });
 }
+
+/// Pivot on a result value lists every result with it; rows open them.
+#[test]
+fn pivot_on_a_result_value() {
+    let mut h = harness_with(vec![case_with_history("pivot")], false);
+    h.set_size(egui::vec2(1400.0, 1000.0));
+    settle(&mut h, |h| {
+        h.state().data_source_count() > 0 && !h.state().is_loading()
+    });
+    click(&mut h, "Web History (3)");
+    settle(&mut h, |h| h.query_by_label("https://b.example/").is_some());
+    h.get_by_label("https://b.example/").click_secondary();
+    h.run_steps(2);
+    click(&mut h, "Pivot on");
+    click(&mut h, "User Name: alice");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Results with this value (3)")
+            .is_some()
+    });
+    shot(&mut h, "pivot");
+    // The palette offers a pivot on what is typed.
+    press(&mut h, egui::Key::K, egui::Modifiers::COMMAND);
+    type_focused(&mut h, "alice");
+    h.get_by_label("Pivot on “alice”");
+}

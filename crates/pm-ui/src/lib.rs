@@ -26,6 +26,7 @@ mod model;
 mod options_hashsets;
 mod options_ui;
 mod palette;
+mod pivot;
 mod platform;
 mod plugins;
 mod report_ui;

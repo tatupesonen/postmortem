@@ -321,6 +321,7 @@ impl PostmortemApp {
 
     pub(super) fn dialogs(&mut self, ctx: &egui::Context) {
         self.command_palette(ctx);
+        self.pivot_window(ctx);
         self.file_search_window(ctx);
         self.keyword_panel(ctx);
         let case = self.analysis.lock().case().cloned();
@@ -523,5 +524,25 @@ impl PostmortemApp {
             self.persisted.custom_tags = s.custom_tags;
         }
         self.persisted.ingest.hash_lookup = s.hash_lookup;
+    }
+
+    /// The Pivot window: rows open their file or result.
+    fn pivot_window(&mut self, ctx: &egui::Context) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            self.pivot = None;
+            return;
+        };
+        let Some(p) = self.pivot.as_mut() else {
+            return;
+        };
+        let (chosen, keep) = p.ui(ctx, &case);
+        if !keep {
+            self.pivot = None;
+        }
+        match chosen {
+            Some(crate::pivot::Open::File(id)) => self.reveal_file(id),
+            Some(crate::pivot::Open::Artifact(id)) => self.reveal_artifact(id),
+            None => {}
+        }
     }
 }

@@ -1596,3 +1596,77 @@ mod tests {
         assert_eq!(h.iter().map(|x| x.1).sum::<u64>(), 4);
     }
 }
+
+/// A result whose attribute holds a pivot value.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ValueMatch {
+    pub artifact: ArtifactRecord,
+    /// Display name of the matching attribute ("Domain", "E-Mail From").
+    pub attribute: String,
+    /// The artifact type's display name.
+    pub type_display: String,
+}
+
+impl CaseDb {
+    /// Results with a text attribute equal to `value` (as typed or in
+    /// lower case), newest artifacts first; uses the `(type_id,
+    /// value_text)` index, one seek per text attribute type.
+    pub fn artifacts_with_value(&self, value: &str, limit: usize) -> Result<Vec<ValueMatch>> {
+        let lower = value.to_lowercase();
+        self.read(|c| {
+            let sql = format!(
+                "SELECT {cols}, t.display_name, ty.display_name FROM attributes at \
+                 JOIN attribute_types t ON t.id = at.type_id \
+                 JOIN artifacts a ON a.id = at.artifact_id \
+                 JOIN artifact_types ty ON ty.id = a.type_id \
+                 WHERE at.type_id IN (SELECT id FROM attribute_types WHERE value_type = 0) \
+                   AND at.value_text IN (?1, ?2) \
+                 GROUP BY a.id ORDER BY a.id DESC LIMIT ?3",
+                cols = ARTIFACT_COLS
+                    .split(", ")
+                    .map(|c| format!("a.{c}"))
+                    .collect::<Vec<_>>()
+                    .join(", ")
+            );
+            let mut st = c.prepare(&sql)?;
+            let n = ARTIFACT_COLS.split(", ").count();
+            let rows = st
+                .query_map(
+                    params![value, lower, i64::try_from(limit).unwrap_or(i64::MAX)],
+                    |r| {
+                        Ok(ValueMatch {
+                            artifact: ArtifactRecord::from_row(r)?,
+                            attribute: r.get(n)?,
+                            type_display: r.get(n + 1)?,
+                        })
+                    },
+                )?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+    }
+
+    /// Communication accounts with identifier `value` (any type; account
+    /// identifiers are stored normalised, so also lower case).
+    pub fn accounts_with_identifier(&self, value: &str) -> Result<Vec<Account>> {
+        let lower = value.to_lowercase();
+        self.read(|c| {
+            let mut st = c.prepare(
+                "SELECT a.id, a.type_id, t.name, a.identifier FROM accounts a \
+                 JOIN account_types t ON t.id = a.type_id \
+                 WHERE a.identifier IN (?1, ?2) ORDER BY t.name",
+            )?;
+            let rows = st
+                .query_map(params![value, lower], |r| {
+                    Ok(Account {
+                        id: r.get(0)?,
+                        type_id: r.get(1)?,
+                        type_name: r.get(2)?,
+                        identifier: r.get(3)?,
+                    })
+                })?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+    }
+}

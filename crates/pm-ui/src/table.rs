@@ -157,6 +157,8 @@ pub(crate) struct TableEvents {
     pub(crate) tag: Option<(Vec<usize>, TagRequest)>,
     /// The selected rows this frame (for shortcuts such as Ctrl+B).
     pub(crate) marked: Vec<usize>,
+    /// Pivot on a value of the clicked row (name, MD5).
+    pub(crate) pivot: Option<String>,
 }
 
 /// A row's identity in a listing: the case file id, then inode and stream
@@ -583,6 +585,22 @@ impl TableState {
                                 ui.ctx().copy_text(r.path.clone());
                                 ui.close();
                             }
+                            ui.menu_button("Pivot on", |ui| {
+                                if ui.button(format!("Name: {}", r.name)).clicked() {
+                                    ev.pivot = Some(r.name.clone());
+                                    ui.close();
+                                }
+                                if let Some(md5) = r
+                                    .file
+                                    .as_ref()
+                                    .and_then(|f| f.md5.as_ref())
+                                    .map(|h| pm_core::decode::to_hex(h))
+                                    && ui.button(format!("MD5: {md5}")).clicked()
+                                {
+                                    ev.pivot = Some(md5);
+                                    ui.close();
+                                }
+                            });
                             if ui.button("Export Table to CSV…").clicked() {
                                 ev.csv = true;
                                 ui.close();

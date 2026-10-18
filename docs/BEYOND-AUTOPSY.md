@@ -187,7 +187,12 @@ otherwise.
    kind.
 4. **Pivot page "everything about X"**: from a file, user, domain, USB
    serial, IP or e-mail address to every artifact, event and file that
-   mentions it.
+   mentions it. **[done 2026-10-18]** (`pm-ui/src/pivot.rs`,
+   `CaseDb::artifacts_with_value` on the `(type_id, value_text)` index):
+   results with the value, files named like it, communication accounts,
+   and text hits; from the palette ("Pivot on …") and the row menus of
+   result and file tables (Pivot on › value / name / MD5). Timeline
+   events are not searched yet.
 5. **Notes and findings**: a per-case notebook; tagged items, screenshots
    and comments become a findings list that feeds the report.
 6. **Triage dashboard** on case open: OS and users, programs, USB

@@ -833,3 +833,55 @@ fn cases_without_the_kaamos_namespace_are_refused() {
     assert!(e.to_string().contains("create the case again"), "{e}");
     assert!(CaseDb::open_read_only(&path).is_err());
 }
+
+/// Pivot: results whose text attribute equals a value, through the
+/// `(type_id, value_text)` index; case variants as typed and lower case.
+#[test]
+fn artifacts_with_a_value_are_found() {
+    let (_dir, db) = new_db();
+    let (ds, a, _) = populate(&db);
+    let text = |n: &str, v: &str| {
+        (
+            catalog::attribute_type_id(n).unwrap(),
+            Value::Text(v.into()),
+            "test".to_owned(),
+        )
+    };
+    let mut web = data_artifact(ds, a, "KAAMOS_WEB_HISTORY");
+    web.attributes = vec![
+        text("KAAMOS_URL", "https://evil.example/"),
+        text("KAAMOS_DOMAIN", "evil.example"),
+    ];
+    let w = db.add_artifact(&web).unwrap();
+    let mut mail = data_artifact(ds, a, "KAAMOS_EMAIL_MSG");
+    mail.attributes = vec![text("KAAMOS_EMAIL_FROM", "boss@evil.example")];
+    db.add_artifact(&mail).unwrap();
+    let hits = db.artifacts_with_value("evil.example", 10).unwrap();
+    assert_eq!(hits.len(), 1);
+    assert_eq!(hits[0].artifact.id, w);
+    assert_eq!(hits[0].attribute, "Domain");
+    assert_eq!(hits[0].type_display, "Web History");
+    // As typed in upper case, the lower-case variant matches.
+    assert_eq!(
+        db.artifacts_with_value("Boss@Evil.Example", 10)
+            .unwrap()
+            .len(),
+        1
+    );
+    // The plan seeks the index.
+    let plan: Vec<String> = db
+        .read(|c| {
+            let mut st = c.prepare(
+                "EXPLAIN QUERY PLAN SELECT artifact_id FROM attributes WHERE type_id IN (SELECT id FROM attribute_types WHERE value_type = 0) AND value_text IN ('a', 'b')",
+            )?;
+            let rows = st
+                .query_map([], |r| r.get::<_, String>(3))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+        .unwrap();
+    assert!(
+        plan.iter().any(|p| p.contains("attributes_type_text")),
+        "{plan:?}"
+    );
+}

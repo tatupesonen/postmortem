@@ -366,6 +366,8 @@ pub(crate) struct ResultEvents {
     pub(crate) tag: Option<(Vec<usize>, TagFor, TagRequest)>,
     /// The selected rows this frame (for Ctrl+B).
     pub(crate) marked: Vec<usize>,
+    /// Pivot on a value of the row.
+    pub(crate) pivot: Option<String>,
 }
 
 /// A sortable, horizontally scrolling table of results.
@@ -529,6 +531,26 @@ impl ResultTable {
                                         ev.tag = Some((marked.clone(), TagFor::SourceFile, t));
                                     }
                                 }
+                                ui.separator();
+                                ui.menu_button("Pivot on", |ui| {
+                                    for (name, v) in &r.attrs {
+                                        if let AttrValue::Text(t) = v
+                                            && !t.is_empty()
+                                        {
+                                            let short: String = t.chars().take(60).collect();
+                                            if ui.button(format!("{name}: {short}")).clicked() {
+                                                ev.pivot = Some(t.clone());
+                                                ui.close();
+                                            }
+                                        }
+                                    }
+                                    if let Some(f) = &r.file
+                                        && ui.button(format!("Source file: {}", f.name)).clicked()
+                                    {
+                                        ev.pivot = Some(f.name.clone());
+                                        ui.close();
+                                    }
+                                });
                             });
                         }
                     });

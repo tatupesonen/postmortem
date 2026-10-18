@@ -59,6 +59,8 @@ pub(crate) enum Action {
     Navigate(NodeId),
     RevealFile(i64),
     RevealArtifact(i64),
+    /// Everything about a value.
+    Pivot(String),
 }
 
 /// One choice in the list.
@@ -204,10 +206,19 @@ impl Palette {
             }
             _ => Vec::new(),
         };
+        let typed = self.query.trim();
+        let pivot = (typed.chars().count() >= 2 && parse_reference(typed).is_none()).then(|| {
+            Entry::new(
+                format!("Pivot on “{typed}”"),
+                "Everything about it",
+                Action::Pivot(typed.to_owned()),
+            )
+        });
         let list: Vec<Entry> = reference
             .into_iter()
             .chain(shown.into_iter().map(|(_, e)| e.clone()))
             .chain(files)
+            .chain(pivot)
             .collect();
         self.cursor = self.cursor.min(list.len().saturating_sub(1));
         let (down, up, enter, esc) = ctx.input_mut(|i| {

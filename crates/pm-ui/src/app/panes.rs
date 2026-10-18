@@ -173,6 +173,9 @@ impl PostmortemApp {
         ev: &crate::table::TableEvents,
         csv: Option<String>,
     ) {
+        if let Some(v) = &ev.pivot {
+            self.pivot = Some(crate::pivot::PivotWindow::new(v));
+        }
         // The table's selection, for shortcuts (Ctrl+B) that act on it.
         self.marked_files = ev
             .marked
@@ -621,6 +624,9 @@ impl PostmortemApp {
                 }
             };
             self.tagging.request(ui.ctx(), &case, target, req);
+        }
+        if let Some(v) = ev.pivot.clone() {
+            self.pivot = Some(crate::pivot::PivotWindow::new(&v));
         }
         if let Some(i) = ev.clicked {
             self.result_selected = Some(i);

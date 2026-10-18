@@ -117,6 +117,7 @@ impl PostmortemApp {
             Action::Navigate(node) => self.navigate(node),
             Action::RevealFile(id) => self.reveal_file(id),
             Action::RevealArtifact(id) => self.reveal_artifact(id),
+            Action::Pivot(v) => self.pivot = Some(crate::pivot::PivotWindow::new(&v)),
         }
     }
 
