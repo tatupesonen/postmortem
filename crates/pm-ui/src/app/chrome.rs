@@ -516,13 +516,16 @@ impl PostmortemApp {
                     .map(|r| r.artifact.id),
                 _ => None,
             };
+            let viewed = self.viewer.content().and_then(|c| c.row.file_id());
             let target = match result {
                 Some(a) => Some(crate::tags_ui::TagTarget::Artifacts(vec![a])),
-                None => self
-                    .viewer
-                    .content()
-                    .and_then(|c| c.row.file_id())
-                    .map(|f| crate::tags_ui::TagTarget::Files(vec![f])),
+                // Several files selected in the table: all of them.
+                None if self.marked_files.len() > 1
+                    && viewed.is_none_or(|v| self.marked_files.contains(&v)) =>
+                {
+                    Some(crate::tags_ui::TagTarget::Files(self.marked_files.clone()))
+                }
+                None => viewed.map(|f| crate::tags_ui::TagTarget::Files(vec![f])),
             };
             if let Some(t) = target {
                 self.tagging.bookmark(ctx, &case, t);

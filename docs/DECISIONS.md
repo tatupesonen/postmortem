@@ -513,8 +513,16 @@ Gallery lists pictures from the DB.
    `pm-mcp`.
 5. Two module APIs coexist (`ModuleFactory` and `pm-plugin-api`);
    continue moving built-in modules onto `pm-plugin-api` (ADR-022).
-6. Explain the ~3 GB peak resident during ingest of a 15 GB image
-   (`postmortem ingest` now reports heap vs mapped pages).
+6. **[done 2026-10-18, a858c00]** Explain the ~3 GB peak resident during ingest of a 15 GB image
+   (`postmortem ingest` now reports heap vs mapped pages). Heaptrack
+   showed Keyword Search's index writer: Tantivy queues up to 10,000
+   documents and a text chunk is ~32 KB in three fields, so the queue held
+   ~650 MB while ingest outpaced indexing. Queued documents now take a
+   share of a 64 MB byte budget and the writer heap is 128 MB. Peak heap
+   with keyword search: Greg Schardt 1,549 → 806 MiB; the 15 GB
+   DESKTOP-SDN1RPT image 1,208 MiB (resident 3.7 GB is mostly mapped,
+   reclaimable file pages). Without keyword search the small image
+   peaks at 159 MiB.
 
 **Consequences.** Memory no longer grows with the number of files for
 browsing features; MCP, reports and the GUI see the same data; old

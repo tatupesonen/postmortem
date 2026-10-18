@@ -166,7 +166,10 @@ otherwise.
 1. **Multi-select in every table**: Ctrl+click toggles, Shift+click
    extends, Ctrl+A selects all; every row action (tag, bookmark, extract,
    add to hash set, export CSV of selection, open in timeline) works on
-   the whole selection. **[next]**
+   the whole selection. **[done for file tables 2026-10-18]**: listings,
+   views and searches (`pm-ui/src/table.rs`); Ctrl+B, Extract Files (to a
+   folder), Add Files to Hash Set, Add/Remove File Tag and Export
+   Selected Rows to CSV take the selection. Next: the result tables.
 2. **Keyboard-first**: Ctrl+B bookmark (done), Ctrl+E external viewer,
    Ctrl+F find in the current view, Alt+←/→ back/forward, Ctrl+1–9 result
    tabs, J/K row stepping with the viewer following, number keys for the

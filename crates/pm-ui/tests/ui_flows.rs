@@ -1490,3 +1490,47 @@ fn time_zone_warning_can_be_kept() {
         "not asked again after reopening"
     );
 }
+
+/// Ctrl+click selects several files; Ctrl+B and the row menu act on all
+/// of them.
+#[test]
+fn multi_select_tags_several_files() {
+    let mut h = harness(vec![demo()]);
+    h.set_size(egui::vec2(1400.0, 1500.0));
+    wait_analysed(&mut h);
+    settle(&mut h, |h| h.state().data_source_count() > 0);
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Pictures"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    click_exact(&mut h, "🗀 Pictures");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("🗋 sunset.bmp").is_some()
+            && h.query_by_label_contains("🗋 thumb.bmp").is_some()
+    });
+    h.get_by_label_contains("🗋 sunset.bmp").click();
+    h.run_steps(2);
+    h.get_by_label_contains("🗋 thumb.bmp")
+        .click_modifiers(egui::Modifiers::COMMAND);
+    h.run_steps(2);
+    h.event(egui::Event::Key {
+        key: egui::Key::B,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::COMMAND,
+    });
+    h.run_steps(2);
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Bookmark (2)").is_some()
+    });
+    // Right-clicking inside the selection keeps it for the row actions.
+    h.get_by_label_contains("🗋 thumb.bmp").click_secondary();
+    h.run_steps(2);
+    h.get_by_label("Extract Files… (2 files)");
+    h.get_by_label("Export Selected Rows to CSV… (2 rows)");
+    shot(&mut h, "multi_select_menu");
+}

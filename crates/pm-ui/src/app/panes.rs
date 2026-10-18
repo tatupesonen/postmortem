@@ -127,6 +127,41 @@ impl PostmortemApp {
         }));
     }
 
+    /// Extract Files: the selected files into a chosen folder (names made
+    /// unique with the file's id when they repeat).
+    pub(super) fn export_many(&mut self, ctx: &egui::Context, files: Vec<Content>) {
+        let Some(dir) = rfd::FileDialog::new()
+            .set_title(format!("Extract {} Files to Folder", files.len()))
+            .pick_folder()
+        else {
+            return;
+        };
+        self.exports.push(Task::spawn(ctx, move || {
+            let mut used = std::collections::HashSet::new();
+            for c in &files {
+                let base = c.row.name.replace([':', '/', '\\'], "_");
+                let name = if used.insert(base.clone()) {
+                    base
+                } else {
+                    let id = c.row.file_id().unwrap_or_default();
+                    let (stem, ext) = base
+                        .rsplit_once('.')
+                        .map_or((base.as_str(), String::new()), |(s, e)| {
+                            (s, format!(".{e}"))
+                        });
+                    format!("{stem}_{id}{ext}")
+                };
+                let src = c.source()?;
+                copy_out(src.as_ref(), &dir.join(name))?;
+            }
+            Ok(format!(
+                "{} files extracted to {}",
+                files.len(),
+                dir.display()
+            ))
+        }));
+    }
+
     /// Row actions every file table shares: tags, pop-out, extract,
     /// external viewer, Add File to Hash Set and CSV export (`csv`, built
     /// by the caller from its table).
@@ -138,30 +173,63 @@ impl PostmortemApp {
         ev: &crate::table::TableEvents,
         csv: Option<String>,
     ) {
-        if let Some((i, req)) = ev.tag
-            && let Some(id) = rows.get(i).and_then(FileRow::file_id)
-        {
-            self.tagging
-                .request(ctx, case, crate::tags_ui::TagTarget::Files(vec![id]), req);
+        // The table's selection, for shortcuts (Ctrl+B) that act on it.
+        self.marked_files = ev
+            .marked
+            .iter()
+            .filter_map(|&i| rows.get(i).and_then(FileRow::file_id))
+            .collect();
+        if let Some((sel, req)) = &ev.tag {
+            let ids: Vec<i64> = sel
+                .iter()
+                .filter_map(|&i| rows.get(i).and_then(FileRow::file_id))
+                .collect();
+            if !ids.is_empty() {
+                self.tagging
+                    .request(ctx, case, crate::tags_ui::TagTarget::Files(ids), *req);
+            }
         }
         let content = |r: &FileRow| Content::from_case(Arc::clone(case), r.clone());
         if let Some(r) = ev.popout.and_then(|i| rows.get(i)) {
             self.open_popout(content(r));
         }
-        if let Some(r) = ev.export.and_then(|i| rows.get(i)) {
-            self.export(ctx, content(r));
+        let to_export: Vec<Content> = ev
+            .export
+            .iter()
+            .filter_map(|&i| rows.get(i))
+            .filter(|r| !r.is_dir())
+            .map(content)
+            .collect();
+        match to_export.len() {
+            0 => {}
+            1 => {
+                if let Some(c) = to_export.into_iter().next() {
+                    self.export(ctx, c);
+                }
+            }
+            _ => self.export_many(ctx, to_export),
         }
         if let Some(r) = ev.external.and_then(|i| rows.get(i)) {
             self.open_external(ctx, case, content(r));
         }
-        if let Some((r, set)) = ev
-            .add_hash
-            .as_ref()
-            .and_then(|(i, set)| Some((rows.get(*i)?, set.clone())))
-        {
-            let c = content(r);
-            self.exports
-                .push(Task::spawn(ctx, move || add_to_hash_set(&c, &set)));
+        if let Some((sel, set)) = &ev.add_hash {
+            let files: Vec<Content> = sel
+                .iter()
+                .filter_map(|&i| rows.get(i))
+                .filter(|r| !r.is_dir() && r.file_id().is_some())
+                .map(content)
+                .collect();
+            let set = set.clone();
+            self.exports.push(Task::spawn(ctx, move || {
+                let mut done = Vec::new();
+                for c in &files {
+                    done.push(add_to_hash_set(c, &set)?);
+                }
+                Ok(match done.as_slice() {
+                    [one] => one.clone(),
+                    _ => format!("{} files added to {}", done.len(), set.display()),
+                })
+            }));
         }
         if let Some(csv) = csv {
             self.save_csv(ctx, csv);
@@ -266,9 +334,10 @@ impl PostmortemApp {
             hash_sets: &self.persisted.ingest.hash_lookup.sets,
         };
         let ev = self.table.ui(ui, &data.rows, &self.prefs, menus);
-        let csv = ev
-            .csv
-            .then(|| self.table.csv(&data.rows, &self.prefs, None));
+        let csv = (ev.csv || ev.csv_selection).then(|| {
+            self.table
+                .csv(&data.rows, &self.prefs, None, ev.csv_selection)
+        });
         if let Some(case) = &case {
             self.file_table_actions(ui.ctx(), case, &data.rows, &ev, csv);
         }
@@ -592,7 +661,8 @@ impl PostmortemApp {
             hash_sets: &self.persisted.ingest.hash_lookup.sets,
         };
         let ev = self.table.ui(ui, &rows, &self.prefs, menus);
-        let csv = ev.csv.then(|| self.table.csv(&rows, &self.prefs, None));
+        let csv = (ev.csv || ev.csv_selection)
+            .then(|| self.table.csv(&rows, &self.prefs, None, ev.csv_selection));
         self.file_table_actions(&ctx, &case, &rows, &ev, csv);
         let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
         if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {
@@ -826,9 +896,13 @@ impl PostmortemApp {
             menus,
             Some(("Keyword Preview", &data.previews)),
         );
-        let csv = ev.csv.then(|| {
-            s.table
-                .csv(rows, &self.prefs, Some(("Keyword Preview", &data.previews)))
+        let csv = (ev.csv || ev.csv_selection).then(|| {
+            s.table.csv(
+                rows,
+                &self.prefs,
+                Some(("Keyword Preview", &data.previews)),
+                ev.csv_selection,
+            )
         });
         self.file_table_actions(&ctx, &case, rows, &ev, csv);
         let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
@@ -883,7 +957,8 @@ impl PostmortemApp {
             hash_sets: &self.persisted.ingest.hash_lookup.sets,
         };
         let ev = s.table.ui(ui, rows, &self.prefs, menus);
-        let csv = ev.csv.then(|| s.table.csv(rows, &self.prefs, None));
+        let csv = (ev.csv || ev.csv_selection)
+            .then(|| s.table.csv(rows, &self.prefs, None, ev.csv_selection));
         self.file_table_actions(&ctx, &case, rows, &ev, csv);
         let content = |r: &FileRow| Content::from_case(Arc::clone(&case), r.clone());
         if let Some(r) = ev.selected.and_then(|i| rows.get(i)) {

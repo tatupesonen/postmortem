@@ -1,6 +1,7 @@
 //! Result table: a virtualised, sortable listing of files.
 
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 
 use egui_extras::{Column, TableBuilder};
 
@@ -134,22 +135,36 @@ pub(crate) fn sorted_indices(rows: &[FileRow], col: Col, ascending: bool) -> Vec
     idx
 }
 
-/// Table interaction results for the caller.
+/// Table interaction results for the caller. Row actions apply to every
+/// selected row (`Vec`s, in display order); viewing actions to the row
+/// clicked.
 #[derive(Debug, Default)]
 pub(crate) struct TableEvents {
     pub(crate) selected: Option<usize>,
     pub(crate) activated: Option<usize>,
     pub(crate) popout: Option<usize>,
-    pub(crate) export: Option<usize>,
+    /// Extract File(s).
+    pub(crate) export: Vec<usize>,
     pub(crate) timeline: Option<usize>,
     /// Open in External Viewer.
     pub(crate) external: Option<usize>,
     /// Export Table to CSV.
     pub(crate) csv: bool,
-    /// Add File to Hash Set: the row and the set's path.
-    pub(crate) add_hash: Option<(usize, std::path::PathBuf)>,
-    /// A tag menu choice for a row.
-    pub(crate) tag: Option<(usize, TagRequest)>,
+    /// Export only the selected rows to CSV.
+    pub(crate) csv_selection: bool,
+    /// Add File(s) to Hash Set: the rows and the set's path.
+    pub(crate) add_hash: Option<(Vec<usize>, std::path::PathBuf)>,
+    /// A tag menu choice for the selected rows.
+    pub(crate) tag: Option<(Vec<usize>, TagRequest)>,
+    /// The selected rows this frame (for shortcuts such as Ctrl+B).
+    pub(crate) marked: Vec<usize>,
+}
+
+/// A row's identity in a listing: inode and stream.
+type RowKey = (u64, Option<u32>);
+
+fn key_of(r: &FileRow) -> RowKey {
+    (r.inode, r.stream)
 }
 
 /// What the row context menu offers beyond the built-in actions.
@@ -167,8 +182,16 @@ pub(crate) struct RowMenus<'a> {
 pub struct TableState {
     pub sort: Col,
     pub ascending: bool,
+    /// The focused row (shown in the viewer).
     #[serde(skip)]
-    pub selected: Option<(u64, Option<u32>)>,
+    pub selected: Option<RowKey>,
+    /// Every selected row (Ctrl+click, Shift+click, Ctrl+A), including
+    /// the focused one.
+    #[serde(skip)]
+    marked: BTreeSet<RowKey>,
+    /// Where a Shift selection starts.
+    #[serde(skip)]
+    anchor: Option<RowKey>,
     #[serde(skip)]
     order: Option<(usize, Col, bool, Vec<usize>)>,
 }
@@ -179,6 +202,8 @@ impl Default for TableState {
             sort: Col::Name,
             ascending: true,
             selected: None,
+            marked: BTreeSet::new(),
+            anchor: None,
             order: None,
         }
     }
@@ -188,7 +213,60 @@ impl TableState {
     /// Clears the selection and cached order when the listing changes.
     pub fn reset(&mut self) {
         self.selected = None;
+        self.marked.clear();
+        self.anchor = None;
         self.order = None;
+    }
+
+    /// Selects only `key`.
+    fn select_one(&mut self, key: RowKey) {
+        self.selected = Some(key);
+        self.marked = BTreeSet::from([key]);
+        self.anchor = Some(key);
+    }
+
+    /// Ctrl+click: adds or removes `key`, which gets the focus.
+    fn toggle(&mut self, key: RowKey) {
+        if self.marked.is_empty()
+            && let Some(s) = self.selected
+        {
+            self.marked.insert(s);
+        }
+        if !self.marked.remove(&key) {
+            self.marked.insert(key);
+        }
+        self.selected = Some(key);
+        self.anchor = Some(key);
+    }
+
+    /// Shift+click / Shift+arrow: the rows from the anchor to display
+    /// position `to` (added to the selection when `add`).
+    fn select_range(&mut self, rows: &[FileRow], order: &[usize], to: usize, add: bool) {
+        let pos = |k: RowKey| {
+            order
+                .iter()
+                .position(|&i| rows.get(i).is_some_and(|r| key_of(r) == k))
+        };
+        let from = self.anchor.and_then(pos).unwrap_or(to);
+        let (lo, hi) = (from.min(to), from.max(to));
+        if !add {
+            self.marked.clear();
+        }
+        for p in lo..=hi {
+            if let Some(r) = order.get(p).and_then(|&i| rows.get(i)) {
+                self.marked.insert(key_of(r));
+            }
+        }
+        self.selected = order.get(to).and_then(|&i| rows.get(i)).map(key_of);
+        if self.anchor.is_none() {
+            self.anchor = self.selected;
+        }
+    }
+
+    /// Whether `r` is selected.
+    fn is_marked(&self, r: &FileRow) -> bool {
+        let k = key_of(r);
+        self.marked.contains(&k) || (self.marked.is_empty() && self.selected == Some(k))
     }
 
     /// Draws the table.
@@ -232,14 +310,25 @@ impl TableState {
                 .iter()
                 .position(|&i| rows.get(i).is_some_and(|r| (r.inode, r.stream) == s))
         });
-        let (down, up, enter) = ui.input(|i| {
+        let (down, up, enter, shift) = ui.input(|i| {
             (
                 i.key_pressed(egui::Key::ArrowDown),
                 i.key_pressed(egui::Key::ArrowUp),
                 i.key_pressed(egui::Key::Enter),
+                i.modifiers.shift,
             )
         });
         let mut scroll_to = None;
+        if !ui.ctx().egui_wants_keyboard_input()
+            && !order.is_empty()
+            && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::A))
+        {
+            // Ctrl+A: every row; the focus stays.
+            self.marked = rows.iter().map(key_of).collect();
+            if self.selected.is_none() {
+                self.selected = order.first().and_then(|&i| rows.get(i)).map(key_of);
+            }
+        }
         if !ui.ctx().egui_wants_keyboard_input() && !order.is_empty() {
             let next = match (down, up, sel_pos) {
                 (true, _, Some(p)) => Some((p + 1).min(order.len() - 1)),
@@ -250,7 +339,11 @@ impl TableState {
             let target =
                 next.and_then(|p| order.get(p).and_then(|&i| rows.get(i).map(|r| (p, i, r))));
             if let Some((p, i, r)) = target {
-                self.selected = Some((r.inode, r.stream));
+                if shift {
+                    self.select_range(rows, &order, p, false);
+                } else {
+                    self.select_one(key_of(r));
+                }
                 ev.selected = Some(i);
                 scroll_to = Some(p);
             } else if enter {
@@ -323,8 +416,7 @@ impl TableState {
                         else {
                             return;
                         };
-                        let is_sel = self.selected == Some((r.inode, r.stream));
-                        row.set_selected(is_sel);
+                        row.set_selected(self.is_marked(r));
                         let deleted = r.deleted();
                         let color = |ui: &egui::Ui| {
                             if deleted {
@@ -395,24 +487,51 @@ impl TableState {
                         });
                         let resp = row.response();
                         if resp.clicked() {
-                            self.selected = Some((r.inode, r.stream));
+                            let m = resp.ctx.input(|i| i.modifiers);
+                            if m.shift {
+                                self.select_range(rows, &order, row.index(), m.command);
+                            } else if m.command {
+                                self.toggle(key_of(r));
+                            } else {
+                                self.select_one(key_of(r));
+                            }
                             ev.selected = Some(i);
                         }
                         if resp.double_clicked() {
                             ev.activated = Some(i);
                         }
                         resp.context_menu(|ui| {
-                            self.selected = Some((r.inode, r.stream));
+                            // Right-clicking outside the selection selects
+                            // that row; inside it, actions take them all.
+                            if !self.is_marked(r) {
+                                self.select_one(key_of(r));
+                            }
+                            self.selected = Some(key_of(r));
                             ev.selected = Some(i);
+                            let marked = self.marked_rows_in(rows, &order);
+                            let n = marked.len();
+                            let files = |one: &str, many: &str| {
+                                if n > 1 {
+                                    format!("{many} ({n} files)")
+                                } else {
+                                    one.to_owned()
+                                }
+                            };
                             if ui.button("Open in New Window").clicked() {
                                 ev.popout = Some(i);
                                 ui.close();
                             }
+                            let any_file = marked
+                                .iter()
+                                .any(|&m| rows.get(m).is_some_and(|r| !r.is_dir()));
                             if ui
-                                .add_enabled(!r.is_dir(), egui::Button::new("Extract File…"))
+                                .add_enabled(
+                                    any_file,
+                                    egui::Button::new(files("Extract File…", "Extract Files…")),
+                                )
                                 .clicked()
                             {
-                                ev.export = Some(i);
+                                ev.export.clone_from(&marked);
                                 ui.close();
                             }
                             let has_time = r
@@ -447,43 +566,72 @@ impl TableState {
                                 ev.csv = true;
                                 ui.close();
                             }
-                            if !r.is_dir()
-                                && r.file_id().is_some()
-                                && let Some(path) = hash_set_menu(ui, menus.hash_sets)
+                            if n > 1
+                                && ui
+                                    .button(format!("Export Selected Rows to CSV… ({n} rows)"))
+                                    .clicked()
                             {
-                                ev.add_hash = Some((i, path));
+                                ev.csv_selection = true;
+                                ui.close();
+                            }
+                            if any_file
+                                && r.file_id().is_some()
+                                && let Some(path) = hash_set_menu(
+                                    ui,
+                                    &files("Add File to Hash Set", "Add Files to Hash Set"),
+                                    menus.hash_sets,
+                                )
+                            {
+                                ev.add_hash = Some((marked.clone(), path));
                             }
                             if let Some(cat) = tags.filter(|_| r.file_id().is_some()) {
                                 ui.separator();
-                                if let Some(t) = crate::tags_ui::add_menu(ui, "Add File Tag", cat) {
-                                    ev.tag = Some((i, t));
+                                if let Some(t) = crate::tags_ui::add_menu(
+                                    ui,
+                                    &files("Add File Tag", "Add File Tag"),
+                                    cat,
+                                ) {
+                                    ev.tag = Some((marked.clone(), t));
                                 }
                                 let on_row = r
                                     .annotations
                                     .as_ref()
                                     .map(|a| a.tags.as_slice())
                                     .unwrap_or_default();
-                                if let Some(t) =
-                                    crate::tags_ui::remove_menu(ui, "Remove File Tag", on_row)
-                                {
-                                    ev.tag = Some((i, t));
+                                if let Some(t) = crate::tags_ui::remove_menu(
+                                    ui,
+                                    &files("Remove File Tag", "Remove File Tag"),
+                                    on_row,
+                                ) {
+                                    ev.tag = Some((marked.clone(), t));
                                 }
                             }
                         });
                     });
                 });
         });
+        ev.marked = self.marked_rows_in(rows, &order);
         ev
+    }
+
+    /// [`Self::marked_rows`] for a known display order.
+    fn marked_rows_in(&self, rows: &[FileRow], order: &[usize]) -> Vec<usize> {
+        order
+            .iter()
+            .copied()
+            .filter(|&i| rows.get(i).is_some_and(|r| self.is_marked(r)))
+            .collect()
     }
 }
 
 /// Autopsy's "Add File to Hash Set" submenu: the updateable sets.
 fn hash_set_menu(
     ui: &mut egui::Ui,
+    title: &str,
     sets: &[pm_modules::hash_lookup::HashSetConfig],
 ) -> Option<std::path::PathBuf> {
     let mut chosen = None;
-    ui.menu_button("Add File to Hash Set", |ui| {
+    ui.menu_button(title, |ui| {
         let mut any = false;
         for set in sets.iter().filter(|s| s.updateable()) {
             any = true;
@@ -507,6 +655,7 @@ impl TableState {
         rows: &[FileRow],
         prefs: &DisplayPrefs,
         extra: Option<(&str, &[String])>,
+        selected_only: bool,
     ) -> String {
         let order = match &self.order {
             Some((k, ..)) if *k == rows.as_ptr() as usize => {
@@ -527,6 +676,9 @@ impl TableState {
         line(&mut head.into_iter());
         for i in order {
             let Some(r) = rows.get(i) else { continue };
+            if selected_only && !self.is_marked(r) {
+                continue;
+            }
             let times = r.meta.as_ref().map(|m| m.times).unwrap_or_default();
             let alloc = |a: bool| if a { "Allocated" } else { "Unallocated" }.to_owned();
             let mut cells = vec![r.name.clone()];
@@ -564,6 +716,38 @@ pub(crate) fn csv_field(s: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    fn listed(n: u64) -> Vec<FileRow> {
+        (0..n).map(|i| row(&format!("f{i}"), false, i)).collect()
+    }
+
+    #[test]
+    fn selection_click_toggle_and_range() {
+        let rows = listed(5);
+        let order: Vec<usize> = (0..5).collect();
+        let mut t = TableState::default();
+        t.select_one(key_of(&rows[1]));
+        assert_eq!(t.marked_rows_in(&rows, &order), [1]);
+        // Ctrl+click adds; the clicked row becomes the Shift anchor.
+        t.toggle(key_of(&rows[3]));
+        assert_eq!(t.marked_rows_in(&rows, &order), [1, 3]);
+        // Shift+click: anchor (3) to 0.
+        t.select_range(&rows, &order, 0, false);
+        assert_eq!(t.marked_rows_in(&rows, &order), [0, 1, 2, 3]);
+        assert_eq!(t.selected, Some(key_of(&rows[0])));
+        // Ctrl+click again removes.
+        t.toggle(key_of(&rows[1]));
+        assert_eq!(t.marked_rows_in(&rows, &order), [0, 2, 3]);
+        // Ctrl+Shift adds a range to the selection.
+        t.select_one(key_of(&rows[4]));
+        t.select_range(&rows, &order, 4, true);
+        assert_eq!(t.marked_rows_in(&rows, &order), [4]);
+        t.reset();
+        assert!(t.marked_rows_in(&rows, &order).is_empty());
+        // A focused row alone counts as selected.
+        t.selected = Some(key_of(&rows[2]));
+        assert_eq!(t.marked_rows_in(&rows, &order), [2]);
+    }
     use pm_fs::{FileKind, Metadata};
 
     fn row(name: &str, dir: bool, size: u64) -> FileRow {
@@ -629,7 +813,7 @@ mod tests {
             ascending: false,
             ..TableState::default()
         };
-        let csv = t.csv(&rows, &DisplayPrefs::default(), None);
+        let csv = t.csv(&rows, &DisplayPrefs::default(), None, false);
         let lines: Vec<&str> = csv.lines().collect();
         assert!(lines[0].starts_with("\"Name\",\"S\",\"C\",\"Modified Time\""));
         assert!(lines[1].starts_with("\"a,b.txt\""));
