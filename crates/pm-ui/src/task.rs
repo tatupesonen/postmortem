@@ -2,8 +2,10 @@
 //!
 //! The UI thread never performs evidence IO beyond tiny reads. Anything that
 //! can take time (opening images, listing directories, extracting strings,
-//! decoding pictures) runs on the rayon pool as a [`Task`]; the UI polls
-//! it each frame and egui is woken when the result arrives.
+//! decoding pictures) runs as a [`Task`] on the UI's own small thread pool;
+//! the UI polls it each frame and egui is woken when the result arrives.
+//! The pool is separate from rayon's global pool, which ingest keeps busy:
+//! queued behind ingest work, a directory listing could wait for minutes.
 
 use std::sync::Arc;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -11,6 +13,23 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use parking_lot::Mutex;
 
 static RUNNING: AtomicUsize = AtomicUsize::new(0);
+
+/// Threads of the UI pool: queries are mostly IO-bound and short.
+const UI_THREADS: usize = 4;
+
+/// The UI pool (`None` if its threads could not be started: tasks then
+/// share the global pool).
+fn pool() -> Option<&'static rayon::ThreadPool> {
+    static POOL: std::sync::OnceLock<Option<rayon::ThreadPool>> = std::sync::OnceLock::new();
+    POOL.get_or_init(|| {
+        rayon::ThreadPoolBuilder::new()
+            .num_threads(UI_THREADS)
+            .thread_name(|i| format!("pm-ui-task-{i}"))
+            .build()
+            .ok()
+    })
+    .as_ref()
+}
 
 /// Number of background tasks currently running (for the status bar).
 pub(crate) fn running() -> usize {
@@ -33,13 +52,17 @@ impl<T: Send + 'static> Task<T> {
         // Wake the window that asked (pop-outs are separate viewports).
         let viewport = ctx.viewport_id();
         RUNNING.fetch_add(1, Ordering::Relaxed);
-        rayon::spawn(move || {
+        let job = move || {
             let v = f();
             *out.lock() = Some(v);
             RUNNING.fetch_sub(1, Ordering::Relaxed);
             ctx.request_repaint_of(viewport);
             ctx.request_repaint();
-        });
+        };
+        match pool() {
+            Some(p) => p.spawn(job),
+            None => rayon::spawn(job),
+        }
         Self::Pending(slot)
     }
 
