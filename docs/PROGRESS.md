@@ -4,24 +4,29 @@
 
 Read `docs/DIRECTION.md` first (owner decisions and working rules).
 
-ADR-023 step 1 is done (de1801a: every view reads the case DB;
-`pm-index` deleted). Next: release v0.1.2 (dist profile: fat LTO,
-stripped), then ADR-023 steps 2–6 (case change bus, split `app.rs`, UI
-task pool, rename the `pm-casedb` query layer, module API migration,
-ingest memory), the Postgres dialect layer (ADR-024), and the
-analyst-workflow features (`BEYOND-AUTOPSY.md` §8, starting with
-multi-select in tables).
+Released v0.2.0 (2026-10-18): all of Autopsy's data source processors
+(Local Disk, Logical Files with native L01, Unallocated Space Image,
+XRY Text Export, Logical Imager Results), the Add Data Source type page,
+`postmortem ingest --disk/--logical/--unalloc/--xry/--imager`, the Windows
+exe icon, and a change-bus fix (changes were published from SQLite's
+commit hook before the commit was visible, which caused the intermittent
+"UI did not settle" failures). Releases are now tagged per feature
+(semver, `DIRECTION.md`).
 
-Also queued:
+Next:
+* Time-zone warning after Recent Activity (DIRECTION.md): map the
+  Windows zone (draft table of CLDR `windowsZones` in the scratchpad,
+  goes to `pm-winartifacts`), compare by offsets with the data source's
+  zone, offer to switch; switching re-reads FAT/exFAT times through
+  `FileSystem::metadata` with the new zone (exFAT entries with their own
+  UTC offset must not move).
+* ADR-023 steps 3–6 (split `app.rs`, UI task pool, rename the
+  `pm-casedb` query layer, module API migration, ingest memory), the
+  Postgres dialect layer (ADR-024), and the analyst-workflow features
+  (`BEYOND-AUTOPSY.md` §8, starting with multi-select in tables).
 * `postmortem ingest --only <ids>` to re-run modules on existing data
-  sources; then re-run Recent Activity on the owner's cases in
-  `~/postmortem/Cases` (bad Windows 10 jump-list dates, fixed in 3f83fcc).
-* Time-zone warning after Recent Activity (DIRECTION.md).
-
-Done recently (2026-10-18): DB timeline (5c40373), artifact timeline
-events (fd63f70), jump-list fix (3f83fcc), gallery on DB with MD5 dedup
-(0d1479b), hash sets/CSV/external viewer/delete case (6f7eaf4), CVT
-(e156ca3), `postmortem ingest` CLI.
+  sources.
+* EWF2 (Ex01/Lx01) reader.
 
 ## 2026-10-15: parallel parity push (goal: all Autopsy features, tested)
 
