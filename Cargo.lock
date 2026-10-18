@@ -5020,7 +5020,7 @@ dependencies = [
 
 [[package]]
 name = "pm-archive"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "bzip2",
  "chardetng",
@@ -5046,7 +5046,7 @@ dependencies = [
 
 [[package]]
 name = "pm-browser"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "flate2",
  "plist",
@@ -5063,7 +5063,7 @@ dependencies = [
 
 [[package]]
 name = "pm-carve"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "crc32fast",
  "flate2",
@@ -5079,7 +5079,7 @@ dependencies = [
 
 [[package]]
 name = "pm-case"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "crossbeam-channel",
  "jiff",
@@ -5106,7 +5106,7 @@ dependencies = [
 
 [[package]]
 name = "pm-casedb"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "parking_lot",
@@ -5121,7 +5121,7 @@ dependencies = [
 
 [[package]]
 name = "pm-core"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "proptest",
@@ -5131,7 +5131,7 @@ dependencies = [
 
 [[package]]
 name = "pm-discovery"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "pm-casedb",
  "pm-core",
@@ -5140,7 +5140,7 @@ dependencies = [
 
 [[package]]
 name = "pm-email"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "base64 0.22.1",
  "mail-parser",
@@ -5149,7 +5149,7 @@ dependencies = [
 
 [[package]]
 name = "pm-encryption"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "aes 0.9.3",
  "flate2",
@@ -5166,7 +5166,7 @@ dependencies = [
 
 [[package]]
 name = "pm-evidence"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "fatfs",
  "jiff",
@@ -5186,7 +5186,7 @@ dependencies = [
 
 [[package]]
 name = "pm-evtlog"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "evtx",
  "fancy-regex",
@@ -5202,7 +5202,7 @@ dependencies = [
 
 [[package]]
 name = "pm-filetype"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "flate2",
  "memchr",
@@ -5218,7 +5218,7 @@ dependencies = [
 
 [[package]]
 name = "pm-fs"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "bitflags 2.13.2",
  "jiff",
@@ -5230,7 +5230,7 @@ dependencies = [
 
 [[package]]
 name = "pm-fs-exfat"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "flate2",
  "jiff",
@@ -5246,7 +5246,7 @@ dependencies = [
 
 [[package]]
 name = "pm-fs-ext"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "pm-core",
@@ -5261,7 +5261,7 @@ dependencies = [
 
 [[package]]
 name = "pm-fs-fat"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "fatfs",
  "jiff",
@@ -5277,7 +5277,7 @@ dependencies = [
 
 [[package]]
 name = "pm-fs-ntfs"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "ntfs",
@@ -5293,7 +5293,7 @@ dependencies = [
 
 [[package]]
 name = "pm-geo"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "pm-casedb",
@@ -5305,7 +5305,7 @@ dependencies = [
 
 [[package]]
 name = "pm-hashdb"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "parking_lot",
  "pm-core",
@@ -5318,7 +5318,7 @@ dependencies = [
 
 [[package]]
 name = "pm-image"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "flate2",
  "jiff",
@@ -5337,7 +5337,7 @@ dependencies = [
 
 [[package]]
 name = "pm-ingest"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "crossbeam-channel",
  "jiff",
@@ -5355,7 +5355,7 @@ dependencies = [
 
 [[package]]
 name = "pm-lnk"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "pm-core",
@@ -5367,7 +5367,7 @@ dependencies = [
 
 [[package]]
 name = "pm-mcp"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "base64 0.22.1",
  "bytes",
@@ -5400,7 +5400,7 @@ dependencies = [
 
 [[package]]
 name = "pm-modules"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "encoding_rs",
  "fatfs",
@@ -5447,7 +5447,7 @@ dependencies = [
 
 [[package]]
 name = "pm-plugin-api"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "serde",
  "serde_json",
@@ -5456,7 +5456,7 @@ dependencies = [
 
 [[package]]
 name = "pm-plugin-sdk"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "pm-plugin-api",
  "serde_json",
@@ -5465,7 +5465,7 @@ dependencies = [
 
 [[package]]
 name = "pm-plugin-wasm"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "parking_lot",
  "pm-plugin-api",
@@ -5481,7 +5481,7 @@ dependencies = [
 
 [[package]]
 name = "pm-prefetch"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "pm-core",
@@ -5492,7 +5492,7 @@ dependencies = [
 
 [[package]]
 name = "pm-registry"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "pm-core",
@@ -5504,7 +5504,7 @@ dependencies = [
 
 [[package]]
 name = "pm-report"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "pm-case",
@@ -5523,7 +5523,7 @@ dependencies = [
 
 [[package]]
 name = "pm-rules"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "proptest",
  "regex",
@@ -5535,7 +5535,7 @@ dependencies = [
 
 [[package]]
 name = "pm-search"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "aho-corasick",
  "csv",
@@ -5560,7 +5560,7 @@ dependencies = [
 
 [[package]]
 name = "pm-testkit"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "bzip2",
  "crc32fast",
@@ -5582,7 +5582,7 @@ dependencies = [
 
 [[package]]
 name = "pm-text"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "cfb",
  "chardetng",
@@ -5604,7 +5604,7 @@ dependencies = [
 
 [[package]]
 name = "pm-timeline"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "pm-case",
@@ -5617,7 +5617,7 @@ dependencies = [
 
 [[package]]
 name = "pm-ui"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "eframe",
  "egui",
@@ -5658,7 +5658,7 @@ dependencies = [
 
 [[package]]
 name = "pm-volume"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "crc32fast",
  "pm-core",
@@ -5673,7 +5673,7 @@ dependencies = [
 
 [[package]]
 name = "pm-winartifacts"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "jiff",
  "pm-core",
@@ -5780,7 +5780,7 @@ dependencies = [
 
 [[package]]
 name = "postmortem"
-version = "0.2.5"
+version = "0.2.6"
 dependencies = [
  "pm-mcp",
  "pm-ui",
