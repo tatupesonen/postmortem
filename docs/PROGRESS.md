@@ -4,23 +4,29 @@
 
 Read `docs/DIRECTION.md` first (owner decisions and working rules).
 
-Released v0.2.0 (2026-10-18): all of Autopsy's data source processors
-(Local Disk, Logical Files with native L01, Unallocated Space Image,
-XRY Text Export, Logical Imager Results), the Add Data Source type page,
-`postmortem ingest --disk/--logical/--unalloc/--xry/--imager`, the Windows
-exe icon, and a change-bus fix (changes were published from SQLite's
-commit hook before the commit was visible, which caused the intermittent
-"UI did not settle" failures). Releases are now tagged per feature
-(semver, `DIRECTION.md`).
+Releases since 0.2.0 (2026-10-18; tags per feature, semver in
+`DIRECTION.md`):
+* 0.2.1: time-zone warning after Recent Activity (switch re-reads
+  FAT/exFAT times), Windows local disks (sector-aligned device reads).
+* 0.2.2: multi-select in file and result tables, keyword-index memory
+  bound (peak heap 1.55 → 0.8 GB on the Greg image), UI task pool,
+  rows without inodes no longer select together, `app.rs` split into
+  `app/`, components own their change handling, `pm_casedb::query`.
+* 0.2.3: command palette (Ctrl+K, `file:N` / `artifact:N`), keyboard
+  shortcuts (Ctrl+E/F/1–9, J/K, 1–9 tags, Help › Keyboard Shortcuts).
+* 0.2.4: Pivot window, Notes with findings in the HTML report
+  (schema v4), tree nodes keep their open state.
+
+Machine notes: heavy jobs run through `~/slop/heavy.sh` (own systemd
+unit, memory capped); systemd-oomd killed the terminal scope otherwise.
 
 Next:
-* ADR-023 steps 3–6 (split `app.rs`, UI task pool, rename the
-  `pm-casedb` query layer, module API migration, ingest memory), the
-  Postgres dialect layer (ADR-024), and the analyst-workflow features
-  (`BEYOND-AUTOPSY.md` §8, starting with multi-select in tables).
-* `postmortem ingest --only <ids>` to re-run modules on existing data
-  sources.
-* EWF2 (Ex01/Lx01) reader.
+* Analyst workflow (`BEYOND-AUTOPSY.md` §8): triage dashboard, saved
+  filters, review state, timeline context, IOC import.
+* ADR-023 item 5 (module API migration; needs plugin API additions: known
+  status, data-source time zone, random-access reads), the Postgres
+  dialect layer (ADR-024).
+* `postmortem ingest --only <ids>`; EWF2 (Ex01/Lx01) reader.
 
 ## 2026-10-15: parallel parity push (goal: all Autopsy features, tested)
 
