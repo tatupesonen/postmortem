@@ -1941,3 +1941,72 @@ fn context_tab_shows_download_source() {
     click_exact(&mut h, "Go to Result");
     settle(&mut h, |h| h.query_by_label_contains("1 results").is_some());
 }
+
+/// A case with a logical-files source holding `places.db`, whose rows
+/// are still in its write-ahead log (`places.db-wal`).
+fn case_with_sqlite(name: &str) -> PathBuf {
+    let dir = CASES.path().join(name);
+    let files = CASES.path().join(format!("{name}-files"));
+    std::fs::create_dir_all(&files).unwrap();
+    {
+        let c = rusqlite::Connection::open(files.join("places.db")).unwrap();
+        c.execute_batch(
+            "PRAGMA journal_mode = WAL; PRAGMA wal_autocheckpoint = 0;
+             CREATE TABLE visits (id INTEGER, url TEXT, visit_time INTEGER);
+             CREATE TABLE empty_one (x TEXT);",
+        )
+        .unwrap();
+        for i in 0..150 {
+            c.execute(
+                "INSERT INTO visits VALUES (?1, ?2, 1600000000)",
+                rusqlite::params![i, format!("https://site{i}.example/")],
+            )
+            .unwrap();
+        }
+        // Keep the WAL: a closing connection would checkpoint it.
+        std::mem::forget(c);
+    }
+    let case = pm_case::Case::create(&dir, pm_case::CaseDetails::default()).unwrap();
+    pm_case::add_logical_files(
+        &case,
+        &[files],
+        &pm_case::LogicalOptions {
+            name: Some("Browser".into()),
+            ..Default::default()
+        },
+        &pm_case::LoadProgress::default(),
+    )
+    .unwrap();
+    dir.join("case.pmcase")
+}
+
+/// Autopsy's SQLite viewer: tables, 100-row pages, rows from the WAL,
+/// and a column shown as dates.
+#[test]
+#[ignore = "WIP: clicking the logical set in the tree does not open it yet (see PROGRESS.md)"]
+fn sqlite_viewer_pages_tables() {
+    let dir = case_with_sqlite("sqlite-viewer");
+    let mut h = harness_with(vec![dir], false);
+    h.set_size(egui::vec2(1400.0, 1100.0));
+    settle(&mut h, |h| h.state().data_source_count() > 0);
+    click_exact(&mut h, "🖴 Browser");
+    click(&mut h, "sqlite-viewer-files");
+    click(&mut h, "places.db");
+    settle(&mut h, |h| h.query_by_label("150 entries").is_some());
+    h.get_by_label("1 of 2");
+    h.get_by_label("https://site0.example/");
+    h.get_by_label("Next page").click();
+    h.run_steps(2);
+    settle(&mut h, |h| h.query_by_label("https://site100.example/").is_some());
+    h.get_by_label("2 of 2");
+    h.get_by_label("visit_time").click_secondary();
+    h.run_steps(2);
+    click_exact(&mut h, "Date (Unix seconds)");
+    settle(&mut h, |h| {
+        h.query_all_by_label("2020-09-13 12:26:40 UTC").next().is_some()
+    });
+    shot(&mut h, "sqlite_viewer");
+    click_exact(&mut h, "visits");
+    click_exact(&mut h, "empty_one");
+    settle(&mut h, |h| h.query_by_label("0 entries").is_some());
+}

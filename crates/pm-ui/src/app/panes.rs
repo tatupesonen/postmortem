@@ -15,7 +15,8 @@ use crate::task::Task;
 use crate::viewers::ViewerPanel;
 use crate::views::View;
 
-use super::{Listing, Popout, PostmortemApp, ResultTab, add_to_hash_set, copy_out};
+use super::{Listing, Popout, PostmortemApp, ResultTab, add_to_hash_set};
+use crate::model::copy_out;
 
 /// File and keyword searches, each in its own result tab.
 #[derive(Debug)]

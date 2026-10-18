@@ -9,6 +9,7 @@ mod hex;
 mod image_view;
 mod metadata;
 pub(crate) mod related;
+mod sqlite;
 mod strings;
 mod text;
 
@@ -71,6 +72,7 @@ impl Tab {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Sniffed {
     Picture,
+    Sqlite,
     Text,
     Binary,
     Empty,
@@ -83,6 +85,9 @@ pub(crate) fn sniff(head: &[u8]) -> Sniffed {
     }
     if image_view::is_picture(head) {
         return Sniffed::Picture;
+    }
+    if sqlite::is_sqlite(head) {
+        return Sniffed::Sqlite;
     }
     let sample = head.get(..4096).unwrap_or(head);
     let printable = sample
@@ -149,6 +154,7 @@ pub(crate) struct ViewerPanel {
     /// The keyword search whose hits the Extracted Text viewer marks.
     query: Option<pm_search::TextQuery>,
     image: ImageView,
+    sqlite: sqlite::SqliteView,
     /// Loaded in the background (the case database is never read on the
     /// UI thread); `None` until requested.
     info: Option<crate::task::Task<Option<CaseFileInfo>>>,
@@ -177,6 +183,7 @@ impl Default for ViewerPanel {
             extracted: ExtractedView::default(),
             query: None,
             image: ImageView::default(),
+            sqlite: sqlite::SqliteView::default(),
             info: None,
             hashes_stale: false,
             related: related::RelatedView::default(),
@@ -299,7 +306,7 @@ impl ViewerPanel {
                 .content
                 .as_ref()
                 .is_some_and(|c| !c.row.is_dir() && (c.case_file().is_some() || self.info_ready())),
-            Tab::Application => self.kind == Sniffed::Picture,
+            Tab::Application => matches!(self.kind, Sniffed::Picture | Sniffed::Sqlite),
             Tab::Results | Tab::Annotations => self.case_file_id().is_some(),
             Tab::Context => self.has_context == Some(true),
             Tab::Hex | Tab::Strings | Tab::Text => {
@@ -315,7 +322,7 @@ impl ViewerPanel {
             return Tab::Extracted;
         }
         match self.kind {
-            Sniffed::Picture => Tab::Application,
+            Sniffed::Picture | Sniffed::Sqlite => Tab::Application,
             Sniffed::Text => Tab::Text,
             Sniffed::Binary => Tab::Hex,
             Sniffed::Empty => Tab::Metadata,
@@ -410,6 +417,9 @@ impl ViewerPanel {
                 }
             }
             (Tab::Text, Some(src)) => self.text.ui(ui, &src),
+            (Tab::Application, Some(src)) if self.kind == Sniffed::Sqlite => {
+                self.sqlite.ui(ui, &content, &src, prefs);
+            }
             (Tab::Application, Some(src)) => self.image.ui(ui, &src, &content.row.path),
             _ => {
                 ui.weak("No content");

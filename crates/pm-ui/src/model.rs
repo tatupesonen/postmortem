@@ -274,3 +274,20 @@ impl Content {
         }
     }
 }
+
+/// Copies a file's content to `dest`.
+pub(crate) fn copy_out(src: &dyn pm_core::io::ReadAt, dest: &std::path::Path) -> Result<(), String> {
+    let mut out = std::fs::File::create(dest).map_err(|e| format!("{}: {e}", dest.display()))?;
+    let mut buf = vec![0u8; 1 << 20];
+    let mut off = 0;
+    while off < src.size() {
+        let n = src.read_at(off, &mut buf).map_err(|e| e.to_string())?;
+        if n == 0 {
+            break;
+        }
+        std::io::Write::write_all(&mut out, buf.get(..n).unwrap_or_default())
+            .map_err(|e| e.to_string())?;
+        off += n as u64;
+    }
+    Ok(())
+}
