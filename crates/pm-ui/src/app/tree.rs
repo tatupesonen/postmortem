@@ -573,7 +573,10 @@ impl PostmortemApp {
         default_open: bool,
         children: impl FnOnce(&mut Self, &mut egui::Ui),
     ) -> egui::Response {
-        let id = ui.make_persistent_id(node);
+        // Keyed by the node alone: an id derived from the parent widgets
+        // changes whenever they do (e.g. while the tree reloads), and the
+        // node then forgets that it was opened.
+        let id = egui::Id::new(("tree-node", node));
         let selected = self.selected.as_ref() == Some(node);
         if has_children {
             let state = egui::collapsing_header::CollapsingState::load_with_default_open(
