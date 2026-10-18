@@ -209,7 +209,11 @@ otherwise.
    The time-zone warning is the dialog from item 0.2.1.
 7. **Saved filters and views** per case and globally.
 8. **Review state**: seen/reviewed marks and unseen counts per node, so a
-   case can be worked to zero.
+   case can be worked to zero. **[done for results 2026-10-18]**: schema
+   v5 `seen` table (change-bus domain Seen); selecting a result marks it
+   seen, unseen rows carry a dot, result types show "· N new" once
+   started, Mark as Seen / Unseen for selections. Files keep marks in the
+   API but listings do not show them (too noisy for whole folders).
 9. **Timeline context**: ±N minutes around any item across all sources;
    collapse repeated identical events (dozens of WMI 5858 entries in one
    second); exclude by type or text. **[done 2026-10-18]**: View in

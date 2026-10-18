@@ -32,10 +32,12 @@ pub(crate) enum Watch {
     Timeline,
     /// The examiner's notes.
     Notes,
+    /// Review state: only counts reload (rows update in place).
+    Seen,
 }
 
 impl Watch {
-    pub(crate) const ALL: [Self; 7] = [
+    pub(crate) const ALL: [Self; 8] = [
         Self::Files,
         Self::Results,
         Self::Annotations,
@@ -43,6 +45,7 @@ impl Watch {
         Self::Reports,
         Self::Timeline,
         Self::Notes,
+        Self::Seen,
     ];
 
     fn domains(self) -> &'static [Domain] {
@@ -50,6 +53,7 @@ impl Watch {
             Self::Files => &[Domain::Files],
             Self::Results => &[Domain::Artifacts],
             Self::Annotations => &[Domain::Tags, Domain::Scores],
+            Self::Seen => &[Domain::Seen],
             Self::Sources => &[Domain::DataSources, Domain::Hosts],
             Self::Reports => &[Domain::Reports],
             Self::Timeline => &[Domain::Events, Domain::Files],

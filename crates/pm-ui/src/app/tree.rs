@@ -289,7 +289,17 @@ impl PostmortemApp {
                 let node = NodeId::Results { type_id: t.type_id };
                 let icon =
                     icons::artifact(&t.name, cat == pm_casedb::catalog::Category::AnalysisResult);
-                let label = format!("{icon} {} ({})", t.display, crate::format::grouped(t.count));
+                // "N new" once the examiner has started on the type.
+                let new = if t.unseen > 0 && t.unseen < t.count {
+                    format!(" · {} new", crate::format::grouped(t.unseen))
+                } else {
+                    String::new()
+                };
+                let label = format!(
+                    "{icon} {} ({}){new}",
+                    t.display,
+                    crate::format::grouped(t.count)
+                );
                 if t.name == "KAAMOS_KEYWORD_HIT" {
                     self.keyword_hits_node(ui, &node, &label, case.as_ref(), t.count);
                 } else {

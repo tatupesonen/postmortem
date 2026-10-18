@@ -1843,3 +1843,32 @@ fn timeline_context_around_a_result() {
     });
     shot(&mut h, "timeline_context");
 }
+
+/// Review state: viewing a result marks it seen; the tree counts what is
+/// left; Mark as Unseen undoes it.
+#[test]
+fn results_are_marked_seen() {
+    let mut h = harness_with(vec![case_with_history("seen")], false);
+    h.set_size(egui::vec2(1400.0, 1000.0));
+    settle(&mut h, |h| {
+        h.state().data_source_count() > 0 && !h.state().is_loading()
+    });
+    click(&mut h, "Web History (3)");
+    settle(&mut h, |h| h.query_by_label("https://a.example/").is_some());
+    assert_eq!(h.query_all_by_label("Not seen yet").count(), 3, "all new");
+    h.get_by_label("https://a.example/").click();
+    h.run_steps(2);
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Web History (3) · 2 new")
+            .is_some()
+            && h.query_all_by_label("Not seen yet").count() == 2
+    });
+    shot(&mut h, "review_state");
+    h.get_by_label("https://a.example/").click_secondary();
+    h.run_steps(2);
+    click_exact(&mut h, "Mark as Unseen");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("2 new").is_none()
+            && h.query_all_by_label("Not seen yet").count() == 3
+    });
+}

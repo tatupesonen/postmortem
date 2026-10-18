@@ -30,12 +30,15 @@ pub(crate) struct TypeCount {
     pub(crate) display: String,
     pub(crate) category: Category,
     pub(crate) count: u64,
+    /// Results not seen yet (review state).
+    pub(crate) unseen: u64,
 }
 
 /// Loads the result types that have results, in display-name order.
 pub(crate) fn load_counts(case: &Case) -> Result<Vec<TypeCount>, String> {
     let db = case.db();
     let counts = db.artifact_counts(None).map_err(|e| e.to_string())?;
+    let unseen = db.unseen_artifact_counts(None).map_err(|e| e.to_string())?;
     let names = db.artifact_type_names().map_err(|e| e.to_string())?;
     let mut out: Vec<TypeCount> = counts
         .into_iter()
@@ -51,6 +54,7 @@ pub(crate) fn load_counts(case: &Case) -> Result<Vec<TypeCount>, String> {
                     Category::DataArtifact
                 },
                 count,
+                unseen: unseen.get(&type_id).copied().unwrap_or(0),
             })
         })
         .collect();
@@ -114,6 +118,8 @@ pub(crate) struct ResultRow {
     pub(crate) attrs: Vec<(String, AttrValue)>,
     /// Tags on the result (Remove Result Tag menu).
     pub(crate) tags: Vec<RowTag>,
+    /// The examiner has looked at it (review state).
+    pub(crate) seen: bool,
 }
 
 /// An attribute value kept typed so times follow the display preference.
@@ -193,6 +199,9 @@ pub(crate) fn load_rows(case: &Case, key: &ResultKey) -> Result<ResultRows, Stri
     };
     let ids: Vec<i64> = arts.iter().take(MAX_ROWS).map(|a| a.id).collect();
     let tags = db.artifact_tags_of(&ids).map_err(|e| e.to_string())?;
+    let seen = db
+        .seen_of(pm_casedb::ObjKind::Artifact, &ids)
+        .map_err(|e| e.to_string())?;
     for artifact in arts.into_iter().take(MAX_ROWS) {
         let attrs: Vec<(String, AttrValue)> = db
             .attributes(artifact.id)
@@ -228,6 +237,7 @@ pub(crate) fn load_rows(case: &Case, key: &ResultKey) -> Result<ResultRows, Stri
             })
             .collect();
         out.rows.push(ResultRow {
+            seen: seen.contains(&artifact.id),
             artifact,
             file,
             attrs,
@@ -362,6 +372,9 @@ pub(crate) enum TagFor {
 #[derive(Debug, Default)]
 pub(crate) struct ResultEvents {
     pub(crate) clicked: Option<usize>,
+    /// The row the examiner opened (primary click or reveal; not the
+    /// context menu, which reports its row every frame it is open).
+    pub(crate) opened: Option<usize>,
     /// A tag menu choice for the selected rows.
     pub(crate) tag: Option<(Vec<usize>, TagFor, TagRequest)>,
     /// The selected rows this frame (for Ctrl+B).
@@ -372,6 +385,8 @@ pub(crate) struct ResultEvents {
     pub(crate) note: Option<usize>,
     /// View in Timeline around the row's time: (time, seconds either side).
     pub(crate) timeline: Option<(i64, i64)>,
+    /// Mark the selected rows seen (`true`) or unseen.
+    pub(crate) mark_seen: Option<(Vec<usize>, bool)>,
 }
 
 /// A sortable, horizontally scrolling table of results.
@@ -384,9 +399,23 @@ pub(crate) struct ResultTable {
     sel: crate::selection::Selection<i64>,
     /// A result to focus and scroll to once its row appears.
     reveal: Option<i64>,
+    /// Review state changed since the rows were loaded, by artifact id.
+    seen: std::collections::HashMap<i64, bool>,
 }
 
 impl ResultTable {
+    /// Shows `ids` as seen or unseen without reloading the rows.
+    pub(crate) fn set_seen(&mut self, ids: &[i64], seen: bool) {
+        for id in ids {
+            self.seen.insert(*id, seen);
+        }
+    }
+
+    /// Whether a row is seen, counting changes made since it loaded.
+    pub(crate) fn is_seen(&self, r: &ResultRow) -> bool {
+        self.seen.get(&r.artifact.id).copied().unwrap_or(r.seen)
+    }
+
     /// Focuses result `artifact_id` (and scrolls to it) when it is shown.
     pub(crate) fn reveal(&mut self, artifact_id: i64) {
         self.reveal = Some(artifact_id);
@@ -444,6 +473,7 @@ impl ResultTable {
             self.reveal = None;
             self.sel.select_one(id);
             ev.clicked = order.get(p).copied();
+            ev.opened = ev.clicked;
             scroll_to = Some(p);
         }
         let mut sort = self.sort;
@@ -482,14 +512,38 @@ impl ResultTable {
                         };
                         let Some(r) = data.rows.get(i) else { return };
                         row.set_selected(self.sel.contains(r.artifact.id) || selected == Some(i));
-                        for c in &cols {
-                            row.col(|ui| cell(ui, data, r, *c, prefs));
+                        let seen_now = self.is_seen(r);
+                        for (n, c) in cols.iter().enumerate() {
+                            row.col(|ui| {
+                                // Review state: a dot on results not seen yet.
+                                if n == 0 && !seen_now {
+                                    let (rect, resp) = ui.allocate_exact_size(
+                                        egui::vec2(10.0, 10.0),
+                                        egui::Sense::hover(),
+                                    );
+                                    ui.painter().circle_filled(
+                                        rect.center(),
+                                        3.5,
+                                        ui.visuals().selection.bg_fill,
+                                    );
+                                    resp.widget_info(|| {
+                                        egui::WidgetInfo::labeled(
+                                            egui::WidgetType::Label,
+                                            true,
+                                            "Not seen yet",
+                                        )
+                                    });
+                                    resp.on_hover_text("Not seen yet");
+                                }
+                                cell(ui, data, r, *c, prefs);
+                            });
                         }
                         let resp = row.response();
                         if resp.clicked() {
                             let m = resp.ctx.input(|i| i.modifiers);
                             self.sel.click(&keys, row.index(), m);
                             ev.clicked = Some(i);
+                            ev.opened = Some(i);
                         }
                         if let Some(cat) = tags {
                             resp.context_menu(|ui| {
@@ -536,6 +590,14 @@ impl ResultTable {
                                     }
                                 }
                                 ui.separator();
+                                if ui.button(label("Mark as Seen")).clicked() {
+                                    ev.mark_seen = Some((marked.clone(), true));
+                                    ui.close();
+                                }
+                                if ui.button(label("Mark as Unseen")).clicked() {
+                                    ev.mark_seen = Some((marked.clone(), false));
+                                    ui.close();
+                                }
                                 if ui.button("Add Note…").clicked() {
                                     ev.note = Some(i);
                                     ui.close();
@@ -653,6 +715,8 @@ impl ResultData {
             }
             // Tags and scores show in the rows.
             Watch::Annotations if due.rows => self.rows.clear(),
+            // Review state: the "new" counts (rows are updated in place).
+            Watch::Seen => self.counts.invalidate(),
             _ => {}
         }
     }

@@ -919,3 +919,41 @@ fn notes_are_kept_and_marked_as_findings() {
     assert_eq!(db.notes(false).unwrap().len(), 1);
     assert!(db.note(n1).unwrap().is_none());
 }
+
+/// Review state: seen marks and unseen counts per result type.
+#[test]
+fn seen_marks_and_unseen_counts() {
+    use pm_casedb::changes::Domain;
+    let (_dir, db) = new_db();
+    let (ds, a, b) = populate(&db);
+    let web = catalog::artifact_type_id("KAAMOS_WEB_HISTORY").unwrap();
+    let w1 = db
+        .add_artifact(&data_artifact(ds, a, "KAAMOS_WEB_HISTORY"))
+        .unwrap();
+    let w2 = db
+        .add_artifact(&data_artifact(ds, b, "KAAMOS_WEB_HISTORY"))
+        .unwrap();
+    assert_eq!(db.unseen_artifact_counts(None).unwrap().get(&web), Some(&2));
+    let before = db.changes().generation(Domain::Seen);
+    db.mark_seen(ObjKind::Artifact, &[w1], "jdoe", 1).unwrap();
+    db.mark_seen(ObjKind::Artifact, &[w1], "jdoe", 2).unwrap();
+    assert!(db.changes().generation(Domain::Seen) > before);
+    assert_eq!(db.unseen_artifact_counts(None).unwrap().get(&web), Some(&1));
+    assert_eq!(
+        db.seen_of(ObjKind::Artifact, &[w1, w2]).unwrap(),
+        [w1].into_iter().collect()
+    );
+    db.mark_seen(ObjKind::File, &[a], "jdoe", 3).unwrap();
+    assert!(db.seen_of(ObjKind::File, &[a]).unwrap().contains(&a));
+    db.mark_seen(ObjKind::Artifact, &[w2], "jdoe", 4).unwrap();
+    assert_eq!(
+        db.unseen_artifact_counts(None).unwrap().get(&web),
+        None,
+        "worked to zero"
+    );
+    db.mark_unseen(ObjKind::Artifact, &[w1]).unwrap();
+    assert_eq!(
+        db.unseen_artifact_counts(Some(ds)).unwrap().get(&web),
+        Some(&1)
+    );
+}

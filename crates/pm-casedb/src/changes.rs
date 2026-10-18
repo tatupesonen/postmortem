@@ -23,7 +23,9 @@ pub enum Domain {
     Artifacts,
     /// Tag names, tag sets and file/artifact tags.
     Tags,
-    /// Aggregate scores.
+    /// Aggregate scores. The `scores` table is WITHOUT ROWID, which
+    /// SQLite's update hook skips, so this never moves on its own: every
+    /// score change comes with an artifact or tag write (Artifacts, Tags).
     Scores,
     /// Timeline events.
     Events,
@@ -41,10 +43,12 @@ pub enum Domain {
     IngestJobs,
     /// The examiner's notes.
     Notes,
+    /// Review state (seen files and results).
+    Seen,
 }
 
 impl Domain {
-    pub const ALL: [Self; 12] = [
+    pub const ALL: [Self; 13] = [
         Self::Files,
         Self::Artifacts,
         Self::Tags,
@@ -57,6 +61,7 @@ impl Domain {
         Self::Reports,
         Self::IngestJobs,
         Self::Notes,
+        Self::Seen,
     ];
 
     fn bit(self) -> u32 {
@@ -86,6 +91,7 @@ impl Domain {
             "reports" => Self::Reports,
             "ingest_jobs" | "ingest_job_modules" => Self::IngestJobs,
             "notes" => Self::Notes,
+            "seen" => Self::Seen,
             _ => return None,
         })
     }

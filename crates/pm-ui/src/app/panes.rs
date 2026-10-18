@@ -664,6 +664,19 @@ impl PostmortemApp {
         {
             tl.lock().focus(t, pad);
         }
+        if let Some((sel, seen)) = &ev.mark_seen {
+            let ids: Vec<i64> = sel
+                .iter()
+                .filter_map(|&i| rows.rows.get(i).map(|r| r.artifact.id))
+                .collect();
+            self.mark_seen(ui.ctx(), &case, ids, *seen);
+        }
+        // Looking at a result marks it seen.
+        if let Some(r) = ev.opened.and_then(|i| rows.rows.get(i))
+            && !self.result_table.is_seen(r)
+        {
+            self.mark_seen(ui.ctx(), &case, vec![r.artifact.id], true);
+        }
         if let Some(i) = ev.clicked {
             self.result_selected = Some(i);
             let row = rows.rows.get(i);
@@ -673,6 +686,33 @@ impl PostmortemApp {
             self.viewer
                 .show(content, row.and_then(crate::results::keyword_query));
         }
+    }
+
+    /// Writes review state in the background (the change bus refreshes the
+    /// counts and rows).
+    pub(super) fn mark_seen(
+        &mut self,
+        ctx: &egui::Context,
+        case: &Arc<pm_case::Case>,
+        ids: Vec<i64>,
+        seen: bool,
+    ) {
+        self.result_table.set_seen(&ids, seen);
+        let case = Arc::clone(case);
+        self.exports.push(Task::spawn(ctx, move || {
+            let db = case.db();
+            let r = if seen {
+                db.mark_seen(
+                    pm_casedb::ObjKind::Artifact,
+                    &ids,
+                    &crate::tags_ui::examiner(),
+                    jiff::Timestamp::now().as_second(),
+                )
+            } else {
+                db.mark_unseen(pm_casedb::ObjKind::Artifact, &ids)
+            };
+            r.map(|()| String::new()).map_err(|e| e.to_string())
+        }));
     }
 
     /// The evidence-backed content of a case file (for the viewers).

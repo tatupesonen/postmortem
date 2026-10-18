@@ -28,6 +28,7 @@ pub mod notes;
 pub mod os_accounts;
 pub mod query;
 mod reports;
+mod seen;
 pub mod summary;
 pub use reports::Report;
 mod scores;
@@ -51,7 +52,7 @@ pub use search::KeywordHitKey;
 pub use tags::{ArtifactTag, NewTagName, PROJECT_VIC, TagSet};
 
 /// Current schema version written by this build.
-pub const SCHEMA_VERSION: i64 = 4;
+pub const SCHEMA_VERSION: i64 = 5;
 /// Oldest schema readable without an upgrade: v3 only adds indexes.
 pub const MIN_READABLE_SCHEMA: i64 = 2;
 
@@ -81,6 +82,7 @@ const MIGRATIONS: &[&str] = &[
     include_str!("../migrations/0002_schema_v2.sql"),
     include_str!("../migrations/0003_timeline_indexes.sql"),
     include_str!("../migrations/0004_notes.sql"),
+    include_str!("../migrations/0005_seen.sql"),
 ];
 /// Rows per transaction in bulk mode.
 const BULK_COMMIT_EVERY: usize = 50_000;
