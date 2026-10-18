@@ -616,6 +616,16 @@ impl PostmortemApp {
                 ui.add_space(18.0);
                 let r = ui.selectable_label(selected, label);
                 if r.clicked() {
+                    // A node can gain children after it was drawn as a
+                    // leaf (a volume's file systems while the tree
+                    // reloads): it then opens as if clicked open.
+                    let mut st = egui::collapsing_header::CollapsingState::load_with_default_open(
+                        ui.ctx(),
+                        id,
+                        false,
+                    );
+                    st.set_open(true);
+                    st.store(ui.ctx());
                     self.navigate(node.clone());
                 }
                 r
