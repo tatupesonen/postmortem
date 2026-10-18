@@ -7,7 +7,7 @@ use crate::case_ui::NewCaseWizard;
 use crate::model::Content;
 use crate::task::Task;
 
-use super::{PostmortemApp, ResultTab};
+use super::PostmortemApp;
 
 impl PostmortemApp {
     /// Adds a disk image to the open case: it is loaded into the case
@@ -124,24 +124,16 @@ impl PostmortemApp {
         self.timeline = None;
         self.gallery = None;
         self.discovery = None;
-        self.result_counts.invalidate();
-        self.result_rows.clear();
+        self.results = crate::results::ResultData::default();
         self.result_selected = None;
-        self.view_counts.invalidate();
-        self.view_rows.clear();
+        self.views = crate::views::ViewData::default();
         self.case_sources.invalidate();
-        self.case_summary.clear();
-        self.node_views.clear();
-        self.account_details = None;
+        self.nodes = crate::case_nodes::NodeData::default();
+        self.searches = super::panes::Searches::default();
         self.tagging = crate::tags_ui::Tagging::default();
         self.file_search = None;
-        self.mime_types.clear();
-        self.searches.clear();
         self.keyword_panel = None;
         self.keyword_indexed.clear();
-        self.keyword_searches.clear();
-        self.result_tab = ResultTab::Listing;
-        self.searches_run = (0, 0);
         ctx.send_viewport_cmd(egui::ViewportCommand::Title("postmortem".into()));
     }
 
@@ -320,46 +312,18 @@ impl PostmortemApp {
             if !due.counts {
                 continue;
             }
+            // Each component knows which changes concern it.
+            self.results.on_change(watch, due);
+            self.views.on_change(watch, due);
+            self.nodes.on_change(watch, due);
+            self.searches.on_change(watch, due);
             match watch {
-                Watch::Files => {
-                    self.view_counts.invalidate();
-                    if due.rows {
-                        self.listings.clear();
-                        self.view_rows.clear();
-                        self.node_views.clear();
-                        self.viewer.refresh_hashes();
-                        for s in &mut self.searches {
-                            s.rows.refresh();
-                        }
-                    }
+                Watch::Files if due.rows => {
+                    self.listings.clear();
+                    self.viewer.refresh_hashes();
                 }
-                Watch::Results => {
-                    self.result_counts.invalidate();
-                    if due.rows {
-                        self.tz_check.refresh();
-                    }
-                    self.keyword_groups.refresh();
-                    self.case_summary.refresh();
-                    if due.rows {
-                        self.result_rows.clear();
-                        self.node_views.clear();
-                    }
-                }
-                Watch::Annotations => {
-                    self.case_summary.refresh();
-                    if due.rows {
-                        self.listings.clear();
-                        self.view_rows.clear();
-                        self.result_rows.clear();
-                        self.node_views.clear();
-                        for s in &mut self.searches {
-                            s.rows.refresh();
-                        }
-                        for s in &mut self.keyword_searches {
-                            s.rows.refresh();
-                        }
-                    }
-                }
+                Watch::Results if due.rows => self.tz_check.refresh(),
+                Watch::Annotations if due.rows => self.listings.clear(),
                 Watch::Sources => {
                     self.case_sources.refresh();
                     self.tz_check.refresh();
@@ -367,7 +331,6 @@ impl PostmortemApp {
                         self.listings.clear();
                     }
                 }
-                Watch::Reports => self.case_summary.refresh(),
                 Watch::Timeline => {
                     if due.rows
                         && let Some(t) = &self.timeline
@@ -375,6 +338,7 @@ impl PostmortemApp {
                         t.lock().invalidate();
                     }
                 }
+                _ => {}
             }
         }
         if self.change_watch.pending() {

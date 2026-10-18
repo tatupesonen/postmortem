@@ -11,7 +11,7 @@ use super::{PostmortemApp, ResultTab};
 
 impl PostmortemApp {
     pub fn navigate(&mut self, node: NodeId) {
-        self.result_tab = ResultTab::Listing;
+        self.searches.tab = ResultTab::Listing;
         if self.selected.as_ref() == Some(&node) {
             return;
         }
@@ -21,8 +21,8 @@ impl PostmortemApp {
         self.forward.clear();
         self.selected = Some(node);
         self.table.reset();
-        self.node_grid.reset();
-        self.account_details = None;
+        self.nodes.grid.reset();
+        self.nodes.account_details = None;
         self.result_selected = None;
         self.result_table = crate::results::ResultTable::default();
     }
@@ -120,7 +120,7 @@ impl PostmortemApp {
             return;
         }
         let hide = self.persisted.hide_known_in_views;
-        let c = self.view_counts.get(ui.ctx(), case.as_ref(), live, hide);
+        let c = self.views.counts.get(ui.ctx(), case.as_ref(), live, hide);
         let n = |v: Option<&u64>| crate::format::grouped(v.copied().unwrap_or(0));
         ui.add_space(8.0);
         ui.heading(format!("{} Views", icons::VIEWS));
@@ -229,11 +229,12 @@ impl PostmortemApp {
         if case.is_none() {
             return;
         }
-        let counts = self.result_counts.get(ui.ctx(), case.as_ref(), live);
+        let counts = self.results.counts.get(ui.ctx(), case.as_ref(), live);
         // Cached rows go stale while results are still being added.
         for t in counts.iter() {
             let stale = self
-                .result_rows
+                .results
+                .rows
                 .get_mut(&crate::results::ResultKey::Type(t.type_id))
                 .and_then(Task::poll)
                 .and_then(|r| r.as_ref().ok())
@@ -241,7 +242,8 @@ impl PostmortemApp {
                     rows.rows.len() < (t.count as usize).min(crate::results::MAX_ROWS)
                 });
             if stale {
-                self.result_rows
+                self.results
+                    .rows
                     .remove(&crate::results::ResultKey::Type(t.type_id));
             }
         }
@@ -305,14 +307,16 @@ impl PostmortemApp {
         let Some(case) = case else {
             return;
         };
-        if total != self.keyword_groups_for {
-            self.keyword_groups_for = total;
-            self.keyword_groups.refresh();
-            self.result_rows
+        if total != self.results.keyword_groups_for {
+            self.results.keyword_groups_for = total;
+            self.results.keyword_groups.refresh();
+            self.results
+                .rows
                 .retain(|k, _| !matches!(k, crate::results::ResultKey::Keyword(_)));
         }
         let loader = Arc::clone(case);
         let tree = self
+            .results
             .keyword_groups
             .get(ui.ctx(), move || {
                 let groups = loader
@@ -369,7 +373,8 @@ impl PostmortemApp {
         };
         let loader = Arc::clone(case);
         let count = self
-            .case_summary
+            .nodes
+            .summary
             .get(ui.ctx(), move || crate::case_nodes::load_summary(&loader))
             .map(|s| crate::format::grouped(s.os_accounts));
         let label = format!(
@@ -425,7 +430,7 @@ impl PostmortemApp {
                 .file_search
                 .get_or_insert_with(crate::file_search_ui::FileSearchWindow::default);
             w.preselect_data_source(ds.id);
-            self.mime_types.refresh();
+            self.views.mime_types.refresh();
             ui.close();
         }
         ui.separator();
@@ -446,7 +451,8 @@ impl PostmortemApp {
         };
         let loader = Arc::clone(&case);
         let Some(sum) = self
-            .case_summary
+            .nodes
+            .summary
             .get(ui.ctx(), move || crate::case_nodes::load_summary(&loader))
         else {
             return;

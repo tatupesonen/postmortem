@@ -116,12 +116,6 @@ pub struct PostmortemApp {
     progress_open: bool,
     progress_closed: Arc<AtomicBool>,
     case_wizard: Option<NewCaseWizard>,
-    result_counts: crate::results::Counts,
-    result_rows:
-        HashMap<crate::results::ResultKey, Task<Result<Arc<crate::results::ResultRows>, String>>>,
-    /// Keyword Hits groups, and the hit count they were loaded for.
-    keyword_groups: crate::task::Cached<crate::keyword_search_ui::HitTree>,
-    keyword_groups_for: u64,
     result_selected: Option<usize>,
     result_table: crate::results::ResultTable,
     /// Analysis was running last frame (refresh results when it stops).
@@ -129,29 +123,22 @@ pub struct PostmortemApp {
     change_watch: crate::changes::ChangeWatch,
     add_wizard: Option<crate::add_source::AddSourceWizard>,
     tz_check: crate::tz_check::TimeZoneCheck,
+    /// Data of the tree and result panes, each refreshed from the change
+    /// bus by its own component.
+    results: crate::results::ResultData,
+    views: crate::views::ViewData,
+    nodes: crate::case_nodes::NodeData,
+    searches: panes::Searches,
     /// Case folder and data-source count the hash resolver was built for.
     resolver_key: Option<PathBuf>,
-    view_counts: crate::views::Counts,
-    view_rows: HashMap<crate::views::View, Task<Result<Arc<crate::views::ViewRows>, String>>>,
     /// The Data Sources tree structure from the case database.
     case_sources: crate::case_tree::Sources,
     tagging: crate::tags_ui::Tagging,
-    /// Counts of the OS Accounts, Tags and Score nodes.
-    case_summary: crate::task::Cached<crate::case_nodes::Summary>,
-    /// Rows of the OS Accounts, Tags and Score views.
-    node_views: HashMap<NodeId, crate::task::Cached<crate::case_nodes::ViewData>>,
-    node_grid: crate::grid::Grid,
-    /// Details of the selected OS account.
-    account_details: Option<(i64, crate::task::Cached<crate::case_nodes::Details>)>,
     file_search: Option<crate::file_search_ui::FileSearchWindow>,
     /// The toolbar's Keyword Search panel, when open.
     keyword_panel: Option<crate::keyword_search_ui::KeywordSearchPanel>,
     /// "Files Indexed" for the panel.
     keyword_indexed: crate::task::Cached<u64>,
-    keyword_searches: Vec<crate::keyword_search_ui::KeywordResults>,
-    result_tab: ResultTab,
-    /// Searches run in this case, for numbering (Autopsy never reuses one).
-    searches_run: (usize, usize),
     run_ingest: Option<crate::add_source::RunIngestDialog>,
     hosts_ui: crate::hosts_ui::HostsUi,
     options: Option<crate::options_ui::OptionsWindow>,
@@ -170,8 +157,6 @@ pub struct PostmortemApp {
     /// Case › Delete Case awaiting confirmation: (folder, display name).
     confirm_delete_case: Option<(PathBuf, String)>,
     removing: Option<Task<Result<(), String>>>,
-    mime_types: crate::task::Cached<Vec<String>>,
-    searches: Vec<crate::file_search_ui::SearchResults>,
 }
 
 impl PostmortemApp {
@@ -214,30 +199,21 @@ impl PostmortemApp {
             progress_open: false,
             progress_closed: Arc::new(AtomicBool::new(false)),
             case_wizard: None,
-            result_counts: crate::results::Counts::default(),
-            result_rows: HashMap::new(),
-            keyword_groups: crate::task::Cached::default(),
-            keyword_groups_for: 0,
             result_selected: None,
             result_table: crate::results::ResultTable::default(),
             change_watch: crate::changes::ChangeWatch::default(),
             add_wizard: None,
             tz_check: crate::tz_check::TimeZoneCheck::default(),
+            results: crate::results::ResultData::default(),
+            views: crate::views::ViewData::default(),
+            nodes: crate::case_nodes::NodeData::default(),
+            searches: panes::Searches::default(),
             resolver_key: None,
-            view_counts: crate::views::Counts::default(),
-            view_rows: HashMap::new(),
             case_sources: crate::case_tree::Sources::default(),
             tagging: crate::tags_ui::Tagging::default(),
-            case_summary: crate::task::Cached::default(),
-            node_views: HashMap::new(),
-            node_grid: crate::grid::Grid::default(),
-            account_details: None,
             file_search: None,
             keyword_panel: None,
             keyword_indexed: crate::task::Cached::default(),
-            keyword_searches: Vec::new(),
-            result_tab: ResultTab::Listing,
-            searches_run: (0, 0),
             run_ingest: None,
             hosts_ui: crate::hosts_ui::HostsUi::default(),
             options: None,
@@ -250,8 +226,6 @@ impl PostmortemApp {
             confirm_remove: None,
             confirm_delete_case: None,
             removing: None,
-            mime_types: crate::task::Cached::default(),
-            searches: Vec::new(),
         };
         app.apply_time_pref();
         // Command line: a case (folder or case.pmcase) is opened; images are

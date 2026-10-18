@@ -299,6 +299,33 @@ pub(crate) fn row_of(f: &FileRecord) -> FileRow {
     }
 }
 
+/// Views data (file types, deleted files, sizes, MIME types), refreshed
+/// from the case change bus.
+#[derive(Debug, Default)]
+pub(crate) struct ViewData {
+    pub(crate) counts: Counts,
+    pub(crate) rows: std::collections::HashMap<View, Task<Result<Arc<ViewRows>, String>>>,
+    pub(crate) mime_types: crate::task::Cached<Vec<String>>,
+}
+
+impl ViewData {
+    /// Reacts to committed case changes.
+    pub(crate) fn on_change(&mut self, watch: crate::changes::Watch, due: crate::changes::Due) {
+        use crate::changes::Watch;
+        match watch {
+            Watch::Files => {
+                self.counts.invalidate();
+                self.mime_types.refresh();
+                if due.rows {
+                    self.rows.clear();
+                }
+            }
+            Watch::Annotations if due.rows => self.rows.clear(),
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

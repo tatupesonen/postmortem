@@ -243,6 +243,7 @@ impl PostmortemApp {
             .collect();
         let loader = Arc::clone(&case);
         let mimes = self
+            .views
             .mime_types
             .get(ctx, move || {
                 loader.db().mime_types().map_err(|e| e.to_string())
@@ -255,15 +256,17 @@ impl PostmortemApp {
             crate::file_search_ui::SearchAction::None => {}
             crate::file_search_ui::SearchAction::Close => self.file_search = None,
             crate::file_search_ui::SearchAction::Search(search) => {
-                self.searches_run.0 += 1;
-                let number = self.searches_run.0;
-                self.searches.push(crate::file_search_ui::SearchResults {
-                    number,
-                    rows: crate::task::Cached::default(),
-                    search: Arc::from(search),
-                    table: crate::table::TableState::default(),
-                });
-                self.result_tab = ResultTab::FileSearch(number);
+                self.searches.run.0 += 1;
+                let number = self.searches.run.0;
+                self.searches
+                    .file
+                    .push(crate::file_search_ui::SearchResults {
+                        number,
+                        rows: crate::task::Cached::default(),
+                        search: Arc::from(search),
+                        table: crate::table::TableState::default(),
+                    });
+                self.searches.tab = ResultTab::FileSearch(number);
             }
         }
     }
@@ -301,16 +304,17 @@ impl PostmortemApp {
             PanelAction::Search(req) => {
                 // Autopsy's dropdown closes once the search starts.
                 self.keyword_panel = None;
-                self.searches_run.1 += 1;
-                let number = self.searches_run.1;
-                self.keyword_searches
+                self.searches.run.1 += 1;
+                let number = self.searches.run.1;
+                self.searches
+                    .keyword
                     .push(crate::keyword_search_ui::KeywordResults {
                         number,
                         request: Arc::new(req),
                         rows: crate::task::Cached::default(),
                         table: crate::table::TableState::default(),
                     });
-                self.result_tab = ResultTab::KeywordSearch(number);
+                self.searches.tab = ResultTab::KeywordSearch(number);
             }
         }
     }
@@ -459,8 +463,8 @@ impl PostmortemApp {
         }
         if s.hide_known_in_views != self.persisted.hide_known_in_views {
             self.persisted.hide_known_in_views = s.hide_known_in_views;
-            self.view_counts.invalidate();
-            self.view_rows.clear();
+            self.views.counts.invalidate();
+            self.views.rows.clear();
         }
         if s.custom_tags != self.persisted.custom_tags {
             let case = self.analysis.lock().case().cloned();

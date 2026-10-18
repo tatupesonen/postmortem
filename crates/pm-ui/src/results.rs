@@ -516,6 +516,36 @@ fn cell(ui: &mut egui::Ui, data: &ResultRows, r: &ResultRow, c: ResultCol, prefs
     }
 }
 
+/// Data Artifacts / Analysis Results data shown by the tree and the result
+/// tables, refreshed from the case change bus.
+#[derive(Debug, Default)]
+pub(crate) struct ResultData {
+    pub(crate) counts: Counts,
+    pub(crate) rows: std::collections::HashMap<ResultKey, Task<Result<Arc<ResultRows>, String>>>,
+    /// Keyword Hits groups, and the hit count they were loaded for.
+    pub(crate) keyword_groups: crate::task::Cached<crate::keyword_search_ui::HitTree>,
+    pub(crate) keyword_groups_for: u64,
+}
+
+impl ResultData {
+    /// Reacts to committed case changes.
+    pub(crate) fn on_change(&mut self, watch: crate::changes::Watch, due: crate::changes::Due) {
+        use crate::changes::Watch;
+        match watch {
+            Watch::Results => {
+                self.counts.invalidate();
+                self.keyword_groups.refresh();
+                if due.rows {
+                    self.rows.clear();
+                }
+            }
+            // Tags and scores show in the rows.
+            Watch::Annotations if due.rows => self.rows.clear(),
+            _ => {}
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

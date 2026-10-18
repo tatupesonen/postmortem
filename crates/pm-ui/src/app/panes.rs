@@ -17,6 +17,53 @@ use crate::views::View;
 
 use super::{Listing, Popout, PostmortemApp, ResultTab, add_to_hash_set, copy_out};
 
+/// File and keyword searches, each in its own result tab.
+#[derive(Debug)]
+pub(super) struct Searches {
+    pub(super) file: Vec<crate::file_search_ui::SearchResults>,
+    pub(super) keyword: Vec<crate::keyword_search_ui::KeywordResults>,
+    /// Searches run in this case, for numbering (Autopsy never reuses one).
+    pub(super) run: (usize, usize),
+    pub(super) tab: ResultTab,
+}
+
+impl Default for Searches {
+    fn default() -> Self {
+        Self {
+            file: Vec::new(),
+            keyword: Vec::new(),
+            run: (0, 0),
+            tab: ResultTab::Listing,
+        }
+    }
+}
+
+impl Searches {
+    /// Reacts to committed case changes.
+    pub(super) fn on_change(&mut self, watch: crate::changes::Watch, due: crate::changes::Due) {
+        use crate::changes::Watch;
+        if !due.rows {
+            return;
+        }
+        match watch {
+            Watch::Files => {
+                for s in &mut self.file {
+                    s.rows.refresh();
+                }
+            }
+            Watch::Annotations => {
+                for s in &mut self.file {
+                    s.rows.refresh();
+                }
+                for s in &mut self.keyword {
+                    s.rows.refresh();
+                }
+            }
+            _ => {}
+        }
+    }
+}
+
 impl PostmortemApp {
     /// Directory listing for a node, loaded in the background from the
     /// case database.
@@ -177,7 +224,7 @@ impl PostmortemApp {
             return;
         };
         let hide = self.persisted.hide_known_in_views;
-        let task = self.view_rows.entry(view.clone()).or_insert_with(|| {
+        let task = self.views.rows.entry(view.clone()).or_insert_with(|| {
             let (case, view) = (Arc::clone(&case), view.clone());
             Task::spawn(ui.ctx(), move || {
                 crate::views::load_rows(&case, &view, hide).map(Arc::new)
@@ -246,7 +293,8 @@ impl PostmortemApp {
         let prefs = self.prefs.clone();
         let target = node.clone();
         let data =
-            self.node_views
+            self.nodes
+                .views
                 .entry(node.clone())
                 .or_default()
                 .get(&ctx, move || match target {
@@ -256,7 +304,7 @@ impl PostmortemApp {
                     _ => crate::case_nodes::load_os_accounts(&loader, &prefs),
                 });
         let Some(data) = data else {
-            if let Some(e) = self.node_views.get(node).and_then(|c| c.error()) {
+            if let Some(e) = self.nodes.views.get(node).and_then(|c| c.error()) {
                 ui.colored_label(ui.visuals().error_fg_color, e.to_owned());
             } else {
                 ui.spinner();
@@ -278,7 +326,7 @@ impl PostmortemApp {
             .allocate_ui(
                 egui::vec2(ui.available_width(), ui.available_height() - details_h),
                 |ui| {
-                    self.node_grid.ui(ui, "node-view", &data.grid, |ui, i| {
+                    self.nodes.grid.ui(ui, "node-view", &data.grid, |ui, i| {
                         let (target, tag) = match refs.get(i) {
                             Some(crate::case_nodes::RowRef::File {
                                 file,
@@ -313,7 +361,7 @@ impl PostmortemApp {
         };
         if let Some(r) = ev.selected.and_then(|i| refs.get(i)) {
             if let crate::case_nodes::RowRef::OsAccount(id) = r {
-                self.account_details = Some((*id, crate::task::Cached::default()));
+                self.nodes.account_details = Some((*id, crate::task::Cached::default()));
             } else if let Some(f) = file_of(r) {
                 self.viewer.set_content(Some(Content::from_case(
                     Arc::clone(&case),
@@ -327,7 +375,7 @@ impl PostmortemApp {
                 crate::views::row_of(&f),
             ));
         }
-        if let Some((id, details)) = &mut self.account_details {
+        if let Some((id, details)) = &mut self.nodes.account_details {
             let (id, loader, prefs) = (*id, Arc::clone(&case), self.prefs.clone());
             ui.separator();
             match details.get(&ctx, move || {
@@ -363,7 +411,7 @@ impl PostmortemApp {
         if self.has_case() {
             self.result_tabs(ui);
         }
-        match self.result_tab {
+        match self.searches.tab {
             ResultTab::Listing => {}
             ResultTab::FileSearch(n) => return self.search_view(ui, n),
             ResultTab::KeywordSearch(n) => return self.keyword_view(ui, n),
@@ -428,7 +476,7 @@ impl PostmortemApp {
         let Some(case) = self.analysis.lock().case().cloned() else {
             return;
         };
-        let task = self.result_rows.entry(key.clone()).or_insert_with(|| {
+        let task = self.results.rows.entry(key.clone()).or_insert_with(|| {
             let (case, key) = (Arc::clone(&case), key.clone());
             Task::spawn(ui.ctx(), move || {
                 crate::results::load_rows(&case, &key).map(Arc::new)
@@ -451,7 +499,8 @@ impl PostmortemApp {
         // The title comes from the cached counts (no IO on the UI thread).
         let title = match key {
             crate::results::ResultKey::Type(type_id) => self
-                .result_counts
+                .results
+                .counts
                 .get(ui.ctx(), Some(&case), false)
                 .iter()
                 .find(|t| t.type_id == *type_id)
@@ -666,14 +715,15 @@ impl PostmortemApp {
     /// The result pane's tabs: Listing, then one per search (closable).
     pub(super) fn result_tabs(&mut self, ui: &mut egui::Ui) {
         let mut tabs = vec![(ResultTab::Listing, "Listing".to_owned())];
-        tabs.extend(self.searches.iter().map(|s| {
+        tabs.extend(self.searches.file.iter().map(|s| {
             (
                 ResultTab::FileSearch(s.number),
                 format!("File Search Results {}", s.number),
             )
         }));
         tabs.extend(
-            self.keyword_searches
+            self.searches
+                .keyword
                 .iter()
                 .map(|s| (ResultTab::KeywordSearch(s.number), s.title())),
         );
@@ -683,11 +733,11 @@ impl PostmortemApp {
         let mut close = None;
         ui.horizontal_wrapped(|ui| {
             for (tab, title) in tabs {
-                let on = self.result_tab == tab;
+                let on = self.searches.tab == tab;
                 ui.scope(|ui| {
                     ui.spacing_mut().item_spacing.x = 2.0;
                     if ui.selectable_label(on, &title).clicked() {
-                        self.result_tab = tab;
+                        self.searches.tab = tab;
                     }
                     if tab != ResultTab::Listing
                         && ui
@@ -704,12 +754,12 @@ impl PostmortemApp {
         ui.separator();
         if let Some(tab) = close {
             match tab {
-                ResultTab::FileSearch(n) => self.searches.retain(|s| s.number != n),
-                ResultTab::KeywordSearch(n) => self.keyword_searches.retain(|s| s.number != n),
+                ResultTab::FileSearch(n) => self.searches.file.retain(|s| s.number != n),
+                ResultTab::KeywordSearch(n) => self.searches.keyword.retain(|s| s.number != n),
                 ResultTab::Listing => {}
             }
-            if self.result_tab == tab {
-                self.result_tab = ResultTab::Listing;
+            if self.searches.tab == tab {
+                self.searches.tab = ResultTab::Listing;
             }
         }
     }
@@ -721,7 +771,8 @@ impl PostmortemApp {
             return;
         };
         let Some(s) = self
-            .keyword_searches
+            .searches
+            .keyword
             .iter_mut()
             .find(|s| s.number == number)
         else {
@@ -795,7 +846,7 @@ impl PostmortemApp {
         let Some(case) = self.analysis.lock().case().cloned() else {
             return;
         };
-        let Some(s) = self.searches.iter_mut().find(|s| s.number == number) else {
+        let Some(s) = self.searches.file.iter_mut().find(|s| s.number == number) else {
             return;
         };
         let (loader, search) = (Arc::clone(&case), Arc::clone(&s.search));

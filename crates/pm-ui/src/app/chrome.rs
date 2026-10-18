@@ -161,8 +161,8 @@ impl PostmortemApp {
                     )
                     .changed()
                 {
-                    self.view_counts.invalidate();
-                    self.view_rows.clear();
+                    self.views.counts.invalidate();
+                    self.views.rows.clear();
                 }
             });
             ui.menu_button("Tools", |ui| {
@@ -179,7 +179,7 @@ impl PostmortemApp {
                 {
                     self.file_search
                         .get_or_insert_with(crate::file_search_ui::FileSearchWindow::default);
-                    self.mime_types.refresh();
+                    self.views.mime_types.refresh();
                     ui.close();
                 }
                 ui.separator();
@@ -507,7 +507,8 @@ impl PostmortemApp {
         if bookmark && let Some(case) = self.analysis.lock().case().cloned() {
             let result = match (&self.selected, self.result_selected) {
                 (Some(NodeId::Results { type_id }), Some(i)) => self
-                    .result_rows
+                    .results
+                    .rows
                     .get_mut(&crate::results::ResultKey::Type(*type_id))
                     .and_then(Task::poll)
                     .and_then(|r| r.as_ref().ok())

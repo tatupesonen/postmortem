@@ -381,3 +381,32 @@ pub(crate) fn account_details(
         ("Data sources", instances),
     ])
 }
+
+/// The OS Accounts, Tags and Score nodes: counts, views and the selected
+/// account, refreshed from the case change bus.
+#[derive(Debug, Default)]
+pub(crate) struct NodeData {
+    pub(crate) summary: crate::task::Cached<Summary>,
+    pub(crate) views:
+        std::collections::HashMap<crate::model::NodeId, crate::task::Cached<ViewData>>,
+    pub(crate) grid: crate::grid::Grid,
+    /// Details of the selected OS account.
+    pub(crate) account_details: Option<(i64, crate::task::Cached<Details>)>,
+}
+
+impl NodeData {
+    /// Reacts to committed case changes.
+    pub(crate) fn on_change(&mut self, watch: crate::changes::Watch, due: crate::changes::Due) {
+        use crate::changes::Watch;
+        match watch {
+            Watch::Results | Watch::Annotations | Watch::Reports => {
+                self.summary.refresh();
+                if due.rows && watch != Watch::Reports {
+                    self.views.clear();
+                }
+            }
+            Watch::Files if due.rows => self.views.clear(),
+            _ => {}
+        }
+    }
+}
