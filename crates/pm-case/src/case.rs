@@ -339,6 +339,12 @@ impl Case {
         Ok(Arc::clone(map.entry(ds_id).or_insert(opened)))
     }
 
+    /// Drops a data source's opened evidence; the next use reopens it
+    /// (after its time zone or paths changed).
+    pub(crate) fn forget_source(&self, ds_id: i64) {
+        self.sources.lock().remove(&ds_id);
+    }
+
     /// Caches evidence the loader already parsed.
     pub(crate) fn register_source(&self, ds_id: i64, source: OpenSource) {
         self.sources.lock().insert(ds_id, Arc::new(source));

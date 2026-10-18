@@ -125,6 +125,7 @@ pub struct PostmortemApp {
     /// Case change bus → view refreshes.
     change_watch: crate::changes::ChangeWatch,
     add_wizard: Option<crate::add_source::AddSourceWizard>,
+    tz_check: crate::tz_check::TimeZoneCheck,
     /// Case folder and data-source count the hash resolver was built for.
     resolver_key: Option<PathBuf>,
     view_counts: crate::views::Counts,
@@ -218,6 +219,7 @@ impl PostmortemApp {
             result_table: crate::results::ResultTable::default(),
             change_watch: crate::changes::ChangeWatch::default(),
             add_wizard: None,
+            tz_check: crate::tz_check::TimeZoneCheck::default(),
             resolver_key: None,
             view_counts: crate::views::Counts::default(),
             view_rows: HashMap::new(),
@@ -413,6 +415,7 @@ impl PostmortemApp {
     pub fn close_case(&mut self, ctx: &egui::Context) {
         self.analysis.lock().close();
         self.change_watch.reset();
+        self.tz_check.clear();
         self.listings.clear();
         self.selected = None;
         self.back.clear();
@@ -2957,6 +2960,16 @@ impl PostmortemApp {
                 }
             }
         }
+        // One lock at a time: the guard of an `if let` scrutinee lives
+        // through its block.
+        let (case, active) = {
+            let analysis = self.analysis.lock();
+            (analysis.case().cloned(), analysis.any_active())
+        };
+        if let Some(case) = case {
+            let busy = active || self.add_wizard.is_some() || self.case_wizard.is_some();
+            self.tz_check.ui(ctx, &case, busy);
+        }
         if let Some(w) = self.case_wizard.as_mut() {
             match w.ui(ctx) {
                 WizardAction::None => {}
@@ -3132,6 +3145,9 @@ impl PostmortemApp {
                 }
                 Watch::Results => {
                     self.result_counts.invalidate();
+                    if due.rows {
+                        self.tz_check.refresh();
+                    }
                     self.keyword_groups.refresh();
                     self.case_summary.refresh();
                     if due.rows {
@@ -3156,6 +3172,7 @@ impl PostmortemApp {
                 }
                 Watch::Sources => {
                     self.case_sources.refresh();
+                    self.tz_check.refresh();
                     if due.rows {
                         self.listings.clear();
                     }

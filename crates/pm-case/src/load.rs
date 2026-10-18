@@ -493,7 +493,7 @@ fn kind_code(k: FileKind) -> FileKindCode {
 }
 
 /// Unix seconds and non-negative nanoseconds.
-fn split_time(t: Option<jiff::Timestamp>) -> Option<(i64, u32)> {
+pub(crate) fn split_time(t: Option<jiff::Timestamp>) -> Option<(i64, u32)> {
     let ns = t?.as_nanosecond();
     let secs = i64::try_from(ns.div_euclid(1_000_000_000)).ok()?;
     let sub = u32::try_from(ns.rem_euclid(1_000_000_000)).ok()?;

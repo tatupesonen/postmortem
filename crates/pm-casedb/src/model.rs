@@ -122,6 +122,10 @@ impl VolumeRecord {
     }
 }
 
+/// Modified, accessed, changed and created times: `(Unix seconds,
+/// nanoseconds)`, `None` when unknown.
+pub type FileTimes = [Option<(i64, u32)>; 4];
+
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct NewFileSystem {
     pub ds_id: i64,

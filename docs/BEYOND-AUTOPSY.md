@@ -224,6 +224,10 @@ Gaps open:
 - Timeline noise: collapse repeats, exclude types/text (item 9).
 - Data-source time zone (Helsinki, from the wizard default) differed from
   the system's (Pacific); warn after Recent Activity reads the registry.
+  **[done 2026-10-18]**: `pm-ui/src/tz_check.rs` compares the Windows zone
+  (CLDR mapping, `pm_core::windows_zones`) with the data source's by UTC
+  offsets and offers to switch or keep (remembered in the case). Switching
+  re-reads FAT/exFAT times in the new zone (`Case::set_data_source_timezone`).
 - Peak memory 3 GB during the file phase; find out how much is heap.
 
 ## 8b. Gaps against Magnet AXIOM (2026-10-18)

@@ -38,6 +38,7 @@ mod thumbs;
 mod timeline;
 mod timeline_chart;
 mod timeline_details;
+mod tz_check;
 mod viewers;
 mod views;
 

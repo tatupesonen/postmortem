@@ -128,6 +128,17 @@ pub fn local_to_timestamp(dt: DateTime, tz: &TimeZone) -> Option<Timestamp> {
     tz.to_ambiguous_timestamp(dt).compatible().ok()
 }
 
+/// Whether two zones give the same UTC offsets over the last ten years
+/// (sampled twice a month), so local times read in either agree, e.g.
+/// `Europe/Helsinki` and `Europe/Kyiv`.
+pub fn same_offsets(a: &TimeZone, b: &TimeZone) -> bool {
+    let now = Timestamp::now().as_second();
+    let step = 15 * 86_400;
+    (0..240).all(|i| {
+        Timestamp::from_second(now - i * step).map_or(true, |t| a.to_offset(t) == b.to_offset(t))
+    })
+}
+
 /// Formats a timestamp for display: ISO-8601 with offset, second precision.
 pub fn format_in(ts: Timestamp, tz: &TimeZone) -> String {
     let z: Zoned = ts.to_zoned(tz.clone());
@@ -143,6 +154,16 @@ pub fn format_utc(ts: Timestamp) -> String {
 mod tests {
     use super::*;
     use proptest::prelude::*;
+
+    #[test]
+    fn same_offsets_compares_rules_not_names() {
+        let tz = |n| TimeZone::get(n).unwrap();
+        assert!(same_offsets(&tz("Europe/Helsinki"), &tz("Europe/Kyiv")));
+        assert!(same_offsets(&TimeZone::UTC, &tz("Etc/UTC")));
+        assert!(!same_offsets(&tz("Europe/Helsinki"), &TimeZone::UTC));
+        // Same standard offset, different daylight saving.
+        assert!(!same_offsets(&tz("America/Phoenix"), &tz("America/Denver")));
+    }
 
     #[test]
     fn filetime_known_values() {

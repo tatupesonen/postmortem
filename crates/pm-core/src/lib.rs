@@ -13,6 +13,7 @@ pub mod decode;
 pub mod io;
 pub mod time;
 pub mod units;
+pub mod windows_zones;
 
 pub use decode::{Bytes, Truncated};
 pub use io::{ReadAt, SharedSource};

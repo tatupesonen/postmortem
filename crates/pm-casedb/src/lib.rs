@@ -380,6 +380,67 @@ impl CaseDb {
         })
     }
 
+    /// Sets the time zone a data source's local file-system times are read
+    /// in (see `pm_case::Case::set_data_source_timezone`, which also
+    /// re-reads those times).
+    pub fn set_data_source_timezone(&self, ds_id: i64, timezone: &str) -> Result<()> {
+        self.write(|tx| {
+            tx.execute(
+                "UPDATE data_sources SET timezone = ?2 WHERE id = ?1",
+                params![ds_id, timezone],
+            )?;
+            Ok(())
+        })
+    }
+
+    /// `(file id, inode)` of the rows a file system listed (file-system and
+    /// slack rows).
+    pub fn file_inodes(&self, fs_id: i64) -> Result<Vec<(i64, u64)>> {
+        self.read(|c| {
+            let mut st = c.prepare(
+                "SELECT id, inode FROM files WHERE fs_id = ?1 AND inode IS NOT NULL AND origin IN (0, 6) ORDER BY id",
+            )?;
+            let rows = st
+                .query_map([fs_id], |r| Ok((r.get::<_, i64>(0)?, r.get::<_, i64>(1)?)))?
+                .filter_map(|r| r.ok().and_then(|(id, i)| Some((id, u64::try_from(i).ok()?))))
+                .collect();
+            Ok(rows)
+        })
+    }
+
+    /// Replaces the modified, accessed, changed and created times of files.
+    pub fn set_file_times(&self, rows: &[(i64, FileTimes)]) -> Result<()> {
+        self.write(|tx| {
+            let mut st = tx.prepare_cached(
+                "UPDATE files SET mtime = ?2, mtime_ns = ?3, atime = ?4, atime_ns = ?5, ctime = ?6, ctime_ns = ?7, \
+                 crtime = ?8, crtime_ns = ?9 WHERE id = ?1",
+            )?;
+            for (id, t) in rows {
+                let [m, a, c, cr] = t.map(|x| (x.map(|v| v.0), x.map(|v| v.1)));
+                st.execute(params![id, m.0, m.1, a.0, a.1, c.0, c.1, cr.0, cr.1])?;
+            }
+            Ok(())
+        })
+    }
+
+    /// The system time zones Recent Activity recorded for a data source
+    /// (`KAAMOS_TIMEZONE` of its operating-system information), as found.
+    pub fn os_time_zones(&self, ds_id: i64) -> Result<Vec<String>> {
+        self.read(|c| {
+            let mut st = c.prepare(
+                "SELECT DISTINCT a.value_text FROM artifacts r \
+                 JOIN artifact_types rt ON rt.id = r.type_id AND rt.name = 'KAAMOS_OS_INFO' \
+                 JOIN attributes a ON a.artifact_id = r.id \
+                 JOIN attribute_types at ON at.id = a.type_id AND at.name = 'KAAMOS_TIMEZONE' \
+                 WHERE r.ds_id = ?1 AND a.value_text IS NOT NULL AND a.value_text <> '' ORDER BY a.value_text",
+            )?;
+            let rows = st
+                .query_map([ds_id], |r| r.get::<_, String>(0))?
+                .collect::<rusqlite::Result<Vec<_>>>()?;
+            Ok(rows)
+        })
+    }
+
     /// Updates the image paths of a data source (evidence moved).
     pub fn set_data_source_paths(&self, ds_id: i64, paths: &[String]) -> Result<()> {
         let json = serde_json::to_string(paths).map_err(|e| DbError::Invalid(e.to_string()))?;

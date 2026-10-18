@@ -834,3 +834,126 @@ fn delete_removes_the_case_but_keeps_foreign_files() {
         "a folder without case.pmcase is refused"
     );
 }
+
+/// Switching a data source's time zone re-reads FAT local times in the new
+/// zone and leaves file systems that store UTC (NTFS) alone.
+#[test]
+fn time_zone_switch_rereads_fat_times() {
+    let (_dir, case, s) = loaded_case();
+    let fs_kinds: HashMap<i64, String> = case
+        .db()
+        .file_systems(s.ds_id)
+        .unwrap()
+        .into_iter()
+        .map(|f| (f.id, f.kind))
+        .collect();
+    let before = all_files(&case, s.ds_id);
+    let pick = |files: &[FileRecord], kind: &str| -> FileRecord {
+        files
+            .iter()
+            .find(|f| {
+                f.origin == Origin::FileSystem
+                    && f.kind == FileKindCode::Regular
+                    && f.times[0].is_some()
+                    && f.fs_id
+                        .and_then(|id| fs_kinds.get(&id))
+                        .is_some_and(|k| k.starts_with(kind))
+            })
+            .unwrap_or_else(|| panic!("a {kind} file with a modified time"))
+            .clone()
+    };
+    let fat = pick(&before, "FAT");
+    let ntfs = pick(&before, "NTFS");
+    let updated = case
+        .set_data_source_timezone(s.ds_id, "Europe/Helsinki")
+        .unwrap();
+    assert!(updated > 0);
+    assert_eq!(
+        case.db().data_source(s.ds_id).unwrap().unwrap().timezone,
+        "Europe/Helsinki"
+    );
+    let after = all_files(&case, s.ds_id);
+    let find = |id| after.iter().find(|f| f.id == id).unwrap();
+    let (old, new) = (fat.times[0].unwrap().0, find(fat.id).times[0].unwrap().0);
+    // Helsinki is UTC+2 (winter) or UTC+3 (summer): the same local time
+    // is earlier in UTC.
+    assert!(
+        old - new == 7_200 || old - new == 10_800,
+        "FAT time moved by {}",
+        old - new
+    );
+    assert_eq!(find(ntfs.id).times, ntfs.times, "NTFS stores UTC");
+    // Back to UTC restores the original times.
+    case.set_data_source_timezone(s.ds_id, "UTC").unwrap();
+    assert_eq!(
+        all_files(&case, s.ds_id)
+            .iter()
+            .find(|f| f.id == fat.id)
+            .unwrap()
+            .times,
+        fat.times
+    );
+    assert!(
+        case.set_data_source_timezone(s.ds_id, "Mars/Olympus")
+            .is_err()
+    );
+}
+
+/// Records an operating-system information result with a Windows zone,
+/// as Recent Activity does.
+fn record_os_zone(case: &Case, ds_id: i64, zone: &str) {
+    let db = case.db();
+    let attr = db
+        .attribute_type(
+            "KAAMOS_TIMEZONE",
+            "Time Zone",
+            pm_casedb::catalog::ValueType::String,
+        )
+        .unwrap();
+    db.add_artifact(&pm_casedb::NewArtifact {
+        type_id: pm_casedb::catalog::artifact_type_id("KAAMOS_OS_INFO").unwrap(),
+        ds_id,
+        file_id: None,
+        source_artifact_id: None,
+        score: None,
+        conclusion: None,
+        configuration: None,
+        justification: None,
+        created_at: 0,
+        attributes: vec![(attr, pm_casedb::Value::Text(zone.into()), "test".into())],
+    })
+    .unwrap();
+}
+
+/// The system zone found by Recent Activity is compared with the data
+/// source's by offsets; a reviewed data source is not reported again.
+#[test]
+fn time_zone_mismatch_is_reported_until_reviewed() {
+    let (_dir, case, s) = loaded_case();
+    assert_eq!(
+        case.time_zone_mismatch(s.ds_id).unwrap(),
+        None,
+        "no OS info yet"
+    );
+    record_os_zone(&case, s.ds_id, "FLE Standard Time");
+    let m = case
+        .time_zone_mismatch(s.ds_id)
+        .unwrap()
+        .expect("UTC differs");
+    assert_eq!(
+        (m.system.as_str(), m.suggested.as_str(), m.current.as_str()),
+        ("FLE Standard Time", "Europe/Kyiv", "UTC")
+    );
+    // Helsinki keeps the same offsets as Kyiv: no warning.
+    case.set_data_source_timezone(s.ds_id, "Europe/Helsinki")
+        .unwrap();
+    assert_eq!(case.time_zone_mismatch(s.ds_id).unwrap(), None);
+    case.set_data_source_timezone(s.ds_id, "UTC").unwrap();
+    assert!(case.time_zone_mismatch(s.ds_id).unwrap().is_some());
+    case.mark_time_zone_reviewed(s.ds_id).unwrap();
+    assert_eq!(
+        case.time_zone_mismatch(s.ds_id).unwrap(),
+        None,
+        "kept by the examiner"
+    );
+}

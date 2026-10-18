@@ -1410,3 +1410,83 @@ fn gallery_shows_identical_pictures_once() {
         h.query_by_label_contains("7 pictures in").is_some()
     });
 }
+
+/// A case whose Recent Activity found a Windows time zone other than the
+/// data source's (UTC); returns its case file.
+fn case_with_system_zone(name: &str, zone: &str) -> PathBuf {
+    let dir = CASES.path().join(name);
+    let case = pm_case::Case::create(&dir, pm_case::CaseDetails::default()).unwrap();
+    let s = pm_case::add_image(
+        &case,
+        pm_testkit::demo::demo_disk_file(),
+        &pm_case::LoadOptions::default(),
+        &pm_case::LoadProgress::default(),
+    )
+    .unwrap();
+    let db = case.db();
+    let attr = db
+        .attribute_type(
+            "KAAMOS_TIMEZONE",
+            "Time Zone",
+            pm_casedb::catalog::ValueType::String,
+        )
+        .unwrap();
+    db.add_artifact(&pm_casedb::NewArtifact {
+        type_id: pm_casedb::catalog::artifact_type_id("KAAMOS_OS_INFO").unwrap(),
+        ds_id: s.ds_id,
+        file_id: None,
+        source_artifact_id: None,
+        score: None,
+        conclusion: None,
+        configuration: None,
+        justification: None,
+        created_at: 0,
+        attributes: vec![(attr, pm_casedb::Value::Text(zone.into()), "test".into())],
+    })
+    .unwrap();
+    dir.join("case.pmcase")
+}
+
+/// The system's time zone differs from the data source's: the examiner is
+/// told and switching re-reads the FAT times in the system's zone.
+#[test]
+fn time_zone_warning_offers_to_switch() {
+    let dir = case_with_system_zone("tz-warning", "FLE Standard Time");
+    let mut h = harness_with(vec![dir.clone()], false);
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Time zone differs").is_some()
+    });
+    h.get_by_label_contains("FLE Standard Time (Europe/Kyiv)");
+    shot(&mut h, "time_zone_warning");
+    click_exact(&mut h, "Switch to Europe/Kyiv");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Time zone differs").is_none()
+            && h.query_by_label_contains("Re-reading").is_none()
+    });
+    let db = pm_casedb::CaseDb::open_read_only(dir.with_file_name("case.db")).unwrap();
+    assert_eq!(db.data_sources().unwrap()[0].timezone, "Europe/Kyiv");
+    // Not asked again once the zones agree.
+    h.run_steps(5);
+    assert!(h.query_by_label_contains("Time zone differs").is_none());
+}
+
+/// Keeping the zone is remembered in the case.
+#[test]
+fn time_zone_warning_can_be_kept() {
+    let dir = case_with_system_zone("tz-keep", "Pacific Standard Time");
+    let mut h = harness_with(vec![dir.clone()], false);
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Time zone differs").is_some()
+    });
+    click_exact(&mut h, "Keep UTC");
+    h.run_steps(5);
+    assert!(h.query_by_label_contains("Time zone differs").is_none());
+    drop(h);
+    let mut h = harness_with(vec![dir], false);
+    settle(&mut h, |h| h.state().data_source_count() > 0);
+    h.run_steps(10);
+    assert!(
+        h.query_by_label_contains("Time zone differs").is_none(),
+        "not asked again after reopening"
+    );
+}

@@ -44,6 +44,12 @@ impl TimeZoneInfo {
     pub fn utc_offset_minutes(&self) -> Option<i32> {
         self.bias.map(|b| -b)
     }
+
+    /// The IANA zone of the Windows zone (CLDR mapping), e.g.
+    /// "America/Chicago" for "Central Standard Time".
+    pub fn iana(&self) -> Option<&'static str> {
+        pm_core::windows_zones::iana_zone(self.name()?)
+    }
 }
 
 /// A Windows upgrade recorded under `Setup\Source OS (Updated on …)`.

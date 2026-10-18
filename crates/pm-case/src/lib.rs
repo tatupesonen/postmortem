@@ -22,6 +22,8 @@ pub mod logical;
 mod logical_imager;
 pub mod raw_sources;
 pub mod spec;
+mod timezone;
+pub use timezone::ZoneMismatch;
 mod xry;
 
 pub use case::{

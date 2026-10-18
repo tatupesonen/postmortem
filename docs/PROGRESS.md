@@ -14,12 +14,6 @@ commit hook before the commit was visible, which caused the intermittent
 (semver, `DIRECTION.md`).
 
 Next:
-* Time-zone warning after Recent Activity (DIRECTION.md): map the
-  Windows zone (draft table of CLDR `windowsZones` in the scratchpad,
-  goes to `pm-winartifacts`), compare by offsets with the data source's
-  zone, offer to switch; switching re-reads FAT/exFAT times through
-  `FileSystem::metadata` with the new zone (exFAT entries with their own
-  UTC offset must not move).
 * ADR-023 steps 3–6 (split `app.rs`, UI task pool, rename the
   `pm-casedb` query layer, module API migration, ingest memory), the
   Postgres dialect layer (ADR-024), and the analyst-workflow features
