@@ -29,9 +29,12 @@ pub struct LocalDisk {
 /// says so when none are found.
 pub fn local_disks() -> Vec<LocalDisk> {
     let mut out = Vec::new();
-    let readable = |p: &Path| {
-        use std::io::Read;
-        std::fs::File::open(p).is_ok_and(|mut f| f.read(&mut [0u8; 1]).is_ok())
+    // Readable as postmortem reads it (whole sectors on Windows), with
+    // its size.
+    let probe = |p: &Path| -> Option<u64> {
+        let s = pm_core::io::FileSource::open(p).ok()?;
+        let mut b = [0u8; 1];
+        (pm_core::ReadAt::read_at(&s, 0, &mut b).ok()? == 1).then(|| pm_core::ReadAt::size(&s))
     };
     #[cfg(target_os = "linux")]
     {
@@ -57,11 +60,11 @@ pub fn local_disks() -> Vec<LocalDisk> {
                 }
                 for d in devs {
                     let path = PathBuf::from(format!("/dev/{d}"));
-                    if readable(&path) {
-                        let size = pm_core::io::FileSource::open(&path)
-                            .ok()
-                            .map(|s| pm_core::ReadAt::size(&s));
-                        out.push(LocalDisk { path, size });
+                    if let Some(size) = probe(&path) {
+                        out.push(LocalDisk {
+                            path,
+                            size: Some(size),
+                        });
                     }
                 }
             }
@@ -81,25 +84,29 @@ pub fn local_disks() -> Vec<LocalDisk> {
             names.sort();
             for n in names {
                 let path = PathBuf::from(format!("/dev/{n}"));
-                if readable(&path) {
-                    let size = pm_core::io::FileSource::open(&path)
-                        .ok()
-                        .map(|s| pm_core::ReadAt::size(&s));
-                    out.push(LocalDisk { path, size });
+                if let Some(size) = probe(&path) {
+                    out.push(LocalDisk {
+                        path,
+                        size: Some(size),
+                    });
                 }
             }
         }
     }
     #[cfg(windows)]
     {
-        // Autopsy probes \\.\PhysicalDrive0.. and gives up after four
-        // misses in a row.
+        // Autopsy (`PlatformUtil.getPhysicalDrives`) probes
+        // \\.\PhysicalDrive0.. and gives up after four misses in a row,
+        // then lists the volumes with a drive letter (`getPartitions`).
         let mut misses = 0;
         for i in 0..64 {
             let path = PathBuf::from(format!(r"\\.\PhysicalDrive{i}"));
-            if readable(&path) {
+            if let Some(size) = probe(&path) {
                 misses = 0;
-                out.push(LocalDisk { path, size: None });
+                out.push(LocalDisk {
+                    path,
+                    size: Some(size),
+                });
             } else {
                 misses += 1;
                 if misses >= 4 {
@@ -107,8 +114,17 @@ pub fn local_disks() -> Vec<LocalDisk> {
                 }
             }
         }
+        for letter in 'A'..='Z' {
+            let path = PathBuf::from(format!(r"\\.\{letter}:"));
+            if let Some(size) = probe(&path) {
+                out.push(LocalDisk {
+                    path,
+                    size: Some(size),
+                });
+            }
+        }
     }
-    let _ = readable;
+    let _ = probe;
     out
 }
 

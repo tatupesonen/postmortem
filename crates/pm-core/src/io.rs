@@ -142,41 +142,71 @@ impl ReadAt for MemSource {
     }
 }
 
-/// A local file read with positional IO (`pread` / `seek_read`).
+/// A local file or device read with positional IO (`pread` /
+/// `seek_read`).
+///
+/// Devices (a local disk or volume) differ from files in two ways the
+/// source hides: Windows accepts only reads whose offset and length are
+/// whole sectors (`\\.\PhysicalDrive0`, `\\.\C:`), and neither a
+/// file length nor, on Windows, the end of the file gives a disk's size.
+/// Reads of a device are therefore widened to whole sectors, and its size
+/// is found by probing when the system does not report it.
 #[derive(Debug)]
 pub struct FileSource {
     file: File,
     size: u64,
+    /// Sector size reads are aligned to (0: no alignment needed).
+    align: u64,
 }
 
 impl FileSource {
     pub fn open(path: impl AsRef<Path>) -> io::Result<Self> {
-        Self::from_file(File::open(path)?)
+        let path = path.as_ref();
+        let file = File::open(path)?;
+        if is_device_path(path) {
+            Ok(Self::device(file))
+        } else {
+            Self::from_file(file)
+        }
     }
 
     /// Wraps an already-open file. The size is sampled once.
-    pub fn from_file(mut file: File) -> io::Result<Self> {
-        let md = file.metadata()?;
-        let size = if md.is_file() {
-            md.len()
-        } else {
-            // Block devices (a local disk) report no length; their end
-            // does.
-            use std::io::Seek;
-            let end = file.seek(io::SeekFrom::End(0)).unwrap_or(0);
-            file.seek(io::SeekFrom::Start(0))?;
-            end
-        };
-        Ok(Self { file, size })
-    }
-}
-
-impl ReadAt for FileSource {
-    fn read_at(&self, offset: u64, buf: &mut [u8]) -> io::Result<usize> {
-        if offset >= self.size {
-            return Ok(0);
+    pub fn from_file(file: File) -> io::Result<Self> {
+        // Device handles may not answer metadata queries at all.
+        if let Ok(md) = file.metadata()
+            && md.is_file()
+        {
+            return Ok(Self {
+                file,
+                size: md.len(),
+                align: 0,
+            });
         }
-        let buf = clamp_mut(buf, self.size - offset);
+        Ok(Self::device(file))
+    }
+
+    /// A disk or volume: sized from its end or by probing, read in whole
+    /// sectors on Windows.
+    fn device(mut file: File) -> Self {
+        let end = std::io::Seek::seek(&mut file, io::SeekFrom::End(0)).unwrap_or(0);
+        let _ = std::io::Seek::seek(&mut file, io::SeekFrom::Start(0));
+        let mut s = Self {
+            file,
+            size: u64::MAX,
+            align: 0,
+        };
+        if cfg!(windows) {
+            s.align = device_alignment(|off, buf| s.raw_read(off, buf));
+        }
+        s.size = if end > 0 {
+            end
+        } else {
+            probe_size(|off, buf| s.read_at(off, buf), s.align.max(512))
+        };
+        s
+    }
+
+    fn raw_read(&self, offset: u64, buf: &mut [u8]) -> io::Result<usize> {
         #[cfg(unix)]
         {
             std::os::unix::fs::FileExt::read_at(&self.file, buf, offset)
@@ -186,9 +216,107 @@ impl ReadAt for FileSource {
             std::os::windows::fs::FileExt::seek_read(&self.file, buf, offset)
         }
     }
+}
+
+impl ReadAt for FileSource {
+    fn read_at(&self, offset: u64, buf: &mut [u8]) -> io::Result<usize> {
+        if offset >= self.size {
+            return Ok(0);
+        }
+        let buf = clamp_mut(buf, self.size - offset);
+        if self.align == 0 {
+            self.raw_read(offset, buf)
+        } else {
+            read_aligned(|o, b| self.raw_read(o, b), self.align, offset, buf)
+        }
+    }
     fn size(&self) -> u64 {
         self.size
     }
+}
+
+/// Whether `path` names a Windows device (`\\.\PhysicalDrive0`,
+/// `\\.\C:`), whose handle reports itself as an empty file.
+fn is_device_path(path: &Path) -> bool {
+    let s = path.as_os_str().to_string_lossy();
+    s.starts_with(r"\\.\") || s.starts_with("//./")
+}
+
+/// The sector size a device accepts: 512, or 4096 for 4K-native disks
+/// (whose 512-byte reads fail). 0 when even that fails (not a device that
+/// needs alignment, or unreadable: errors then surface on use).
+fn device_alignment(read: impl Fn(u64, &mut [u8]) -> io::Result<usize>) -> u64 {
+    for a in [512u64, 4096] {
+        let mut b = vec![0u8; a as usize];
+        if read(0, &mut b).is_ok_and(|n| n > 0) {
+            return a;
+        }
+    }
+    0
+}
+
+/// Reads `buf.len()` bytes at `offset` through `read`, which accepts only
+/// offsets and lengths that are multiples of `align`.
+pub fn read_aligned(
+    read: impl Fn(u64, &mut [u8]) -> io::Result<usize>,
+    align: u64,
+    offset: u64,
+    buf: &mut [u8],
+) -> io::Result<usize> {
+    let start = offset - offset % align;
+    let end = (offset + buf.len() as u64).div_ceil(align) * align;
+    if start == offset && end == offset + buf.len() as u64 {
+        return read(offset, buf);
+    }
+    let len = usize::try_from(end - start).map_err(|_| io::Error::other("read too large"))?;
+    let mut tmp = vec![0u8; len];
+    let mut got = 0usize;
+    while got < len {
+        let chunk = tmp.get_mut(got..).unwrap_or_default();
+        match read(start + got as u64, chunk) {
+            Ok(0) => break,
+            Ok(n) => got += n,
+            Err(e) if e.kind() == io::ErrorKind::Interrupted => {}
+            // Past the end of the device a sector read fails: keep what
+            // was read.
+            Err(_) if got > 0 => break,
+            Err(e) => return Err(e),
+        }
+    }
+    let skip = usize::try_from(offset - start).unwrap_or(usize::MAX);
+    let avail = got.saturating_sub(skip).min(buf.len());
+    if let (Some(dst), Some(src)) = (buf.get_mut(..avail), tmp.get(skip..skip + avail)) {
+        dst.copy_from_slice(src);
+    }
+    Ok(avail)
+}
+
+/// The size of a device that does not report one: the end of the last
+/// readable `sector` found by doubling, then bisecting.
+pub fn probe_size(read: impl Fn(u64, &mut [u8]) -> io::Result<usize>, sector: u64) -> u64 {
+    let mut b = vec![0u8; sector as usize];
+    let ok = |n: u64, b: &mut [u8]| read(n * sector, b).is_ok_and(|r| r > 0);
+    if !ok(0, &mut b) {
+        return 0;
+    }
+    // Sector `lo` is readable, `hi` is not.
+    let (mut lo, mut hi) = (0u64, 1u64);
+    while ok(hi, &mut b) {
+        lo = hi;
+        hi = match hi.checked_mul(2) {
+            Some(h) if h < u64::MAX / sector => h,
+            _ => return (lo + 1) * sector,
+        };
+    }
+    while hi - lo > 1 {
+        let mid = lo + (hi - lo) / 2;
+        if ok(mid, &mut b) {
+            lo = mid;
+        } else {
+            hi = mid;
+        }
+    }
+    (lo + 1) * sector
 }
 
 /// A window `[start, start + len)` into another source.
@@ -326,6 +454,46 @@ mod tests {
         assert_eq!(&buf[..2], &[8, 9]);
         assert_eq!(src.read_at(10, &mut buf).unwrap(), 0);
         assert_eq!(src.read_at(u64::MAX, &mut buf).unwrap(), 0);
+    }
+
+    /// A device that accepts only whole 512-byte sectors, like a Windows
+    /// physical drive.
+    fn sector_device(data: Vec<u8>) -> impl Fn(u64, &mut [u8]) -> io::Result<usize> {
+        move |off, buf| {
+            if off % 512 != 0 || buf.len() % 512 != 0 {
+                return Err(io::Error::from(io::ErrorKind::InvalidInput));
+            }
+            let off = usize::try_from(off).unwrap();
+            if off >= data.len() {
+                return Err(io::Error::from(io::ErrorKind::InvalidInput));
+            }
+            let n = buf.len().min(data.len() - off);
+            buf[..n].copy_from_slice(&data[off..off + n]);
+            Ok(n)
+        }
+    }
+
+    #[test]
+    fn unaligned_reads_of_a_sector_device() {
+        let data: Vec<u8> = (0..512 * 9).map(|i| (i % 251) as u8).collect();
+        let dev = sector_device(data.clone());
+        let mut one = [0u8; 1];
+        assert!(dev(0, &mut one).is_err(), "the device itself refuses");
+        assert_eq!(read_aligned(&dev, 512, 0, &mut one).unwrap(), 1);
+        assert_eq!(one[0], data[0]);
+        let mut mid = vec![0u8; 1000];
+        assert_eq!(read_aligned(&dev, 512, 700, &mut mid).unwrap(), 1000);
+        assert_eq!(mid, data[700..1700]);
+        // Up to the end, then short.
+        let mut tail = vec![0u8; 100];
+        assert_eq!(
+            read_aligned(&dev, 512, 512 * 9 - 40, &mut tail).unwrap(),
+            40
+        );
+        assert_eq!(probe_size(&dev, 512), 512 * 9);
+        assert_eq!(probe_size(sector_device(vec![0; 512]), 512), 512);
+        assert_eq!(probe_size(sector_device(Vec::new()), 512), 0);
+        assert_eq!(device_alignment(&dev), 512);
     }
 
     #[test]

@@ -353,7 +353,8 @@ impl Case {
     fn reopen(&self, rec: &DataSourceRecord) -> Result<OpenSource> {
         let paths: Vec<PathBuf> = rec.paths.iter().map(PathBuf::from).collect();
         let first = paths.first().cloned().unwrap_or_default();
-        if !first.is_file() {
+        // A local disk is a device, not a file.
+        if !(first.is_file() || std::fs::File::open(&first).is_ok()) {
             return Err(CaseError::MissingEvidence {
                 ds_id: rec.id,
                 path: first,
