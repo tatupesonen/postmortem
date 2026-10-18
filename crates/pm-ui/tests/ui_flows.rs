@@ -837,7 +837,7 @@ fn tagging_results_from_the_result_table() {
     h.query_all_by_label(src).next().unwrap().click_secondary();
     h.run_steps(2);
     click(&mut h, "Add Result Tag");
-    click_exact(&mut h, "Follow Up");
+    click(&mut h, "Follow Up");
     settle(&mut h, |h| {
         h.query_by_label_contains("Follow Up (1)").is_some()
     });
