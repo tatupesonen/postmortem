@@ -14,6 +14,9 @@ Releases since 0.2.0 (2026-10-18; tags per feature, semver in
   `app/`, components own their change handling, `pm_casedb::query`.
 * 0.2.3: command palette (Ctrl+K, `file:N` / `artifact:N`), keyboard
   shortcuts (Ctrl+E/F/1–9, J/K, 1–9 tags, Help › Keyboard Shortcuts).
+* 0.2.5: Case Overview dashboard (default page), IOC Search, timeline
+  context (±N around an item, collapsed repeats, exclude text), tree
+  nodes clicked while still leaves open once they get children.
 * 0.2.4: Pivot window, Notes with findings in the HTML report
   (schema v4), tree nodes keep their open state.
 
@@ -21,8 +24,8 @@ Machine notes: heavy jobs run through `~/slop/heavy.sh` (own systemd
 unit, memory capped); systemd-oomd killed the terminal scope otherwise.
 
 Next:
-* Analyst workflow (`BEYOND-AUTOPSY.md` §8): triage dashboard, saved
-  filters, review state, timeline context, IOC import.
+* Analyst workflow (`BEYOND-AUTOPSY.md` §8): review state (seen marks,
+  unseen counts), saved filters and views, screenshots in notes.
 * ADR-023 item 5 (module API migration; needs plugin API additions: known
   status, data-source time zone, random-access reads), the Postgres
   dialect layer (ADR-024).
