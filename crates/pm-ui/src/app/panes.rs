@@ -176,6 +176,9 @@ impl PostmortemApp {
         if let Some(v) = &ev.pivot {
             self.pivot = Some(crate::pivot::PivotWindow::new(v));
         }
+        if let Some(id) = ev.note.and_then(|i| rows.get(i)).and_then(FileRow::file_id) {
+            self.note_about(pm_casedb::ObjKind::File, id);
+        }
         // The table's selection, for shortcuts (Ctrl+B) that act on it.
         self.marked_files = ev
             .marked
@@ -627,6 +630,9 @@ impl PostmortemApp {
         }
         if let Some(v) = ev.pivot.clone() {
             self.pivot = Some(crate::pivot::PivotWindow::new(&v));
+        }
+        if let Some(r) = ev.note.and_then(|i| rows.rows.get(i)) {
+            self.note_about(pm_casedb::ObjKind::Artifact, r.artifact.id);
         }
         if let Some(i) = ev.clicked {
             self.result_selected = Some(i);

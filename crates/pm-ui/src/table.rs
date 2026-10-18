@@ -159,6 +159,8 @@ pub(crate) struct TableEvents {
     pub(crate) marked: Vec<usize>,
     /// Pivot on a value of the clicked row (name, MD5).
     pub(crate) pivot: Option<String>,
+    /// Add Note… about the clicked row.
+    pub(crate) note: Option<usize>,
 }
 
 /// A row's identity in a listing: the case file id, then inode and stream
@@ -583,6 +585,10 @@ impl TableState {
                             }
                             if ui.button("Copy Path").clicked() {
                                 ui.ctx().copy_text(r.path.clone());
+                                ui.close();
+                            }
+                            if r.file_id().is_some() && ui.button("Add Note…").clicked() {
+                                ev.note = Some(i);
                                 ui.close();
                             }
                             ui.menu_button("Pivot on", |ui| {

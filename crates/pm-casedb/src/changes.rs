@@ -39,10 +39,12 @@ pub enum Domain {
     Reports,
     /// Ingest job records.
     IngestJobs,
+    /// The examiner's notes.
+    Notes,
 }
 
 impl Domain {
-    pub const ALL: [Self; 11] = [
+    pub const ALL: [Self; 12] = [
         Self::Files,
         Self::Artifacts,
         Self::Tags,
@@ -54,6 +56,7 @@ impl Domain {
         Self::Accounts,
         Self::Reports,
         Self::IngestJobs,
+        Self::Notes,
     ];
 
     fn bit(self) -> u32 {
@@ -82,6 +85,7 @@ impl Domain {
             "accounts" | "account_types" | "account_relationships" => Self::Accounts,
             "reports" => Self::Reports,
             "ingest_jobs" | "ingest_job_modules" => Self::IngestJobs,
+            "notes" => Self::Notes,
             _ => return None,
         })
     }

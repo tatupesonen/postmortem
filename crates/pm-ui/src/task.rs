@@ -14,8 +14,13 @@ use parking_lot::Mutex;
 
 static RUNNING: AtomicUsize = AtomicUsize::new(0);
 
-/// Threads of the UI pool: queries are mostly IO-bound and short.
-const UI_THREADS: usize = 4;
+/// Threads of the UI pool: half the cores, at least four (queries are
+/// mostly short and IO-bound, but a slow one must not hold up the rest).
+fn ui_threads() -> usize {
+    std::thread::available_parallelism()
+        .map_or(4, |n| n.get() / 2)
+        .max(4)
+}
 
 /// The UI pool (`None` if its threads could not be started: tasks then
 /// share the global pool).
@@ -23,7 +28,7 @@ fn pool() -> Option<&'static rayon::ThreadPool> {
     static POOL: std::sync::OnceLock<Option<rayon::ThreadPool>> = std::sync::OnceLock::new();
     POOL.get_or_init(|| {
         rayon::ThreadPoolBuilder::new()
-            .num_threads(UI_THREADS)
+            .num_threads(ui_threads())
             .thread_name(|i| format!("pm-ui-task-{i}"))
             .build()
             .ok()

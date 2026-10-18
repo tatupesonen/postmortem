@@ -116,6 +116,8 @@ impl PostmortemApp {
         self.analysis.lock().close();
         self.change_watch.reset();
         self.tz_check.clear();
+        self.notes = None;
+        self.pivot = None;
         self.listings.clear();
         self.selected = None;
         self.back.clear();
@@ -323,6 +325,11 @@ impl PostmortemApp {
                     self.viewer.refresh_hashes();
                 }
                 Watch::Results if due.rows => self.tz_check.refresh(),
+                Watch::Notes => {
+                    if let Some(n) = &mut self.notes {
+                        n.refresh();
+                    }
+                }
                 Watch::Annotations if due.rows => self.listings.clear(),
                 Watch::Sources => {
                     self.case_sources.refresh();

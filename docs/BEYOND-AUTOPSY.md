@@ -194,7 +194,11 @@ otherwise.
    result and file tables (Pivot on › value / name / MD5). Timeline
    events are not searched yet.
 5. **Notes and findings**: a per-case notebook; tagged items, screenshots
-   and comments become a findings list that feeds the report.
+   and comments become a findings list that feeds the report. **[done
+   2026-10-18]**: schema v4 `notes` table (`pm-casedb/src/notes.rs`,
+   change-bus domain Notes), Tools › Notes (`pm-ui/src/notes_ui.rs`),
+   Add Note… in file and result row menus, notes marked Finding listed in
+   the HTML report's summary. Screenshots in notes are not done.
 6. **Triage dashboard** on case open: OS and users, programs, USB
    devices, top domains, notable hits, encryption, timeline density,
    time-zone warnings.

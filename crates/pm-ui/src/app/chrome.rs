@@ -191,6 +191,14 @@ impl PostmortemApp {
                     self.palette.open();
                     ui.close();
                 }
+                if ui
+                    .add_enabled(self.has_case(), egui::Button::new("📝 Notes"))
+                    .clicked()
+                {
+                    self.notes
+                        .get_or_insert_with(crate::notes_ui::NotesWindow::default);
+                    ui.close();
+                }
                 ui.separator();
                 if ui.button("⚙ Ingest Progress").clicked() {
                     self.progress_open = true;

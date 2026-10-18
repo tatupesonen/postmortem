@@ -368,6 +368,8 @@ pub(crate) struct ResultEvents {
     pub(crate) marked: Vec<usize>,
     /// Pivot on a value of the row.
     pub(crate) pivot: Option<String>,
+    /// Add Note… about the row.
+    pub(crate) note: Option<usize>,
 }
 
 /// A sortable, horizontally scrolling table of results.
@@ -532,6 +534,10 @@ impl ResultTable {
                                     }
                                 }
                                 ui.separator();
+                                if ui.button("Add Note…").clicked() {
+                                    ev.note = Some(i);
+                                    ui.close();
+                                }
                                 ui.menu_button("Pivot on", |ui| {
                                     for (name, v) in &r.attrs {
                                         if let AttrValue::Text(t) = v

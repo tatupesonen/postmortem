@@ -322,6 +322,7 @@ impl PostmortemApp {
     pub(super) fn dialogs(&mut self, ctx: &egui::Context) {
         self.command_palette(ctx);
         self.pivot_window(ctx);
+        self.notes_window(ctx);
         self.file_search_window(ctx);
         self.keyword_panel(ctx);
         let case = self.analysis.lock().case().cloned();
@@ -544,5 +545,36 @@ impl PostmortemApp {
             Some(crate::pivot::Open::Artifact(id)) => self.reveal_artifact(id),
             None => {}
         }
+    }
+
+    /// Tools › Notes: links open the noted file or result.
+    fn notes_window(&mut self, ctx: &egui::Context) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            self.notes = None;
+            return;
+        };
+        let Some(n) = self.notes.as_mut() else {
+            return;
+        };
+        let (chosen, keep) = n.ui(ctx, &case);
+        if !keep {
+            self.notes = None;
+        }
+        match chosen {
+            Some(crate::pivot::Open::File(id)) => self.reveal_file(id),
+            Some(crate::pivot::Open::Artifact(id)) => self.reveal_artifact(id),
+            None => {}
+        }
+    }
+
+    /// Opens Notes with a new note about `kind`/`id`.
+    pub(super) fn note_about(&mut self, kind: pm_casedb::ObjKind, id: i64) {
+        let Some(case) = self.analysis.lock().case().cloned() else {
+            return;
+        };
+        let label = crate::notes_ui::about_label(&case, kind, id);
+        self.notes
+            .get_or_insert_with(crate::notes_ui::NotesWindow::default)
+            .note_about(kind, id, label);
     }
 }

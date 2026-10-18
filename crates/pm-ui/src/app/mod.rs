@@ -132,6 +132,8 @@ pub struct PostmortemApp {
     palette: crate::palette::Palette,
     /// Pivot windows' state (one window, value changeable).
     pivot: Option<crate::pivot::PivotWindow>,
+    /// Tools › Notes.
+    notes: Option<crate::notes_ui::NotesWindow>,
     /// Results selected in the result table shown last frame.
     marked_results: Vec<i64>,
     /// Data of the tree and result panes, each refreshed from the change
@@ -219,6 +221,7 @@ impl PostmortemApp {
             marked_files: Vec::new(),
             palette: crate::palette::Palette::default(),
             pivot: None,
+            notes: None,
             marked_results: Vec::new(),
             results: crate::results::ResultData::default(),
             views: crate::views::ViewData::default(),
@@ -256,6 +259,11 @@ impl PostmortemApp {
             }
         }
         app
+    }
+
+    /// Background UI tasks still running (test diagnostics).
+    pub fn running_tasks(&self) -> usize {
+        crate::task::running()
     }
 
     /// Number of data sources in the open case (as the tree last read

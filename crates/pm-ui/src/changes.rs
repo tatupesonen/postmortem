@@ -30,16 +30,19 @@ pub(crate) enum Watch {
     Reports,
     /// Timeline events (artifact events and file times).
     Timeline,
+    /// The examiner's notes.
+    Notes,
 }
 
 impl Watch {
-    pub(crate) const ALL: [Self; 6] = [
+    pub(crate) const ALL: [Self; 7] = [
         Self::Files,
         Self::Results,
         Self::Annotations,
         Self::Sources,
         Self::Reports,
         Self::Timeline,
+        Self::Notes,
     ];
 
     fn domains(self) -> &'static [Domain] {
@@ -50,6 +53,7 @@ impl Watch {
             Self::Sources => &[Domain::DataSources, Domain::Hosts],
             Self::Reports => &[Domain::Reports],
             Self::Timeline => &[Domain::Events, Domain::Files],
+            Self::Notes => &[Domain::Notes],
         }
     }
 }

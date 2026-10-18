@@ -31,10 +31,11 @@ pub(crate) enum Tool {
     IngestProgress,
     Plugins,
     Options,
+    Notes,
 }
 
 impl Tool {
-    const ALL: [(Self, &'static str); 14] = [
+    const ALL: [(Self, &'static str); 15] = [
         (Self::NewCase, "New Case…"),
         (Self::OpenCase, "Open Case…"),
         (Self::AddDataSource, "Add Data Source…"),
@@ -49,6 +50,7 @@ impl Tool {
         (Self::IngestProgress, "Ingest Progress"),
         (Self::Plugins, "Plugins"),
         (Self::Options, "Options"),
+        (Self::Notes, "Notes"),
     ];
 }
 

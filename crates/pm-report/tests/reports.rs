@@ -81,6 +81,19 @@ fn case() -> (tempfile::TempDir, Arc<Case>) {
         .remove(0);
     db.tag_artifact(download.id, notable.id, "installer", "examiner", 2)
         .unwrap();
+    // The examiner's notes: one finding about a file, one plain note.
+    let n = db
+        .add_note(
+            "Router password <stored> in plain text",
+            Some((pm_casedb::ObjKind::File, pw.id)),
+            "examiner",
+            3,
+        )
+        .unwrap();
+    db.update_note(n, "Router password <stored> in plain text", true, 4)
+        .unwrap();
+    db.add_note("Check the VPN logs later", None, "examiner", 5)
+        .unwrap();
     (dir, case)
 }
 
@@ -117,6 +130,11 @@ fn html_report_has_autopsys_layout_and_tables() {
         summary.contains("Demo &lt;Case&gt; Forensic Report"),
         "escaped case name"
     );
+    // Findings, not plain notes, are in the summary.
+    assert!(summary.contains("<h2>Findings</h2>"));
+    assert!(summary.contains("Router password &lt;stored&gt; in plain text"));
+    assert!(summary.contains("passwords.txt"), "the noted file's path");
+    assert!(!summary.contains("VPN logs"), "plain notes stay out");
     let downloads = read(&content.join("Web_Downloads.html"));
     for h in [
         "<th>Destination</th>",

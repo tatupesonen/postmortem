@@ -132,13 +132,17 @@ fn settle(
             // What was on screen, so a CI failure says what was missing.
             let labels: Vec<String> = h
                 .query_all(egui_kittest::kittest::by())
-                .filter_map(|n| n.accesskit_node().label())
+                .filter_map(|n| {
+                    let a = n.accesskit_node();
+                    a.label().or_else(|| a.value())
+                })
                 .filter(|l| !l.trim().is_empty())
                 .take(200)
                 .collect();
             panic!(
-                "UI did not settle after {:?}; visible labels: {labels:?}",
-                settle_timeout()
+                "UI did not settle after {:?} ({} UI tasks running); visible labels: {labels:?}",
+                settle_timeout(),
+                h.state().running_tasks()
             );
         }
         std::thread::sleep(Duration::from_millis(5));
@@ -1575,6 +1579,7 @@ fn multi_select_in_result_tables() {
 fn type_focused(h: &mut Harness<'_, PostmortemApp>, text: &str) {
     h.run_steps(2);
     h.query_all_by_role(egui::accesskit::Role::TextInput)
+        .chain(h.query_all_by_role(egui::accesskit::Role::MultilineTextInput))
         .find(egui_kittest::Node::is_focused)
         .expect("a focused text field")
         .type_text(text);
@@ -1727,4 +1732,42 @@ fn pivot_on_a_result_value() {
     press(&mut h, egui::Key::K, egui::Modifiers::COMMAND);
     type_focused(&mut h, "alice");
     h.get_by_label("Pivot on “alice”");
+}
+
+/// Add Note… from a file's menu writes a note about it in Tools › Notes.
+#[test]
+fn notes_about_a_file() {
+    let mut h = harness(vec![demo()]);
+    h.set_size(egui::vec2(1400.0, 1200.0));
+    wait_analysed(&mut h);
+    settle(&mut h, |h| h.state().data_source_count() > 0);
+    click_exact(&mut h, "🖴 demo.dd");
+    for label in ["NTFS / exFAT", "/ (NTFS)", "Users", "alice", "Pictures"] {
+        click(&mut h, label);
+        settle(&mut h, |h| {
+            h.query_all_by_label_contains("Loading").next().is_none()
+        });
+    }
+    click_exact(&mut h, "🗀 Pictures");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("🗋 sunset.bmp").is_some()
+    });
+    h.get_by_label_contains("🗋 sunset.bmp").click_secondary();
+    h.run_steps(2);
+    click_exact(&mut h, "Add Note…");
+    settle(&mut h, |h| h.query_by_label("About:").is_some());
+    type_focused(&mut h, "Sunset photo taken at the meeting place");
+    click_exact(&mut h, "Add Note");
+    settle(&mut h, |h| {
+        h.query_by_label("Sunset photo taken at the meeting place")
+            .is_some()
+    });
+    // The note links to its file.
+    assert!(
+        h.query_all_by_label_contains("/Users/alice/Pictures/sunset.bmp")
+            .next()
+            .is_some()
+    );
+    h.get_by_label("Finding");
+    shot(&mut h, "notes");
 }

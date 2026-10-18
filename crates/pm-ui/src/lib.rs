@@ -23,6 +23,7 @@ mod hosts_ui;
 mod icons;
 mod keyword_search_ui;
 mod model;
+mod notes_ui;
 mod options_hashsets;
 mod options_ui;
 mod palette;

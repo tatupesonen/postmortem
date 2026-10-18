@@ -164,8 +164,53 @@ fn summary_html(case: &Case, settings: &ReportSettings) -> String {
         }
         s.push_str("</table>\n");
     }
+    findings_html(case, &mut s);
     s.push_str("</div>\n</body>\n</html>");
     s
+}
+
+/// The examiner's notes marked as findings (Tools › Notes), newest first.
+fn findings_html(case: &Case, s: &mut String) {
+    let db = case.db();
+    let notes = db.notes(true).unwrap_or_default();
+    if notes.is_empty() {
+        return;
+    }
+    s.push_str("<h2>Findings</h2>\n<table>\n<tr><th>Finding</th><th>About</th><th>Examiner</th><th>Date</th></tr>\n");
+    for n in &notes {
+        let about = match n.about {
+            Some((pm_casedb::ObjKind::File, id)) => db
+                .file(id)
+                .ok()
+                .flatten()
+                .map_or_else(|| format!("file:{id}"), |f| f.path()),
+            Some((pm_casedb::ObjKind::Artifact, id)) => db
+                .artifact(id)
+                .ok()
+                .flatten()
+                .and_then(|a| {
+                    pm_casedb::catalog::ARTIFACT_TYPES
+                        .iter()
+                        .find(|t| t.0 == a.type_id)
+                        .map(|t| format!("{} (artifact:{id})", t.2))
+                })
+                .unwrap_or_else(|| format!("artifact:{id}")),
+            Some((_, id)) => format!("{id}"),
+            None => String::new(),
+        };
+        let date = jiff::Timestamp::from_second(n.updated_at)
+            .map(|t| t.strftime("%Y-%m-%d %H:%M UTC").to_string())
+            .unwrap_or_default();
+        let _ = writeln!(
+            s,
+            "<tr><td>{}</td><td>{}</td><td>{}</td><td>{}</td></tr>",
+            esc(&n.text).replace('\n', "<br>"),
+            esc(&about),
+            esc(&n.examiner),
+            esc(&date)
+        );
+    }
+    s.push_str("</table>\n");
 }
 
 impl TableReportModule for HtmlReport {

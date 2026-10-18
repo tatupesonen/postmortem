@@ -155,6 +155,10 @@ impl PostmortemApp {
             Tool::IngestProgress => self.progress_open = true,
             Tool::Plugins => self.plugins_open = true,
             Tool::Options => self.open_options(),
+            Tool::Notes => {
+                self.notes
+                    .get_or_insert_with(crate::notes_ui::NotesWindow::default);
+            }
         }
     }
 

@@ -885,3 +885,37 @@ fn artifacts_with_a_value_are_found() {
         "{plan:?}"
     );
 }
+
+/// The notebook: notes about files or results, findings, and the change
+/// bus's Notes domain.
+#[test]
+fn notes_are_kept_and_marked_as_findings() {
+    use pm_casedb::changes::Domain;
+    let (_dir, db) = new_db();
+    let (_, a, _) = populate(&db);
+    let before = db.changes().generation(Domain::Notes);
+    let n1 = db
+        .add_note("Look at the VPN logs", None, "jdoe", 100)
+        .unwrap();
+    let n2 = db
+        .add_note("Exfiltration tool", Some((ObjKind::File, a)), "jdoe", 200)
+        .unwrap();
+    assert!(db.changes().generation(Domain::Notes) > before);
+    let all = db.notes(false).unwrap();
+    assert_eq!(
+        all.iter().map(|n| n.id).collect::<Vec<_>>(),
+        [n2, n1],
+        "newest first"
+    );
+    assert_eq!(all[0].about, Some((ObjKind::File, a)));
+    assert!(db.notes(true).unwrap().is_empty());
+    db.update_note(n2, "Exfiltration tool (rclone)", true, 300)
+        .unwrap();
+    let findings = db.notes(true).unwrap();
+    assert_eq!(findings.len(), 1);
+    assert_eq!(findings[0].text, "Exfiltration tool (rclone)");
+    assert_eq!(findings[0].updated_at, 300);
+    db.delete_note(n1).unwrap();
+    assert_eq!(db.notes(false).unwrap().len(), 1);
+    assert!(db.note(n1).unwrap().is_none());
+}
