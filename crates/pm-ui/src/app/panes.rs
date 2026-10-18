@@ -420,8 +420,15 @@ impl PostmortemApp {
             )
             .inner;
         if let Some((target, tag)) = remove {
-            self.tagging
-                .request(&ctx, &case, target, crate::tags_ui::TagRequest::Remove(tag));
+            self.tagging.request(
+                &ctx,
+                &case,
+                target,
+                crate::tags_ui::TagRequest::Remove {
+                    tag_id: tag,
+                    tag_name_id: None,
+                },
+            );
         }
         let file_of = |r: &crate::case_nodes::RowRef| match r {
             crate::case_nodes::RowRef::File { file, .. } => Some(file.clone()),
@@ -593,21 +600,27 @@ impl PostmortemApp {
             self.result_selected,
             Some(&tags),
         );
-        if let Some((i, which, req)) = ev.tag
-            && let Some(r) = rows.rows.get(i)
-        {
+        self.marked_results = ev
+            .marked
+            .iter()
+            .filter_map(|&i| rows.rows.get(i).map(|r| r.artifact.id))
+            .collect();
+        if let Some((sel, which, req)) = ev.tag {
+            let picked = sel.iter().filter_map(|&i| rows.rows.get(i));
             let target = match which {
                 crate::results::TagFor::Result => {
-                    Some(crate::tags_ui::TagTarget::Artifacts(vec![r.artifact.id]))
+                    crate::tags_ui::TagTarget::Artifacts(picked.map(|r| r.artifact.id).collect())
                 }
-                crate::results::TagFor::SourceFile => r
-                    .file
-                    .as_ref()
-                    .map(|f| crate::tags_ui::TagTarget::Files(vec![f.id])),
+                crate::results::TagFor::SourceFile => {
+                    let mut files: Vec<i64> = picked
+                        .filter_map(|r| r.file.as_ref().map(|f| f.id))
+                        .collect();
+                    files.sort_unstable();
+                    files.dedup();
+                    crate::tags_ui::TagTarget::Files(files)
+                }
             };
-            if let Some(target) = target {
-                self.tagging.request(ui.ctx(), &case, target, req);
-            }
+            self.tagging.request(ui.ctx(), &case, target, req);
         }
         if let Some(i) = ev.clicked {
             self.result_selected = Some(i);

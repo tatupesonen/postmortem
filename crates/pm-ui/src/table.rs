@@ -1,7 +1,6 @@
 //! Result table: a virtualised, sortable listing of files.
 
 use std::cmp::Ordering;
-use std::collections::BTreeSet;
 
 use egui_extras::{Column, TableBuilder};
 
@@ -167,6 +166,14 @@ fn key_of(r: &FileRow) -> RowKey {
     (r.inode, r.stream)
 }
 
+/// Row keys in display order.
+fn keys_of(rows: &[FileRow], order: &[usize]) -> Vec<RowKey> {
+    order
+        .iter()
+        .filter_map(|&i| rows.get(i).map(key_of))
+        .collect()
+}
+
 /// What the row context menu offers beyond the built-in actions.
 #[derive(Debug, Clone, Copy, Default)]
 pub(crate) struct RowMenus<'a> {
@@ -182,16 +189,9 @@ pub(crate) struct RowMenus<'a> {
 pub struct TableState {
     pub sort: Col,
     pub ascending: bool,
-    /// The focused row (shown in the viewer).
+    /// The selected rows and the focused one (shown in the viewer).
     #[serde(skip)]
-    pub selected: Option<RowKey>,
-    /// Every selected row (Ctrl+click, Shift+click, Ctrl+A), including
-    /// the focused one.
-    #[serde(skip)]
-    marked: BTreeSet<RowKey>,
-    /// Where a Shift selection starts.
-    #[serde(skip)]
-    anchor: Option<RowKey>,
+    sel: crate::selection::Selection<RowKey>,
     #[serde(skip)]
     order: Option<(usize, Col, bool, Vec<usize>)>,
 }
@@ -201,9 +201,7 @@ impl Default for TableState {
         Self {
             sort: Col::Name,
             ascending: true,
-            selected: None,
-            marked: BTreeSet::new(),
-            anchor: None,
+            sel: crate::selection::Selection::default(),
             order: None,
         }
     }
@@ -212,61 +210,13 @@ impl Default for TableState {
 impl TableState {
     /// Clears the selection and cached order when the listing changes.
     pub fn reset(&mut self) {
-        self.selected = None;
-        self.marked.clear();
-        self.anchor = None;
+        self.sel.clear();
         self.order = None;
-    }
-
-    /// Selects only `key`.
-    fn select_one(&mut self, key: RowKey) {
-        self.selected = Some(key);
-        self.marked = BTreeSet::from([key]);
-        self.anchor = Some(key);
-    }
-
-    /// Ctrl+click: adds or removes `key`, which gets the focus.
-    fn toggle(&mut self, key: RowKey) {
-        if self.marked.is_empty()
-            && let Some(s) = self.selected
-        {
-            self.marked.insert(s);
-        }
-        if !self.marked.remove(&key) {
-            self.marked.insert(key);
-        }
-        self.selected = Some(key);
-        self.anchor = Some(key);
-    }
-
-    /// Shift+click / Shift+arrow: the rows from the anchor to display
-    /// position `to` (added to the selection when `add`).
-    fn select_range(&mut self, rows: &[FileRow], order: &[usize], to: usize, add: bool) {
-        let pos = |k: RowKey| {
-            order
-                .iter()
-                .position(|&i| rows.get(i).is_some_and(|r| key_of(r) == k))
-        };
-        let from = self.anchor.and_then(pos).unwrap_or(to);
-        let (lo, hi) = (from.min(to), from.max(to));
-        if !add {
-            self.marked.clear();
-        }
-        for p in lo..=hi {
-            if let Some(r) = order.get(p).and_then(|&i| rows.get(i)) {
-                self.marked.insert(key_of(r));
-            }
-        }
-        self.selected = order.get(to).and_then(|&i| rows.get(i)).map(key_of);
-        if self.anchor.is_none() {
-            self.anchor = self.selected;
-        }
     }
 
     /// Whether `r` is selected.
     fn is_marked(&self, r: &FileRow) -> bool {
-        let k = key_of(r);
-        self.marked.contains(&k) || (self.marked.is_empty() && self.selected == Some(k))
+        self.sel.contains(key_of(r))
     }
 
     /// Draws the table.
@@ -305,7 +255,7 @@ impl TableState {
         let order = self.order.as_ref().map(|o| o.3.clone()).unwrap_or_default();
 
         // Keyboard navigation: arrows move the selection, Enter opens.
-        let sel_pos = self.selected.and_then(|s| {
+        let sel_pos = self.sel.focus.and_then(|s| {
             order
                 .iter()
                 .position(|&i| rows.get(i).is_some_and(|r| (r.inode, r.stream) == s))
@@ -323,11 +273,7 @@ impl TableState {
             && !order.is_empty()
             && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::A))
         {
-            // Ctrl+A: every row; the focus stays.
-            self.marked = rows.iter().map(key_of).collect();
-            if self.selected.is_none() {
-                self.selected = order.first().and_then(|&i| rows.get(i)).map(key_of);
-            }
+            self.sel.select_all(&keys_of(rows, &order));
         }
         if !ui.ctx().egui_wants_keyboard_input() && !order.is_empty() {
             let next = match (down, up, sel_pos) {
@@ -340,9 +286,9 @@ impl TableState {
                 next.and_then(|p| order.get(p).and_then(|&i| rows.get(i).map(|r| (p, i, r))));
             if let Some((p, i, r)) = target {
                 if shift {
-                    self.select_range(rows, &order, p, false);
+                    self.sel.select_range(&keys_of(rows, &order), p, false);
                 } else {
-                    self.select_one(key_of(r));
+                    self.sel.select_one(key_of(r));
                 }
                 ev.selected = Some(i);
                 scroll_to = Some(p);
@@ -488,13 +434,7 @@ impl TableState {
                         let resp = row.response();
                         if resp.clicked() {
                             let m = resp.ctx.input(|i| i.modifiers);
-                            if m.shift {
-                                self.select_range(rows, &order, row.index(), m.command);
-                            } else if m.command {
-                                self.toggle(key_of(r));
-                            } else {
-                                self.select_one(key_of(r));
-                            }
+                            self.sel.click(&keys_of(rows, &order), row.index(), m);
                             ev.selected = Some(i);
                         }
                         if resp.double_clicked() {
@@ -504,9 +444,9 @@ impl TableState {
                             // Right-clicking outside the selection selects
                             // that row; inside it, actions take them all.
                             if !self.is_marked(r) {
-                                self.select_one(key_of(r));
+                                self.sel.select_one(key_of(r));
                             }
-                            self.selected = Some(key_of(r));
+                            self.sel.focus = Some(key_of(r));
                             ev.selected = Some(i);
                             let marked = self.marked_rows_in(rows, &order);
                             let n = marked.len();
@@ -717,37 +657,6 @@ pub(crate) fn csv_field(s: &str) -> String {
 mod tests {
     use super::*;
 
-    fn listed(n: u64) -> Vec<FileRow> {
-        (0..n).map(|i| row(&format!("f{i}"), false, i)).collect()
-    }
-
-    #[test]
-    fn selection_click_toggle_and_range() {
-        let rows = listed(5);
-        let order: Vec<usize> = (0..5).collect();
-        let mut t = TableState::default();
-        t.select_one(key_of(&rows[1]));
-        assert_eq!(t.marked_rows_in(&rows, &order), [1]);
-        // Ctrl+click adds; the clicked row becomes the Shift anchor.
-        t.toggle(key_of(&rows[3]));
-        assert_eq!(t.marked_rows_in(&rows, &order), [1, 3]);
-        // Shift+click: anchor (3) to 0.
-        t.select_range(&rows, &order, 0, false);
-        assert_eq!(t.marked_rows_in(&rows, &order), [0, 1, 2, 3]);
-        assert_eq!(t.selected, Some(key_of(&rows[0])));
-        // Ctrl+click again removes.
-        t.toggle(key_of(&rows[1]));
-        assert_eq!(t.marked_rows_in(&rows, &order), [0, 2, 3]);
-        // Ctrl+Shift adds a range to the selection.
-        t.select_one(key_of(&rows[4]));
-        t.select_range(&rows, &order, 4, true);
-        assert_eq!(t.marked_rows_in(&rows, &order), [4]);
-        t.reset();
-        assert!(t.marked_rows_in(&rows, &order).is_empty());
-        // A focused row alone counts as selected.
-        t.selected = Some(key_of(&rows[2]));
-        assert_eq!(t.marked_rows_in(&rows, &order), [2]);
-    }
     use pm_fs::{FileKind, Metadata};
 
     fn row(name: &str, dir: bool, size: u64) -> FileRow {

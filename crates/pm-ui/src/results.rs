@@ -362,7 +362,10 @@ pub(crate) enum TagFor {
 #[derive(Debug, Default)]
 pub(crate) struct ResultEvents {
     pub(crate) clicked: Option<usize>,
-    pub(crate) tag: Option<(usize, TagFor, TagRequest)>,
+    /// A tag menu choice for the selected rows.
+    pub(crate) tag: Option<(Vec<usize>, TagFor, TagRequest)>,
+    /// The selected rows this frame (for Ctrl+B).
+    pub(crate) marked: Vec<usize>,
 }
 
 /// A sortable, horizontally scrolling table of results.
@@ -370,6 +373,9 @@ pub(crate) struct ResultEvents {
 pub(crate) struct ResultTable {
     sort: Option<Sort>,
     order: Order,
+    /// Selected rows by artifact id: kept when the rows reload (after
+    /// tagging); another listing gets a new table.
+    sel: crate::selection::Selection<i64>,
 }
 
 impl ResultTable {
@@ -407,6 +413,16 @@ impl ResultTable {
                 _ => Ordering::Equal,
             },
         );
+        // Artifact ids in display order.
+        let keys: Vec<i64> = order
+            .iter()
+            .filter_map(|&i| data.rows.get(i).map(|r| r.artifact.id))
+            .collect();
+        if !ui.ctx().egui_wants_keyboard_input()
+            && ui.input_mut(|i| i.consume_key(egui::Modifiers::COMMAND, egui::Key::A))
+        {
+            self.sel.select_all(&keys);
+        }
         let mut ev = ResultEvents::default();
         let mut sort = self.sort;
         crate::sortable::hscroll(ui, "results-h", |ui| {
@@ -440,32 +456,58 @@ impl ResultTable {
                             return;
                         };
                         let Some(r) = data.rows.get(i) else { return };
-                        row.set_selected(selected == Some(i));
+                        row.set_selected(self.sel.contains(r.artifact.id) || selected == Some(i));
                         for c in &cols {
                             row.col(|ui| cell(ui, data, r, *c, prefs));
                         }
                         let resp = row.response();
                         if resp.clicked() {
+                            let m = resp.ctx.input(|i| i.modifiers);
+                            self.sel.click(&keys, row.index(), m);
                             ev.clicked = Some(i);
                         }
                         if let Some(cat) = tags {
                             resp.context_menu(|ui| {
-                                ev.clicked = Some(i);
-                                if let Some(t) = crate::tags_ui::add_menu(ui, "Add Result Tag", cat)
-                                {
-                                    ev.tag = Some((i, TagFor::Result, t));
+                                // Right-clicking outside the selection
+                                // selects that row; inside it, the menu
+                                // acts on them all.
+                                if !self.sel.contains(r.artifact.id) {
+                                    self.sel.select_one(r.artifact.id);
                                 }
+                                self.sel.focus = Some(r.artifact.id);
+                                ev.clicked = Some(i);
+                                let marked: Vec<usize> = self
+                                    .sel
+                                    .positions(&keys)
+                                    .into_iter()
+                                    .filter_map(|p| order.get(p).copied())
+                                    .collect();
+                                let n = marked.len();
+                                let label = |what: &str| {
+                                    if n > 1 {
+                                        format!("{what} ({n} results)")
+                                    } else {
+                                        what.to_owned()
+                                    }
+                                };
                                 if let Some(t) =
-                                    crate::tags_ui::remove_menu(ui, "Remove Result Tag", &r.tags)
+                                    crate::tags_ui::add_menu(ui, &label("Add Result Tag"), cat)
                                 {
-                                    ev.tag = Some((i, TagFor::Result, t));
+                                    ev.tag = Some((marked.clone(), TagFor::Result, t));
+                                }
+                                if let Some(t) = crate::tags_ui::remove_menu(
+                                    ui,
+                                    &label("Remove Result Tag"),
+                                    &r.tags,
+                                ) {
+                                    ev.tag = Some((marked.clone(), TagFor::Result, t));
                                 }
                                 if r.file.is_some() {
                                     ui.separator();
                                     if let Some(t) =
-                                        crate::tags_ui::add_menu(ui, "Add File Tag", cat)
+                                        crate::tags_ui::add_menu(ui, &label("Add File Tag"), cat)
                                     {
-                                        ev.tag = Some((i, TagFor::SourceFile, t));
+                                        ev.tag = Some((marked.clone(), TagFor::SourceFile, t));
                                     }
                                 }
                             });
@@ -474,6 +516,12 @@ impl ResultTable {
                 });
         });
         self.sort = sort;
+        ev.marked = self
+            .sel
+            .positions(&keys)
+            .into_iter()
+            .filter_map(|p| order.get(p).copied())
+            .collect();
         ev
     }
 }

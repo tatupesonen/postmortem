@@ -143,8 +143,12 @@ pub(crate) enum TagRequest {
     TagAndComment,
     /// Open the "New Tag" dialog.
     NewTag,
-    /// Remove this tag (by tag id).
-    Remove(i64),
+    /// Remove this tag (by tag id). With several items selected, each
+    /// loses its tags of the same name (`tag_name_id`).
+    Remove {
+        tag_id: i64,
+        tag_name_id: Option<i64>,
+    },
 }
 
 /// Autopsy's Add Tag submenu, in its order: custom names (sorted), then
@@ -212,7 +216,10 @@ pub(crate) fn remove_menu(ui: &mut egui::Ui, label: &str, tags: &[RowTag]) -> Op
         ui.menu_button(label, |ui| {
             for t in tags {
                 if ui.button(&t.name).clicked() {
-                    out = Some(TagRequest::Remove(t.id));
+                    out = Some(TagRequest::Remove {
+                        tag_id: t.id,
+                        tag_name_id: Some(t.tag_name_id),
+                    });
                     ui.close();
                 }
             }
@@ -511,7 +518,18 @@ impl Tagging {
                     },
                 );
             }
-            TagRequest::Remove(tag_id) => self.spawn(ctx, case, target, Write::Remove(tag_id)),
+            TagRequest::Remove {
+                tag_id,
+                tag_name_id,
+            } => self.spawn(
+                ctx,
+                case,
+                target,
+                Write::Remove {
+                    tag_id,
+                    tag_name_id,
+                },
+            ),
         }
     }
 
@@ -632,7 +650,10 @@ enum Write {
         notable: bool,
         comment: String,
     },
-    Remove(i64),
+    Remove {
+        tag_id: i64,
+        tag_name_id: Option<i64>,
+    },
 }
 
 impl Write {
@@ -642,10 +663,34 @@ impl Write {
         let now = jiff::Timestamp::now().as_second();
         let who = examiner();
         let (tag_name_id, comment) = match self {
-            Self::Remove(tag_id) => {
-                return match target {
-                    TagTarget::Files(_) => db.untag_file(tag_id).map_err(err),
-                    TagTarget::Artifacts(_) => db.untag_artifact(tag_id).map_err(err),
+            Self::Remove {
+                tag_id,
+                tag_name_id,
+            } => {
+                return match (target, tag_name_id) {
+                    // Several items: their tags of that name.
+                    (TagTarget::Files(ids), Some(name)) if ids.len() > 1 => {
+                        for id in ids {
+                            for t in db.file_tags(*id).map_err(err)? {
+                                if t.tag_name_id == name {
+                                    db.untag_file(t.id).map_err(err)?;
+                                }
+                            }
+                        }
+                        Ok(())
+                    }
+                    (TagTarget::Artifacts(ids), Some(name)) if ids.len() > 1 => {
+                        for id in ids {
+                            for t in db.artifact_tags(*id).map_err(err)? {
+                                if t.tag_name_id == name {
+                                    db.untag_artifact(t.id).map_err(err)?;
+                                }
+                            }
+                        }
+                        Ok(())
+                    }
+                    (TagTarget::Files(_), _) => db.untag_file(tag_id).map_err(err),
+                    (TagTarget::Artifacts(_), _) => db.untag_artifact(tag_id).map_err(err),
                 };
             }
             Self::Apply {

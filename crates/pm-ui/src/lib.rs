@@ -29,6 +29,7 @@ mod platform;
 mod plugins;
 mod report_ui;
 mod results;
+mod selection;
 mod sortable;
 mod summary;
 mod table;

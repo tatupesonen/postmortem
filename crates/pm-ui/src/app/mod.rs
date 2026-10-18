@@ -125,6 +125,8 @@ pub struct PostmortemApp {
     tz_check: crate::tz_check::TimeZoneCheck,
     /// Files selected in the table shown last frame (Ctrl+B tags them).
     marked_files: Vec<i64>,
+    /// Results selected in the result table shown last frame.
+    marked_results: Vec<i64>,
     /// Data of the tree and result panes, each refreshed from the change
     /// bus by its own component.
     results: crate::results::ResultData,
@@ -207,6 +209,7 @@ impl PostmortemApp {
             add_wizard: None,
             tz_check: crate::tz_check::TimeZoneCheck::default(),
             marked_files: Vec::new(),
+            marked_results: Vec::new(),
             results: crate::results::ResultData::default(),
             views: crate::views::ViewData::default(),
             nodes: crate::case_nodes::NodeData::default(),

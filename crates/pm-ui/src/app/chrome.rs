@@ -518,6 +518,12 @@ impl PostmortemApp {
             };
             let viewed = self.viewer.content().and_then(|c| c.row.file_id());
             let target = match result {
+                // Several results selected: all of them.
+                Some(a) if self.marked_results.len() > 1 && self.marked_results.contains(&a) => {
+                    Some(crate::tags_ui::TagTarget::Artifacts(
+                        self.marked_results.clone(),
+                    ))
+                }
                 Some(a) => Some(crate::tags_ui::TagTarget::Artifacts(vec![a])),
                 // Several files selected in the table: all of them.
                 None if self.marked_files.len() > 1

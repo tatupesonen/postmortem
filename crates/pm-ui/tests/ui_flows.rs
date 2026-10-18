@@ -1533,4 +1533,40 @@ fn multi_select_tags_several_files() {
     h.get_by_label("Extract Files… (2 files)");
     h.get_by_label("Export Selected Rows to CSV… (2 rows)");
     shot(&mut h, "multi_select_menu");
+    // Removing the tag takes it off both files.
+    click(&mut h, "Remove File Tag (2 files)");
+    click_exact(&mut h, "Bookmark");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Bookmark (2)").is_none()
+            && h.query_by_label_contains("Bookmark (1)").is_none()
+    });
+}
+
+/// Results are selected the same way; Ctrl+B bookmarks them all.
+#[test]
+fn multi_select_in_result_tables() {
+    let mut h = harness_with(vec![case_with_history("multi-results")], false);
+    h.set_size(egui::vec2(1400.0, 1500.0));
+    settle(&mut h, |h| {
+        h.state().data_source_count() > 0 && !h.state().is_loading()
+    });
+    click(&mut h, "Web History (3)");
+    settle(&mut h, |h| h.query_by_label("https://c.example/").is_some());
+    // Unsorted, the rows are in database order: c, a, b.
+    h.get_by_label("https://c.example/").click();
+    h.run_steps(2);
+    h.get_by_label("https://b.example/")
+        .click_modifiers(egui::Modifiers::SHIFT);
+    h.run_steps(2);
+    h.event(egui::Event::Key {
+        key: egui::Key::B,
+        physical_key: None,
+        pressed: true,
+        repeat: false,
+        modifiers: egui::Modifiers::COMMAND,
+    });
+    h.run_steps(2);
+    settle(&mut h, |h| {
+        h.query_by_label_contains("Bookmark (3)").is_some()
+    });
 }
