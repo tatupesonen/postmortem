@@ -659,6 +659,11 @@ impl PostmortemApp {
         if let Some(r) = ev.note.and_then(|i| rows.rows.get(i)) {
             self.note_about(pm_casedb::ObjKind::Artifact, r.artifact.id);
         }
+        if let Some((t, pad)) = ev.timeline
+            && let Some(tl) = self.open_timeline(ui.ctx())
+        {
+            tl.lock().focus(t, pad);
+        }
         if let Some(i) = ev.clicked {
             self.result_selected = Some(i);
             let row = rows.rows.get(i);
@@ -727,14 +732,14 @@ impl PostmortemApp {
                 self.open_popout(content(r));
             }
         }
-        if let Some(r) = ev.timeline.and_then(|i| rows.get(i)) {
+        if let Some((r, pad)) = ev.timeline.and_then(|(i, pad)| Some((rows.get(i)?, pad))) {
             let t = r
                 .meta
                 .as_ref()
                 .and_then(|m| m.times.modified.or(m.times.created))
                 .map(jiff::Timestamp::as_second);
             if let (Some(t), Some(tl)) = (t, self.open_timeline(&ctx)) {
-                tl.lock().focus(t, 60);
+                tl.lock().focus(t, pad);
             }
         }
     }

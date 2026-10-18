@@ -144,7 +144,8 @@ pub(crate) struct TableEvents {
     pub(crate) popout: Option<usize>,
     /// Extract File(s).
     pub(crate) export: Vec<usize>,
-    pub(crate) timeline: Option<usize>,
+    /// View in Timeline: the row and the seconds either side.
+    pub(crate) timeline: Option<(usize, i64)>,
     /// Open in External Viewer.
     pub(crate) external: Option<usize>,
     /// Export Table to CSV.
@@ -162,6 +163,10 @@ pub(crate) struct TableEvents {
     /// Add Note… about the clicked row.
     pub(crate) note: Option<usize>,
 }
+
+/// "View in Timeline" windows: events this many seconds either side.
+pub(crate) const TIMELINE_CONTEXT: [(&str, i64); 3] =
+    [("±1 minute", 60), ("±10 minutes", 600), ("±1 hour", 3600)];
 
 /// A row's identity in a listing: the case file id, then inode and stream
 /// (carved, derived and logical files have no inode: keying by inode alone
@@ -563,16 +568,16 @@ impl TableState {
                                 .meta
                                 .as_ref()
                                 .is_some_and(|m| m.times.modified.or(m.times.created).is_some());
-                            if ui
-                                .add_enabled(
-                                    has_time && !r.is_dir(),
-                                    egui::Button::new("View File in Timeline…"),
-                                )
-                                .clicked()
-                            {
-                                ev.timeline = Some(i);
-                                ui.close();
-                            }
+                            ui.add_enabled_ui(has_time && !r.is_dir(), |ui| {
+                                ui.menu_button("View File in Timeline", |ui| {
+                                    for (label, pad) in TIMELINE_CONTEXT {
+                                        if ui.button(label).clicked() {
+                                            ev.timeline = Some((i, pad));
+                                            ui.close();
+                                        }
+                                    }
+                                });
+                            });
                             if ui
                                 .add_enabled(
                                     !r.is_dir(),

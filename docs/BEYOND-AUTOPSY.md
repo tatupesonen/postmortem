@@ -212,7 +212,10 @@ otherwise.
    case can be worked to zero.
 9. **Timeline context**: ±N minutes around any item across all sources;
    collapse repeated identical events (dozens of WMI 5858 entries in one
-   second); exclude by type or text.
+   second); exclude by type or text. **[done 2026-10-18]**: View in
+   Timeline (±1 min / ±10 min / ±1 h) on file and result rows; the event
+   list collapses consecutive identical events (×N) and excludes by
+   description text (types were already filterable).
 10. **IOC import**: paste hashes, domains, IPs or names; one result list.
     **[done 2026-10-18]**: Tools › IOC Search (`pm-ui/src/ioc.rs`):
     classifies each line (MD5/SHA-1/SHA-256, IP, e-mail, domain, name;

@@ -1814,3 +1814,32 @@ fn ioc_search_finds_a_hash() {
     });
     shot(&mut h, "ioc_search");
 }
+
+/// A result's "View in Timeline" opens the events around it; Exclude
+/// leaves events out by description.
+#[test]
+fn timeline_context_around_a_result() {
+    let mut h = harness_with(vec![case_with_history("tl-context")], false);
+    h.set_size(egui::vec2(1400.0, 1000.0));
+    h.ctx.set_embed_viewports(true);
+    settle(&mut h, |h| {
+        h.state().data_source_count() > 0 && !h.state().is_loading()
+    });
+    click(&mut h, "Web History (3)");
+    settle(&mut h, |h| h.query_by_label("https://a.example/").is_some());
+    h.get_by_label("https://a.example/").click_secondary();
+    h.run_steps(2);
+    click(&mut h, "View in Timeline");
+    click_exact(&mut h, "±10 minutes");
+    settle(&mut h, |h| {
+        h.query_all_by_label_contains("https://c.example/").count() >= 2
+            && h.query_by_label_contains("Collapse repeats").is_some()
+    });
+    h.get_by_label("Exclude:").click();
+    type_focused(&mut h, "c.example");
+    settle(&mut h, |h| {
+        h.query_by_label_contains("1 collapsed or excluded")
+            .is_some()
+    });
+    shot(&mut h, "timeline_context");
+}

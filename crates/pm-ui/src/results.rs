@@ -370,6 +370,8 @@ pub(crate) struct ResultEvents {
     pub(crate) pivot: Option<String>,
     /// Add Note… about the row.
     pub(crate) note: Option<usize>,
+    /// View in Timeline around the row's time: (time, seconds either side).
+    pub(crate) timeline: Option<(i64, i64)>,
 }
 
 /// A sortable, horizontally scrolling table of results.
@@ -538,6 +540,21 @@ impl ResultTable {
                                     ev.note = Some(i);
                                     ui.close();
                                 }
+                                // The result's first time attribute.
+                                let when = r.attrs.iter().find_map(|(_, v)| match v {
+                                    AttrValue::Time(t) => Some(*t),
+                                    _ => None,
+                                });
+                                ui.add_enabled_ui(when.is_some(), |ui| {
+                                    ui.menu_button("View in Timeline", |ui| {
+                                        for (label, pad) in crate::table::TIMELINE_CONTEXT {
+                                            if ui.button(label).clicked() {
+                                                ev.timeline = when.map(|t| (t, pad));
+                                                ui.close();
+                                            }
+                                        }
+                                    });
+                                });
                                 ui.menu_button("Pivot on", |ui| {
                                     for (name, v) in &r.attrs {
                                         if let AttrValue::Text(t) = v

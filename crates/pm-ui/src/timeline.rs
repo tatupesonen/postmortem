@@ -109,6 +109,10 @@ pub(crate) struct TimelineWindow {
     desc_level: crate::timeline_details::DescLevel,
     details: Option<(String, Vec<crate::timeline_details::Cluster>)>,
     detail_sel: Option<usize>,
+    /// List: fold consecutive identical events into one row (×N).
+    collapse: bool,
+    /// List: leave out events whose description contains this.
+    exclude: String,
 }
 
 impl std::fmt::Debug for TimelineWindow {
@@ -145,6 +149,8 @@ impl TimelineWindow {
             desc_level: crate::timeline_details::DescLevel::default(),
             details: None,
             detail_sel: None,
+            collapse: true,
+            exclude: String::new(),
         }
     }
 
@@ -744,7 +750,37 @@ impl TimelineWindow {
                     TimeUnit::Seconds.label(e - 1, &tz)
                 ));
             }
+            ui.separator();
+            ui.checkbox(&mut self.collapse, "Collapse repeats")
+                .on_hover_text("Show consecutive identical events (same time, type and description) once, with a count");
+            let label = ui.label("Exclude:");
+            ui.add(
+                egui::TextEdit::singleline(&mut self.exclude)
+                    .hint_text("text in the description")
+                    .desired_width(180.0),
+            )
+            .labelled_by(label.id);
         });
+        let exclude = self.exclude.trim().to_lowercase();
+        let vis = visible_rows(
+            rows,
+            |r| listing.subject(r.subject).map(|s| &*s.description),
+            self.collapse,
+            &exclude,
+        );
+        if vis.len() != rows.len() {
+            ui.weak(format!(
+                "{} shown ({} collapsed or excluded)",
+                crate::format::grouped(vis.len() as u64),
+                crate::format::grouped((rows.len() - vis.len()) as u64)
+            ));
+        }
+        let vis_key = {
+            use std::hash::{Hash, Hasher};
+            let mut h = std::collections::hash_map::DefaultHasher::new();
+            (self.collapse, &exclude, rows.len()).hash(&mut h);
+            usize::try_from(h.finish()).unwrap_or(0)
+        };
         let kinds = |r: &ListRow| {
             r.kinds
                 .iter()
@@ -753,10 +789,11 @@ impl TimelineWindow {
                 .join(", ")
         };
         let subject = |r: &ListRow| listing.subject(r.subject);
+        let row_of = |v: usize| vis.get(v).and_then(|(i, _)| rows.get(*i));
         let order = self
             .event_order
-            .get(0, rows.len(), self.event_sort, |a, b, col| {
-                let (Some(a), Some(b)) = (rows.get(a), rows.get(b)) else {
+            .get(vis_key, vis.len(), self.event_sort, |a, b, col| {
+                let (Some(a), Some(b)) = (row_of(a), row_of(b)) else {
                     return std::cmp::Ordering::Equal;
                 };
                 let (sa, sb) = (subject(a), subject(b));
@@ -810,7 +847,8 @@ impl TimelineWindow {
                 })
                 .body(|body| {
                     body.rows(row_h, order.len(), |mut row| {
-                        let Some(i) = order.get(row.index()).copied() else {
+                        let Some(&(i, repeats)) = order.get(row.index()).and_then(|&v| vis.get(v))
+                        else {
                             return;
                         };
                         let Some(r) = rows.get(i) else { return };
@@ -834,6 +872,10 @@ impl TimelineWindow {
                             } else {
                                 text
                             });
+                            if repeats > 1 {
+                                ui.weak(format!("×{repeats}"))
+                                    .on_hover_text(format!("{repeats} identical events"));
+                            }
                         });
                         row.col(|ui| {
                             ui.label(ds_name(s.ds_id));
@@ -854,6 +896,39 @@ impl TimelineWindow {
             self.viewer.set_content(content);
         }
     }
+}
+
+/// The list rows shown: those whose description contains `exclude`
+/// (lower case) left out and, with `collapse`, consecutive events with the
+/// same time, types and description folded into the first with their
+/// count. Rows without a description are dropped.
+fn visible_rows<'a>(
+    rows: &'a [ListRow],
+    description: impl Fn(&'a ListRow) -> Option<&'a str>,
+    collapse: bool,
+    exclude: &str,
+) -> Vec<(usize, u32)> {
+    let mut vis: Vec<(usize, u32)> = Vec::with_capacity(rows.len());
+    for (i, r) in rows.iter().enumerate() {
+        let Some(desc) = description(r) else {
+            continue;
+        };
+        if !exclude.is_empty() && desc.to_lowercase().contains(exclude) {
+            continue;
+        }
+        if collapse
+            && let Some((last, n)) = vis.last_mut()
+            && let Some(p) = rows.get(*last)
+            && p.time == r.time
+            && p.kinds == r.kinds
+            && description(p) == Some(desc)
+        {
+            *n += 1;
+            continue;
+        }
+        vis.push((i, 1));
+    }
+    vis
 }
 
 fn swatch(ui: &mut egui::Ui, c: Color32) {
@@ -880,6 +955,34 @@ fn toggle<T: std::hash::Hash + Eq + Copy>(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn repeats_collapse_and_text_is_excluded() {
+        let row = |time, kind| ListRow {
+            time,
+            subject: 0,
+            kinds: vec![kind],
+        };
+        let rows = [
+            row(10, EventType::FileModified),
+            row(10, EventType::FileModified),
+            row(10, EventType::FileModified),
+            row(10, EventType::FileAccessed),
+            row(11, EventType::FileModified),
+        ];
+        let desc = ["wmi 5858", "wmi 5858", "wmi 5858", "wmi 5858", "logon"];
+        let by_index = |r: &ListRow| {
+            let i = rows.iter().position(|x| std::ptr::eq(x, r))?;
+            desc.get(i).copied()
+        };
+        assert_eq!(
+            visible_rows(&rows, by_index, true, ""),
+            [(0, 3), (3, 1), (4, 1)],
+            "same time, type and text fold; another type does not"
+        );
+        assert_eq!(visible_rows(&rows, by_index, false, "").len(), 5);
+        assert_eq!(visible_rows(&rows, by_index, true, "wmi"), [(4, 1)]);
+    }
     use egui_kittest::Harness;
     use egui_kittest::kittest::Queryable;
 
