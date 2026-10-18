@@ -16,6 +16,7 @@
 mod case;
 mod content;
 pub mod derived;
+mod l01;
 pub mod load;
 pub mod logical;
 mod logical_imager;

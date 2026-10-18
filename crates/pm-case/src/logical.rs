@@ -129,6 +129,13 @@ pub fn add_logical_files(
             let d = t.ok()?.duration_since(SystemTime::UNIX_EPOCH).ok()?;
             Some((i64::try_from(d.as_secs()).ok()?, d.subsec_nanos()))
         };
+        if ft.is_file() && parent_id.is_none() && pm_image::ewf::is_logical_evidence(&path) {
+            // An L01 is extracted and added as the files it holds.
+            flush(db, &mut batch, &mut summary)?;
+            let added = crate::l01::add_l01(case, ds_id, &path, progress, &mut summary)?;
+            total_size = total_size.saturating_add(added);
+            continue;
+        }
         let size = if ft.is_file() { md.len() } else { 0 };
         let mut f = NewFile::new(
             ds_id,

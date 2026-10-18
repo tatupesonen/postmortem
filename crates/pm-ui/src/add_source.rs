@@ -143,7 +143,9 @@ impl SourceKind {
             Self::LocalDisk => {
                 "A disk or partition of this computer, read in place (needs administrator rights)."
             }
-            Self::LogicalFiles => "Files and folders of this computer, read in place.",
+            Self::LogicalFiles => {
+                "Files and folders of this computer, read in place; L01 logical evidence files are extracted."
+            }
             Self::Unallocated => {
                 "A raw file of unallocated space, carved and searched without file-system analysis."
             }

@@ -77,17 +77,17 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 
 | Feature | Autopsy source | Status | Notes / what is missing |
 |---|---|---|---|
-| Add DS wizard: DSP selection page | `AddImageWizardSelectDspPanel` | Missing | The wizard (`pm-ui/src/add_source.rs`) only supports disk images. |
+| Add DS wizard: DSP selection page | `AddImageWizardSelectDspPanel` | Done | Step 1 of `pm-ui/src/add_source.rs` lists the six processors below in Autopsy's order, followed by each processor's panel and ingest configuration; UI test `add_logical_files_from_the_wizard`. `postmortem ingest` takes `--disk`, `--logical`, `--unalloc`, `--xry` and `--imager`. |
 | Add DS wizard: host selection page (new host from DS name / named host / existing host) | `AddImageWizardSelectHostPanel` | Missing | The `hosts` table exists but nothing uses it. |
 | Disk Image / VM file DSP (path, time zone, sector size, ignore FAT orphans, MD5/SHA-1/SHA-256 to verify, BitLocker password) | `A/casemodule/ImageDSProcessor`, `ImageFilePanel`, `AddImageTask` | Partial | Done: path, time zone and FAT-orphan option. Missing: sector size override, hash entry fields (input for Data Source Integrity), and password. Formats are limited (§3). |
 | Ingest configuration page in wizard | `AddImageWizardIngestConfigPanel` | Partial | Module checkboxes, hash-set configuration and the unallocated-space filter radio, with a test. No custom file filters or profiles, and no settings panels for other modules. |
 | Add progress page (+ adding warnings/errors) | `AddImageWizardAddingProgressPanel` | Partial | Progress is shown in the status bar and the Ingest Progress window. There is no wizard page with critical-error / warning lists. |
-| Local Disk DSP (read-only physical device; optional VHD copy; FAT-orphan option) | `LocalDiskDSProcessor`, `LocalDiskPanel`, `LocalDiskSelectionDialog` | Missing | Planned in `pm-evidence`. The image-writer VHD copy is in §31. |
-| Logical Files DSP (files/folders → LocalFilesDataSource, virtual dirs, timestamps) | `LocalFilesDSProcessor`, `LogicalFilesDspPanel`, `LocalFilesPanel`, `AddLocalFilesTask`, `services/FileManager` | Missing | The schema has `origin=3 local` and `local_path`, but no loader and no UI. |
-| Logical Evidence File (L01) via Logical Files DSP | `LogicalEvidenceFilePanel` | Missing | Needs the EWF L01 `ltree` reader (`PLAN.md` M1 unchecked). |
-| Unallocated Space Image File DSP (raw blob, optional chunking) | `A/datasourceprocessors/RawDSProcessor`, `RawDSInputPanel`, `AddRawImageTask` | Missing | — |
-| XRY Text Export DSP (calls/contacts/messages/device info/web bookmarks reports) | `A/datasourceprocessors/xry/*` (15 files) | Missing | — |
-| Autopsy Logical Imager Results DSP | `A/logicalimager/dsp/*` | Missing | — |
+| Local Disk DSP (read-only physical device; optional VHD copy; FAT-orphan option) | `LocalDiskDSProcessor`, `LocalDiskPanel`, `LocalDiskSelectionDialog` | Partial | `pm-case/src/raw_sources.rs`: disks and partitions are listed (Linux `/sys/block`, macOS `/dev/diskN`, Windows `\\.\PhysicalDriveN`), then read in place with the time zone and FAT-orphan options. Missing: the image-writer VHD copy (§31). |
+| Logical Files DSP (files/folders → LocalFilesDataSource, virtual dirs, timestamps) | `LocalFilesDSProcessor`, `LogicalFilesDspPanel`, `LocalFilesPanel`, `AddLocalFilesTask`, `services/FileManager` | Done | `pm-case/src/logical.rs` reads files in place (`LogicalFileSet<N>` or a given name, modified/created/accessed checkboxes). Symbolic links and special files are skipped with a warning. The tree shows the top-level folders plus a Files node. Tests are in `pm-modules/tests/data_sources.rs`. |
+| Logical Evidence File (L01) via Logical Files DSP | `LogicalEvidenceFilePanel` | Done | `pm-case/src/l01.rs` reads the `ltree` natively and extracts into `ModuleOutput/L01/<name>`, as Autopsy does with `ewfexport`. Recorded times are kept, and this works on every OS (Autopsy: Windows only). The fixture `fixtures/ewf/small.L01` is verified with libewf. |
+| Unallocated Space Image File DSP (raw blob, optional chunking) | `A/datasourceprocessors/RawDSProcessor`, `RawDSInputPanel`, `AddRawImageTask` | Done | `pm-case/src/raw_sources.rs`: `Unalloc_<ds>_<start>_<end>` pieces of 2 GB (or one), carved by PhotoRec into a top-level `$CarvedFiles`. |
+| XRY Text Export DSP (calls/contacts/messages/device info/web bookmarks reports) | `A/datasourceprocessors/xry/*` (15 files) | Done | `pm-case/src/xry.rs` follows Autopsy's reader and parsers: multi-segment messages are joined, and phone accounts are related to the device. Differences: the reports are part of the file set and carry their artifacts, and a UTC offset in a time is applied. |
+| Autopsy Logical Imager Results DSP | `A/logicalimager/dsp/*` | Done | `pm-case/src/logical_imager.rs`: the folder is copied into the case, and `SearchResults.txt` / `*_users.txt` become reports. VHDs are added as images and hits found by meta address + name; otherwise `root/` becomes a logical file set. Each hit is an Interesting Item in "Logical Imager results". Missing: the external-drive scan of the panel (only manual folder choice). |
 | Memory Image DSP (Volatility) | `EXP/volatilityDSP/*` | Missing | External-tool runner (§17). |
 | Auto-ingest DSP confidence ordering (`AutoIngestDataSourceProcessor.canProcess`) | `A/datasourceprocessors/DataSourceProcessorUtility` | Missing | Needed for the CLI and auto-ingest. |
 | Unallocated-space virtual files (`$Unalloc`, chunked) | Autopsy + `AddImageTask` | Done | `pm-case/src/load.rs` (`chunk_ranges`), with tests. |
@@ -103,7 +103,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Raw / split raw (.dd .img .raw .bin .001 .aa) | `GeneralFilter.RAW_IMAGE_EXTS`, Autopsy | Done | Tests in `pm-image/tests/open.rs`. |
 | EWF v1 E01/s01 (multi-segment, stored hashes, header metadata) | `GeneralFilter.ENCASE_IMAGE_EXTS`, libewf | Done | Verified against ewfacquire, with a fuzz target (`fuzz_targets/ewf_read.rs`). |
 | EWF2 Ex01 / Lx01 | libewf | Missing | Sniffed only; returns `Unsupported`. |
-| L01 logical evidence | `LogicalEvidenceFilePanel` | Missing | See §2. |
+| L01 logical evidence | `LogicalEvidenceFilePanel` | Done | See §2. EWF2 Lx01 is still missing. |
 | VMDK (sparse, flat, descriptor, split) | `GeneralFilter.VIRTUAL_MACHINE_EXTS`, libvmdk | Done | In-house reader (pm-image), with parents; differential tests against qemu-img. |
 | VHD (fixed/dynamic/differencing) | same | Done | In-house reader with parent chains. |
 | VHDX | same | Done | In-house reader with parent chains. |
@@ -578,7 +578,7 @@ Method: I enumerated every NetBeans module and package in `../autopsy`, includin
 | Image Writer (VHD copy of local disk while ingesting) | `A/imagewriter/*` | Missing | — |
 | Make Live Triage Drive | `A/livetriage/*` | Missing | Probably N/A? in its Autopsy form (copies the Java install); a postmortem portable build would replace it. |
 | Create Logical Imager (rule config wizard, JSON config) | `A/logicalimager/configuration/*` | Missing | — |
-| Logical Imager results DSP | `A/logicalimager/dsp/*` | Missing | See §2. |
+| Logical Imager results DSP | `A/logicalimager/dsp/*` | Done | See §2. |
 
 ## 32. Plugins
 
@@ -667,11 +667,9 @@ Each package fits one agent. Every UI package touches `pm-ui`, which `RULES.md` 
 
 **WP-5: Data source processors.**
 - Scope:
-  - Logical files/folders DSP (LocalFilesDataSource, virtual dirs).
-  - L01/Lx01 + Ex01 (EWF2) reader.
-  - Local disk DSP (read-only devices, cross-platform enumeration).
-  - Unallocated-space image DSP.
-  - DSP choice page, host selection page, DSP hash-entry fields, sector size.
+  - ~~Logical files/folders DSP~~, ~~L01~~, ~~local disk DSP~~, ~~unallocated-space image DSP~~, ~~XRY~~, ~~logical imager results~~, ~~DSP choice page~~ (done 2026-10-18).
+  - Lx01 + Ex01 (EWF2) reader.
+  - Host selection page, DSP hash-entry fields, sector size.
   - Remove data source UI, missing-image relocate dialog, Run Ingest Modules on an existing data source.
   - Slack files.
 - Key sources: `A/casemodule/LocalFilesDSProcessor`, `AddLocalFilesTask`, `services/FileManager`, `LocalDiskDSProcessor`, `A/datasourceprocessors/RawDSProcessor`, `AddImageWizardSelectDsp/SelectHost*`, `MissingImageDialog`, `A/ingest/runIngestModuleWizard/*`.

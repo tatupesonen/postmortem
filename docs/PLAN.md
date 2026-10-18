@@ -132,7 +132,7 @@ embedded Python.
 | `pm-volume` | MBR/EBR, GPT (APM, BSD, LVM not yet) | MBR + GPT done |
 | `pm-fs` | FileSystem trait, ExtentSource, walker | done |
 | `pm-fs-ntfs`, `pm-fs-fat`, `pm-fs-exfat`, `pm-fs-ext` | file systems | done (NTFS extras pending) |
-| `pm-evidence` | image → volume system → file systems | done (logical files/local disk DSPs pending) |
+| `pm-evidence` | image → volume system → file systems | done (other data sources live in `pm-case`) |
 | `pm-casedb` | schema v3, migrations, typed API, query layer, artifact timeline events | done (SQLite); PostgreSQL planned |
 | `pm-case` | case folder, metadata, loader, evidence re-open, delete | done (event bus pending, ADR-023) |
 | `pm-ingest` | jobs, pipelines, writer thread, inbox, progress | done (profiles pending) |
@@ -170,7 +170,7 @@ for new parsers, benchmarks recorded, PROGRESS log entry.
 ### M1 — Evidence layer (vertical-slice subset first)
 - [x] `fuzz/` crate with targets for volume, FAT; smoke script `scripts/fuzz-smoke.sh` (seeds in `fuzz/seeds/`)
 - [x] `pm-image` EWF v1 (E01/s01): segments (E01…ZZZ), zlib/stored chunks, >2 GiB offset overflow, stored MD5/SHA-1, header2/header metadata, error2; verified against ewfacquire (9 format variants, multi-segment) + fuzz target
-- [ ] `pm-image` EWF2 (Ex01/Lx01) and L01 logical evidence (file tree in `ltree`)
+- [ ] `pm-image` EWF2 (Ex01/Lx01); L01 logical evidence is done (`pm-case/src/l01.rs`)
 - [x] `pm-fs-ntfs`: boot, MFT (incl. fragmented $MFT via attribute list), fixups (torn-tolerant), runlists, resident/non-resident, LZNT1, sparse, init size, ADS, $SI+$FN times, deleted via parent map, $I30 slack, orphans, unallocated clusters. In-house `NtfsBuilder` (pm-testkit) validated by Autopsy; differential vs `fls` + `ntfs` crate oracle; fuzz target
 - [ ] NTFS extras: $Secure/owner SIDs, reparse points/junctions, $UsnJrnl/$LogFile parsing, EFS flagging, WOF/compact compression, hard-link enumeration, bulk MFT enumeration fast path
 - [ ] `pm-evidence`: probe chain (image → VS → FS registry), unallocated-space virtual files, partitions with unknown FS, "no VS" fallback, logical files & folders DSP, local disk DSP (read-only)

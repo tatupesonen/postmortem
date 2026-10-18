@@ -163,6 +163,56 @@ fn read_sections(seg: &dyn ReadAt, seg_no: usize) -> Result<Vec<Section>, ImageE
     Ok(out)
 }
 
+/// Largest `ltree` section read (the file-entry tree of an L01).
+const MAX_LTREE: u64 = 512 * 1024 * 1024;
+/// The `ltree` header before the UTF-16 tree text.
+const LTREE_HEADER: u64 = 48;
+
+/// Whether `path` starts with the EWF-L01 (logical evidence) signature.
+pub fn is_logical_evidence(path: &Path) -> bool {
+    use std::io::Read;
+    let mut head = [0u8; 8];
+    std::fs::File::open(path)
+        .and_then(|mut f| f.read_exact(&mut head))
+        .is_ok()
+        && &head == b"LVF\x09\x0d\x0a\xff\x00"
+}
+
+/// The file-entry tree (`ltree` section) of an L01 set, decoded from
+/// UTF-16LE; `None` when the segments have none. The data the tree's
+/// extents address is the set's media stream ([`crate::open_segments`]).
+pub fn logical_tree(paths: &[PathBuf]) -> Result<Option<String>, ImageError> {
+    for (i, p) in paths.iter().enumerate() {
+        let seg = FileSource::open(p).map_err(|e| ImageError::Open {
+            path: p.clone(),
+            source: e,
+        })?;
+        for sec in read_sections(&seg, i + 1)? {
+            if sec.kind != "ltree" {
+                continue;
+            }
+            let start = sec.start + SECTION_DESCRIPTOR + LTREE_HEADER;
+            let len = sec.end.saturating_sub(start);
+            if len > MAX_LTREE {
+                return Err(corrupt(format!("ltree section of {len} bytes")));
+            }
+            let raw = seg.read_vec_at(start, len as usize)?;
+            let units: Vec<u16> = raw
+                .chunks_exact(2)
+                .map(|c| {
+                    u16::from_le_bytes([
+                        c.first().copied().unwrap_or(0),
+                        c.get(1).copied().unwrap_or(0),
+                    ])
+                })
+                .collect();
+            let text = String::from_utf16_lossy(&units);
+            return Ok(Some(text.trim_end_matches('\0').to_owned()));
+        }
+    }
+    Ok(None)
+}
+
 /// Human-readable names of EWF header keys.
 fn label(k: &str) -> &str {
     match k {

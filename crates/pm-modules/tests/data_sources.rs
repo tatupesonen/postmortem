@@ -433,3 +433,57 @@ fn logical_imager_sparse_vhd() {
     let f = db.file(hits[0].file_id.unwrap()).unwrap().unwrap();
     assert_eq!(f.name, target.name);
 }
+
+/// An L01 among logical files is extracted (as Autopsy does with
+/// `ewfexport`) and its file-entry tree added with the recorded times.
+#[test]
+fn l01_in_logical_files_is_extracted() {
+    let l01 = Path::new(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/ewf/small.L01");
+    let tmp = tempfile::tempdir().unwrap();
+    let case = Case::create(tmp.path().join("case"), CaseDetails::default()).unwrap();
+    let s = add_logical_files(
+        &case,
+        &[l01],
+        &LogicalOptions::default(),
+        &LoadProgress::default(),
+    )
+    .unwrap();
+    assert!(s.warnings.is_empty(), "{:?}", s.warnings);
+    let files = case
+        .db()
+        .query_files(
+            &FileQuery {
+                ds_id: Some(s.ds_id),
+                ..FileQuery::default()
+            },
+            0,
+            100,
+        )
+        .unwrap();
+    let paths: Vec<String> = files
+        .iter()
+        .map(|f| format!("{}{}", f.parent_path, f.name))
+        .collect();
+    for p in [
+        "/small.L01",
+        "/small.L01/docs",
+        "/small.L01/docs/a.txt",
+        "/small.L01/docs/Ääkköset.txt",
+        "/small.L01/b.bin",
+    ] {
+        assert!(paths.iter().any(|x| x == p), "{p} in {paths:?}");
+    }
+    let a = files.iter().find(|f| f.name == "a.txt").unwrap();
+    assert_eq!(a.size, 17);
+    assert_eq!(a.times[0], Some((1_600_000_003, 0)), "written");
+    assert_eq!(a.times[3], Some((1_600_000_001, 0)), "created");
+    assert_eq!(
+        case.content(a).unwrap().read_vec_at(0, 17).unwrap(),
+        b"hello from a.txt\n"
+    );
+    let b = files.iter().find(|f| f.name == "b.bin").unwrap();
+    let data = case.content(b).unwrap().read_vec_at(0, 512).unwrap();
+    assert_eq!(&data[..3], &[0, 1, 2]);
+    assert_eq!(data[511], 0);
+    assert_eq!(case.db().data_source(s.ds_id).unwrap().unwrap().size, 529);
+}
